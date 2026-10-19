@@ -5,7 +5,7 @@ each click sends out a sonar pulse that lights up the walls around you.
 At night, go out to find people and get back to your crypt or a safe dark
 space before dawn, so you can sleep through the day.
 
-Current build (v0.10.0): sonar pulse, first-person outline view, settings, people
+Current build (v0.10.4): sonar pulse, first-person outline view, settings, people
 who walk set paths through the maps, one night at a time (feed, sleep
 and dawn; see Night rules below), a main menu, an upgrade shop, night boons,
 random runs and saves. You never see a person directly:
@@ -60,7 +60,7 @@ torchlight shows you to people, so drink and hide in the dark.
 ## Night rules
 
 - A night runs from 20:00 to 06:00. Real time for one night is set by
-  `nightLengthMin` in the config (default 6 minutes).
+  `nightLengthMin` in the config (default 4 minutes).
 - Blood starts at 60 out of 100 and drains over the night. Drinking (hold right-click)
   fills the bar while each person's own blood pool (18 to 32) lasts; the flow
   is faster when they are full and slows as they empty, capped at 100. A drained person stays still for the night. Let go early

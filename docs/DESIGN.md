@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.10.0)
+# Vampires Can't See - Design (v0.10.4)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.10.0'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.10.4'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map
@@ -60,7 +60,7 @@ Source: `js/night.js`, `js/config.js`, `js/game.js`, `js/data/hunger.js`.
 | Item | Value |
 |---|---|
 | Clock | 20:00 to 06:00 = 600 game minutes. Minute 540 = 05:00, 570 = 05:30 |
-| Night length | `config.nightLengthMin` (default 6, schema 2..30) x 60 x `fx.nightLen` real seconds. The settings slider offers 4..12 |
+| Night length | `config.nightLengthMin` (default 4, schema 2..30) x 60 x `fx.nightLen` real seconds. The settings slider offers 4..12 |
 | Nights per run | 5 (win after sleeping through night 5) |
 | Blood max / start | 100 / `min(100, 60 + fx.startBlood)` |
 | Base drain | `bloodMax / nightSec` per real second x `fx.drain` x ramp |
@@ -416,7 +416,7 @@ Source: `js/config.js` (DEFAULTS, SCHEMA), `index.html`, `game.js` (`syncControl
 | feedToggle | false | bool | Click to start/stop drinking |
 | reduceMotion | false | bool | Reduce motion (also follows the OS setting) |
 | largeText | false | bool | Large text |
-| nightLengthMin | 6 | 2..30 (slider 4..12) | Night length |
+| nightLengthMin | 4 | 2..30 (slider 4..12) | Night length |
 | poolMin / poolMax | 18 / 32 | 5..100 / 5..150 | Walker blood pool |
 | feedReach / feedArcDeg | 1.5 / 60 | 1..3 / 20..120 | Drink reach and arc |
 | dazedTime | 3 | 0.5..10 | Released victim dazed time |

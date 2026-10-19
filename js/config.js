@@ -14,7 +14,7 @@
     turnSpeedKeys: 2.4,
     renderScale: 1.0,
     volume: 0.7,
-    nightLengthMin: 6,
+    nightLengthMin: 4,
     cfgV: 2,
     showFps: false,
     fovDeg: 66,

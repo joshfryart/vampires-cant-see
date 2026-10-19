@@ -59,7 +59,7 @@ test('DEFAULTS is frozen and has the contract values', () => {
     turnSpeedKeys: 2.4,
     renderScale: 1.0,
     volume: 0.7,
-    nightLengthMin: 6,
+    nightLengthMin: 4,
     cfgV: 2,
     showFps: false,
     fovDeg: 66,
@@ -389,18 +389,18 @@ test('autosaveSec is range-checked (5..300)', () => {
   assert.strictEqual(sanitize({ autosaveSec: 301 }).config.autosaveSec, 20);
 });
 
-test('load migrates old settings without cfgV: night length reset to 6, saved with cfgV 2', () => {
+test('load migrates old settings without cfgV: night length reset to 4, saved with cfgV 2', () => {
   const storage = fakeStorage();
   setStorage(storage);
   try {
     storage.setItem('vcs.settings', JSON.stringify({ nightLengthMin: 8, volume: 0.3 }));
     const c = load();
-    assert.strictEqual(DEFAULTS.nightLengthMin, 6);
-    assert.strictEqual(c.nightLengthMin, 6);
+    assert.strictEqual(DEFAULTS.nightLengthMin, 4);
+    assert.strictEqual(c.nightLengthMin, 4);
     assert.strictEqual(c.volume, 0.3);
     assert.strictEqual(c.cfgV, 2);
     assert.strictEqual(JSON.parse(storage._store.get('vcs.settings')).cfgV, 2);
-    assert.strictEqual(JSON.parse(storage._store.get('vcs.settings')).nightLengthMin, 6);
+    assert.strictEqual(JSON.parse(storage._store.get('vcs.settings')).nightLengthMin, 4);
   } finally {
     clearStorage();
   }

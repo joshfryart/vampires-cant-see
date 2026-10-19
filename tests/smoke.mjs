@@ -1352,13 +1352,13 @@ try {
     const hid = (id) => pg.evaluate((i) => document.getElementById(i).hidden, id);
     await pg.goto(urlG + '?seed=7&debug=1');
     await titleG();
-    check('v0.9.1: default night length is 6 on a fresh profile', await pg.evaluate(() => VCS.Config.DEFAULTS.nightLengthMin === 6 && JSON.parse(localStorage.getItem('vcs.settings') || 'null') === null));
-    // Old settings (no cfgV) migrate to 6.
+    check('v0.9.1: default night length is 6 on a fresh profile', await pg.evaluate(() => VCS.Config.DEFAULTS.nightLengthMin === 4 && JSON.parse(localStorage.getItem('vcs.settings') || 'null') === null));
+    // Old settings (no cfgV) migrate to 4.
     await pg.evaluate(() => localStorage.setItem('vcs.settings', JSON.stringify({ nightLengthMin: 8, volume: 0.4 })));
     await pg.goto(urlG + '?seed=7&debug=1');
     await titleG();
     const mig = await pg.evaluate(() => JSON.parse(localStorage.getItem('vcs.settings')));
-    check('v0.9.1: old settings without cfgV migrate to 6 and save cfgV 2', mig.nightLengthMin === 6 && mig.cfgV === 2 && mig.volume === 0.4, JSON.stringify(mig));
+    check('v0.9.1: old settings without cfgV migrate to 4 and save cfgV 2', mig.nightLengthMin === 4 && mig.cfgV === 2 && mig.volume === 0.4, JSON.stringify(mig));
     await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
     await sleep(300);
     const nsec0 = await pg.evaluate(() => window.VCS.Game.debugState().night);

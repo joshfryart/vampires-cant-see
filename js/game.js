@@ -266,7 +266,7 @@
   /** A fresh Night state sized from config.nightLengthMin and the run's effects (null if Night fails). */
   function newNightState() {
     try {
-      const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 6;
+      const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4;
       return VCS.Night.create({ nightSec: m * 60 * fxv('nightLen'), bloodStart: Math.min(100, 60 + fxv('startBlood')), drainMul: fxv('drain'), ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0 });
     } catch (err) {
       L().error('Night.create failed', err);
@@ -1221,14 +1221,29 @@
     }
   }
 
-  /** Stereo pan (-1..1) of the nearest wall relative to where the player faces. */
+  /** Stereo pan (-1..1): 1/dist-weighted circular mean of visible walls within 60 deg of facing (0 if none). */
   function echoPan(lp) {
-    const v = lp.vis;
-    if (!v || !v.length) return 0;
-    let mi = 0;
-    for (let i = 1; i < v.length; i++) if (v[i] < v[mi]) mi = i;
-    const rel = (mi / v.length) * Math.PI * 2 - S.player.angle;
-    return clamp(Math.sin(rel), -1, 1);
+    try {
+      const v = lp && lp.vis;
+      if (!v || !v.length || !S.player) return 0;
+      const n = v.length;
+      const lim = Math.PI / 3;
+      let ss = 0;
+      let sc = 0;
+      for (let i = 0; i < n; i++) {
+        const d = v[i];
+        if (!(d > 0) || !isFinite(d)) continue;
+        const rel = Math.atan2(Math.sin((i / n) * Math.PI * 2 - S.player.angle), Math.cos((i / n) * Math.PI * 2 - S.player.angle));
+        if (Math.abs(rel) > lim) continue;
+        const w = 1 / d;
+        ss += Math.sin(rel) * w;
+        sc += Math.cos(rel) * w;
+      }
+      if (ss === 0 && sc === 0) return 0;
+      return clamp(Math.sin(Math.atan2(ss, sc)), -1, 1);
+    } catch (err) {
+      return 0;
+    }
   }
 
   /** Clamp v into [lo, hi]. */
@@ -2854,7 +2869,7 @@
     }
     applyFx();
     if (S.night) {
-      const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 6;
+      const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4;
       S.night.nightSec = m * 60 * fxv('nightLen');
       S.night.drainMul = fxv('drain');
     }
@@ -3873,7 +3888,7 @@
       if (snap.v >= 2 && snap.night !== undefined && snap.night !== null) {
         const cur = S.night;
         const rn = VCS.Night.restore(snap.night, {
-          nightSec: (S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 6) * 60 * fxv('nightLen'),
+          nightSec: (S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4) * 60 * fxv('nightLen'),
           drainMul: fxv('drain'),
           ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0,
           nights: cur ? cur.nights : undefined,
