@@ -450,9 +450,10 @@ describe('world-v06.test.js', () => {
     const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3 }] }));
     assert.strictEqual(w.lights.length, 1);
     assert.strictEqual(w.lightAt(3.5, 3.5), 1);
-    assert.strictEqual(w.lightAt(4.5, 3.5), 1);                       // 1 cell, inside 0.5 * 2.25 (3 * LIGHT_SCALE)
-    assert.ok(Math.abs(w.lightAt(5.5, 3.5) - (2 - 4 / 2.25)) < 1e-6);   // 2 cells: 2 - 2*2/2.25
-    assert.strictEqual(w.lightAt(6.5, 3.5), 0);                       // 3 cells > radius 2.25
+    assert.strictEqual(w.lightAt(4.5, 3.5), 0);                       // 1 cell > radius 0.45 (3 * LIGHT_SCALE 0.15): own cell only
+    const w2 = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // radius 1.8
+    assert.ok(Math.abs(w2.lightAt(4.5, 3.5) - (2 - 2 / 1.8)) < 1e-6);   // 1 cell: 2 - 2*1/1.8
+    assert.strictEqual(w2.lightAt(5.5, 3.5), 0);                      // 2 cells > radius 1.8
     assert.strictEqual(w.lightAt(12.5, 3.5), 0);
   });
 
@@ -471,7 +472,7 @@ describe('world-v06.test.js', () => {
     if (withDoor) rows = put(rows, 6, 3, 'D');
     return rows;
   }
-  const TORCH6 = [{ type: 'torch', col: 3, row: 3, light: 6 }];
+  const TORCH6 = [{ type: 'torch', col: 3, row: 3, light: 40 }];
 
   test('lightAt is 0 behind a wall, and lit on the same side (control)', () => {
     const open = World.load(def(box(15, 7), { props: TORCH6 }));

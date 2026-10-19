@@ -270,13 +270,13 @@ describe('render-feed.test.js', () => {
       const glow = r.octx.calls.filter((c) => c.fn === 'fillRect' && c.alpha > 0.04);
       return { r: r, glow: glow };
     }
-    const lit = look(32.5, 12.5, Math.PI / 2, 5, false);
+    const lit = look(38.5, 9.5, Math.PI, 5, false);
     assert.ok(lit.glow.length > 4, 'lit window glows in the dark with no pulse');
     assert.ok(lit.glow.every((c) => c.alpha <= 0.25 + 1e-9), 'glow alpha <= 0.25');
     assert.ok(!lit.r.logged || Object.keys(lit.r.logged).length === 0);
     assert.strictEqual(look(22.5, 5, -Math.PI / 2, 5, false).glow.length, 0, 'unlit window shows no glow');
-    const a = look(32.5, 12.5, Math.PI / 2, 5.0, true).glow.map((c) => c.alpha.toFixed(4)).join();
-    const b = look(32.5, 12.5, Math.PI / 2, 5.6, true).glow.map((c) => c.alpha.toFixed(4)).join();
+    const a = look(38.5, 9.5, Math.PI, 5.0, true).glow.map((c) => c.alpha.toFixed(4)).join();
+    const b = look(38.5, 9.5, Math.PI, 5.6, true).glow.map((c) => c.alpha.toFixed(4)).join();
     assert.strictEqual(a, b, 'static under reduced motion');
     // Rings reveal the frame: lit tint on lit glass, cold tint on dark glass.
     function strokes(x, y, ang, color) {
@@ -292,11 +292,11 @@ describe('render-feed.test.js', () => {
       }
       return n;
     }
-    assert.ok(strokes(32.5, 12.5, Math.PI / 2, '#ffd596') > 0, 'lit window frame is candle gold');
+    assert.ok(strokes(38.5, 9.5, Math.PI, '#ffd596') > 0, 'lit window frame is candle gold');
     assert.ok(strokes(22.5, 5, -Math.PI / 2, '#c4e2ff') > 0, 'dark window frame is cold glass');
   }));
 
-  test('props on the town map draw without a logged failure; flames show without any pulse', () => withPath2D(() => {
+  test('props on the town map draw without a logged failure; flames show only under a ripple', () => withPath2D(() => {
     const canvas = fakeCanvas(640, 360);
     const r = Render.create(canvas, {});
     r.reduced = false;
@@ -309,12 +309,14 @@ describe('render-feed.test.js', () => {
     r.octx.calls.length = 0;
     Render.drawFirstPerson(r, world, pl, sonar, 5, {});
     const flame = r.octx.calls.filter((c) => c.fn === 'stroke' && c.stroke === 'rgb(255,176,64)');
-    assert.ok(flame.length >= 1, 'flame drawn in the dark');
-    assert.ok(flame.every((c) => c.alpha <= 0.6), 'flame stays faint');
+    assert.strictEqual(flame.length, 0, 'v0.10.5: no flame without a pulse');
     VCS.Sonar.emit(sonar, world, pl.x, pl.y, 5, {});
     for (let t = 5.05; t < 6.5; t += 0.1) Render.drawFirstPerson(r, world, pl, sonar, t, {});
     assert.ok(!r.logged || !r.logged.props, 'props drew without failure');
-    assert.ok(!r.logged || !r.logged.flames, 'flames drew without failure');
+    r.octx.calls.length = 0;
+    VCS.Sonar.emit(sonar, world, pl.x, pl.y, 8, {});
+    for (let t = 8.02; t < 8.9; t += 0.04) Render.drawFirstPerson(r, world, pl, sonar, t, {});
+    assert.ok(r.octx.calls.some((c) => c.fn === 'stroke' && c.stroke === 'rgb(255,176,64)'), 'flame drawn while the wavefront passes');
   }));
 
   test('weak pulse flicker is slow and shallow; reduced motion is a static dim', () => {

@@ -2246,6 +2246,8 @@
   const STRIPS = new Float32Array(9);
   const bandOut = new Float32Array(2);
   const pband = { lo: 0, hi: 0 };
+  /** Holder side for the torch being drawn (see torchHolder); set per prop in drawProps. */
+  let holdLat = 2;
 
   /** Union of lit heights at (x,y) over all pulses that currently reach it; false when none. */
   function propBand(sonar, t, x, y) {
@@ -2289,8 +2291,46 @@
     c.quadraticCurveTo(x + w * 0.45, y0 - hh * 0.3, x, y0);
   }
 
+  /**
+   * Torch holder path (no stroke): lat in -1..1 is the wall's side on screen (wall sconce: iron bracket and
+   * plate on that wall face, wooden shaft in a cup); lat > 1.5 means no wall, a free-standing iron post.
+   */
+  function torchHolder(c, cx, Y, hs, lat) {
+    const w = 0.07 * hs;
+    // Wooden shaft and the cup it sits in (flame starts at Y(0.62)).
+    c.moveTo(cx, Y(0.42));
+    c.lineTo(cx, Y(0.6));
+    c.moveTo(cx - w * 1.3, Y(0.62));
+    c.lineTo(cx - w, Y(0.54));
+    c.lineTo(cx + w, Y(0.54));
+    c.lineTo(cx + w * 1.3, Y(0.62));
+    if (lat > 1.5) {
+      // Free-standing: post with a ring holder under the cup and a splayed foot.
+      c.moveTo(cx, Y(0.54));
+      c.lineTo(cx, Y(0.04));
+      c.moveTo(cx - w * 1.1, Y(0.44));
+      c.lineTo(cx + w * 1.1, Y(0.44));
+      c.moveTo(cx - w * 2.2, Y(0));
+      c.lineTo(cx, Y(0.1));
+      c.lineTo(cx + w * 2.2, Y(0));
+      return;
+    }
+    // Wall sconce: plate bar on the wall face, scrolled arm curling up to the cup.
+    const dir = lat < 0 ? -1 : 1;
+    const len = (0.12 + 0.2 * Math.abs(lat)) * hs + w * 1.5;
+    const wx = cx + dir * len;
+    c.moveTo(wx, Y(0.28));
+    c.lineTo(wx, Y(0.5));
+    c.moveTo(wx, Y(0.34));
+    c.quadraticCurveTo(cx + dir * len * 0.4, Y(0.34), cx, Y(0.44));
+    c.moveTo(cx + dir * w * 1.2, Y(0.4));
+    c.arc(cx + dir * w * 0.8, Y(0.37), w * 0.5, 0, TWO_PI);
+    c.moveTo(cx - w * 0.9, Y(0.44));
+    c.lineTo(cx + w * 0.9, Y(0.44));
+  }
+
   /** Stroke the body path of a prop (hs = px per cell, vs = px per wall height, fy = floor y at centre). */
-  function propBody(c, type, cx, fy, hs, vs, t, ph, body, alpha) {
+  function propBody(c, type, cx, fy, hs, vs, t, ph, body, alpha, lat) {
     const Y = function (z) { return fy - z * vs; };
     c.strokeStyle = body;
     c.beginPath();
@@ -2417,17 +2457,7 @@
         break;
       }
       case 'torch': {
-        // Wall sconce: bracket arm and a small cup.
-        const w = 0.07 * hs;
-        c.moveTo(cx, Y(0.38));
-        c.lineTo(cx, Y(0.55));
-        c.moveTo(cx - w * 1.3, Y(0.62));
-        c.lineTo(cx - w, Y(0.55));
-        c.lineTo(cx + w, Y(0.55));
-        c.lineTo(cx + w * 1.3, Y(0.62));
-        c.moveTo(cx - w * 1.8, Y(0.46));
-        c.lineTo(cx, Y(0.38));
-        c.lineTo(cx + w * 1.8, Y(0.46));
+        torchHolder(c, cx, Y, hs, lat);
         break;
       }
       case 'brazier': {
@@ -2453,7 +2483,7 @@
     c.stroke();
     if (type === 'torch' || type === 'brazier') {
       const fw = (type === 'torch' ? 0.07 : 0.13) * hs;
-      const fy0 = type === 'torch' ? Y(0.6) : Y(0.4);
+      const fy0 = type === 'torch' ? Y(0.62) : Y(0.4);
       const fh = (type === 'torch' ? 0.2 : 0.34) * vs;
       c.strokeStyle = COL_FLAME;
       c.beginPath();
@@ -2541,6 +2571,7 @@
         }
         px += off.x;
         py += off.y;
+        holdLat = off.x === 0 && off.y === 0 ? 2 : (off.x > 0 ? 1 : off.x < 0 ? -1 : 0) * -sa + (off.y > 0 ? 1 : off.y < 0 ? -1 : 0) * ca;
       }
       if (!project(player, px, py, halfW, tanHalf)) continue;
       const depth = proj.fwd;
@@ -2559,7 +2590,6 @@
       if (def.fire) {
         const rad = typeof pr.light === 'number' && pr.light > 0 ? pr.light : def.light;
         lightHint(r, player, ca, sa, halfW, tanHalf, pr.x, pr.y, rad, Math.min(1, alpha));
-        if (flameSeen) flameSeen.set(pr, r.frameNo);
       }
       const body = flash ? '#ffffff' : spriteStyle(COL_PROP, b);
       const phase = (pr.x * 3.1 + pr.y * 1.7);
@@ -2580,7 +2610,7 @@
       const fn = function (c) {
         if (full || !Ripple) {
           c.globalAlpha = Math.min(1, alpha);
-          propBody(c, pr.type, cxj, fyj, hs, vs, t, phase, body, alpha);
+          propBody(c, pr.type, cxj, fyj, hs, vs, t, phase, body, alpha, holdLat);
           return;
         }
         const ns = Ripple.maskStrips(zMin, zMax, 1.0, 0.12, STRIPS);
@@ -2595,74 +2625,11 @@
           c.rect(cxj - hw - hs * 0.4, yTop, hw * 2 + hs * 0.8, yBot - yTop);
           c.clip();
           c.globalAlpha = Math.min(1, alpha * sal);
-          propBody(c, pr.type, cxj, fyj, hs, vs, t, phase, body, alpha);
+          propBody(c, pr.type, cxj, fyj, hs, vs, t, phase, body, alpha, holdLat);
           c.restore();
         }
       };
       clippedDraw(r, cx - hw - lw - hs * 0.4, cx + hw + lw + hs * 0.4, depth, fn);
-      drawn++;
-    }
-    ctx.globalAlpha = 1;
-    return drawn;
-  }
-
-  const flameSeen = typeof WeakMap === 'function' ? new WeakMap() : null;
-
-  /**
-   * Fire props are light sources, so their flames show without sonar (faint, with distance falloff).
-   * Props already drawn lit this frame are skipped (their flame is part of the lit doodle). Count drawn.
-   */
-  function drawFlames(r, world, player, tanHalf, t) {
-    const props = world.props;
-    if (!props || !props.length || r.quality < 1) return 0;
-    const halfW = r.ow / 2;
-    const focal = halfW / tanHalf;
-    const ca = Math.cos(player.angle);
-    const sa = Math.sin(player.angle);
-    const ctx = r.octx;
-    // Half-speed flicker (< 2.5 Hz) since these flames are on screen all the time; still under reduced motion.
-    const tt = r.reduced ? 0 : t * 0.5;
-    let drawn = 0;
-    ctx.strokeStyle = COL_FLAME;
-    ctx.lineWidth = 1 * r.wscale;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    for (let k = 0; k < props.length; k++) {
-      const pr = props[k];
-      const def = pr && PROP_DEF[pr.type];
-      if (!def || !def.fire) continue;
-      if (flameSeen && flameSeen.get(pr) === r.frameNo) continue;
-      const dx = pr.x - player.x;
-      const dy = pr.y - player.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > PROP_MAX_DIST * PROP_MAX_DIST) continue;
-      const fwd0 = dx * ca + dy * sa;
-      if (fwd0 <= 0.1) continue;
-      const right0 = -dx * sa + dy * ca;
-      if (Math.abs(right0) > fwd0 * tanHalf * 1.2 + 1) continue;
-      let px = pr.x;
-      let py = pr.y;
-      if (pr.type === 'torch' && propOff) {
-        const off = propOff.get(pr);
-        if (off) { px += off.x; py += off.y; }
-      }
-      if (!project(player, px, py, halfW, tanHalf)) continue;
-      const depth = proj.fwd;
-      const cx = proj.sx;
-      const hs = focal / depth;
-      if (cx < -hs || cx > r.ow + hs) continue;
-      // Occluded by a nearer wall at that column?
-      const col = Math.max(0, Math.min(r.cols - 1, Math.floor(cx / r.colW)));
-      if (depth > r.zbuf[col] + 0.05) continue;
-      const vs = r.oh / depth;
-      const fy = r.horizon + 0.5 * vs;
-      const fw = (pr.type === 'torch' ? 0.07 : 0.13) * hs;
-      const fy0 = pr.type === 'torch' ? fy - 0.6 * vs : fy - 0.4 * vs;
-      const fh = (pr.type === 'torch' ? 0.2 : 0.34) * vs;
-      ctx.globalAlpha = Math.min(0.6, 0.55 / (1 + 0.1 * depth));
-      ctx.beginPath();
-      flamePath(ctx, cx, fy0, fw, fh, tt, pr.x * 3.1 + pr.y * 1.7);
-      ctx.stroke();
       drawn++;
     }
     ctx.globalAlpha = 1;
@@ -2902,11 +2869,8 @@
     if (anyPulse) echoes = drawEchoes(r, people, sonar, t, player, tanHalf);
     r.echoesDrawn = echoes;
     r.sprites = drawn + echoes;
-    // Torch and brazier flames are light sources: visible even with no sound in the air.
-    let flames = 0;
-    try { flames = drawFlames(r, world, player, tanHalf, t); } catch (e) { logOnce(r, 'flames', e); }
-
-    if (anyPulse || flames > 0) {
+    // v0.10.5: torch and brazier flames/holders are drawn only by drawProps (ripple + afterglow).
+    if (anyPulse) {
       const smooth = r.ow !== r.canvas.width;
       ctx.globalCompositeOperation = 'lighter';
       if (r.quality >= 4 && r.glow && (r.litColumns > 0 || drawn > 0 || echoes > 0)) {

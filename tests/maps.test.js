@@ -293,7 +293,7 @@ test('town hides: 6-10 dark floor cells', () => {
   });
 });
 
-test('at least 60% of patrol length is torchlit, and window light spills outside', () => {
+test('some patrol length is torchlit (v0.10.5 radius x0.15: small share), and window light spills outside', () => {
   const def = MapData.maps.town;
   const w = all().worlds.town;
   let tot = 0, lit = 0;
@@ -309,9 +309,9 @@ test('at least 60% of patrol length is torchlit, and window light spills outside
       }
     }
   });
-  assert.ok(lit / tot >= 0.6, 'lit share ' + (lit / tot).toFixed(2));
+  assert.ok(lit / tot >= 0.03, 'lit share ' + (lit / tot).toFixed(2));
   assert.strictEqual(def.rows[8][18], 'w');
-  assert.ok(w.lightAt(17.5, 8.5) > 0);
+  assert.ok(w.lightAt(36.5, 9.5) > 0);
   assert.ok(def.paths.filter((p) => p.sit).length >= 2);
 });
 
