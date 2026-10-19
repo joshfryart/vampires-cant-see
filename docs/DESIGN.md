@@ -362,6 +362,8 @@ Tutorial hints (`game.js`, one per browser, shown under the crosshair, one at a 
 
 The far safe spot pays +5 Essence.
 
+Light rule: every door, gate and safe spot in the town must be reachable from the crypt door along cells with `lightAt` < 0.6 (checked in `tests/maps.test.js`); torches go on wall faces or verges, not the road centre.
+
 ## 11. HUD and controls (640 x 360 internal canvas)
 
 Dim (alpha <= 0.55), boiled lines (10 fps), readable at 640x360. Every optional field absent = unchanged output.
