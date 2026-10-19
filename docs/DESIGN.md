@@ -174,6 +174,8 @@ Each level: `range` (cells), `strength` (visual), `z` (source height), `fade` (s
 | startle | 1.5 | 1.0 | 0.1 | 12 |
 | wind / room | - | 1 | 0.025 / 0.02 | ambience beds (6.4) |
 
+Echo timing: one speed, SONAR_SPEED 12 cells/s; echo delay = round trip at that speed.
+
 Rooms (`SoundData.rooms`): indoor range x1, 2 bounces, fade x1; outdoor range x1.3, 1 bounce, fade x0.8.
 
 ### 6.3 Spatial rules (`Audio.play` options)

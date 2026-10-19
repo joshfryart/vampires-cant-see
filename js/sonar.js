@@ -4,7 +4,8 @@
 
   const TWO_PI = Math.PI * 2;
   const TOL = 0.35;
-  const DEFAULTS = { speed: 12, range: 10, fade: 3.0, cooldown: 0.8, maxPulses: 64, visRays: 720, reflectors: 6, bounces: 2 };
+  const SONAR_SPEED = 12; // cells/s: the one speed for the visual ring and echo timing
+  const DEFAULTS = { speed: SONAR_SPEED, range: 10, fade: 3.0, cooldown: 0.8, maxPulses: 64, visRays: 720, reflectors: 6, bounces: 2 };
   const MAX_PER_SOUND = 12;
 
   function logger() {
@@ -367,7 +368,14 @@
     ps.length = w;
   }
 
+  /** Round-trip echo delay (s) for a reflector d cells away: 2d / speed (default SONAR_SPEED). */
+  function echoDelay(d, speed) {
+    const v = typeof speed === 'number' && speed > 0 ? speed : SONAR_SPEED;
+    return (2 * d) / v;
+  }
+
   const Sonar = {
+    SONAR_SPEED: SONAR_SPEED, echoDelay: echoDelay,
     DEFAULTS: DEFAULTS, create: create, emit: emit, emitSound: emitSound, wallArc: wallArc, nearestDist: nearestDist,
     brightnessAt: brightnessAt, ageAt: ageAt, brightnessAt3: brightnessAt3, sample2: sample2, sample3: sample3, ageAt3: ageAt3, heightBand: heightBand, visibleFrom: visibleFrom, litAt: litAt, ringRadius: ringRadius, prune: prune, reset: reset, cooldownLeft: cooldownLeft
   };

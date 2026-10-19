@@ -64,7 +64,7 @@
     }
   }
 
-  const ROOMS = { indoor: { delayMul: 1, gainMul: 1, cutoff: 2200 }, outdoor: { delayMul: 1.8, gainMul: 0.7, cutoff: 1400 } };
+  const ROOMS = { indoor: { gainMul: 1, cutoff: 2200 }, outdoor: { gainMul: 0.7, cutoff: 1400 } };
   const MAX_VOICES = 96;
 
   /** Remember a voice (osc + its gain) so stopAll can fade it. Never throws. */
@@ -299,7 +299,6 @@
     try {
       if (!ready(a)) return;
       if (!(delaySec >= 0 && delaySec <= MAX_ECHO_DELAY)) return;
-      if (a.room === 'outdoor') delaySec = Math.min(MAX_ECHO_DELAY, delaySec * ROOMS.outdoor.delayMul);
       if (typeof strength !== 'number' || !Number.isFinite(strength)) return;
       const s = clamp01(strength * (ROOMS[a.room] || ROOMS.indoor).gainMul);
       if (s <= 0 || strength <= 0) return;

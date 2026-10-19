@@ -1103,7 +1103,7 @@
       VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
       e.pan = clamp(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), -1, 1);
       if (S.audio) {
-        VCS.Audio.echo(S.audio, clamp(e.dist / 34 + 0.02, 0.03, 0.5), clamp(0.7 * e.strength, 0.1, 0.7), e.pan);
+        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), clamp(0.7 * e.strength, 0.1, 0.7), e.pan);
       }
     }
     markerRipples(tPrev, S.clock);
@@ -1176,7 +1176,7 @@
     if (lp) {
       const nearest = VCS.Sonar.nearestDist(lp);
       const range = lp.range || 10;
-      VCS.Audio.echo(a, clamp(2 * nearest / 34, 0.03, 0.6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
+      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
     }
     bounceEchoes();
     return true;
@@ -1212,7 +1212,8 @@
     picks.sort(function (a, b) { return a.t0 - b.t0; });
     for (let i = 0; i < picks.length && i < max; i++) {
       const c = picks[i];
-      const delay = c.t0 - S.clock;
+      const dc = Math.sqrt((c.x - S.player.x) * (c.x - S.player.x) + (c.y - S.player.y) * (c.y - S.player.y));
+      const delay = c.t0 - S.clock + dc / (c.speed || S.sonar.speed);
       if (delay > 2) continue;
       VCS.Audio.echo(S.audio, delay, clamp(0.35 * (c.strength || 0.4), 0.05, 0.3), panTo(c.x, c.y));
     }
