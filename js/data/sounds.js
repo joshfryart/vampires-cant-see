@@ -10,7 +10,6 @@
       door: { range: 5, strength: 0.5, z: 0.5, fade: 2.5, bounces: 1, gain: 0.25, hearDist: 18 },
       interact: { range: 3, strength: 0.35, z: 0.3, fade: 1.8, bounces: 1, gain: 0.15 },
       ping: { range: null, strength: 1, z: 0.62, fade: null, bounces: 2, gain: null },
-      crackle: { range: 1.6, strength: 0.25, z: 0.7, fade: 0.9, bounces: 0, gain: 0.05, hearDist: 8, interval: 1.5 },
       scream: { range: 7, strength: 0.6, z: 0.85, fade: 2.2, bounces: 1, gain: 0.3, hearDist: 25 },
       startle: { range: 1.5, strength: 0.3, z: 0.8, fade: 1.0, bounces: 0, gain: 0.1, hearDist: 12 },
       creak: { range: 3, strength: 0.4, z: 0.5, fade: 1.5, bounces: 0, gain: 0.2, hearDist: 12 },

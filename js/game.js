@@ -60,7 +60,6 @@
     grace: 0,
     playerLit: 0,
     wipeK: 0,
-    crackle: {},
     pctx: { player: null, playerLit: 0, react: null, t: 0, grace: 0 },
     nearIdx: [-1, -1, -1, -1],
     nearD: [0, 0, 0, 0],
@@ -754,7 +753,6 @@
     VCS.Sonar.reset(S.sonar);
     if (S.ripple) S.ripple.rings.length = 0;
     if (S.audio) VCS.Audio.stopAll(S.audio, 0.15);
-    S.crackle = {};
     const up = unlockedPower(n);
     const sub = up ? up.how : '';
     showCard('Night ' + n + unlockText(n), 0, sub.trim() || null);
@@ -811,7 +809,6 @@
     resetWorldDoors();
     S.seedBase = 0;
     S.peopleByMap = {};
-    S.crackle = {};
     S.seq = null;
     S.drink = null;
     S.landings.length = 0;
@@ -3398,6 +3395,7 @@
     if (!a) return;
     const live = S.runOn && (S.state === 'playing' || S.state === 'feeding' || S.state === 'sleeping' || S.state === 'transition');
     const kind = live ? (S.roomKind === 'outdoor' ? 'outdoor' : 'indoor') : 'none';
+    if (!live) { VCS.Audio.fireBed(a, 0, 0, 0); VCS.Audio.fireBed(a, 1, 0, 0); }
     const lvl = cfgNum('ambienceGain', 0.6);
     if (kind === S.ambKey && lvl === S.ambLvl) return;
     const ok = VCS.Audio.ambience(a, { kind: kind, level01: lvl });
@@ -3622,41 +3620,38 @@
     return w._gates.length ? base.concat(w._gates) : base;
   }
 
-  /** Every 'interval' s each of the 4 nearest audible lights crackles (staggered per light). */
+  const FIRE_NEAR = 1.5;
+  const fireLvl = [0, 0];
+  const fireIdx = [-1, -1];
+  const fireD = [Infinity, Infinity];
+
+  /** Steady fire noise bed: the 2 nearest torches within FIRE_NEAR cells, level fading to 0 at that distance, panned to the torch. */
   function crackleTorches() {
-    const w = S.world;
-    const lights = w.lights;
-    if (!lights || !lights.length || !S.player) return;
-    const lv = level('crackle');
-    const hear = lv.hearDist || 8;
-    const iv = lv.interval || 1.5;
-    const idx = S.nearIdx;
-    const dd = S.nearD;
-    for (let k = 0; k < 4; k++) { idx[k] = -1; dd[k] = Infinity; }
-    for (let i = 0; i < lights.length; i++) {
-      const d = Math.hypot(lights[i].x - S.player.x, lights[i].y - S.player.y);
-      if (d > hear) continue;
-      for (let k = 0; k < 4; k++) {
-        if (d < dd[k]) {
-          for (let m = 3; m > k; m--) { idx[m] = idx[m - 1]; dd[m] = dd[m - 1]; }
-          idx[k] = i;
-          dd[k] = d;
-          break;
-        }
+    const a = S.audio;
+    if (!a) return;
+    const lights = S.world && S.world.lights;
+    const p = S.player;
+    const live = !!(lights && lights.length && p && S.runOn && (S.state === 'playing' || S.state === 'feeding'));
+    fireIdx[0] = fireIdx[1] = -1;
+    fireD[0] = fireD[1] = Infinity;
+    if (live) {
+      for (let i = 0; i < lights.length; i++) {
+        const dx = lights[i].x - p.x;
+        const dy = lights[i].y - p.y;
+        if (dx > FIRE_NEAR || dx < -FIRE_NEAR || dy > FIRE_NEAR || dy < -FIRE_NEAR) continue;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d >= FIRE_NEAR) continue;
+        if (d < fireD[0]) { fireD[1] = fireD[0]; fireIdx[1] = fireIdx[0]; fireD[0] = d; fireIdx[0] = i; }
+        else if (d < fireD[1]) { fireD[1] = d; fireIdx[1] = i; }
       }
     }
-    let next = S.crackle[S.mapName];
-    if (!next || next.length !== lights.length) {
-      next = S.crackle[S.mapName] = new Array(lights.length);
-      for (let i = 0; i < lights.length; i++) next[i] = S.clock + ((i * 0.618) % 1) * iv;
-    }
-    for (let k = 0; k < 4; k++) {
-      const i = idx[k];
-      if (i < 0 || S.clock < next[i]) continue;
-      next[i] = S.clock + iv;
+    for (let k = 0; k < 2; k++) {
+      const i = fireIdx[k];
+      if (i < 0) { fireLvl[k] = 0; VCS.Audio.fireBed(a, k, 0, 0); continue; }
       const L0 = lights[i];
-      emitSound('crackle', L0.x, L0.y);
-      if (S.audio) VCS.Audio.play(S.audio, 'crackle', spatial(L0.x, L0.y, lv.gain));
+      const lv = 1 - fireD[k] / FIRE_NEAR;
+      fireLvl[k] = lv;
+      VCS.Audio.fireBed(a, k, lv, panTo(L0.x, L0.y));
     }
   }
 

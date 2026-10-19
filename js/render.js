@@ -16,9 +16,10 @@
   /** Window line tints: candle gold when light spills through from the far side, cold glass otherwise. */
   const COL_WIN_LIT = '#ffd596';
   const COL_WIN_DARK = '#c4e2ff';
-  /** Candle glow in lit window panes: max alpha and flicker rate (Hz, < 1). */
+  /** Candle glow in lit window panes: max alpha (steady, no flicker). */
   const WIN_GLOW_MAX = 0.25;
-  const WIN_FLICKER_HZ = 0.7;
+  /** Warm screen-edge glow: alpha at full light (lightAt = 1). */
+  const EDGE_GLOW_MAX = 1;
   /** Door lines are drawn this much brighter than wall lines (alpha multiplier, clamped to 1). */
   const DOOR_GAIN = 1.35;
   const C_LOW = [91, 127, 214];
@@ -737,8 +738,7 @@
     const ctx = r.octx;
     const hp = r.ybot[i] - r.ytop[i];
     if (hp < 6) return;
-    const fl = r.reduced ? 1 : 0.85 + 0.15 * Math.sin(t * WIN_FLICKER_HZ * TWO_PI + hx * 2.7);
-    let a = (0.06 + 0.19 * v) * fl / (1 + 0.05 * dist);
+    let a = (0.06 + 0.19 * v) / (1 + 0.05 * dist);
     if (a > WIN_GLOW_MAX) a = WIN_GLOW_MAX;
     const u = r.wcolU[i];
     if (u > 0.47 && u < 0.53) return; // the vertical mullion stays dark
@@ -2239,9 +2239,11 @@
     chair: { zc: 0.22, top: 0.52 },
     bench: { zc: 0.2, top: 0.4 },
     well: { zc: 0.3, top: 0.86 },
-    torch: { zc: 0.6, top: 0.85, fire: true, light: 3 },
+    torch: { zc: 0.72, top: 0.85, fire: true, light: 3 },
     brazier: { zc: 0.45, top: 0.78, fire: true, light: 3.5 }
   };
+  /** Extra heights sampled when a fire prop is not lit at its centre height. */
+  const FIRE_Z = [0.3, 0.95, 0.5];
   const propOff = typeof WeakMap === 'function' ? new WeakMap() : null;
   const STRIPS = new Float32Array(9);
   const bandOut = new Float32Array(2);
@@ -2278,11 +2280,10 @@
     return true;
   }
 
-  /** Flickering teardrop flame (outer + inner) as path segments. */
+  /** Steady teardrop flame (outer + inner); only the tip sways, slower than 1 Hz, and the size never changes. */
   function flamePath(c, x, y0, w, h, t, ph) {
-    const fl = 1 + 0.18 * Math.sin(t * 17 + ph) + 0.1 * Math.sin(t * 29 + ph * 2.3);
-    const sw = Math.sin(t * 9 + ph) * w * 0.35;
-    const hh = h * fl;
+    const sw = Math.sin(t * TWO_PI * 0.6 + ph) * w * 0.25;
+    const hh = h;
     c.moveTo(x, y0);
     c.quadraticCurveTo(x - w, y0 - hh * 0.45, x + sw, y0 - hh);
     c.quadraticCurveTo(x + w, y0 - hh * 0.45, x, y0);
@@ -2492,43 +2493,6 @@
     }
   }
 
-  /** Warm floor ring(s) showing a lit fire's light radius. */
-  function lightHint(r, player, ca, sa, halfW, tanHalf, lx, ly, radius, a) {
-    const ctx = r.octx;
-    const focal = halfW / tanHalf;
-    const horizon = r.horizon;
-    const half = r.oh / 2;
-    ctx.strokeStyle = COL_LIGHT;
-    ctx.lineWidth = 1.2 * r.wscale;
-    for (let ring = 0; ring < 2; ring++) {
-      const R = ring === 0 ? radius : radius * 0.5;
-      ctx.globalAlpha = Math.min(1, a * (ring === 0 ? 0.55 : 0.35));
-      ctx.beginPath();
-      let pen = false;
-      for (let sg = 0; sg <= 32; sg++) {
-        const th = (sg / 32) * TWO_PI;
-        const wx = lx + Math.cos(th) * R;
-        const wy = ly + Math.sin(th) * R;
-        const dx = wx - player.x;
-        const dy = wy - player.y;
-        const fwd = dx * ca + dy * sa;
-        let ok = fwd > 0.2;
-        let sx = 0;
-        let y = 0;
-        if (ok) {
-          sx = halfW + ((-dx * sa + dy * ca) / fwd) * focal;
-          y = horizon + half / fwd;
-          if (sx < -20 || sx > r.ow + 20 || y > r.oh * 3) ok = false;
-          else if (fwd > r.zbuf[Math.max(0, Math.min(r.cols - 1, Math.floor(sx / r.colW)))] + 0.05) ok = false;
-        }
-        if (!ok) { pen = false; continue; }
-        if (!pen) { ctx.moveTo(sx, y); pen = true; } else ctx.lineTo(sx, y);
-      }
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-
   /** Draw all props lit by the current pulses; returns the count drawn. */
   function drawProps(r, world, player, sonar, t, tanHalf) {
     const props = world.props;
@@ -2551,7 +2515,11 @@
       if (fwd0 <= 0.1) continue;
       const right0 = -dx * sa + dy * ca;
       if (Math.abs(right0) > fwd0 * tanHalf * 1.2 + 1) continue;
-      const b = litAt3(sonar, pr.x, pr.y, def.zc, t);
+      let b = litAt3(sonar, pr.x, pr.y, def.zc, t);
+      if (def.fire && b <= 0.01) {
+        // Fires: any wavefront that reached the torch (at any height) draws flame and holder for the afterglow.
+        for (let q = 0; q < FIRE_Z.length && b <= 0.01; q++) b = litAt3(sonar, pr.x, pr.y, FIRE_Z[q], t);
+      }
       if (b <= 0.01) continue;
       const age = samp3[1];
       // Sconces hug the nearest wall.
@@ -2587,16 +2555,12 @@
       const idb = ((pr.x * 7 + pr.y * 13) | 0) * 8;
       const jx = r.boilOn ? J(r, idb, 0) * 0.7 * r.wscale : 0;
       const jy = r.boilOn ? J(r, idb, 1) * 0.7 * r.wscale : 0;
-      if (def.fire) {
-        const rad = typeof pr.light === 'number' && pr.light > 0 ? pr.light : def.light;
-        lightHint(r, player, ca, sa, halfW, tanHalf, pr.x, pr.y, rad, Math.min(1, alpha));
-      }
       const body = flash ? '#ffffff' : spriteStyle(COL_PROP, b);
       const phase = (pr.x * 3.1 + pr.y * 1.7);
       let full = true;
       let zMin = 0;
       let zMax = 1.2;
-      if (propBand(sonar, t, pr.x, pr.y)) {
+      if (!def.fire && propBand(sonar, t, pr.x, pr.y)) {
         zMin = pband.lo;
         zMax = pband.hi;
         full = zMin <= 0.02 && zMax >= def.top + 0.05;
@@ -2707,17 +2671,23 @@
     }
   }
 
+  /** Warm screen-edge glow alpha for raw light level lit (0..1): continuous, no time term. */
+  function edgeGlowAlpha(lit) {
+    const k = typeof lit === 'number' && isFinite(lit) ? (lit < 0 ? 0 : lit > 1 ? 1 : lit) : 0;
+    return Math.pow(k, 1.2) * 0.5 * EDGE_GLOW_MAX;
+  }
+
   /** Draw vignette and faint animated film grain over the frame. */
   function drawAtmosphere(r, lit, t) {
     const ctx = r.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
-    if (lit >= 0.3 && r.warmVig) {
-      // Exposed: faint warm glow at the screen edges, breathing slightly.
-      const k = Math.min(1, (lit - 0.2) / 0.6);
+    const ea = edgeGlowAlpha(lit);
+    if (ea > 0.002 && r.warmVig) {
+      // Warm glow at the screen edges, steady, stronger the closer the player is to the light.
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = Math.min(0.35, 0.25 * k * (1 + (r.reduced ? 0 : 0.08 * Math.sin((t || 0) * 5))));
+      ctx.globalAlpha = ea;
       ctx.drawImage(r.warmVig, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = 1;
@@ -2955,20 +2925,7 @@
       }
     }
 
-    // Lights (warm circles) and props (dots).
-    const lights = world.lights;
-    if (lights && lights.length) {
-      ctx.strokeStyle = 'rgba(255,170,70,0.55)';
-      for (let i = 0; i < lights.length; i++) {
-        const L = lights[i];
-        const lx = ox + L.x * CELL;
-        const ly = oy + L.y * CELL;
-        if (lx < -200 || ly < -200 || lx > W + 200 || ly > H + 200) continue;
-        ctx.beginPath();
-        ctx.arc(lx, ly, Math.max(1, L.radius * CELL), 0, TWO_PI);
-        ctx.stroke();
-      }
-    }
+    // Props (dots).
     const wprops = world.props;
     if (wprops && wprops.length) {
       for (let i = 0; i < wprops.length; i++) {
@@ -3139,7 +3096,8 @@
     AFTERGLOW_K: AFTERGLOW_K,
     SWEEP: SWEEP,
     glowDur: glowDur,
-    glow: glow
+    glow: glow,
+    edgeGlowAlpha: edgeGlowAlpha
   };
   VCS.Render = Render;
   if (typeof module !== 'undefined' && module.exports) module.exports = Render;

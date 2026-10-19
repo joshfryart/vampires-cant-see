@@ -155,6 +155,9 @@ Source: `js/data/sounds.js`, `js/audio.js`, `js/game.js` (`spatial`, `occludedTo
 - Torches are light sources (`light` radius on some torches in `maps.js`). Light is shown as `lightAt(x,y)` (0..1).
 - About 48% of the town is torch-lit.
 - Glass windows (`w`) let light through; they still block movement and sonar.
+- No drawn light circles or rings. Light shows only as: the warm screen-edge glow (alpha = `lightAt(player)^1.2 * 0.5`, steady, `Render.edgeGlowAlpha`); torch/brazier flame and holder under a sonar wavefront (any height reached, fades with the afterglow); floor/wall spill only where the ripple has passed.
+- Nothing about light flickers: flames keep a fixed size (tip sways < 1 Hz, brightness constant); window candle glow is steady.
+- Fire sound: no pulse or interval. Within 1.5 cells of a torch, `Audio.fireBed` plays a quiet lowpass (2.5 kHz) noise bed (max 0.035 x volume), panned to the torch, fading to 0 at 1.5 cells; 2 nearest torches; only while playing or feeding.
 
 ### 6.2 Sound levels
 

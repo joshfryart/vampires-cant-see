@@ -477,13 +477,6 @@
       const k = v.pitch;
       bend(ctx, f, 'sawtooth', [55 * k, 120 * k, 70 * k, 140 * k, 80 * k], t, 0.08, 0.75, peak);
     },
-    // tiny fizzy pop, like a spark
-    crackle: function (ctx, out, t, peak, v) {
-      const k = v.pitch;
-      tone(ctx, out, 'square', 1500 * k, 600 * k, t, 0.002, 0.025, peak);
-      tone(ctx, out, 'triangle', 2400 * k, 900 * k, t + 0.045, 0.002, 0.02, peak * 0.7);
-      tone(ctx, out, 'square', 1100 * k, 500 * k, t + 0.09, 0.002, 0.03, peak * 0.5);
-    },
     // cartoon scream: wobbly high slide with a detuned partner
     scream: function (ctx, out, t, peak, v) {
       const k = v.pitch;
@@ -589,7 +582,7 @@
   };
 
   /**
-   * Plays a movement/interaction sound. Kinds: step, personStep, doorOpen, doorClose, interact, creak, crackle, scream, startle,
+   * Plays a movement/interaction sound. Kinds: step, personStep, doorOpen, doorClose, interact, creak, scream, startle,
    * chime, heartbeat, feed, yawn, gasp, miss, shriek, mist, still, gift, overflow, whimper, dog, bell.
    * No-op when not ready or the kind is unknown.
    * @param {object} a Audio state.
@@ -960,7 +953,69 @@
     }
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, stopAll, ambience, oneShotFar, breath };
+  const FIRE_MAX = 0.035;
+  const FIRE_SLOTS = 2;
+
+  /**
+   * Steady quiet fire noise bed for one of 2 slots (shared noise buffer, lowpass 2.5 kHz, panned).
+   * level01 0..1 scales the gain (0 = silent); the voice is built on first use and only retargeted after.
+   * @param {object} a Audio state.
+   * @param {number} slot 0 or 1.
+   * @param {number} level01 0..1.
+   * @param {number} pan -1..1.
+   * @returns {boolean} true when audible.
+   */
+  function fireBed(a, slot, level01, pan) {
+    try {
+      if (!ready(a) || !(slot >= 0 && slot < FIRE_SLOTS)) return false;
+      const lv = typeof level01 === 'number' && Number.isFinite(level01) ? clamp01(level01) : 0;
+      if (!a.fire) a.fire = [null, null];
+      let v = a.fire[slot];
+      if (!v) {
+        if (lv <= 0.001) return false;
+        const ctx = a.ctx;
+        const buf = noiseBuffer(ctx);
+        if (!buf) return false;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const f = ctx.createBiquadFilter();
+        f.type = 'lowpass';
+        f.frequency.value = 2500;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        src.connect(f);
+        f.connect(g);
+        let pn = null;
+        if (typeof ctx.createStereoPanner === 'function') {
+          pn = ctx.createStereoPanner();
+          if (pn && pn.pan) { pn.connect(master(ctx).out); g.connect(pn); } else pn = null;
+        }
+        if (!pn) g.connect(master(ctx).out);
+        src.start(ctx.currentTime || 0, slot * 1.3);
+        v = a.fire[slot] = { g: g, pn: pn, lv: 0, tgt: 0, pan: 0 };
+      }
+      const ctx2 = a.ctx;
+      const now = ctx2.currentTime || 0;
+      const tgt = lv * a.volume * FIRE_MAX;
+      if (Math.abs(tgt - v.tgt) > FIRE_MAX * 0.01 || (tgt === 0 && v.tgt !== 0)) {
+        v.lv = lv;
+        v.tgt = tgt;
+        if (typeof v.g.gain.setTargetAtTime === 'function') v.g.gain.setTargetAtTime(tgt, now, 0.12);
+        else v.g.gain.value = tgt;
+      }
+      if (v.pn && typeof pan === 'number' && Number.isFinite(pan) && Math.abs(pan - v.pan) > 0.02) {
+        v.pan = pan < -1 ? -1 : pan > 1 ? 1 : pan;
+        v.pn.pan.value = v.pan;
+      }
+      return v.lv > 0;
+    } catch (e) {
+      reportFailure(a, 'Sound failed to update the fire bed', e);
+      return false;
+    }
+  }
+
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, stopAll, ambience, oneShotFar, breath, fireBed };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;

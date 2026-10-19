@@ -413,3 +413,19 @@ describe('render-warm.test.js', () => {
 
 });
 
+
+describe('edge glow ramp', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const Render = require('../js/render.js');
+  test('edgeGlowAlpha is continuous, monotonic, 0 at 0 and 0.5 at 1', () => {
+    const f = Render.edgeGlowAlpha;
+    assert.strictEqual(f(0), 0);
+    assert.ok(Math.abs(f(1) - 0.5) < 1e-9);
+    assert.ok(f(0.29) > 0 && f(0.31) - f(0.29) < 0.02, 'no switch at 0.3');
+    let prev = 0;
+    for (let i = 1; i <= 20; i++) { const v = f(i / 20); assert.ok(v > prev); prev = v; }
+    assert.strictEqual(f(5), f(1));
+    assert.strictEqual(f(NaN), 0);
+  });
+});
