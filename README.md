@@ -54,11 +54,11 @@ What you can read from an echo today: direction (stereo pan and where the ring l
 | **[estimate]** | Engineering judgement, no measurement behind it |
 | **[tuning]** | Gameplay knob, no physical claim |
 
-**Conventions.** Levels are in dB of intensity, relative to the direct click at 1 m on the beam axis. Distances are in metres: $r = d \cdot cellM$, with $d$ in cells and $cellM = 1.0$ m per cell. $c = 343$ m/s [source] [12][15].
+**Conventions.** Levels are in dB of intensity, relative to the direct click at 1 m on the beam axis. Distances are in metres: $r = d \cdot cellM$, with $d$ in cells and $cellM = 1.0$ m per cell. $c = 343$ m/s (standard value for air at 20 °C) [estimate].
 
 ### The mouth beam
 
-The beam shape follows a fit to measured mouth clicks of blind expert echolocators [1][2], read as relative intensity. A head is modelled as a rigid sphere in [3][4][5][29]; its rear "bright spot" is left out because a real head and torso break it. The beam is applied once, on the outgoing click.
+The beam shape follows a fit to measured mouth clicks of blind expert echolocators [1][2], read as relative intensity. A head is modelled as a rigid sphere in [3][4][5][29]; its rear "bright spot" is left out because a real head and torso break it. The sphere gives about +6 dB high-frequency gain on the near side (pressure doubling, [4]); no frontal gain figure is taken from [3]-[5] or [29], and the beam's own shape comes from [1][2] only. The beam is applied once, on the outgoing click.
 
 | Angle from facing | 0° | 30° | 60° | 90° | 120° | 150° | 180° |
 |---|---|---|---|---|---|---|---|
@@ -84,18 +84,18 @@ $$L_{obj}=B_{tx}(\theta)-40\log_{10}\!\frac{\max(r,r_{min})}{1\,\mathrm{m}}+TS-2
 | $r_{min}$ (near-field clamp) | 0.5 m | [tuning] |
 | $TS$, prop of radius 0.3 m: $10\log_{10}(a^2/4)$ | -16.5 dB | [computed] [6] |
 | $TS$, person | -15 dB (plausible range -20 to -5) | [estimate] |
-| Absorption $\alpha$ of stone, brick, glass, wood | within about 0.5 dB of each other in the level term | [source] [18][19][20] |
+| Absorption $\alpha$ of stone, brick, glass, wood | within about 0.5 dB of each other in the level term | [source] [19][23] |
 | Grass, $10\log_{10}(1-\alpha)$ at $\alpha=0.6$ | -4.0 dB | [computed] [26] |
 
 People absorb sound [21], but per-person figures are absorption areas, not a coefficient, so people use $TS$ instead of $\alpha$.
 
-The energy that hits a surface is split three ways, each from the incident energy: absorbed $\alpha$, specular $(1-\alpha)(1-s)$, diffuse $(1-\alpha)s$. Rough surfaces such as cobbles scatter more [22][23]. A surface counts as rough when its bumps exceed the Rayleigh limit [24][25]; the smooth/rough label for visuals uses $\sigma_h<\lambda/(32\cos\theta_i)$, 0.315 cm at 3.4 kHz and normal incidence [computed]. Cobble size is taken from sett paving specifications [27][28] [estimate].
+The energy that hits a surface is split three ways, each from the incident energy: absorbed $\alpha$, specular $(1-\alpha)(1-s)$, diffuse $(1-\alpha)s$. Rough surfaces such as cobbles scatter more [22][23]. A surface counts as rough when its bumps exceed the Rayleigh limit [24][25]; the smooth/rough label for visuals uses $\sigma_h<\lambda/(32\cos\theta_i)$, 0.315 cm at 3.4 kHz and normal incidence [computed]. The Rayleigh form $\lambda/(8\cos\theta_i)$ is from [25]; [24] gives only the normal-incidence form $\lambda/8$. Cobble size (200 × 100 × 100 mm setts, 10 mm joints) is from one Camden drawing [27] [estimate]; any 100-200 mm range is a design choice [tuning].
 
 Game calibration, which is not physics, is applied afterwards: $L_{game}=G_{class}+\kappa L_{phys}$ with $\kappa\in[0,1]$ [tuning].
 
 ### Air absorption
 
-Over the round trip the loss is $2r\,a(f)$, with $a(f)$ from the ISO 9613-1 formula at 10 °C and 70 % relative humidity [15] [computed].
+Over the round trip the loss is $2r\,a(f)$, with $a(f)$ computed from the ISO 9613-1 equations (method only; [15] gives no tabulated values) at 10 °C and 70 % relative humidity [computed].
 
 | f (Hz) | 500 | 1k | 2k | 3.4k | 4k | 8k |
 |---|---|---|---|---|---|---|
@@ -107,9 +107,9 @@ Over a 20 m path that is 0.49 dB at 3.4 kHz and 2.37 dB at 8 kHz: small, so it o
 
 $$TL(f)\approx 20\log_{10}(m f)-47$$
 
-$m$ is surface mass in kg/m² and $f$ in Hz [source] [7][8]. Mixed walls (a door with a gap) combine by transmitted power: $\bar\tau=\sum S_i10^{-TL_i/10}/\sum S_i$, $TL=-10\log_{10}\bar\tau$ [source]. A door with a 1 % open gap is limited to about 20 dB [computed].
+$m$ is surface mass in kg/m² and $f$ in Hz. The constant is -48 dB for random incidence [source] [7] and -47 dB for field incidence [source] [8]; the game uses -47. The normal-incidence constant (about -42.4, from $20\log_{10}(\pi/\rho c)$ with $\rho c=413$) is derived here, not in a cited source [computed]. Mixed walls (a door with a gap) combine by transmitted power: $\bar\tau=\sum S_i10^{-TL_i/10}/\sum S_i$, $TL=-10\log_{10}\bar\tau$ [computed]. A door with a 1 % open gap is limited to about 20 dB [computed].
 
-Glass has a weak spot at its critical frequency, $f_c=c^2/(1.814\,c_L\,t)$ [source] [9][10]. For 4 mm glass that is 2989 Hz and for 6 mm glass 1993 Hz [computed]; the 4 mm figure agrees with a published 3000 Hz [9]. Brick and stone are capped at 55 and 65 dB [tuning] and are effectively silent; sound reaches you only by going around them.
+Glass has a weak spot at its critical frequency, $f_c=c^2/(1.814\,c_L\,t)$ [computed]. For 4 mm glass that is 2989 Hz and for 6 mm glass 1993 Hz [computed]; the 3000 Hz for 4 mm glass comes from a trade source [9] and our 2989 Hz agrees. [10] is qualitative only and gives no 4 mm value. Brick and stone are capped at 55 and 65 dB [tuning] and are effectively silent; sound reaches you only by going around them.
 
 ### Around corners (Maekawa)
 
@@ -125,7 +125,7 @@ Reverberation time from room volume $V$ and absorption $A=S\bar\alpha+4mV$, wher
 
 $$T_{60}=\frac{0.161\,V}{A}$$
 
-Each reverb comb filter gets its own feedback gain from its delay $\tau$ [source] [12]:
+Each reverb comb filter gets its own feedback gain from its delay $\tau$ [computed]:
 
 $$g=10^{-3\tau/T_{60}}$$
 
@@ -136,11 +136,11 @@ $$g=10^{-3\tau/T_{60}}$$
 | Church | 16 × 14 | 8.0 m | 5.18 s |
 | House (house1) | 10 × 8 | 2.7 m | 1.13 s |
 
-Mean absorption $\bar\alpha$ per room is an [estimate] [14][18][19][20]. The game clamps $T_{60}$ to 0.4 to 2.5 s [tuning] so clicks stay readable.
+Mean absorption $\bar\alpha$ per room is an [estimate] informed by [14][19][23]. The game clamps $T_{60}$ to 0.4 to 2.5 s [tuning] so clicks stay readable.
 
 ### Very close walls hum (repetition pitch)
 
-When an echo returns within a few milliseconds of the click, the ear hears a pitch rather than a separate echo [16][17]:
+When an echo returns within a few milliseconds of the click, the ear hears a pitch rather than a separate echo; the 30 ms limit is from [17], and [16] covers repetition pitch only:
 
 $$f = \frac{c}{2d}$$
 
@@ -152,7 +152,7 @@ Physical echo delay is too fast to read as a ring, so the game keeps its own spe
 
 $$t_{echo}=\frac{d_{out}}{v_{vis}}+\frac{d_{back}}{v_{aud}}$$
 
-giving 0.113, 0.564 and 1.127 s at 1, 5 and 10 cells [computed]. Physical time is used only for sub-30 ms structure such as the comb delay.
+giving 0.113, 0.564 and 1.127 s at 1, 5 and 10 cells [computed]. Physical time is used only for sub-30 ms structure such as the comb delay [17].
 
 ## Status
 
@@ -246,35 +246,35 @@ Numbering is kept from the research notes. Each source is used by the maths abov
 
 1. Thaler L. et al. (2017). Mouth-clicks used by blind expert human echolocators – signal description and model based signal synthesis. PLoS Computational Biology 13(8): e1005670. https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005670
 2. Same paper, accepted manuscript PDF (Durham repository). https://durham-repository.worktribe.com/OutputFile/1399301
-3. Duda R.O., Martens W.L. (1998). Range dependence of the response of a spherical head model. J. Acoust. Soc. Am. 104(5): 3048–3058. https://escholarship.org/uc/item/0kb7r9m9
-4. Brungart D.S., Rabinowitz W.M. (1998). Head-related transfer functions in the near field. AFRL technical report. https://apps.dtic.mil/sti/tr/pdf/ADA399561.pdf
-5. Treeby B.E., Paurobally R., Pan J. (2006). Investigation of the effect of impedance on azimuth cues derived from spherical head models. ICAD 2006. https://discovery-pp.ucl.ac.uk/id/eprint/10061774/1/2006-Treeby-ICAD.pdf
+3. Duda R.O., Martens W.L. (1998). Range dependence of the response of a spherical head model. J. Acoust. Soc. Am. 104(5): 3048–3058 (cited for the spherical head model only; the abstract page does not mention the bright spot). https://escholarship.org/uc/item/0kb7r9m9
+4. Brungart D.S., Rabinowitz W.M. (1998). Head-related transfer functions in the near field (rigid sphere 18 cm diameter; about 6 dB high-frequency gain at the ipsilateral ear from pressure doubling; "acoustic bright spot" at the far ear near -90 degrees). Report dated March 1998, report number AFRL-HE-WP-TR-2001-0171. https://apps.dtic.mil/sti/tr/pdf/ADA399561.pdf
+5. Treeby B.E., Paurobally R., Pan J. (2006). Investigation of the effect of impedance on azimuth cues derived from spherical head models. ICAD 2006 (bright spot at the contralateral ear; no frontal gain figure). https://discovery-pp.ucl.ac.uk/id/eprint/10061774/1/2006-Treeby-ICAD.pdf
 6. DOSITS, The sonar equation. https://dosits.org/science/advanced-topics/sonar-equation/
-7. Warnock A.C.C. (1985). CBD-239 Factors affecting sound transmission loss. NRC Canada. https://web.mit.edu/parmstr/Public/NRCan/CanBldgDigests/cbd239_e.html
-8. Marshall Day Acoustics / INSUL, Seminar 2: Design of walls and floors for good sound insulation. https://www.insul.s05.system7.co.nz/media/29391/Seminar-2.pdf
+7. Warnock A.C.C. (1985). CBD-239 Factors affecting sound transmission loss. NRC Canada (gives TL = 20 log(m f) - 48; used here for the mass-law form only). https://web.mit.edu/parmstr/Public/NRCan/CanBldgDigests/cbd239_e.html
+8. INSUL Seminar 2, "Design of walls and floors for good sound insulation" (author not stated on the page; mass law 20 log(mf) - 47). https://www.insul.s05.system7.co.nz/media/29391/Seminar-2.pdf
 9. IQ Glass, Effective ways to sound proof with glass. https://www.iqglassuk.com/news/effective-ways-to-sound-proof-with-glass/bp201/
-10. Marsh J.A. (1970). The airborne sound insulation of glass. Institute of Acoustics. https://www.ioa.org.uk/system/files/publications/JA%20MARSH%20THE%20AIRBORNE%20SOUND%20INSULATION%20OF%20GLASS.pdf
-11. Gazzola R. / Farina A. (2003). Lezione XXXII: Barriere acustiche (Maekawa). https://www.angelofarina.it/Dispense02/032.pdf
-12. ProSoundTraining, Sabine and Eyring equations (course 320). https://prosoundtraining.com/course_docs/course320/sabineandeyringeq.pdf
+10. Marsh (1970). The airborne sound insulation of glass. Institute of Acoustics (qualitative: critical frequency falls with thickness; gives no 4 mm value; the 3000 Hz figure rests on [9] alone). https://www.ioa.org.uk/system/files/publications/JA%20MARSH%20THE%20AIRBORNE%20SOUND%20INSULATION%20OF%20GLASS.pdf
+11. Gazzola R. (2003), course notes hosted by A. Farina. Lezione XXXII: Barriere acustiche ed esercizi. https://www.angelofarina.it/Dispense02/032.pdf
+12. Beranek L.L. (2006). Analysis of Sabine and Eyring equations and their application to concert hall audience and chair absorption. J. Acoust. Soc. Am. 120(3). (copy hosted at prosoundtraining.com course 320). https://prosoundtraining.com/course_docs/course320/sabineandeyringeq.pdf
 13. Wikipedia, Reverberation. https://en.wikipedia.org/wiki/Reverberation
 14. Commercial Acoustics, Target reverberation times. https://commercial-acoustics.com/guides/target-reverb-times/
-15. Sengpiel E., Air damping formula (ISO 9613-1 equations). https://sengpielaudio.com/AirdampingFormula.htm
-16. Schenkman B.N., Gidla V.K. Human echolocation in static situations: auditory models of detection thresholds for distance, pitch, loudness and timbre. arXiv:1801.09900. https://arxiv.org/pdf/1801.09900
+15. Sengpiel E., Air damping formula (ISO 9613-1:1993 equations only; no tabulated values, so air-absorption numbers in this README are computed, not quoted). https://sengpielaudio.com/AirdampingFormula.htm
+16. Schenkman B.N., Gidla V.K. Human echolocation in static situations: auditory models of detection thresholds for distance, pitch, loudness and timbre. arXiv:1801.09900 (2018; repetition pitch only, not cited for 30 ms). https://arxiv.org/pdf/1801.09900
 17. Wikipedia, Repetition pitch (Bilsen 1966; Bilsen & Ritsma 1969/70). https://en.wikipedia.org/wiki/Repetition_pitch
 18. pyroomacoustics materials database (absorption and scattering tables). https://pyroomacoustics.readthedocs.io/en/stable/pyroomacoustics.materials.database.html
-19. Acta Acustica (2021) 5:14, Acoustic simulation of J.S. Bach's Thomaskirche, Table 1. https://acta-acustica.edpsciences.org/articles/aacus/full_html/2021/01/aacus200072/T1.html
-20. Engineering Toolbox, Sound absorption coefficients. https://www.engineeringtoolbox.com/accoustic-sound-absorption-d_68.html
+19. Acta Acustica (2021) 5:14, Acoustic simulation of J.S. Bach's Thomaskirche in 1723 and 1539, Table 1. https://acta-acustica.edpsciences.org/articles/aacus/full_html/2021/01/aacus200072/T1.html
+20. Engineering Toolbox, Room absorption coefficients (single values or ranges per material, not per frequency band; no per-band value is taken from it). https://www.engineeringtoolbox.com/accoustic-sound-absorption-d_68.html
 21. BAUX Book of Acoustics 2.2.4, absorption per person. https://book.baux.com/book-of-acoustics/2-2-4-sound-absorption/
 22. Rizzi L., Farina A. et al. (2006). Surface scattering uniformity measurements in reflection free environments. AES 121st Convention paper 6922. https://angelofarina.it/Public/papers/223-AES121.PDF
-23. Acta Acustica (2024), Acoustic analysis of the Odeo Cornaro in Padua, Table 2. https://acta-acustica.edpsciences.org/articles/aacus/full_html/2024/01/aacus230061/T2.html
-24. ITC University of Twente Living Textbook, The Rayleigh roughness criterion. https://ltb.itc.utwente.nl/541/concept/98358
-25. FDTD-based diffuse scattering and transmission models for ray-tracing of millimeter-wave communication systems. arXiv:2008.01688. https://arxiv.org/pdf/2008.01688
+23. Acta Acustica 8 (2024) 25, Acoustic analysis of a well-preserved Renaissance music space: the Odeo Cornaro in Padua, Table 2 (Odeon alpha 125-4000 Hz; s at 707 Hz). https://acta-acustica.edpsciences.org/articles/aacus/full_html/2024/01/aacus230061/T2.html
+24. ITC University of Twente Living Textbook, The Rayleigh roughness criterion (normal-incidence form h < lambda/8; the cos(theta) angle dependence is taken from [25]). https://ltb.itc.utwente.nl/541/concept/98358
+25. FDTD-based diffuse scattering and transmission models for ray-tracing of millimeter-wave communication systems. arXiv:2008.01688 (electromagnetic mm-wave paper, used for the Rayleigh form sigma_c = lambda/(8 cos theta) only; 2020 preprint). https://arxiv.org/pdf/2008.01688
 26. Good C.E., Glean A.J., Vignola J.F. et al. (2013). Measurements of sound absorption of living grass. JASA (abstract). https://labs.sonicfield.org/library/measurements-of-sound-absorption-of-living-grass
-27. Camden / Camlins, Bertram Street edge paving detail (200×100×100 mm granite setts, 10 mm joints). https://camdocs.camden.gov.uk/CMWebDrawer/Record/10108245/file/document
-28. Wikipedia, Sett (paving). https://en.wikipedia.org/wiki/Sett_(paving)
-29. Doma S., Fels J. (2021). Analysis of spatial cue distortions in HRTFs using a simplified head model. DAGA 2021. https://pub.dega-akustik.de/DAGA_2021/data/articles/000125.pdf
+27. Camden / Camlins, Bertram Street edge paving detail (200 × 100 × 100 mm granite setts with 10 mm joints, 8-12 mm tolerance; one project's drawing, not a general standard). https://camdocs.camden.gov.uk/CMWebDrawer/Record/10108245/file/document
+28. Wikipedia, Sett (paving). Background only; gives no dimensions or joint widths and is not cited for size. https://en.wikipedia.org/wiki/Sett_(paving)
+29. Doma S., Fels J. (2021). Analysis of spatial cue distortions in HRTFs using a simplified head model. DAGA 2021 (resonator-sphere radius about 8 cm; "so-called bright spot" on the averted side; no frontal gain figure). https://pub.dega-akustik.de/DAGA_2021/data/articles/000125.pdf
 
-Links were checked by a separate verification pass. Pages that could not be reached are listed as "not checked"; none is listed here.
+Links were checked on 2026-10-18 by fetching each page. [18]: page confirmed, per-material values not compared. [4] and [16] were read only in part.
 
 ## License
 
