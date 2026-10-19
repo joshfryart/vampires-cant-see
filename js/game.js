@@ -1390,7 +1390,7 @@
     if (S.view === 'top') {
       VCS.Render.drawTopDown(r, S.world, S.player, S.sonar, S.clock, { people: S.people });
     } else {
-      const ro = { bob: S.bob, people: S.people, ripple: S.ripple, lit: S.playerLit };
+      const ro = { bob: S.bob, people: S.people, ripple: S.ripple, lit: S.playerLit, debug: S.debugEnabled };
       const wr = fxv('warmRadius');
       if (wr > 0 && S.people) ro.warm = { radius: wr, people: S.people.people.map(function (p) { return { x: p.x, y: p.y }; }) };
       const dk = S.drink;

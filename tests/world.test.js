@@ -447,26 +447,28 @@ describe('world-v06.test.js', () => {
   // World: lights ---------------------------------------------------------------
 
   test('lightAt: full inside half the radius, linear falloff, zero at the radius', () => {
-    const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3 }] }));
+    // torch light 12 -> core radius 12 * LIGHT_SCALE 0.6 = 7.2; light at cell (3,3), centre (3.5,3.5)
+    const w = World.load(def(box(40, 9), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] }));
     assert.strictEqual(w.lights.length, 1);
     assert.strictEqual(w.lightAt(3.5, 3.5), 1);
-    assert.strictEqual(w.lightAt(4.5, 3.5), 0);                       // 1 cell > radius 0.45 (3 * LIGHT_SCALE 0.15): own cell only
-    const w2 = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // radius 12 * 0.2 = 2.4
-    assert.ok(Math.abs(w2.lightAt(5.5, 3.5) - (2 - 2 * 2 / 2.4)) < 1e-6); // 2 cells: 2 - 2*2/2.4
-    assert.strictEqual(w2.lightAt(6.5, 3.5), 0);                      // 3 cells > radius 2.4
-    assert.strictEqual(w.lightAt(12.5, 3.5), 0);
+    assert.strictEqual(w.lightAt(6.5, 3.5), 1);                       // 3 cells <= half radius 3.6
+    assert.ok(Math.abs(w.lightAt(8.5, 3.5) - (2 - 2 * 5 / 7.2)) < 1e-6); // 5 cells: 2 - 2*5/7.2
+    assert.ok(Math.abs(w.lightAt(10.5, 3.5) - (2 - 2 * 7 / 7.2)) < 1e-6); // 7 cells: just inside the radius
+    assert.strictEqual(w.lightAt(11.5, 3.5), 0);                      // 8 cells > radius 7.2
+    assert.strictEqual(w.lightAt(12.5, 3.5), 0);                      // 9 cells > radius 7.2
+    assert.strictEqual(w.lightAt(30.5, 3.5), 0);
   });
 
   test('outerAt is faint-positive just outside the core radius', () => {
-    const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // core 2.4
-    assert.strictEqual(w.lightAt(6.5, 3.5), 0);
-    assert.ok(w.outerAt(6.5, 3.5) > 0 && w.outerAt(6.5, 3.5) < 1);
+    const w = World.load(def(box(40, 9), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // core 7.2, outer 12.96
+    assert.strictEqual(w.lightAt(12.5, 3.5), 0);                      // 9 cells: outside core
+    assert.ok(w.outerAt(12.5, 3.5) > 0 && w.outerAt(12.5, 3.5) < 1);  // inside outer 12.96
     assert.strictEqual(w.lightSources().length, 1);
   });
 
   test('outerAt is 0 beyond 1.8x the core radius', () => {
-    const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // outer 2.4 * 1.8 = 4.32
-    assert.strictEqual(w.outerAt(8.5, 3.5), 0);
+    const w = World.load(def(box(40, 9), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // outer 7.2 * 1.8 = 12.96
+    assert.strictEqual(w.outerAt(18.5, 3.5), 0);                      // 15 cells > 12.96
     assert.strictEqual(w.outerAt(-1, -1), 0);
   });
 

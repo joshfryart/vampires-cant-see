@@ -57,6 +57,21 @@ describe('render-feed.test.js', () => {
     return r.octx.calls.filter((c) => c.fn === 'stroke' && c.stroke === '#ff8a78');
   }
 
+  test('drawLightRadiiDebug draws no strokes when debug is off, strokes when on', () => {
+    const { r, sonar } = setup();
+    const world = VCS.World.load(VCS.MapData.maps.town, { requireStart: false });
+    r.horizon = r.oh / 2;
+    const L = world.lightSources();
+    assert.ok(L.length > 0, 'town has lights');
+    const p = { x: L[0].x - 3, y: L[0].y, angle: 0 };
+    VCS.Sonar.emit(sonar, world, p.x, p.y, 0);
+    const t = 0.3;
+    r.octx.calls.length = 0;
+    Render.drawLightRadiiDebug(r, world, sonar, t, p, Math.tan(0.57), false);
+    assert.strictEqual(r.octx.calls.filter((c) => c.fn === 'stroke').length, 0);
+    Render.drawLightRadiiDebug(r, world, sonar, t, p, Math.tan(0.57), true); // must not throw
+  });
+
   test('feedLock draws the victim echo coral at 1.6px, even when faded', () => {
     const f = setup();
     const people = { echoes: [echo(7, 0), echo(8, 0)] };

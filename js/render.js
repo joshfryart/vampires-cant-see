@@ -2866,6 +2866,53 @@
   }
 
   /** Draw the first-person sonar view onto the main canvas. */
+  const DBG_INK = '#cfe3ff';
+  const DBG_SOLID = [];
+  const DBG_DOT = [3, 4];
+  const DBG_SEG = 48;
+
+  function dbgRing(r, player, cx, cy, rad, halfW, tanHalf) {
+    const ctx = r.octx;
+    let pen = false;
+    ctx.beginPath();
+    for (let i = 0; i <= DBG_SEG; i++) {
+      const a = (i / DBG_SEG) * TWO_PI;
+      if (project(player, cx + Math.cos(a) * rad, cy + Math.sin(a) * rad, halfW, tanHalf)) {
+        const y = r.horizon + 0.5 * (r.oh / proj.fwd);
+        if (pen) ctx.lineTo(proj.sx, y); else ctx.moveTo(proj.sx, y);
+        pen = true;
+      } else {
+        pen = false;
+      }
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * Devtool (?debug=1 only): while a pulse has reached a light, draw its core radius (solid) and outer halo
+   * (dotted, 1.8 x core) as thin dim ellipses on the first-person floor plane. Does nothing when debug is off.
+   */
+  function drawLightRadiiDebug(r, world, sonar, t, player, tanHalf, debug) {
+    if (!debug || !world || !sonar || !player || typeof world.lightSources !== 'function') return;
+    if (!(sonar.pulses && sonar.pulses.length)) return;
+    const src = world.lightSources();
+    const ctx = r.octx;
+    const halfW = r.ow / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = DBG_INK;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < src.length; i++) {
+      const L = src[i];
+      if (litAt3(sonar, L.x, L.y, 0.3, t) <= 0.01) continue;
+      ctx.setLineDash(DBG_SOLID);
+      dbgRing(r, player, L.x, L.y, L.radius, halfW, tanHalf);
+      ctx.setLineDash(DBG_DOT);
+      dbgRing(r, player, L.x, L.y, L.radius * 1.8, halfW, tanHalf);
+    }
+    ctx.restore();
+  }
+
   function drawFirstPerson(r, world, player, sonar, t, opts) {
     const ctx = r.ctx;
     ctx.globalCompositeOperation = 'source-over';
@@ -2920,6 +2967,7 @@
     }
     if (anyPulse) { try { drawn += drawProps(r, world, player, sonar, t, tanHalf); } catch (e) { logOnce(r, 'props', e); } }
     if (anyPulse) echoes = drawEchoes(r, people, sonar, t, player, tanHalf);
+    if (opts && opts.debug) { try { drawLightRadiiDebug(r, world, sonar, t, player, tanHalf, true); } catch (e) { logOnce(r, 'lightdbg', e); } }
     r.echoesDrawn = echoes;
     r.sprites = drawn + echoes;
     // v0.10.5: torch and brazier flames/holders are drawn only by drawProps (ripple + afterglow).
@@ -3171,6 +3219,7 @@
     create: create,
     setConfig: setConfig,
     drawFirstPerson: drawFirstPerson,
+    drawLightRadiiDebug: drawLightRadiiDebug,
     drawTopDown: drawTopDown,
     drawHud: drawHud,
     drawWipe: drawWipe,
