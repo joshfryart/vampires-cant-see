@@ -3146,6 +3146,9 @@
       S.ctx.imageSmoothingEnabled = false;
       fitCanvas();
       S.input = VCS.Input.create(S.canvas, S.config);
+      if (S.input && typeof S.input.setLockGate === 'function') {
+        S.input.setLockGate(function () { return S.state === 'playing' || S.state === 'feeding' || S.state === 'sleeping'; });
+      }
       const c = S.config;
       const num = function (v, d) { return typeof v === 'number' ? v : d; };
       S.sonar = VCS.Sonar.create({

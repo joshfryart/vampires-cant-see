@@ -30,6 +30,7 @@
     let dragging = false;
     let dragMoved = 0;
     let suppressLock = false;
+    let lockGate = null;
     const cfgOn = function (k, d) {
       const v = config && config[k];
       return typeof v === 'boolean' ? v : d;
@@ -184,6 +185,11 @@
     }
     function onCanvasClick() {
       if (suppressLock) { suppressLock = false; return; }
+      if (lockGate) {
+        let ok = false;
+        try { ok = !!lockGate(); } catch (err) { ok = false; }
+        if (!ok) return;
+      }
       if (!locked()) requestLock();
     }
 
@@ -244,6 +250,8 @@
       isLocked: locked,
       /** Ask the browser for pointer lock. */
       requestLock: requestLock,
+      /** Gate for click-initiated pointer lock: fn() returns true to allow. */
+      setLockGate: function (fn) { lockGate = typeof fn === 'function' ? fn : null; },
       /** Remove all listeners. */
       destroy: function () {
         root.removeEventListener('keydown', onKeyDown);

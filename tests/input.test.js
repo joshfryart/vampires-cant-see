@@ -177,6 +177,25 @@ describe('input-feed.test.js', () => {
     t2.inp.destroy();
   });
 
+  test('lock gate blocks canvas-click pointer lock when false, allows when true', () => {
+    let n = 0;
+    const t = setup({}, { requestPointerLock() { n++; } });
+    let allow = false;
+    t.inp.setLockGate(() => allow);
+    t.c.fire('click', {});
+    assert.strictEqual(n, 0);
+    allow = true;
+    t.c.fire('click', {});
+    assert.strictEqual(n, 1);
+    t.inp.setLockGate(() => { throw new Error('boom'); });
+    t.c.fire('click', {});
+    assert.strictEqual(n, 1);
+    t.inp.setLockGate(null);
+    t.c.fire('click', {});
+    assert.strictEqual(n, 2);
+    t.inp.destroy();
+  });
+
   test('successful pointerlockchange clears lockUnavailable; isLocked reflects state', () => {
     const t = setup({}, { requestPointerLock() {} });
     (t.dls.pointerlockerror || []).forEach((f) => f());
