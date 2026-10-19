@@ -196,12 +196,12 @@ describe('audio.test.js', () => {
     assert.ok(Math.abs(peakOf(gain) - 0.7 * 0.35) < 1e-9);
   });
 
-  test('echo with delay above 2 seconds does nothing', () => {
+  test('echo with delay above 6 seconds does nothing', () => {
     const { FakeAudioContext } = makeFakeContext();
     setGlobal('AudioContext', FakeAudioContext);
     const a = Audio.create();
     Audio.unlock(a);
-    Audio.echo(a, 2.5, 1);
+    Audio.echo(a, 6.5, 1);
     Audio.echo(a, Infinity, 1);
     Audio.echo(a, -0.1, 1);
     Audio.echo(a, NaN, 1);
@@ -399,7 +399,7 @@ describe('audio.test.js', () => {
     Audio.play(a, 'doorOpen');
     assert.strictEqual(ctx.filters[0].type, 'bandpass');
     const before = ctx.oscillators.length;
-    Audio.play(a, 'step', { delay: 3 });
+    Audio.play(a, 'step', { delay: 7 });
     Audio.play(a, 'step', { gain: 0 });
     assert.strictEqual(ctx.oscillators.length, before);
   });

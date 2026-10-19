@@ -12,7 +12,7 @@
   const TAIL_SEC = 0.12;
   const FLOOR_GAIN = 0.0001;
   const ECHO_FILTER_HZ = 2200;
-  const MAX_ECHO_DELAY = 2;
+  const MAX_ECHO_DELAY = 6;
   const STEP_HZ = 120;
   const STEP_SEC = 0.04;
   const STEP_GAIN = 0.08;
