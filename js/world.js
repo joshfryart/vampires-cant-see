@@ -22,7 +22,7 @@
   const PROP_TYPES = ['gravestone', 'cross', 'barrel', 'table', 'chair', 'bench', 'well', 'torch', 'brazier'];
   const NON_SOLID = { cross: true, torch: true };
   const DEFAULT_LIGHT = { torch: 3, brazier: 3.5 };
-  const LIGHT_SCALE = 0.15; // v0.10.5: light radius x0.15 (was 0.75 in v0.10.4; torches lit too much)
+  const LIGHT_SCALE = 0.2; // v0.10.8: light radius x0.2 (was 0.15 in v0.10.5)
   const PROP_R = 0.3;
   const MAX_W = 64;
   const MAX_H = 48;
