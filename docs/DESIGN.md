@@ -157,7 +157,7 @@ Source: `js/data/sounds.js`, `js/audio.js`, `js/game.js` (`spatial`, `occludedTo
 - Glass windows (`w`) let light through; they still block movement and sonar.
 - No drawn light circles or rings. Light shows only as: the warm screen-edge glow (alpha = `lightAt(player)^1.2 * 0.5`, steady, `Render.edgeGlowAlpha`); torch/brazier flame and holder under a sonar wavefront (any height reached, fades with the afterglow); floor/wall spill only where the ripple has passed.
 - Two zones per light: the core (`lightAt`, the torch radius) and a faint outer halo (`outerAt`, radius = 1.8 x core, same falloff shape and occlusion). Edge glow level = `max(core, 0.35 * outer)` through `Render.edgeZoneAlpha` (outer never above 35%).
-- Edge glow is directional (`edgeSides` in `js/render.js`): lights within 3 x radius are weighted by their outer value at the player and averaged as bearing relative to facing. The side facing the light gets x(1 + 0.6|side|), the far side x(1 - 0.6|side|) (0.4 at full side); the top edge gets x(0.5 + 0.5 max(0, cos)). No light nearby: no glow. No flicker, no drawn circle.
+- Edge glow is directional (`edgeSides` in `js/render.js`; bearing low-passed 0.15 per frame, direct under reduced motion; 8-stop smoothstep gradients): lights within 3 x radius are weighted by their outer value at the player and averaged as bearing relative to facing. The side facing the light gets x(1 + 0.6|side|), the far side x(1 - 0.6|side|) (0.4 at full side); the top edge gets x(0.5 + 0.5 max(0, cos)). No light nearby: no glow. No flicker, no drawn circle.
 - Nothing about light flickers: flames keep a fixed size (tip sways < 1 Hz, brightness constant); window candle glow is steady.
 - Fire sound: no pulse or interval. Within 1.5 cells of a torch, `Audio.fireBed` plays a quiet lowpass (2.5 kHz) noise bed (max 0.035 x volume), panned to the torch, fading to 0 at 1.5 cells; 2 nearest torches; only while playing or feeding.
 
@@ -362,7 +362,7 @@ Tutorial hints (`game.js`, one per browser, shown under the crosshair, one at a 
 
 The far safe spot pays +5 Essence.
 
-Light rule: every door, gate and safe spot in the town must be reachable from the crypt door along cells with `lightAt` < 0.6 (checked in `tests/maps.test.js`); torches go on wall faces or verges, not the road centre.
+Light rule: every door, gate and safe spot in the town must be reachable from the crypt door along cells with `lightAt` < 0.6, and every door and the gate along cells < 0.3 (checked in `tests/maps.test.js`); torches go on wall faces or verges, not the road centre.
 
 ## 11. HUD and controls (640 x 360 internal canvas)
 

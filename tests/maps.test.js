@@ -283,13 +283,13 @@ test('town: crypt has one C and no S; town has 3 safe spots, all dark with dark 
   });
 });
 
-test('town: every door, gate and safe spot has a dark route (lightAt < 0.6) from the crypt door', () => {
+function darkRouteCheck(limit, chars, minTargets) {
   const def = MapData.maps.town;
   const w = all().worlds.town;
   const rows = def.rows;
   const start = def.doors.find((d) => d.id === 'mausoleum');
   const free = (c, r) => r >= 0 && r < rows.length && c >= 0 && c < rows[r].length &&
-    !World.WALLS.includes(rows[r][c]) && w.lightAt(c + 0.5, r + 0.5) < 0.6;
+    !World.WALLS.includes(rows[r][c]) && w.lightAt(c + 0.5, r + 0.5) < limit;
   const seen = new Set([start.col + ',' + start.row]);
   const queue = [[start.col, start.row]];
   while (queue.length) {
@@ -302,12 +302,20 @@ test('town: every door, gate and safe spot has a dark route (lightAt < 0.6) from
   let targets = 0;
   rows.forEach((row, r) => {
     for (let c = 0; c < row.length; c++) {
-      if (!'DGS'.includes(row[c])) continue;
+      if (!chars.includes(row[c])) continue;
       targets++;
       assert.ok(seen.has(c + ',' + r), 'no dark route to ' + row[c] + ' at ' + c + ',' + r);
     }
   });
-  assert.ok(targets >= 11, 'targets ' + targets);
+  assert.ok(targets >= minTargets, 'targets ' + targets);
+}
+
+test('town: every door, gate and safe spot has a dark route (lightAt < 0.6) from the crypt door', () => {
+  darkRouteCheck(0.6, 'DGS', 11);
+});
+
+test('town: every door and the gate have a darker route (lightAt < 0.3) from the crypt door', () => {
+  darkRouteCheck(0.3, 'DG', 8);
 });
 
 test('town hides: 6-10 dark floor cells', () => {

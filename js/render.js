@@ -206,15 +206,19 @@
         const cx = c.getContext('2d');
         if (!cx) return null;
         const g = cx.createLinearGradient(x0, y0, x1, y1);
-        g.addColorStop(0, 'rgba(255,150,50,0.55)');
-        g.addColorStop(1, 'rgba(255,150,50,0)');
+        // Smoothstep fade over 8 stops: no visible band edge as the glow scales in and out.
+        for (let i = 0; i <= 7; i++) {
+          const u = i / 7;
+          const k = 1 - u * u * (3 - 2 * u);
+          g.addColorStop(u, 'rgba(255,150,50,' + (0.55 * k).toFixed(4) + ')');
+        }
         cx.fillStyle = g;
         cx.fillRect(0, 0, W, H);
         return c;
       };
-      const sl = mk(0, 0, W * 0.4, 0);
-      const sr = mk(W, 0, W * 0.6, 0);
-      const st = mk(0, 0, 0, H * 0.4);
+      const sl = mk(0, 0, W * 0.45, 0);
+      const sr = mk(W, 0, W * 0.55, 0);
+      const st = mk(0, 0, 0, H * 0.5);
       if (sl && sr && st) r.warmSide = { left: sl, right: sr, top: st };
     } catch (e) {
       r.warmSide = null;
@@ -2710,16 +2714,21 @@
   /**
    * Directional edge glow for the player: { left, right, top } alphas (0..1).
    * Stronger on the side facing nearby lights, weak on the far side. All zero with no light nearby.
+   * Optional state ({ out, cos, side, init }) low-passes the bearing (0.15 per frame) so turning
+   * does not snap; with reduced true the target is used directly. Without state the call is pure.
    */
-  function edgeSides(world, player) {
-    const out = { left: 0, right: 0, top: 0 };
+  function edgeSides(world, player, state, reduced) {
+    const out = state && state.out ? state.out : { left: 0, right: 0, top: 0 };
+    out.left = 0;
+    out.right = 0;
+    out.top = 0;
     if (!world || !player || typeof world.outerAt !== 'function' || typeof world.lightSources !== 'function') return out;
     const px = player.x;
     const py = player.y;
     const core = world.lightAt(px, py);
     const outer = world.outerAt(px, py);
     const ea = edgeZoneAlpha(core, outer);
-    if (!(ea > 0)) return out;
+    if (!(ea > 0)) { if (state) state.init = false; return out; }
     const srcs = world.lightSources();
     let sx = 0;
     let sy = 0;
@@ -2739,9 +2748,18 @@
       if (d > 0.05) { sx += w * Math.cos(rel); sy += w * Math.sin(rel); }
       sw += w;
     }
-    if (!(sw > 0)) return out;
-    const cosRel = sx / sw;
-    const side = Math.max(-1, Math.min(1, sy / sw));
+    if (!(sw > 0)) { if (state) state.init = false; return out; }
+    let cosRel = sx / sw;
+    let side = Math.max(-1, Math.min(1, sy / sw));
+    if (state) {
+      if (!state.init || reduced) { state.cos = cosRel; state.side = side; state.init = true; }
+      else {
+        state.cos += (cosRel - state.cos) * 0.15;
+        state.side += (side - state.side) * 0.15;
+      }
+      cosRel = state.cos;
+      side = state.side;
+    }
     const a = Math.abs(side);
     const near = 1 + 0.6 * a;
     const far = 1 - 0.6 * a;
@@ -2759,7 +2777,8 @@
     if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
     if (world && player && r.warmSide) {
       // Zoned, directional edge glow (core + faint outer halo), steady.
-      const e = edgeSides(world, player);
+      if (!r.edgeState) r.edgeState = { out: { left: 0, right: 0, top: 0 }, cos: 0, side: 0, init: false };
+      const e = edgeSides(world, player, r.edgeState, r.reduced);
       ctx.globalCompositeOperation = 'lighter';
       if (e.left > 0.002) { ctx.globalAlpha = e.left; ctx.drawImage(r.warmSide.left, 0, 0); }
       if (e.right > 0.002) { ctx.globalAlpha = e.right; ctx.drawImage(r.warmSide.right, 0, 0); }
