@@ -1,281 +1,267 @@
 # Vampires Can't See
 
-*A first-person night walk through a small town, played by sound alone: click, listen, and watch the echoes draw the world.*
+A first-person browser game. You are a vampire. You echolocate like a bat:
+each click sends out a sonar pulse that lights up the walls around you.
+At night, go out to find people and get back to your crypt or a safe dark
+space before dawn, so you can sleep through the day.
 
-`v0.10.3` · `plain JavaScript` · `no build step` · `504 unit tests` · `Playwright smoke test`
+Current build (v0.10.0): sonar pulse, first-person outline view, settings, people
+who walk set paths through the maps, one night at a time (feed, sleep
+and dawn; see Night rules below), a main menu, an upgrade shop, night boons,
+random runs and saves. You never see a person directly:
+when a pulse reaches them it leaves a fading echo of their outline where
+they were, so repeated pulses show you where they are heading. Walls quiver
+as the wavefront passes and struck people send out small rings of their own.
 
----
+The look is quirky and hand-drawn: lines wobble ("boil") a few times a
+second, the title is drawn letter by letter on a crooked baseline with a
+little bat, and menus have uneven, slightly tilted borders. Sounds come
+from where they happen: footsteps are tiny rings on the floor at the foot
+that landed (left and right alternate), so they light only wall bases, while
+your ping comes from head height. The audio is cartoonish (bip ping,
+creaky doors, hollow tok). If the wobble bothers you, turn off
+**Wobbly lines** in Settings.
 
-## What it is
+## How to play
 
-You are a blind vampire. The screen is dark. A click sends out sonar, like a bat's, and the rings wrap around walls, doors, props and people in a minimal outline. You use that outline to move through a small town and into its interiors, find people to feed on, and reach your crypt or another dark, safe space before dawn.
+Double-click `index.html` to open the game. No install or server is needed.
 
-It is plain JavaScript in the browser: no framework, no bundler, no install.
+- Click to start (this also locks the mouse for turning).
+- Left-click or Space: send a sonar pulse (the walls around you light up
+  and fade)
+- E: open or close a door in front of you (walking into a closed door also
+  opens it); sleep at your crypt or a safe spot (crypt and safe spots
+  answer with a knock)
+- Hold right-click or R: grab and drink from a person within 1.5 cells in front
+  of you (even one who has noticed you or is cowering). Let go, left-click,
+  Space or Esc to stop; you cannot move or look while drinking. With "Click to
+  start/stop drinking" on in Settings, click instead of holding. Drinking with
+  nobody in reach plays a soft miss sound
+- Q shriek · Shift or C mist · F still: use a power (see Powers)
+- M: toggle the top-down map view (debug builds only, `?debug=1`)
+- W / S: move forward / back
+- A / D: strafe left / right
+- Mouse: turn (with the mouse not locked, drag with the left button to look)
+- Up / Down arrows: move forward / back
+- Left / Right arrows: turn
+- Esc: pause (Esc again or Resume to continue)
+- F3: toggle the debug overlay
 
-```mermaid
-flowchart LR
-    A([Dusk: leave the crypt]) --> B[Hunt: click, listen, navigate]
-    B --> C{Fed?}
-    C -- yes --> D[Watch the clock]
-    C -- no --> B
-    D --> E([Dawn approaches])
-    E --> F{Reached a dark<br/>safe space?}
-    F -- yes --> G[Shelter and sleep<br/>save, spend Essence]
-    F -- no --> H[Sunlight: night lost]
-    G --> A
-```
+Sound: browsers block audio until the page gets a click, so click the title
+screen once to turn sound on.
 
-A night lasts 6 minutes. Hunger, fear and the powers (shriek, mist, still) shape the hunt. Essence buys permanent upgrades between nights.
+## Tips
 
-## How sonar works
+Listen for breathing: people close to you breathe audibly, so the sound tells
+you where they are. The crypt bell rings every 20 to 40 seconds from the
+direction of your crypt, so follow it home. Light means you can be seen:
+torchlight shows you to people, so drink and hide in the dark.
 
-A click (left mouse button or Space) leaves the mouth, spreads as a beam that is loudest straight ahead, and travels outward. Where it meets a wall or object, the surface sends part of it back. The echo reaches your ears later and quieter, and the screen draws it as an expanding ring that brightens where the reflection is strong.
+## Night rules
 
-```mermaid
-flowchart LR
-    S([Click at the mouth]) --> B[Beam<br/>loudest ahead,<br/>weaker to the sides and rear]
-    B --> W[Wall or object<br/>absorbs some, reflects some]
-    W --> E[Echo<br/>delayed and quieter]
-    E --> H([Your ears:<br/>stereo pan + ring on screen])
-```
+- A night runs from 20:00 to 06:00. Real time for one night is set by
+  `nightLengthMin` in the config (default 6 minutes).
+- Blood starts at 60 out of 100 and drains over the night. Drinking (hold right-click)
+  fills the bar while each person's own blood pool (18 to 32) lasts; the flow
+  is faster when they are full and slows as they empty, capped at 100. A drained person stays still for the night. Let go early
+  and they are dazed for 3 s, then run off silently with what is left. Below 25 blood you are weak: your pulses
+  get shorter and dimmer.
+- Drink in the dark. Your victim's heartbeat sends out a pulse that grows as
+  you drink, and anyone near it freezes and turns toward the sound. If another
+  person sees you (torchlight, or within 1 cell) they flee and the drink ends.
+  Grabbing someone from the front makes them gasp.
+- At 05:00 a bell chime sounds. From 05:30 your pulses fade outdoors.
+- At 06:00 dawn comes. If you are outdoors then, the run is lost. Indoors
+  you can keep going, but stepping outside while it is day loses the run.
+- Sleep at the crypt or a safe spot (E) to end the night. Survive five
+  nights to win the run.
+- The farthest safe spot in town pays +5 Essence each time you sleep there.
 
-What you can read from an echo today: direction (stereo pan and where the ring lands), distance (delay and ring timing), and whether you are indoors or outdoors (room tone).
+## Blood gifts
 
-## The maths (planned v0.11)
+Drink while your blood is full and the extra fills the **overflow** bar. When
+it is full, the drink ends and you pick one of three gifts (keys 1, 2, 3 or
+click). The first costs 40 overflow, the second 60. Two gifts per night at
+most; after that, drinking at full blood works as before. The count resets
+when you sleep. Each gift adds 2 Essence at the end of the run.
 
-> Status: designed from cited sources; not validated against measurements. None of this is in the game yet. It is specified in `docs/SPEC-echoes.md` (to be pushed) and will ship in stages behind flags that default to off.
-
-**Tags used on every value**
-
-| Tag | Meaning |
+| Gift | Effect |
 |---|---|
-| **[source]** | Equation or value from a cited paper or reference; the form and arithmetic were checked against the standard textbook form |
-| **[computed]** | Derived by the stated formula |
-| **[estimate]** | Engineering judgement, no measurement behind it |
-| **[tuning]** | Gameplay knob, no physical claim |
+| Keener Ear | Sonar range ×1.05 |
+| Longer Echo | Sonar fade time ×1.05 |
+| Quicker Call | Pulse cooldown ×0.95 |
+| Slower Thirst | Blood drain ×0.95 |
+| Deeper Draw | Drink rate ×1.08 |
+| Quieter | Noise ×0.95 |
+| Calm Town | Fear −2 |
+| Reserve | +10 blood at the start of the next night |
 
-**Conventions.** Levels are in dB of intensity, relative to the direct click at 1 m on the beam axis. Distances are in metres: $r = d \cdot cellM$, with $d$ in cells and $cellM = 1.0$ m per cell. $c = 343$ m/s (standard value for air at 20 °C) [estimate].
+## Powers
 
-### The mouth beam
+Spend blood to use a power. Each one unlocks on a night and has its own
+cooldown. Costs and cooldowns never change. You cannot use a power you cannot pay for.
 
-The beam shape follows a fit to measured mouth clicks of blind expert echolocators [1][2], read as relative intensity. A head is modelled as a rigid sphere in [3][4][5][29]; its rear "bright spot" is left out because a real head and torso break it. The sphere gives about +6 dB high-frequency gain on the near side (pressure doubling, [4]); no frontal gain figure is taken from [3]-[5] or [29], and the beam's own shape comes from [1][2] only. The beam is applied once, on the outgoing click.
-
-| Angle from facing | 0° | 30° | 60° | 90° | 120° | 150° | 180° |
-|---|---|---|---|---|---|---|---|
-| $B_{tx}$ (dB) | 0 | -1 | -3 | -5 | -8 | -13 | -18 |
-| Tag | [computed] | [computed] | [computed] | [computed] | [computed] | [computed] | [tuning] |
-
-Values from 0° to 150° are the fit mean rounded to 1 dB. The 180° value is a floor. Between nodes the beam is linear in dB and symmetric left to right. The receive side is 0 dB by default [tuning]; left and right come from stereo pan only.
-
-### Echo level
-
-A flat wall acts as a mirror: the echo behaves like a source at twice the distance, so it loses 6 dB per doubling [6]. A compact object or person re-radiates, so it loses 12 dB per doubling, and its strength is its target strength $TS$ [6].
-
-Wall (specular, at the point where the ray meets the wall at 90°):
-
-$$L_{wall}=B_{tx}(\theta)-20\log_{10}\!\frac{2\max(r,r_{min})}{1\,\mathrm{m}}+10\log_{10}(1-\alpha)+10\log_{10}(1-s)-2r\,a(f)$$
-
-Object or person (sonar equation, $TS$ in dB re 1 m):
-
-$$L_{obj}=B_{tx}(\theta)-40\log_{10}\!\frac{\max(r,r_{min})}{1\,\mathrm{m}}+TS-2r\,a(f)$$
-
-| Value | Number | Tag |
-|---|---|---|
-| $r_{min}$ (near-field clamp) | 0.5 m | [tuning] |
-| $TS$, prop of radius 0.3 m: $10\log_{10}(a^2/4)$ | -16.5 dB | [computed] [6] |
-| $TS$, person | -15 dB (plausible range -20 to -5) | [estimate] |
-| Absorption $\alpha$ of stone, brick, glass, wood | within about 0.5 dB of each other in the level term | [source] [19][23] |
-| Grass, $10\log_{10}(1-\alpha)$ at $\alpha=0.6$ | -4.0 dB | [computed] [26] |
-
-People absorb sound [21], but per-person figures are absorption areas, not a coefficient, so people use $TS$ instead of $\alpha$.
-
-The energy that hits a surface is split three ways, each from the incident energy: absorbed $\alpha$, specular $(1-\alpha)(1-s)$, diffuse $(1-\alpha)s$. Rough surfaces such as cobbles scatter more [22][23]. A surface counts as rough when its bumps exceed the Rayleigh limit [24][25]; the smooth/rough label for visuals uses $\sigma_h<\lambda/(32\cos\theta_i)$, 0.315 cm at 3.4 kHz and normal incidence [computed]. The Rayleigh form $\lambda/(8\cos\theta_i)$ is from [25]; [24] gives only the normal-incidence form $\lambda/8$. Cobble size (200 × 100 × 100 mm setts, 10 mm joints) is from one Camden drawing [27] [estimate]; any 100-200 mm range is a design choice [tuning].
-
-Game calibration, which is not physics, is applied afterwards: $L_{game}=G_{class}+\kappa L_{phys}$ with $\kappa\in[0,1]$ [tuning].
-
-### Air absorption
-
-Over the round trip the loss is $2r\,a(f)$, with $a(f)$ computed from the ISO 9613-1 equations (method only; [15] gives no tabulated values) at 10 °C and 70 % relative humidity [computed].
-
-| f (Hz) | 500 | 1k | 2k | 3.4k | 4k | 8k |
+| Power | Key | Unlock night | Cost | Cooldown | Fear | Effect |
 |---|---|---|---|---|---|---|
-| $a$ (dB/m) | 0.0019 | 0.0037 | 0.0097 | 0.0245 | 0.0331 | 0.1184 |
+| Shriek | Q | 1 | 15 | 6 s | +2 | Pulse reaches twice as far; people react from 2.5× startle distance. Still does not silence it |
+| Mist | Shift | 2 | 10 | 3 s | +1 | Dash 2 cells along your move direction (or facing, if idle); stops at walls. Silent, and bumps go unnoticed |
+| Still | F | 3 | 10 | 12 s | +1 | For 5 s, your pings, doors and footsteps do not alert people, and bumps go unnoticed |
 
-Over a 20 m path that is 0.49 dB at 3.4 kHz and 2.37 dB at 8 kHz: small, so it only matters for a high-pitched ping.
+## Fear
 
-### Sound through walls (mass law)
+Fear runs from 0 to 15. It is shown as eyes near the dawn clock, three fear
+per eye, up to five eyes.
 
-$$TL(f)\approx 20\log_{10}(m f)-47$$
+- Rises +1 the first time you grab each person in a night.
+- Shriek +2, Mist +1, Still +1.
+- Sleep −5 (not below 0). Calm Town gift −2.
+- Higher fear makes people startle and flee sooner: startle distance rises
+  4% per point (up to +60%), flee speed 1.5% per point (up to +20%), and they
+  take longer to calm down (up to +60%).
 
-$m$ is surface mass in kg/m² and $f$ in Hz. The constant is -48 dB for random incidence [source] [7] and -47 dB for field incidence [source] [8]; the game uses -47. The normal-incidence constant (about -42.4, from $20\log_{10}(\pi/\rho c)$ with $\rho c=413$) is derived here, not in a cited source [computed]. Mixed walls (a door with a gap) combine by transmitted power: $\bar\tau=\sum S_i10^{-TL_i/10}/\sum S_i$, $TL=-10\log_{10}\bar\tau$ [computed]. A door with a 1 % open gap is limited to about 20 dB [computed].
+## Drain ramp
 
-Glass has a weak spot at its critical frequency, $f_c=c^2/(1.814\,c_L\,t)$ [computed]. For 4 mm glass that is 2989 Hz and for 6 mm glass 1993 Hz [computed]; the 3000 Hz for 4 mm glass comes from a trade source [9] and our 2989 Hz agrees. [10] is qualitative only and gives no 4 mm value. Brick and stone are capped at 55 and 65 dB [tuning] and are effectively silent; sound reaches you only by going around them.
+Blood drains faster each night. Night N drains at (1 + 0.12 × (N − 1)) times
+the base rate: night 1 is 1.0×, night 5 is 1.48×.
 
-### Around corners (Maekawa)
+## Main menu
 
-With $N=2\delta/\lambda$ and $\delta$ the extra path over the edge [source] [11]:
+- **Continue**: resume the saved run (off when there is no run saved).
+- **New run**: start a fresh run. If a run is in progress, click twice to
+  abandon it; an abandoned run counts as a loss.
+- **Shop**: spend essence on upgrades.
+- **Stats**: runs, wins, nights survived, people fed, best nights and essence earned.
+- **Export save** / **Import save**: download your progress as a `.json` file,
+  or load one.
 
-$$\Delta L=\begin{cases}0 & \text{line of sight clear}\\[2pt] \min\!\big(C_{cap},\,10\log_{10}(3+20N)\big) & \text{line of sight blocked, edge path exists}\\[2pt] \text{no path} & \text{fully occluded}\end{cases}$$
+## Essence
 
-Grazing incidence ($N=0$) gives 4.77 dB [computed]. $C_{cap}=24$ dB [tuning]. A clear line of sight is exactly 0 dB, so the formula never adds loss to an open view.
+Essence is the currency for the shop. A run ends with
+**nights survived × 4 + people fed**, plus **15 for a win**, **2 for each
+blood gift** taken, and **5 for each sleep at the far safe spot**. You get the
+essence when the run ends, whether you win, lose or abandon it.
 
-### Rooms
+## Upgrade shop
 
-Reverberation time from room volume $V$ and absorption $A=S\bar\alpha+4mV$, where $m=a/4.343$ is the air term [source] [12][13]:
+Each upgrade has three tiers. Costs are 5, 12 and 25 essence for tiers 1 to 3.
+A tier sets the effect; it does not add to earlier tiers.
 
-$$T_{60}=\frac{0.161\,V}{A}$$
+| Upgrade | Effect | Tier 1 | Tier 2 | Tier 3 |
+|---|---|---|---|---|
+| Far Echo | Sonar range | ×1.15 | ×1.3 | ×1.45 |
+| Lingering Echo | Sonar fade time | ×1.2 | ×1.4 | ×1.6 |
+| Quick Call | Pulse cooldown | ×0.9 | ×0.8 | ×0.7 |
+| Full Veins | Starting blood | +10 | +20 | +30 |
+| Slow Thirst | Blood drain | ×0.9 | ×0.8 | ×0.7 |
+| Deep Draw | Drink rate | ×1.15 | ×1.3 | ×1.45 |
+| Soft Step | Startle radius | ×0.85 | ×0.7 | ×0.55 |
+| Long Night | Night length | ×1.1 | ×1.2 | ×1.3 |
+| Warm Sense | Warm halo radius (cells) | +3 | +5 | +7 |
 
-Each reverb comb filter gets its own feedback gain from its delay $\tau$ [computed]:
+## Night boons
 
-$$g=10^{-3\tau/T_{60}}$$
+After you sleep, pick one of three boons (click it, or press 1, 2 or 3).
+Boons last for the rest of the run. Each boon can be picked once per run,
+except Full Belly.
 
-| Room (from `js/data/maps.js`) | Cells | Height [estimate] | $T_{60}$ at 1.0 m/cell, Sabine [computed] |
-|---|---|---|---|
-| Crypt | 12 × 7 | 3.0 m | 3.60 s |
-| Tavern | 18 × 12 | 3.5 m | 1.26 s |
-| Church | 16 × 14 | 8.0 m | 5.18 s |
-| House (house1) | 10 × 8 | 2.7 m | 1.13 s |
-
-Mean absorption $\bar\alpha$ per room is an [estimate] informed by [14][19][23]. The game clamps $T_{60}$ to 0.4 to 2.5 s [tuning] so clicks stay readable.
-
-### Very close walls hum (repetition pitch)
-
-When an echo returns within a few milliseconds of the click, the ear hears a pitch rather than a separate echo; the 30 ms limit is from [17], and [16] covers repetition pitch only:
-
-$$f = \frac{c}{2d}$$
-
-It is applied only for $d \le 2$ m [tuning], as a feed-forward comb $y(t)=x(t)+g\,x(t-\tau)$ with $\tau=2d/c$, because a feedback comb under about 2.7 ms is not possible in WebAudio.
-
-### Timing
-
-Physical echo delay is too fast to read as a ring, so the game keeps its own speeds [tuning]: the visual ring travels at 12 cells/s and the echo sound at 34 cells/s. The planned single arrival law (flag `echoTiming`) is
-
-$$t_{echo}=\frac{d_{out}}{v_{vis}}+\frac{d_{back}}{v_{aud}}$$
-
-giving 0.113, 0.564 and 1.127 s at 1, 5 and 10 cells [computed]. Physical time is used only for sub-30 ms structure such as the comb delay [17].
-
-## Status
-
-| Area | State | Version |
-|---|---|---|
-| Menus, pause, settings | Shipped | 0.10.3 |
-| Save and load, with backup copy | Shipped | 0.10.3 |
-| Night loop (6 min), dawn and shelter | Shipped | 0.10.3 |
-| Hunger, feeding, fear | Shipped | 0.10.3 |
-| Powers: shriek (Q), mist (Shift/C), still (F) | Shipped | 0.10.3 |
-| Meta upgrades (Essence) | Shipped | 0.10.3 |
-| Logging and error checks | Shipped | 0.10.3 |
-| Tests: 504 unit (`node:test`), Playwright smoke test | Shipped | 0.10.3 |
-| Balance simulator | Shipped | tools |
-| Acoustics S1: pure maths module and data | Planned, flag off | 0.11 |
-| S2: echo level (walls, objects, people) | Planned, flag `echoLevel` | 0.11 |
-| S3: mouth beam | Planned, flag `beam` | 0.11 |
-| S4: per-material occlusion and Maekawa | Planned, flag `occlusion` | 0.11 |
-| S5: reverb per zone | Planned, flag `reverbZones` | 0.11 |
-| S6: air absorption per band | Planned, flag `airBands` | 0.11 |
-| S7: roughness and diffuse tails | Planned, flag `rough` | 0.11 |
-| S8: repetition pitch | Planned, flag `repPitch` | 0.11 |
-| S9: click ping option | Planned, flag `clickPing` | 0.11 |
-| S10: visuals from echo level | Planned, flag `visuals` | 0.11 |
-| S11: echo timing | Planned, flag `echoTiming`; needs a decision, since wall echoes get later | 0.11 |
-
-All v0.11 flags default to off, which reproduces current behaviour exactly.
-
-## Run it
-
-Open `index.html` in a modern browser. Or serve the folder with any static server, for example:
-
-```sh
-python3 -m http.server 8000
-# then open http://localhost:8000
-```
-
-There is no build and no install. Audio starts on your first click, as browsers require.
-
-```sh
-node --test tests/*.test.js     # unit tests
-node tests/smoke.mjs            # browser smoke test (needs Playwright and Chromium)
-node tools/check-secrets.mjs    # run before every commit
-node tools/sim.mjs              # balance simulation
-```
-
-## Controls
-
-| Input | Action |
+| Boon | Effect |
 |---|---|
-| WASD or arrow keys | Move |
-| Mouse | Look |
-| Left click or Space | Sonar pulse |
-| Right click or R | Drink |
-| E | Open doors, sleep |
-| Q | Shriek |
-| Shift or C | Mist |
-| F | Still |
-| Esc | Pause |
+| Bat's Ear | Sonar range ×1.1 |
+| Echo Memory | Sonar fade time ×1.15 |
+| Quick Ping | Pulse cooldown ×0.9 |
+| Cold Blood | Blood drain ×0.85 |
+| Fast Fangs | Drink rate ×1.2 |
+| Hush | Startle radius ×0.8 |
+| Moonlit | Night length ×1.1 |
+| Warm Hint | Warm halo radius +2 cells |
+| Full Belly | +25 blood now (can be picked again) |
 
-A **[DEVTOOL]** button sits at the bottom right of the menu.
+## Random runs
 
-## Project layout
+Each new run is different. People start at different points on their paths,
+and some walk their path in reverse. On maps with two or more safe spots,
+on maps with two or more safe spots, a third of them (rounded down) are sealed
+for the run. In town that is one of the three. The crypt is never sealed.
 
-```text
-index.html            entry point
-css/style.css
-js/
-  game.js             main loop and wiring
-  config.js  flags.js  system.js  log.js  checks.js
-  world.js  raycast.js  sonar.js  ripple.js  render.js
-  audio.js  input.js  hud.js  icons.js  devpanel.js
-  player.js  people.js  hunger.js  night.js  meta.js  save.js
-  data/
-    maps.js  sounds.js  upgrades.js  hunger.js
-tests/
-  *.test.js           unit tests (node:test)
-  smoke.mjs           Playwright smoke test
-tools/
-  sim.mjs             balance simulator
-  check-secrets.mjs   pre-commit secret scan
-docs/
-  DESIGN.md           design notes (to be added)
-  SPEC-echoes.md      v0.11 acoustics specification (to be added)
-TROUBLESHOOTING.md
-```
+## Saving
 
-## Sources
+- The run saves automatically every 20 seconds of play. It also saves when
+  you pause, change map, or switch away from the tab.
+- If the game is open in a second tab, saving pauses in the other tab. A small
+  "not saved" dot shows on screen while a save fails or is paused.
+- The run is stored under `vcs.run`. Upgrades, essence and stats are stored
+  under `vcs.meta`. Each has a `.bak` backup copy.
+- The run save is deleted when the run ends.
+- Run saves use schema v4. Older v3 run saves still continue.
+- Saves live in this browser only. Use **Export save** to keep a copy.
 
-Numbering is kept from the research notes. Each source is used by the maths above.
+If something goes wrong, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
-1. Thaler L. et al. (2017). Mouth-clicks used by blind expert human echolocators – signal description and model based signal synthesis. PLoS Computational Biology 13(8): e1005670. https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005670
-2. Same paper, accepted manuscript PDF (Durham repository). https://durham-repository.worktribe.com/OutputFile/1399301
-3. Duda R.O., Martens W.L. (1998). Range dependence of the response of a spherical head model. J. Acoust. Soc. Am. 104(5): 3048–3058 (cited for the spherical head model only; the abstract page does not mention the bright spot). https://escholarship.org/uc/item/0kb7r9m9
-4. Brungart D.S., Rabinowitz W.M. (1998). Head-related transfer functions in the near field (rigid sphere 18 cm diameter; about 6 dB high-frequency gain at the ipsilateral ear from pressure doubling; "acoustic bright spot" at the far ear near -90 degrees). Report dated March 1998, report number AFRL-HE-WP-TR-2001-0171. https://apps.dtic.mil/sti/tr/pdf/ADA399561.pdf
-5. Treeby B.E., Paurobally R., Pan J. (2006). Investigation of the effect of impedance on azimuth cues derived from spherical head models. ICAD 2006 (bright spot at the contralateral ear; no frontal gain figure). https://discovery-pp.ucl.ac.uk/id/eprint/10061774/1/2006-Treeby-ICAD.pdf
-6. DOSITS, The sonar equation. https://dosits.org/science/advanced-topics/sonar-equation/
-7. Warnock A.C.C. (1985). CBD-239 Factors affecting sound transmission loss. NRC Canada (gives TL = 20 log(m f) - 48; used here for the mass-law form only). https://web.mit.edu/parmstr/Public/NRCan/CanBldgDigests/cbd239_e.html
-8. INSUL Seminar 2, "Design of walls and floors for good sound insulation" (author not stated on the page; mass law 20 log(mf) - 47). https://www.insul.s05.system7.co.nz/media/29391/Seminar-2.pdf
-9. IQ Glass, Effective ways to sound proof with glass. https://www.iqglassuk.com/news/effective-ways-to-sound-proof-with-glass/bp201/
-10. Marsh (1970). The airborne sound insulation of glass. Institute of Acoustics (qualitative: critical frequency falls with thickness; gives no 4 mm value; the 3000 Hz figure rests on [9] alone). https://www.ioa.org.uk/system/files/publications/JA%20MARSH%20THE%20AIRBORNE%20SOUND%20INSULATION%20OF%20GLASS.pdf
-11. Gazzola R. (2003), course notes hosted by A. Farina. Lezione XXXII: Barriere acustiche ed esercizi. https://www.angelofarina.it/Dispense02/032.pdf
-12. Beranek L.L. (2006). Analysis of Sabine and Eyring equations and their application to concert hall audience and chair absorption. J. Acoust. Soc. Am. 120(3). (copy hosted at prosoundtraining.com course 320). https://prosoundtraining.com/course_docs/course320/sabineandeyringeq.pdf
-13. Wikipedia, Reverberation. https://en.wikipedia.org/wiki/Reverberation
-14. Commercial Acoustics, Target reverberation times. https://commercial-acoustics.com/guides/target-reverb-times/
-15. Sengpiel E., Air damping formula (ISO 9613-1:1993 equations only; no tabulated values, so air-absorption numbers in this README are computed, not quoted). https://sengpielaudio.com/AirdampingFormula.htm
-16. Schenkman B.N., Gidla V.K. Human echolocation in static situations: auditory models of detection thresholds for distance, pitch, loudness and timbre. arXiv:1801.09900 (2018; repetition pitch only, not cited for 30 ms). https://arxiv.org/pdf/1801.09900
-17. Wikipedia, Repetition pitch (Bilsen 1966; Bilsen & Ritsma 1969/70). https://en.wikipedia.org/wiki/Repetition_pitch
-18. pyroomacoustics materials database (absorption and scattering tables). https://pyroomacoustics.readthedocs.io/en/stable/pyroomacoustics.materials.database.html
-19. Acta Acustica (2021) 5:14, Acoustic simulation of J.S. Bach's Thomaskirche in 1723 and 1539, Table 1. https://acta-acustica.edpsciences.org/articles/aacus/full_html/2021/01/aacus200072/T1.html
-20. Engineering Toolbox, Room absorption coefficients (single values or ranges per material, not per frequency band; no per-band value is taken from it). https://www.engineeringtoolbox.com/accoustic-sound-absorption-d_68.html
-21. BAUX Book of Acoustics 2.2.4, absorption per person. https://book.baux.com/book-of-acoustics/2-2-4-sound-absorption/
-22. Rizzi L., Farina A. et al. (2006). Surface scattering uniformity measurements in reflection free environments. AES 121st Convention paper 6922. https://angelofarina.it/Public/papers/223-AES121.PDF
-23. Acta Acustica 8 (2024) 25, Acoustic analysis of a well-preserved Renaissance music space: the Odeo Cornaro in Padua, Table 2 (Odeon alpha 125-4000 Hz; s at 707 Hz). https://acta-acustica.edpsciences.org/articles/aacus/full_html/2024/01/aacus230061/T2.html
-24. ITC University of Twente Living Textbook, The Rayleigh roughness criterion (normal-incidence form h < lambda/8; the cos(theta) angle dependence is taken from [25]). https://ltb.itc.utwente.nl/541/concept/98358
-25. FDTD-based diffuse scattering and transmission models for ray-tracing of millimeter-wave communication systems. arXiv:2008.01688 (electromagnetic mm-wave paper, used for the Rayleigh form sigma_c = lambda/(8 cos theta) only; 2020 preprint). https://arxiv.org/pdf/2008.01688
-26. Good C.E., Glean A.J., Vignola J.F. et al. (2013). Measurements of sound absorption of living grass. JASA (abstract). https://labs.sonicfield.org/library/measurements-of-sound-absorption-of-living-grass
-27. Camden / Camlins, Bertram Street edge paving detail (200 × 100 × 100 mm granite setts with 10 mm joints, 8-12 mm tolerance; one project's drawing, not a general standard). https://camdocs.camden.gov.uk/CMWebDrawer/Record/10108245/file/document
-28. Wikipedia, Sett (paving). Background only; gives no dimensions or joint widths and is not cited for size. https://en.wikipedia.org/wiki/Sett_(paving)
-29. Doma S., Fels J. (2021). Analysis of spatial cue distortions in HRTFs using a simplified head model. DAGA 2021 (resonator-sphere radius about 8 cm; "so-called bright spot" on the averted side; no frontal gain figure). https://pub.dega-akustik.de/DAGA_2021/data/articles/000125.pdf
+## URL flags
 
-Links were checked on 2026-10-18 by fetching each page. [18]: page confirmed, per-material values not compared. [4] and [16] were read only in part.
+- `?debug=1`: verbose logging, the F3 overlay, and the M map view on from
+  the start. Also enables the test hooks below.
+- `?map=NAME` (only with `?debug=1`): start on a named map, for example
+  `?debug=1&map=test`.
+- `?safe=1`: ignore saved settings and start with defaults.
 
-## License
+## Debug hooks (debug builds only)
 
-All rights reserved; ask the author.
+These are on `VCS.Game` and exist only with `?debug=1`. They are for testing
+and are not part of play.
+
+- `debugState()`: a snapshot of the game state, including the night clock,
+  blood, status and fed count.
+- `debugTime(h, m)`: set the night clock (20:00 to 06:00 only).
+- `debugBlood(v)`: set blood (0 to 100).
+- `debugFeed()`: grab and start drinking the person in front of you (held until a stop rule fires). Returns true if it started.
+- `debugFeedHold(seconds)`: start a drink and hold it for up to that many simulated seconds, then let go. Returns true if it started.
+- `debugPeopleState()`: the live People state of the current map.
+- `debugSleep()`: sleep if you are at a crypt or safe spot. Returns true if it started.
+- `debugNight()`: a copy of the night state.
+- `debugPulse()`, `debugTeleport(x, y, angle)`, `debugAdvance(seconds)`,
+  `debugInteract()`, `debugEchoes()`, `debugMap(name, doorId)`, `debugZone()`:
+  pulse, move, step time forward, interact, read echoes, jump to a map, and
+  read the current zone.
+
+## Running the tests
+
+Requires Node 22.
+
+    node --test tests/*.test.js
+    node tests/smoke.mjs
+
+`tests/smoke.mjs` drives the game in Chromium through Playwright. It needs
+Playwright installed and writes a screenshot to `tests/out/smoke.png`.
+
+## Folder layout
+
+    index.html          the page (double-click to run)
+    css/style.css       layout and overlay styling
+    js/                 game code, classic scripts, no build step
+      log.js            logging and error reports
+      config.js         settings with validation and localStorage
+      checks.js         browser feature checks
+      data/maps.js      map data and people paths
+      data/sounds.js    sound levels (range, strength, gain, fade)
+      data/upgrades.js  upgrade and boon data
+      world.js          map loading and collision
+      raycast.js        ray casting for walls and the sonar view
+      sonar.js          pulse wavefront and echoes
+      audio.js          Web Audio sounds (pings, steps, doors, night sounds)
+      ripple.js         wobble helper and secondary echo rings
+      people.js         walkers on paths, feeding and echo snapshots
+      night.js          night clock, blood, dawn and sleep (pure state)
+      meta.js           upgrades, essence and stats kept across runs
+      save.js           safe storage, checksums, backups and import/export
+      icons.js          hand-drawn icons, tombstone and crypt menu
+      render.js         first-person view and outlines
+      hud.js            blood vial, dawn clock dial, cards and fades
+      input.js          keyboard and mouse input
+      player.js         player movement and turning
+      game.js           main loop, states, menus and overlays
+      hunger.js         overflow gifts, powers and fear (pure state)
+      data/hunger.js    gift, power and fear data
+    tests/              node:test unit tests and the smoke test
+    tools/sim.mjs       economy simulation (node tools/sim.mjs)
+    docs/DESIGN.md      rules, numbers and design for all modules
