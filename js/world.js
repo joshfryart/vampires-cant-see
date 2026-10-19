@@ -22,6 +22,7 @@
   const PROP_TYPES = ['gravestone', 'cross', 'barrel', 'table', 'chair', 'bench', 'well', 'torch', 'brazier'];
   const NON_SOLID = { cross: true, torch: true };
   const DEFAULT_LIGHT = { torch: 3, brazier: 3.5 };
+  const LIGHT_SCALE = 0.75; // v0.10.4: light radius x0.75 (town felt too lit)
   const PROP_R = 0.3;
   const MAX_W = 64;
   const MAX_H = 48;
@@ -491,7 +492,7 @@
         const k = doorKey(d.col, d.row);
         (propCells[k] || (propCells[k] = [])).push(p);
       }
-      if (light > 0) lights.push({ x: p.x, y: p.y, radius: light, type: p.type });
+      if (light > 0) lights.push({ x: p.x, y: p.y, radius: light * LIGHT_SCALE, type: p.type });
     }
     const nearBuf = [];
     function propsNear(x, y, r) {

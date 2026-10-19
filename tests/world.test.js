@@ -450,9 +450,9 @@ describe('world-v06.test.js', () => {
     const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3 }] }));
     assert.strictEqual(w.lights.length, 1);
     assert.strictEqual(w.lightAt(3.5, 3.5), 1);
-    assert.strictEqual(w.lightAt(4.5, 3.5), 1);                       // 1 cell, inside 0.5 * 3
-    assert.ok(Math.abs(w.lightAt(5.5, 3.5) - 2 / 3) < 1e-6);          // 2 cells: 2 - 2*2/3
-    assert.strictEqual(w.lightAt(6.5, 3.5), 0);                       // 3 cells = radius
+    assert.strictEqual(w.lightAt(4.5, 3.5), 1);                       // 1 cell, inside 0.5 * 2.25 (3 * LIGHT_SCALE)
+    assert.ok(Math.abs(w.lightAt(5.5, 3.5) - (2 - 4 / 2.25)) < 1e-6);   // 2 cells: 2 - 2*2/2.25
+    assert.strictEqual(w.lightAt(6.5, 3.5), 0);                       // 3 cells > radius 2.25
     assert.strictEqual(w.lightAt(12.5, 3.5), 0);
   });
 
@@ -471,18 +471,18 @@ describe('world-v06.test.js', () => {
     if (withDoor) rows = put(rows, 6, 3, 'D');
     return rows;
   }
-  const TORCH5 = [{ type: 'torch', col: 3, row: 3, light: 5 }];
+  const TORCH6 = [{ type: 'torch', col: 3, row: 3, light: 6 }];
 
   test('lightAt is 0 behind a wall, and lit on the same side (control)', () => {
-    const open = World.load(def(box(15, 7), { props: TORCH5 }));
+    const open = World.load(def(box(15, 7), { props: TORCH6 }));
     assert.ok(open.lightAt(7.5, 3.5) > 0, 'control: the unwalled point is lit');
-    const walled = World.load(def(splitRows(false), { props: TORCH5 }));
+    const walled = World.load(def(splitRows(false), { props: TORCH6 }));
     assert.strictEqual(walled.lightAt(7.5, 3.5), 0);
     assert.ok(walled.lightAt(5.5, 3.5) > 0);
   });
 
   test('lightAt recomputes when a door between light and point opens and closes', () => {
-    const w = World.load(def(splitRows(true), { props: TORCH5 }));
+    const w = World.load(def(splitRows(true), { props: TORCH6 }));
     assert.strictEqual(w.lightAt(7.5, 3.5), 0);
     assert.strictEqual(w.setDoor(6, 3, true), true);
     assert.ok(w.lightAt(7.5, 3.5) > 0, 'open door lets light through');
@@ -616,7 +616,7 @@ describe('world-v06.test.js', () => {
   });
 
   test('glass (w) lets light through; a stone wall does not', () => {
-    const mk = (ch) => World.load(def(put(splitRows(false), 6, 3, ch), { props: TORCH5 }));
+    const mk = (ch) => World.load(def(put(splitRows(false), 6, 3, ch), { props: TORCH6 }));
     const glass = mk('w');
     assert.ok(glass.lightAt(7.5, 3.5) > 0, 'lit outside the window');
     assert.ok(glass.isSolid(6.5, 3.5), 'window still blocks movement');
