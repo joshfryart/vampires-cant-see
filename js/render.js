@@ -196,6 +196,29 @@
       wctx.fillRect(0, 0, W, H);
     }
     r.warmVig = wctx ? wv : null;
+    // Directional edge glows: one linear gradient per screen side (left, right, top).
+    r.warmSide = null;
+    try {
+      const mk = function (x0, y0, x1, y1) {
+        const c = doc.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const cx = c.getContext('2d');
+        if (!cx) return null;
+        const g = cx.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, 'rgba(255,150,50,0.55)');
+        g.addColorStop(1, 'rgba(255,150,50,0)');
+        cx.fillStyle = g;
+        cx.fillRect(0, 0, W, H);
+        return c;
+      };
+      const sl = mk(0, 0, W * 0.4, 0);
+      const sr = mk(W, 0, W * 0.6, 0);
+      const st = mk(0, 0, 0, H * 0.4);
+      if (sl && sr && st) r.warmSide = { left: sl, right: sr, top: st };
+    } catch (e) {
+      r.warmSide = null;
+    }
     if (!r.grain) {
       const gc = doc.createElement('canvas');
       gc.width = 128;
@@ -2677,14 +2700,74 @@
     return Math.pow(k, 1.2) * 0.5 * EDGE_GLOW_MAX;
   }
 
+  /** Edge glow alpha from the core and outer light values: the outer zone reads faint (<= 35%). */
+  function edgeZoneAlpha(core, outer) {
+    const c = typeof core === 'number' && isFinite(core) ? core : 0;
+    const o = typeof outer === 'number' && isFinite(outer) ? outer : 0;
+    return edgeGlowAlpha(Math.max(c, 0.35 * o));
+  }
+
+  /**
+   * Directional edge glow for the player: { left, right, top } alphas (0..1).
+   * Stronger on the side facing nearby lights, weak on the far side. All zero with no light nearby.
+   */
+  function edgeSides(world, player) {
+    const out = { left: 0, right: 0, top: 0 };
+    if (!world || !player || typeof world.outerAt !== 'function' || typeof world.lightSources !== 'function') return out;
+    const px = player.x;
+    const py = player.y;
+    const core = world.lightAt(px, py);
+    const outer = world.outerAt(px, py);
+    const ea = edgeZoneAlpha(core, outer);
+    if (!(ea > 0)) return out;
+    const srcs = world.lightSources();
+    let sx = 0;
+    let sy = 0;
+    let sw = 0;
+    for (let i = 0; i < srcs.length; i++) {
+      const L = srcs[i];
+      const dx = L.x - px;
+      const dy = L.y - py;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 3 * L.radius) continue;
+      const RO = L.radius * 1.8;
+      if (d >= RO) continue;
+      const w = d <= 0.5 * RO ? 1 : 2 - 2 * d / RO;
+      if (!(w > 0)) continue;
+      const rel = Math.atan2(Math.sin(Math.atan2(dy, dx) - player.angle), Math.cos(Math.atan2(dy, dx) - player.angle));
+      // A light on the player's own spot has no bearing: it adds weight but no direction.
+      if (d > 0.05) { sx += w * Math.cos(rel); sy += w * Math.sin(rel); }
+      sw += w;
+    }
+    if (!(sw > 0)) return out;
+    const cosRel = sx / sw;
+    const side = Math.max(-1, Math.min(1, sy / sw));
+    const a = Math.abs(side);
+    const near = 1 + 0.6 * a;
+    const far = 1 - 0.6 * a;
+    out.right = Math.min(1, ea * (side >= 0 ? near : far));
+    out.left = Math.min(1, ea * (side >= 0 ? far : near));
+    out.top = Math.min(1, ea * (0.5 + 0.5 * Math.max(0, cosRel)));
+    return out;
+  }
+
   /** Draw vignette and faint animated film grain over the frame. */
-  function drawAtmosphere(r, lit, t) {
+  function drawAtmosphere(r, lit, t, world, player) {
     const ctx = r.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
-    const ea = edgeGlowAlpha(lit);
-    if (ea > 0.002 && r.warmVig) {
+    if (world && player && r.warmSide) {
+      // Zoned, directional edge glow (core + faint outer halo), steady.
+      const e = edgeSides(world, player);
+      ctx.globalCompositeOperation = 'lighter';
+      if (e.left > 0.002) { ctx.globalAlpha = e.left; ctx.drawImage(r.warmSide.left, 0, 0); }
+      if (e.right > 0.002) { ctx.globalAlpha = e.right; ctx.drawImage(r.warmSide.right, 0, 0); }
+      if (e.top > 0.002) { ctx.globalAlpha = e.top; ctx.drawImage(r.warmSide.top, 0, 0); }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    } else if (edgeGlowAlpha(lit) > 0.002 && r.warmVig) {
+      const ea = edgeGlowAlpha(lit);
       // Warm glow at the screen edges, steady, stronger the closer the player is to the light.
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = ea;
@@ -2863,7 +2946,7 @@
       ctx.globalCompositeOperation = 'source-over';
     }
     if (opts && opts.warm) { try { drawWarm(r, player, tanHalf, opts.warm); } catch (e) { logOnce(r, 'warm', e); } }
-    drawAtmosphere(r, opts && typeof opts.lit === 'number' ? opts.lit : 0, t);
+    drawAtmosphere(r, opts && typeof opts.lit === 'number' ? opts.lit : 0, t, world, player);
     if (opts && typeof opts.vignette === 'number' && opts.vignette > 0.001) drawFeedVignette(r, Math.min(1, opts.vignette));
     adapt(r, !!anyPulse && r.litColumns > 0);
   }
@@ -3097,7 +3180,8 @@
     SWEEP: SWEEP,
     glowDur: glowDur,
     glow: glow,
-    edgeGlowAlpha: edgeGlowAlpha
+    edgeGlowAlpha: edgeGlowAlpha,
+    edgeZoneAlpha: edgeZoneAlpha
   };
   VCS.Render = Render;
   if (typeof module !== 'undefined' && module.exports) module.exports = Render;

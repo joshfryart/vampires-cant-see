@@ -457,6 +457,19 @@ describe('world-v06.test.js', () => {
     assert.strictEqual(w.lightAt(12.5, 3.5), 0);
   });
 
+  test('outerAt is faint-positive just outside the core radius', () => {
+    const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // core 1.8
+    assert.strictEqual(w.lightAt(5.5, 3.5), 0);
+    assert.ok(w.outerAt(5.5, 3.5) > 0 && w.outerAt(5.5, 3.5) < 1);
+    assert.strictEqual(w.lightSources().length, 1);
+  });
+
+  test('outerAt is 0 beyond 1.8x the core radius', () => {
+    const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3, light: 12 }] })); // outer 3.24
+    assert.strictEqual(w.outerAt(7.5, 3.5), 0);
+    assert.strictEqual(w.outerAt(-1, -1), 0);
+  });
+
   test('lightAt is 0 out of bounds', () => {
     const w = World.load(def(box(15, 7), { props: [{ type: 'torch', col: 3, row: 3 }] }));
     assert.strictEqual(w.lightAt(-1, -1), 0);

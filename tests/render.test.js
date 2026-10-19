@@ -428,4 +428,11 @@ describe('edge glow ramp', () => {
     assert.strictEqual(f(5), f(1));
     assert.strictEqual(f(NaN), 0);
   });
+  test('edgeZoneAlpha is monotone in core and 0 when both are 0', () => {
+    const f = Render.edgeZoneAlpha;
+    assert.strictEqual(f(0, 0), 0);
+    let prev = 0;
+    for (let i = 1; i <= 20; i++) { const v = f(i / 20, 0.5); assert.ok(v >= prev); prev = v; }
+    assert.ok(f(0, 1) > 0 && f(0, 1) <= Render.edgeGlowAlpha(0.35) + 1e-9);
+  });
 });

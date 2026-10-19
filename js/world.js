@@ -532,6 +532,9 @@
 
     // Light grid: per-cell max falloff, recomputed whenever a door changes.
     const lightGrid = new Float32Array(width * height);
+    /** Outer halo: same falloff shape out to OUTER_K x the core radius. */
+    const OUTER_K = 1.8;
+    const outerGrid = new Float32Array(width * height);
     /** True when a solid tile lies strictly between the cell of (x0,y0) and the cell of (x1,y1) (DDA). */
     function lineBlocked(x0, y0, x1, y1) {
       let cx = Math.floor(x0);
@@ -557,28 +560,46 @@
     }
     function recomputeLights() {
       lightGrid.fill(0);
+      outerGrid.fill(0);
       for (let i = 0; i < lights.length; i++) {
         const L = lights[i];
         const R = L.radius;
-        const c0 = Math.max(0, Math.floor(L.x - R));
-        const c1 = Math.min(width - 1, Math.floor(L.x + R));
-        const r0 = Math.max(0, Math.floor(L.y - R));
-        const r1 = Math.min(height - 1, Math.floor(L.y + R));
+        const RO = R * OUTER_K;
+        const c0 = Math.max(0, Math.floor(L.x - RO));
+        const c1 = Math.min(width - 1, Math.floor(L.x + RO));
+        const r0 = Math.max(0, Math.floor(L.y - RO));
+        const r1 = Math.min(height - 1, Math.floor(L.y + RO));
         for (let cy = r0; cy <= r1; cy++) {
           for (let cx = c0; cx <= c1; cx++) {
             if (isSolid(cx + 0.5, cy + 0.5)) continue;
             const px = cx + 0.5;
             const py = cy + 0.5;
             const d = Math.hypot(px - L.x, py - L.y);
-            if (d >= R) continue;
-            const v = d <= 0.5 * R ? 1 : 2 - 2 * d / R;
+            if (d >= RO) continue;
             const k = cy * width + cx;
-            if (v <= lightGrid[k]) continue;
+            const vo = d <= 0.5 * RO ? 1 : 2 - 2 * d / RO;
+            const needO = vo > outerGrid[k];
+            const v = d >= R ? 0 : d <= 0.5 * R ? 1 : 2 - 2 * d / R;
+            const needC = v > lightGrid[k];
+            if (!needO && !needC) continue;
             if (lineBlocked(L.x, L.y, px, py)) continue;
-            lightGrid[k] = v;
+            if (needO) outerGrid[k] = vo;
+            if (needC) lightGrid[k] = v;
           }
         }
       }
+    }
+    function outerAt(x, y) {
+      const cx = Math.floor(x);
+      const cy = Math.floor(y);
+      if (!(cx >= 0 && cy >= 0 && cx < width && cy < height)) return 0;
+      return outerGrid[cy * width + cx];
+    }
+    /** Read-only copy of the light sources (core radius). */
+    function lightSources() {
+      const out = [];
+      for (let i = 0; i < lights.length; i++) out.push({ x: lights[i].x, y: lights[i].y, radius: lights[i].radius });
+      return out;
     }
     function lightAt(x, y) {
       const cx = Math.floor(x);
@@ -622,6 +643,8 @@
       blocks: blocks,
       lights: lights,
       lightAt: lightAt,
+      outerAt: outerAt,
+      lightSources: lightSources,
       start: start,
       spots: spots
     };
