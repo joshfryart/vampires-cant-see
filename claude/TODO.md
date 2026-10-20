@@ -82,7 +82,7 @@ ode_modules).
 - [x] Doors textured + windows (crooked panes, lit glow without ring, floor spill) (0.10.3)
 - [x] Harden flaky smoke checks — state-waits, pinned drink pools (0.10.3)
 - [x] Light radius (see Done 2026-10-18 above)
-- [ ] Vignette → CSS overlay (~1.5 ms); street ≥50 headless
+- [x] Vignette → CSS overlay (merged 2026-10-20; street ≥50 headless not re-measured)
 - [ ] Doorway detours for patrols (door test conflict)
 - [ ] Key rebinding
 - [ ] Re-run sim incl. light/seen model; playtest balance
