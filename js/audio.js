@@ -94,7 +94,17 @@
         let w = 0;
         for (let i = 0; i < list.length; i++) if (list[i].end > now) list[w++] = list[i];
         list.length = w;
-        if (list.length >= MAX_VOICES) list.shift();
+        if (list.length >= MAX_VOICES) {
+          // Real cap: silence and stop the oldest voice instead of only forgetting it.
+          const old = list.shift();
+          try {
+            old.g.gain.cancelScheduledValues(now);
+            old.g.gain.setValueAtTime(0, now);
+            old.osc.stop(now + 0.01);
+          } catch (e) {
+            // already ended
+          }
+        }
       }
       list.push({ osc: osc, g: g, end: endAt });
     } catch (e) {
@@ -207,6 +217,15 @@
     g.connect(target);
     src.start(t);
     src.stop(t + dur);
+    src.onended = function () {
+      try {
+        src.disconnect();
+        f.disconnect();
+        g.disconnect();
+      } catch (e) {
+        // best effort
+      }
+    };
     return true;
   }
 
@@ -769,7 +788,7 @@
       if (o.occ && typeof o.occ.mat === 'string' && A) {
         fx = A.occlusion(o.occ.mat, o.occ.diff);
         gain *= fx.gain;
-        lpHz = fx.lpHz;
+        lpHz = lpHz ? Math.min(lpHz, fx.lpHz) : fx.lpHz;
       } else if (o.occluded) lpHz = 600;
       const ctx = a.ctx;
       const bus = ctx.createGain();
@@ -1004,7 +1023,10 @@
         gain *= 1 - o.dist / hear;
       }
       if (o.behind) gain *= 0.7;
-      if (o.occluded) gain *= 0.5;
+      const A = acoustics();
+      if (o.occ && typeof o.occ.mat === 'string' && A) gain *= A.occlusion(o.occ.mat, o.occ.diff).gain;
+      else if (o.occluded) gain *= 0.5;
+      const dullIt = !!(o.occluded || o.behind || (o.occ && typeof o.occ.mat === 'string' && A));
       gain *= a.volume;
       if (!(gain > 0)) return false;
       const ctx = a.ctx;
@@ -1015,7 +1037,7 @@
       const half = 0.8 / rate;
       const t = ctx.currentTime || 0;
       const src = ctx.createBufferSource();
-      src.buffer = o.occluded || o.behind ? bufs.dull : bufs.soft;
+      src.buffer = dullIt ? bufs.dull : bufs.soft;
       src.loop = true;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);

@@ -788,6 +788,29 @@ describe('audio-a2.test.js', () => {
     assert.strictEqual(Audio.play(a, 'scream', { dist: 20 }), true);
   });
 
+  test('behind + occ takes the lower cutoff; breath honors occ like play', () => {
+    const a = mk();
+    Audio.play(a, 'doorClose');
+    const n0 = a.ctx.made.length;
+    Audio.play(a, 'doorClose', { behind: true, occ: { mat: 'brick' } });
+    const lp = a.ctx.made.slice(n0).map((f) => f.frequency.value);
+    assert.ok(Math.abs(lp[0] - Math.min(1200, A.occlusion('brick').lpHz)) < 1e-6, 'min cutoff');
+    const b = mk();
+    assert.strictEqual(Audio.breath(b, { occ: { mat: 'brick' } }), true);
+    assert.strictEqual(Audio.breath(b, { occ: { mat: 'brick' } }), true);
+  });
+
+  test('voice cap is real: the oldest tracked voice is stopped past 96', () => {
+    const a = mk();
+    let first = null;
+    for (let i = 0; i < 130; i++) {
+      Audio.play(a, 'doorClose', { delay: 5 });
+      if (i === 0) first = a.ctx.__vcsVoices[0];
+    }
+    assert.ok(a.ctx.__vcsVoices.length <= 96);
+    assert.ok(!a.ctx.__vcsVoices.includes(first));
+  });
+
   test('occluded and behind add lowpass; absent adds none', () => {
     const a = mk();
     Audio.play(a, 'doorClose');

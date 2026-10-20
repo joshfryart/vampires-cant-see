@@ -8,7 +8,7 @@ describe('render-feed.test.js', () => {
   const assert = require('node:assert');
 
   const R = '../js/';
-  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps']) require(R + m + '.js');
+  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps', 'data/sounds']) require(R + m + '.js');
   const Render = require(R + 'render.js');
   const VCS = globalThis.VCS;
 
@@ -356,31 +356,49 @@ describe('render-feed.test.js', () => {
     assert.ok(r.octx.calls.some((c) => c.fn === 'stroke' && c.stroke === 'rgb(255,176,64)'), 'flame drawn while the wavefront passes');
   }));
 
-  test('mouth beam gain follows 0/-1/-3/-8/-14/-18/-20 dB', () => {
-    const db = [0, -1, -3, -8, -14, -18, -20];
-    for (let i = 0; i < db.length; i++) {
-      const g = Render.beamGain(i * 30 * Math.PI / 180);
-      assert.ok(Math.abs(20 * Math.log10(g) - db[i]) < 0.05, 'dB at ' + i * 30);
+  test('render ring beam and sonar beam share one curve (0/90/180 deg); aimOf reads pu.facing', () => {
+    require('../js/data/sounds.js');
+    const A = VCS.SoundData.acoustics;
+    const hall = VCS.World.load(VCS.MapData.maps.town, { requireStart: false });
+    const s = VCS.Sonar.create({ bounces: 0, visRays: 360, speed: 10, fade: 2, range: 10 });
+    VCS.Sonar.emit(s, hall, 5.5, 3.5, 0, { facing: 0.7 });
+    const p = s.lastPulse;
+    assert.strictEqual(p.facing, 0.7);
+    for (const deg of [0, 90, 180]) {
+      const rel = deg * Math.PI / 180;
+      const g = Render.beamGain(rel);
+      assert.ok(Math.abs(g - A.visFactor(A.beam(rel))) < 1e-9, 'curve at ' + deg);
+      assert.ok(Math.abs(g - VCS.Sonar.beamAt(p, 0.7 + rel)) < 0.01, 'agrees with sonar at ' + deg);
     }
     assert.ok(Math.abs(Render.beamGain(-Math.PI / 2) - Render.beamGain(Math.PI / 2)) < 1e-6, 'symmetric');
     assert.ok(Math.abs(Render.beamGain(2 * Math.PI) - 1) < 1e-6, 'wraps');
-    assert.ok(Render.beamReach(16, 1) > Render.beamReach(16, 0.1));
+    assert.ok(Render.beamGain(Math.PI) >= 0.15 - 1e-9);
+    assert.ok(Render.beamReach(16, 1) > Render.beamReach(16, 0.15));
   });
 
   function airArcs(f) { return f.r.octx.calls.filter((c) => c.fn === 'arc' && c.args[2] > 0).length; }
 
-  test('air rings: 3 hollow circles leave the mouth, aimed by the beam, gated by matDetail', () => withPath2D(() => {
+  test('air rings: 3 hollow circles leave the mouth, aimed by the beam (pu.facing), gated by matDetail', () => withPath2D(() => {
+    const ringsAt = (angle, t, facing) => {
+      const f = setup();
+      f.r.quality = 3;
+      f.sonar.range = 4; // short ping: the rear beam reach (0.61 of range) ends inside the ring window
+      VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, typeof facing === 'number' ? { facing: facing } : {});
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.02, {}); // fixes the aim at the player's facing
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, f.world, { x: 5.5, y: 5.5, angle: angle }, f.sonar, t, {});
+      return airArcs(f);
+    };
+    const T = 100.25;
+    const ahead = ringsAt(0, T);
+
+    assert.ok(ahead > 0, 'rings drawn');
+    assert.ok(ringsAt(Math.PI, T) < ahead, 'turned away from the aim: dimmer, shorter');
+    assert.ok(ringsAt(0, T, Math.PI) < ahead, 'pu.facing (not the player angle) sets the aim');
     const f = setup();
     f.r.quality = 3;
     VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, { range: 12 });
-    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.02, {}); // fixes the aim at the player's facing
-    f.r.octx.calls.length = 0;
-    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.25, {});
-    const ahead = airArcs(f);
-    assert.ok(ahead > 0, 'rings drawn');
-    f.r.octx.calls.length = 0;
-    Render.drawFirstPerson(f.r, f.world, { x: 5.5, y: 5.5, angle: Math.PI }, f.sonar, 100.25, {});
-    assert.ok(airArcs(f) < ahead, 'turned away from the aim: dimmer, shorter');
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.02, {});
     f.r.matDetail = false;
     f.r.octx.calls.length = 0;
     Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.25, {});

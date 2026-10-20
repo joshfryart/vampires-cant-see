@@ -120,29 +120,18 @@
   function styleFor(b) { return STYLES[Math.max(0, Math.min(STYLE_N, Math.round(b * STYLE_N)))]; }
 
   // ---- Mouth beam: the ping leaves the mouth as a beam aimed where you face ----
-  /** Beam level in dB at 0/30/60/90/120/150/180 degrees off the aim. */
-  const BEAM_DB = [0, -1, -3, -8, -14, -18, -20];
-  /** Linear gain per whole degree off axis (0..180), built once. */
-  const BEAM_LUT = new Float32Array(181);
-  for (let d = 0; d <= 180; d++) {
-    const i = Math.min(5, Math.floor(d / 30));
-    const f = d / 30 - i;
-    BEAM_LUT[d] = Math.pow(10, (BEAM_DB[i] + (BEAM_DB[i + 1] - BEAM_DB[i]) * f) / 20);
-  }
-  /** Linear beam gain (1 on axis, 0.1 behind) for an angle in radians off the aim. */
+  /** Visual beam gain (0.15..1) for an angle in radians off the aim: the same curve the sonar bakes into pulses (SoundData.acoustics). */
   function beamGain(rel) {
     if (!(rel === rel)) return 1;
-    let a = Math.abs(rel) % TWO_PI;
-    if (a > Math.PI) a = TWO_PI - a;
-    const x = a * 57.29578;
-    const i = Math.floor(x);
-    if (i >= 180) return BEAM_LUT[180];
-    return BEAM_LUT[i] + (BEAM_LUT[i + 1] - BEAM_LUT[i]) * (x - i);
+    const sd = root.VCS && root.VCS.SoundData;
+    const A = sd && sd.acoustics;
+    return A ? A.visFactor(A.beam(rel)) : 1;
   }
   /** Reach of a ping (cells) at beam gain gb: 30% of range behind, full range on axis. */
   function beamReach(range, gb) { return range * (0.3 + 0.7 * gb); }
-  /** Facing of a ping, fixed the first time it is seen (pu.aim if the sim set one). */
+  /** Facing of a ping, fixed the first time it is seen (pu.facing from the sonar, else pu.aim). */
   function aimOf(pu, player) {
+    if (typeof pu.facing === 'number' && isFinite(pu.facing)) return pu.facing;
     if (typeof pu.aim === 'number' && isFinite(pu.aim)) return pu.aim;
     if (typeof pu._aim !== 'number') pu._aim = player.angle;
     return pu._aim;
