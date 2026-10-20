@@ -155,6 +155,8 @@ describe('people.test.js', () => {
         const p = st.people[out[k].id];
         if (p.state === 'idle' && p.phase === 0) idleSteps++;
         assert.ok(Number.isFinite(out[k].x) && Number.isFinite(out[k].y));
+        assert.ok(['sneak', 'walk', 'run'].includes(out[k].gait), 'gait ' + out[k].gait);
+        assert.ok(out[k].pace > 0 && Number.isFinite(out[k].pace));
       }
     }
     assert.strictEqual(idleSteps, 0);

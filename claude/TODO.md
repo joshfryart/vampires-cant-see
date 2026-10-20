@@ -3,7 +3,7 @@
 Each version: Opus pulls src → contract → agents → tests + smoke + screenshot review → publish → update `src/`, HANDOFF.md, TODO.md.
 
 ## Next (in order)
-1. [ ] Playtest v0.10.12 in browser: windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
+1. [ ] Playtest v0.10.13 in browser: step rings differ for sneak/run and grass/wood/stone; windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
 2. [ ] Smoke test runs on a real machine (times out in sandbox). Run `node tests/smoke.mjs` before the next release.
 3. [ ] Perf: street 44–52 fps headless → hold ≥50 (vignette → CSS overlay first).
 4. [ ] Drink grab: victim pulled toward player, resists, resistance falls with blood (requested 2026-10-18).
@@ -26,6 +26,9 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 - [x] Echo timing: one sonar speed 12 cells/s, echo delay = round trip (2d/12), delay cap 6 s, old 34 cells/s audio speed removed (v0.10.11, 3559222, 42d4ada)
 - [x] W1 windows ripple-only: no always-on glow; frame + panes show only under a ripple, linger 1.5× wall afterglow; floor spill and test updated (v0.10.12)
 - [x] Villager footstep sound: heel thump + scuff per floor (grass/wood/stone), feet alternate (v0.10.12). Ring shrink/scuff still open below.
+- [x] Villager step ring scaled by gait (sneak/walk/run from wary/flee) and floor (grass/wood/stone) and pace; base ring shrunk 0.7→0.4 range, 0.35→0.25 strength; room indoor/outdoor still applied on top (v0.10.13)
+- [x] Version numbers go up one patch at a time (0.10.12 → 0.10.13 → ...)
+- [ ] Footstep ring look: flattened floor "scuff" ellipse, left/right offset (render, still open)
 - [x] Itch zip + playable artifact republished at each release
 
 ## Done

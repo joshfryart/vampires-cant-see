@@ -674,7 +674,7 @@ describe('sounds.test.js', () => {
     const l = SoundData.levels;
     const row = (k, keys) => keys.map((x) => l[k][x]);
     assert.deepStrictEqual(row('step', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [1.1, 0.3, 0, 0.8, 0, 0.08]);
-    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.7, 0.35, 0, 0.7, 0, 0.12]);
+    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.4, 0.25, 0, 0.6, 0, 0.12]);
     assert.deepStrictEqual(row('door', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [5, 0.5, 0.5, 2.5, 1, 0.25]);
     assert.deepStrictEqual(row('interact', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [3, 0.35, 0.3, 1.8, 1, 0.15]);
     assert.strictEqual(l.ping.bounces, 2);
@@ -705,9 +705,25 @@ describe('sounds.test.js', () => {
     }
   });
 
+  test('stepScale: sneak < walk < run, grass < wood < stone, pace clamps, unknown names act as walk/stone', () => {
+    const sc = SoundData.stepScale;
+    for (const key of ['range', 'strength', 'fade', 'gain']) {
+      assert.ok(sc('sneak', 'wood', 1)[key] < sc('walk', 'wood', 1)[key], key + ' sneak < walk');
+      assert.ok(sc('walk', 'wood', 1)[key] < sc('run', 'wood', 1)[key], key + ' walk < run');
+      assert.ok(sc('walk', 'grass', 1)[key] < sc('walk', 'wood', 1)[key], key + ' grass < wood');
+      assert.ok(sc('walk', 'wood', 1)[key] < sc('walk', 'stone', 1)[key], key + ' wood < stone');
+    }
+    assert.deepStrictEqual(sc('walk', 'wood', 1), { range: 1, strength: 1, fade: 1, gain: 1 });
+    assert.deepStrictEqual(sc('nope', 'nope', NaN), sc('walk', 'stone', 1));
+    assert.strictEqual(sc('walk', 'wood', 9).range, 1.25);
+    assert.strictEqual(sc('walk', 'wood', 0.1).range, 0.8);
+    const worst = sc('run', 'stone', 9).range * SoundData.levels.personStep.range;
+    assert.ok(worst < 1.5, 'loudest villager step ring still small: ' + worst);
+  });
+
   test('quieter sounds are weaker than louder ones', () => {
     const l = SoundData.levels;
-    assert.ok(l.step.strength <= l.personStep.strength);
+    assert.ok(l.personStep.strength <= l.step.strength);
     assert.ok(l.personStep.strength <= l.interact.strength);
     assert.ok(l.interact.strength < l.door.strength);
     assert.ok(l.door.strength < l.ping.strength);

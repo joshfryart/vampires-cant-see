@@ -6,7 +6,7 @@
   const SoundData = {
     levels: {
       step: { range: 1.1, strength: 0.3, z: 0, fade: 0.8, bounces: 0, gain: 0.08, interval: 0.48, footOffset: 0.15, footSide: 0.12 },
-      personStep: { range: 0.7, strength: 0.35, z: 0, fade: 0.7, bounces: 0, gain: 0.12, hearDist: 9 },
+      personStep: { range: 0.4, strength: 0.25, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
       door: { range: 5, strength: 0.5, z: 0.5, fade: 2.5, bounces: 1, gain: 0.25, hearDist: 18 },
       interact: { range: 3, strength: 0.35, z: 0.3, fade: 1.8, bounces: 1, gain: 0.15 },
       ping: { range: null, strength: 1, z: 0.62, fade: null, bounces: 2, gain: null },
@@ -32,6 +32,19 @@
       bell: { range: 0, strength: 0, z: 0.9, fade: 1, bounces: 0, gain: 0.3, hearDist: 80 },
       breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 }
     },
+    // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
+    stepScaleTable: {
+      gait: {
+        sneak: { range: 0.6, strength: 0.6, fade: 0.8, gain: 0.55 },
+        walk: { range: 1, strength: 1, fade: 1, gain: 1 },
+        run: { range: 1.8, strength: 1.6, fade: 1.2, gain: 1.8 }
+      },
+      floor: {
+        grass: { range: 0.6, strength: 0.6, fade: 0.8, gain: 0.7 },
+        wood: { range: 1, strength: 1, fade: 1, gain: 1 },
+        stone: { range: 1.3, strength: 1.2, fade: 1.2, gain: 1.1 }
+      }
+    },
     rooms: {
       indoor: { rangeMul: 1, bounceCap: 2, fadeMul: 1 },
       outdoor: { rangeMul: 1.3, bounceCap: 1, fadeMul: 0.8 }
@@ -44,6 +57,18 @@
     reach: 1.3,
     reachArc: Math.PI / 3,
     maxBounceEchoes: 4
+  };
+
+  /**
+   * Multipliers {range, strength, fade, gain} for one villager step from gait (sneak|walk|run), floor (grass|wood|stone)
+   * and pace (stride speed / default, clamped 0.8..1.25: slow elders are quieter, brisk walkers louder). Unknown names act as walk / stone.
+   */
+  SoundData.stepScale = function (gait, floor, pace) {
+    const g = SoundData.stepScaleTable.gait[gait] || SoundData.stepScaleTable.gait.walk;
+    const f = SoundData.stepScaleTable.floor[floor] || SoundData.stepScaleTable.floor.stone;
+    let k = typeof pace === 'number' && isFinite(pace) ? pace : 1;
+    k = k < 0.8 ? 0.8 : k > 1.25 ? 1.25 : k;
+    return { range: g.range * f.range * k, strength: g.strength * f.strength * k, fade: g.fade * f.fade, gain: g.gain * f.gain * k };
   };
 
   VCS.SoundData = SoundData;

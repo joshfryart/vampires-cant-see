@@ -858,7 +858,10 @@
     return lv || { range: 3, strength: 0.3, bounces: 0, gain: 0.1 };
   }
 
-  /** Emit a sound pulse; over {range,z,bounces} overrides the level table (guarded: Sonar.emitSound may not exist yet). Passes the source height z and fade. Returns the pulse or null. */
+  /** Emit a sound pulse; over {range,z,bounces} overrides (rangeMul/strengthMul/fadeMul scale it) the level table (guarded: Sonar.emitSound may not exist yet). Passes the source height z and fade. Returns the pulse or null. */
+  /** Multiplier from an optional override: finite positive number, else 1. */
+  function num(v) { return typeof v === 'number' && isFinite(v) && v > 0 ? v : 1; }
+
   function emitSound(kind, x, y, over) {
     try {
       if (!S.sonar || typeof VCS.Sonar.emitSound !== 'function') return null;
@@ -871,14 +874,14 @@
       const baseRange = typeof ov.range === 'number' && isFinite(ov.range) ? ov.range : lv.range * wm;
       const opts = {
         kind: kind,
-        range: baseRange * room.rangeMul * (1 - 0.5 * wash),
-        strength: lv.strength * wm,
+        range: baseRange * room.rangeMul * (1 - 0.5 * wash) * num(ov.rangeMul),
+        strength: lv.strength * wm * num(ov.strengthMul),
         bounces: Math.min(typeof ov.bounces === 'number' ? ov.bounces : lv.bounces || 0, room.bounceCap),
         visRays: 180
       };
       if (typeof ov.z === 'number') opts.z = ov.z;
       else if (typeof lv.z === 'number') opts.z = lv.z;
-      if (typeof lv.fade === 'number') opts.fade = lv.fade * room.fadeMul * (1 - 0.3 * weak) * (1 - 0.6 * wash);
+      if (typeof lv.fade === 'number') opts.fade = lv.fade * room.fadeMul * (1 - 0.3 * weak) * (1 - 0.6 * wash) * num(ov.fadeMul);
       const pu = VCS.Sonar.emitSound(S.sonar, S.world, x, y, S.clock, opts);
       if (pu && weak > 0) tagWeak(pu, weak, 1);
       return pu;
@@ -1067,8 +1070,10 @@
       const lv = level('personStep');
       for (let i = 0; i < out.length; i++) {
         const e = out[i];
-        emitSound('personStep', e.x, e.y);
-        if (S.audio) VCS.Audio.play(S.audio, 'personStep', spatial(e.x, e.y, lv.gain, { material: stepMaterial(e.x, e.y) }));
+        const mat = stepMaterial(e.x, e.y);
+        const sc = VCS.SoundData.stepScale(e.gait, mat, e.pace);
+        emitSound('personStep', e.x, e.y, { rangeMul: sc.range, strengthMul: sc.strength, fadeMul: sc.fade });
+        if (S.audio) VCS.Audio.play(S.audio, 'personStep', spatial(e.x, e.y, Math.min(1, lv.gain * sc.gain), { material: mat }));
       }
     }
     // Choice: people open any closed door they come within 1 cell of; it stays open.

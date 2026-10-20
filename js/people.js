@@ -1000,7 +1000,7 @@
   }
 
   /**
-   * Fill out with {x, y, id} for each foot plant since the last call (two per walk cycle, none while idle).
+   * Fill out with {x, y, id, gait: sneak|walk|run, pace} for each foot plant since the last call (two per walk cycle, none while idle).
    * Objects are reused between calls; out.length is set to the count, which is returned.
    */
   function stepEvents(people, tPrev, t, out) {
@@ -1014,8 +1014,10 @@
       p.stepsReported = p.steps;
       for (let k = 0; k < todo; k++) {
         let e = pool[n];
-        if (!e) { e = { x: 0, y: 0, id: 0 }; pool[n] = e; }
+        if (!e) { e = { x: 0, y: 0, id: 0, gait: 'walk', pace: 1 }; pool[n] = e; }
         e.x = p.x; e.y = p.y; e.id = p.id;
+        e.gait = p.mode === 'flee' ? 'run' : p.wary > 0 ? 'sneak' : 'walk';
+        e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;
         n++;
       }
