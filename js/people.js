@@ -221,6 +221,83 @@
     return route;
   }
 
+  function sched() { return VCS.Schedule || null; }
+
+  /** Lit-street cost: cells whose own light is >= LIT_MIN are cheap, dark cells cost more. Cached per state. */
+  function stepCost(state, world, cx, cy, pref) {
+    if (!(pref > 0) || typeof world.lightAt !== 'function') return 1;
+    const k = cy * 100000 + cx;
+    let c = state.litCache.get(k);
+    if (c === undefined) { c = litAt(world, cx + 0.5, cy + 0.5) >= LIT_MIN ? 1 : 1 + pref; state.litCache.set(k, c); }
+    return c;
+  }
+
+  /** Cheapest walkable route (4-connected, doors open) from p to cell (tx,ty), preferring lit cells. Cell centres, start excluded; null when unreachable. */
+  function routeTo(state, world, p, tx, ty, pref) {
+    const sx = Math.floor(p.x);
+    const sy = Math.floor(p.y);
+    if (sx === tx && sy === ty) return [];
+    const key = function (cx, cy) { return cy * 100000 + cx; };
+    const dist = new Map();
+    const prev = new Map();
+    const heap = [[0, sx, sy]];
+    dist.set(key(sx, sy), 0);
+    prev.set(key(sx, sy), null);
+    const push = function (e) {
+      heap.push(e);
+      let i = heap.length - 1;
+      while (i > 0) {
+        const up = (i - 1) >> 1;
+        if (heap[up][0] <= heap[i][0]) break;
+        const t = heap[up]; heap[up] = heap[i]; heap[i] = t; i = up;
+      }
+    };
+    const pop = function () {
+      const top = heap[0];
+      const last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = i * 2 + 1;
+          const r = l + 1;
+          let m = i;
+          if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+          if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+          if (m === i) break;
+          const t = heap[m]; heap[m] = heap[i]; heap[i] = t; i = m;
+        }
+      }
+      return top;
+    };
+    let guard = 0;
+    while (heap.length && guard++ < 20000) {
+      const e = pop();
+      const cx = e[1];
+      const cy = e[2];
+      if (e[0] > dist.get(key(cx, cy))) continue;
+      if (cx === tx && cy === ty) break;
+      const nb = [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]];
+      for (let k = 0; k < 4; k++) {
+        const nx = nb[k][0];
+        const ny = nb[k][1];
+        if (!cellWalkable(world, nx, ny)) continue;
+        const nd = e[0] + stepCost(state, world, nx, ny, pref);
+        const nk = key(nx, ny);
+        if (dist.has(nk) && dist.get(nk) <= nd) continue;
+        dist.set(nk, nd);
+        prev.set(nk, [cx, cy]);
+        push([nd, nx, ny]);
+      }
+    }
+    if (!prev.has(key(tx, ty))) return null;
+    const cells = [];
+    for (let c = [tx, ty]; c; c = prev.get(key(c[0], c[1]))) cells.push(c);
+    cells.reverse();
+    cells.shift();
+    return cells.map(function (c) { return { x: c[0] + 0.5, y: c[1] + 0.5 }; });
+  }
+
   /**
    * Pick a refuge: the nearest LIT cell (<= LIT_MAX_STEPS) farther from the player than p is (rp.lightPref > 0),
    * else the nearest hide spot (<= HIDE_MAX_STEPS) farther from the player. Sets p.route (cell-centre waypoints)
@@ -271,7 +348,7 @@
     const state = {
       people: [], echoes: [], seed: seed, rng: mulberry32(seed),
       maxEchoes: typeof o.maxEchoes === 'number' && o.maxEchoes > 0 ? Math.floor(o.maxEchoes) : 24,
-      radius: 0.2, hides: sanitizeHides(world, mapDef), time: 0, lastScream: -Infinity, events: [], world: world || null,
+      radius: 0.2, hides: sanitizeHides(world, mapDef), time: 0, nightFrac: 0, nightSec: 0, litCache: new Map(), lastScream: -Infinity, events: [], world: world || null,
       rp: {
         startleDist: REACT_DEFAULTS.startleDist, seeDist: REACT_DEFAULTS.seeDist, seeCone: REACT_DEFAULTS.seeCone,
         bumpDist: REACT_DEFAULTS.bumpDist, fleeMul: REACT_DEFAULTS.fleeMul, calmAfter: REACT_DEFAULTS.calmAfter,
@@ -286,6 +363,14 @@
     const accOffset = Math.floor(mulberry32((seed * 7919 + 13) >>> 0)() * ACCESSORIES.length);
     const spawns = (world && world.spots && world.spots.people) || [];
     const defs = mapDef && Array.isArray(mapDef.paths) ? mapDef.paths : [];
+    const Sched = sched();
+    const places = {};
+    if (Sched && mapDef && mapDef.places && typeof mapDef.places === 'object') {
+      Object.keys(mapDef.places).forEach(function (k) {
+        const c = mapDef.places[k];
+        if (Array.isArray(c) && isFinite(c[0]) && isFinite(c[1]) && world && !world.isSolid(c[0] + 0.5, c[1] + 0.5)) places[k] = { x: c[0] + 0.5, y: c[1] + 0.5 };
+      });
+    }
     for (let i = 0; i < spawns.length; i++) {
       const def = defs[i];
       const path = buildPath(world, spawns[i], def, i);
@@ -303,13 +388,19 @@
         mode: 'path', modeLeft: 0, fleeFrom: { x: 0, y: 0 }, calmLeft: 0, fdir: 1, blockCount: 0, preState: 'idle',
         sit: sit, route: null, ri: 0, ret: null, ri2: 0, bumping: false, wary: 0, whimperIn: WHIMPER_GAP
       });
+      // V1: a role with a night schedule walks routed trips between named places instead of its hand-made loop.
+      const person = state.people[state.people.length - 1];
+      if (Sched && !sit && def && Sched.hasRole(def.role)) {
+        person.sched = Sched.make(def.role, places, { x: path[0].x, y: path[0].y }, mulberry32((seed * 31 + i * 977 + 5) >>> 0), { home: def.home, slot: i });
+        if (person.sched) person.idleLeft = 0;
+      }
     }
     if (o.shuffle === true) {
       // v0.8: shuffle draws come after all per-person draws so unshuffled streams are unchanged.
       for (let i = 0; i < state.people.length; i++) {
         const p = state.people[i];
         const n = p.path.length;
-        if (n <= 1 || p.sit) continue;
+        if (n <= 1 || p.sit || p.sched) continue;
         const k = Math.min(n - 1, Math.floor(state.rng() * n));
         if (state.rng() < 0.5) p.path = p.path.slice().reverse();
         p.x = p.path[k].x; p.y = p.path[k].y;
@@ -497,6 +588,47 @@
     return moved;
   }
 
+  /** Waypoint reached on a scheduled trip: keep walking the route, or settle at the stop. */
+  function schedArrive(p) {
+    const s = p.sched;
+    if (p.idx < p.path.length - 1) { p.idx++; return; }
+    settle(p, s.target);
+  }
+
+  /** At the stop for good: idle there, seated when the act is a sitting one. */
+  function settle(p, si) {
+    const s = p.sched;
+    s.en = false;
+    s.si = si;
+    s.retarget = false;
+    p.state = 'idle';
+    p.idleLeft = 0;
+    p.seated = !!(s.stops[si] && sched().isSeated(s.stops[si].act));
+  }
+
+  /** Idle with a schedule: dwell until the night clock moves on (or a flight broke the trip), then route to the stop. */
+  function schedIdle(state, world, p) {
+    const Sched = sched();
+    const s = p.sched;
+    if (s.en) { p.state = 'walk'; return; }
+    const want = Sched.stopAt(s.stops, state.nightFrac);
+    if (want === s.si && !s.retarget) return;
+    const stop = s.stops[want];
+    s.target = want;
+    s.retarget = false;
+    let cells = null;
+    try { cells = routeTo(state, world, p, Math.floor(stop.x), Math.floor(stop.y), state.rp.lightPref > 0 ? 0.6 : 0); } catch (e) { cells = null; }
+    if (!cells || !cells.length) { settle(p, want); return; } // there already, or unreachable: stay for this stop
+    const trip = [{ x: p.x, y: p.y, wait: 0 }];
+    for (let i = 0; i < cells.length; i++) trip.push({ x: cells[i].x, y: cells[i].y, wait: 0 });
+    p.path = Sched.simplify(trip);
+    p.idx = 1;
+    p.seated = false;
+    s.en = true;
+    p.state = 'walk';
+    p.lookTarget = 0;
+  }
+
   function stepPath(state, world, p, dt, r) {
     // Walking back from a hide spot: retrace the cells before rejoining the loop.
     if (p.ret) {
@@ -525,6 +657,7 @@
       p.lookAngle += (p.lookTarget - p.lookAngle) * Math.min(1, 3 * dt);
       p.phase *= Math.max(0, 1 - 8 * dt);
       if (p.phase < 0.01) p.phase = 0;
+      if (p.sched) { schedIdle(state, world, p); return; }
       if (p.idleLeft <= 0 && p.path.length > 1 && (!p.sit || p.idx !== 0 || Math.hypot(p.path[0].x - p.x, p.path[0].y - p.y) > 0.05)) {
         p.state = 'walk';
         p.lookTarget = 0;
@@ -542,6 +675,7 @@
       p.x = tgt.x;
       p.y = tgt.y;
       p.walked += dist;
+      if (p.sched) { schedArrive(p); return; }
       p.state = 'idle';
       p.idleLeft = tgt.wait * (0.85 + 0.3 * state.rng());
       p.idx = p.sit ? 0 : (p.idx + 1) % p.path.length;
@@ -550,6 +684,7 @@
     const moved = moveToward(world, p, dx, dy, dist, step, r);
     if (moved < step * 0.05) {
       // Stuck against a wall (bad path); give up on this leg.
+      if (p.sched) { p.sched.en = false; p.sched.retarget = true; p.state = 'idle'; p.idleLeft = 1; return; }
       p.state = 'idle';
       p.idleLeft = tgt.wait;
       p.idx = p.sit ? 0 : (p.idx + 1) % p.path.length;
@@ -646,6 +781,15 @@
     p.blockCount = 0;
     p.lookTarget = 0;
     p.wary = rp && rp.waryTime > 0 ? rp.waryTime : 0;
+    if (p.sched) {
+      // Scheduled people re-plan the trip to their current stop from wherever the flight left them.
+      p.sched.en = false;
+      p.sched.retarget = true;
+      p.seated = false;
+      p.state = 'idle';
+      p.idleLeft = 0;
+      return;
+    }
     if (p.sit) {
       // Sitters walk back to their seat and stay.
       p.idx = 0;
@@ -688,6 +832,8 @@
     const pl = ctx && ctx.player;
     const hasPlayer = !!pl && isFinite(pl.x) && isFinite(pl.y) && !(ctx.grace > 0);
     const lit = ctx && typeof ctx.playerLit === 'number' ? ctx.playerLit : 0;
+    if (ctx && typeof ctx.nightFrac === 'number' && isFinite(ctx.nightFrac)) state.nightFrac = ctx.nightFrac;
+    if (ctx && typeof ctx.nightSec === 'number' && isFinite(ctx.nightSec)) state.nightSec = ctx.nightSec;
     // Pose bookkeeping for the renderer (no behaviour): seconds in the current mode, gait phase before this tick.
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
@@ -984,7 +1130,7 @@
           moving: p.state === 'walk', t: la, dist: dist, strength: strength, pan: 0, look: p.look,
           zMin: band[0], zMax: band[1], fade: efade,
           // Pose state for the renderer (snapshot of the moment the wavefront passed).
-          mode: p.mode, sit: !!p.sit, wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
+          mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
         };
         if (dup >= 0) es.splice(dup, 1);
         es.push(echo);
@@ -1041,12 +1187,20 @@
   }
 
   /** Compact state for debugState(). */
+  function schedInfo(state, p) {
+    const s = p.sched;
+    if (!s) return null;
+    const cur = s.stops[s.si];
+    const nx = s.stops[Math.min(s.stops.length - 1, Math.max(0, s.si) + 1)];
+    return { role: s.role, stop: cur ? cur.place : null, act: cur ? cur.act : null, next: nx ? nx.place : null, walking: !!s.en, eta: sched().eta(s.stops, Math.max(0, s.si), state.nightFrac, state.nightSec) };
+  }
+
   function snapshot(state) {
     const out = [];
     const ps = state && state.people ? state.people : [];
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
-      out.push({ id: p.id, x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0 });
+      out.push({ id: p.id, x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0, sched: schedInfo(state, p) });
     }
     return out;
   }

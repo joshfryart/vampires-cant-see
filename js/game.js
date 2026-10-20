@@ -3757,6 +3757,8 @@
     c.react = reactCfgNow();
     c.t = S.clock;
     c.grace = S.grace;
+    c.nightFrac = S.night ? VCS.Night.clock(S.night).frac : 0;
+    c.nightSec = S.night ? S.night.nightSec : 0;
     return c;
   }
 

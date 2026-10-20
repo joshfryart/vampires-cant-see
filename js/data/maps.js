@@ -245,6 +245,9 @@
           { type: 'barrel', col: 29, row: 29 },
           { type: 'table', col: 30, row: 26 },
           { type: 'bench', col: 6, row: 28 },
+          { type: 'bench', col: 44, row: 32 },
+          { type: 'bench', col: 39, row: 32 },
+          { type: 'bench', col: 33, row: 14 },
           { type: 'table', col: 11, row: 27 },
           { type: 'chair', col: 11, row: 26 },
           { type: 'barrel', col: 4, row: 31 },
@@ -267,23 +270,41 @@
           { type: 'cross', col: 52, row: 44 }
         ],
         paths: [
-          { points: [[16, 3], [16, 17], [28, 16], [16, 17]], waits: [3, 1, 7, 1], speed: 1 },
-          { points: [[28, 3], [23, 3], [23, 8], [28, 8]], waits: [2, 1, 4, 1], speed: 1 },
-          { points: [[32, 3], [36, 3], [36, 12], [32, 12]], waits: [1, 1, 3, 6], speed: 1 },
-          { points: [[61, 3], [61, 18], [50, 18], [61, 18]], waits: [2, 1, 8, 1], speed: 1.1 },
-          { points: [[50, 4], [57, 4], [57, 13], [50, 13]], waits: [2, 1, 2, 5], speed: 1 },
-          { points: [[20, 8], [26, 8], [26, 12], [20, 10]], waits: [1.5, 1, 5, 1], speed: 1 },
+          { points: [[16, 3], [16, 17], [28, 16], [16, 17]], waits: [3, 1, 7, 1], speed: 1.3, role: 'guard' },
+          { points: [[28, 3], [23, 3], [23, 8], [28, 8]], waits: [2, 1, 4, 1], speed: 1, role: 'innkeeper', home: 'tavern' },
+          { points: [[32, 3], [36, 3], [36, 12], [32, 12]], waits: [1, 1, 3, 6], speed: 1, role: 'drunk', home: 'barn' },
+          { points: [[61, 3], [61, 18], [50, 18], [61, 18]], waits: [2, 1, 8, 1], speed: 1.1, role: 'priest', home: 'church' },
+          { points: [[50, 4], [57, 4], [57, 13], [50, 13]], waits: [2, 1, 2, 5], speed: 1, role: 'elder', home: 'house2' },
+          { points: [[20, 8], [26, 8], [26, 12], [20, 10]], waits: [1.5, 1, 5, 1], speed: 1, role: 'regular', home: 'house2' },
           { points: [[20, 12], [20, 11]], waits: [1, 1], speed: 1, sit: true },
           { points: [[44, 13], [44, 14]], waits: [1, 1], speed: 1, sit: true },
-          { points: [[2, 19], [20, 19], [35, 19], [58, 19], [58, 20]], waits: [3, 1, 6, 1, 2], speed: 1.2 },
-          { points: [[34, 21], [34, 38]], waits: [2, 6], speed: 1.1 },
-          { points: [[52, 21], [52, 36], [45, 36], [52, 36]], waits: [1.5, 1, 6, 1], speed: 1.2 },
+          { points: [[2, 19], [20, 19], [35, 19], [58, 19], [58, 20]], waits: [3, 1, 6, 1, 2], speed: 1.3, role: 'guard' },
+          { points: [[34, 21], [34, 38]], waits: [2, 6], speed: 1.1, role: 'insomniac', home: 'barn' },
+          { points: [[52, 21], [52, 36], [45, 36], [52, 36]], waits: [1.5, 1, 6, 1], speed: 1.2, role: 'farmer', home: 'house1' },
           { points: [[5, 28], [5, 27]], waits: [1, 1], speed: 1, sit: true },
-          { points: [[20, 29], [26, 29], [23, 26], [20, 26]], waits: [3, 2, 6, 1], speed: 1 },
-          { points: [[3, 42], [28, 42], [28, 40], [14, 40]], waits: [2, 4, 1, 2], speed: 1.3 }
+          { points: [[20, 29], [26, 29], [23, 26], [20, 26]], waits: [3, 2, 6, 1], speed: 1, role: 'mother', home: 'house2' },
+          { points: [[3, 42], [28, 42], [28, 40], [14, 40]], waits: [2, 4, 1, 2], speed: 1.3, role: 'gravedigger', home: 'shed' }
         ],
         // Dark doorway/alcove floor cells people can flee to.
-        hides: [[6, 4], [9, 4], [10, 24], [13, 24], [29, 24], [40, 25], [43, 27], [19, 14]]
+        hides: [[6, 4], [9, 4], [10, 24], [13, 24], [29, 24], [40, 25], [43, 27], [19, 14]],
+        // Named stops for night schedules (js/schedule.js), [col,row]; every one is a cell people already walk.
+        places: {
+          // Streets and yards (watch posts and errands).
+          square: [28, 16], street_w: [16, 17], street_mid: [35, 19], street_e: [58, 19], street_far: [2, 19],
+          well: [28, 40], road_s: [3, 42], grave: [14, 40], lane_s: [34, 38], barn_b: [52, 36], barn: [45, 36],
+          // Tavern, church.
+          tavern_a: [28, 3], tavern_b: [23, 8], tavern_c: [36, 12], tavern_hearth: [21, 4], tavern_bed: [33, 13],
+          church_a: [50, 13], church_b: [57, 4], church_c: [50, 4], church_bed: [58, 5],
+          // Homes: hearth (cook), table (eat), work (mend/spin), bed (sleep); 2/3 = housemates' own cells.
+          house1_hearth: [4, 25], house1_table: [8, 25], house1_work: [12, 26], house1_bed: [6, 29],
+          house2_hearth: [20, 25], house2_hearth2: [21, 25], house2_hearth3: [22, 25],
+          house2_table: [23, 28], house2_table2: [24, 28], house2_table3: [23, 29],
+          house2_work: [25, 27], house2_work2: [24, 26], house2_work3: [26, 27],
+          house2_bed: [24, 31], house2_bed2: [26, 31], house2_bed3: [26, 32],
+          barn_hearth: [41, 26], barn_table: [43, 29], barn_table2: [43, 30], barn_work: [41, 27], barn_work2: [40, 26],
+          barn_bed: [44, 31], barn_bed2: [39, 31],
+          shed_hearth: [44, 38], shed_table: [46, 39], shed_work: [44, 39], shed_bed: [46, 38]
+        }
       }
     },
     links: []
