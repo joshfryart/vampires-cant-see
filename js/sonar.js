@@ -43,15 +43,51 @@
     return Math.max(0, state.cooldown - (t - state.lastEmit));
   }
 
-  function makeVis(world, x, y, range, n) {
-    const R = root.VCS.Raycast;
-    const vis = new Float32Array(n);
-    for (let i = 0; i < n; i++) vis[i] = R.distOne(world, x, y, (i / n) * TWO_PI, range);
-    return vis;
+  // Hit surface materials, by index into Pulse.vmat (unknown names map to stone).
+  const MATS = ['stone', 'brick', 'wood', 'iron', 'glass', 'cobble', 'roughStone', 'grass'];
+  const NO_HIT = 255;
+
+  function acoustics() {
+    const sd = root.VCS && root.VCS.SoundData;
+    return sd && sd.acoustics ? sd.acoustics : null;
   }
 
-  function makePulse(world, x, y, t0, range, speed, strength, kind, gen, n, z, fade) {
-    return { x: x, y: y, z: z, fade: fade, t0: t0, range: range, speed: speed, vis: makeVis(world, x, y, range, n), strength: strength, kind: kind, gen: gen };
+  /** Per-ray distance, hit material index and hit normal code (0 +x, 1 -x, 2 +y, 3 -y, 255 no hit). Writes into the pulse. */
+  function fillRays(pulse, world, x, y, range, n) {
+    const R = root.VCS.Raycast;
+    const vis = new Float32Array(n);
+    const vmat = new Uint8Array(n);
+    const vnorm = new Uint8Array(n);
+    const h = R.blank();
+    for (let i = 0; i < n; i++) {
+      R.hitOne(world, x, y, (i / n) * TWO_PI, range, h);
+      vis[i] = h.rayDist;
+      if (h.hit) {
+        const mi = MATS.indexOf(h.mat);
+        vmat[i] = mi < 0 ? 0 : mi;
+        vnorm[i] = h.nx > 0 ? 0 : h.nx < 0 ? 1 : h.ny > 0 ? 2 : 3;
+      } else {
+        vmat[i] = 0;
+        vnorm[i] = NO_HIT;
+      }
+    }
+    pulse.vis = vis;
+    pulse.vmat = vmat;
+    pulse.vnorm = vnorm;
+  }
+
+  function makePulse(world, x, y, t0, range, speed, strength, kind, gen, n, z, fade, facing) {
+    const p = { x: x, y: y, z: z, fade: fade, t0: t0, range: range, speed: speed, vis: null, strength: strength, kind: kind, gen: gen };
+    fillRays(p, world, x, y, range, n);
+    // Mouth beam (v0.11): the click leaves the mouth shaped by B(theta); vbeam is the visual brightness factor per ray.
+    const A = acoustics();
+    if (typeof facing === 'number' && isFinite(facing) && A) {
+      p.facing = facing;
+      const vb = new Float32Array(n);
+      for (let i = 0; i < n; i++) vb[i] = A.visFactor(A.beam((i / n) * TWO_PI - facing));
+      p.vbeam = vb;
+    }
+    return p;
   }
 
   /** Reflection points (nearest wall points, local minima of vis, >= 20 deg apart). Returns [{a, d}] nearest first. */
@@ -96,7 +132,7 @@
     const kind = typeof o.kind === 'string' ? o.kind : 'ping';
     const z = typeof o.z === 'number' && isFinite(o.z) ? Math.max(0, Math.min(1.2, o.z)) : 0.5;
     const fade = typeof o.fade === 'number' && isFinite(o.fade) && o.fade > 0 ? o.fade : state.fade;
-    const primary = makePulse(world, x, y, t, range, state.speed, strength, kind, 0, rays, z, fade);
+    const primary = makePulse(world, x, y, t, range, state.speed, strength, kind, 0, rays, z, fade, o.facing);
     const made = [primary];
     if (bounces > 0) {
       const maxRefl = state.reflectors || 6;
@@ -114,7 +150,15 @@
             const hy = par.y + Math.sin(ca) * refl[r].d;
             const ox = hx - Math.cos(ca) * 0.08;
             const oy = hy - Math.sin(ca) * 0.08;
-            const child = makePulse(world, ox, oy, par.t0 + refl[r].d / par.speed, cr, par.speed, par.strength * 0.45, kind, gen, 180, par.z, par.fade * 0.8);
+            // The child source is the wall point: it inherits the mouth beam of the ray that struck it (no second cut).
+            let bm = 1;
+            if (par.vbeam) {
+              let bi = Math.round((ca / TWO_PI) * par.vbeam.length);
+              if (bi >= par.vbeam.length) bi -= par.vbeam.length;
+              bm = par.vbeam[bi];
+            }
+            const child = makePulse(world, ox, oy, par.t0 + refl[r].d / par.speed, cr, par.speed, par.strength * 0.45 * bm, kind, gen, 180, par.z, par.fade * 0.8);
+            child.mat = MATS[par.vmat[rayIndex(par, ca)]];
             made.push(child);
             next.push(child);
           }
@@ -134,6 +178,7 @@
     const o = { kind: 'ping', range: state.range, strength: 1, bounces: state.bounces, visRays: state.visRays };
     if (opts && typeof opts.z === 'number') o.z = opts.z;
     if (opts && typeof opts.fade === 'number') o.fade = opts.fade;
+    if (opts && typeof opts.facing === 'number') o.facing = opts.facing;
     const pulse = emitSound(state, world, x, y, t, o);
     if (!pulse) return false;
     state.lastEmit = t;
@@ -187,6 +232,7 @@
       let b = 1 - age / fade;
       b = b * b * (1 - 0.5 * d / p.range);
       if (p.strength !== undefined) b *= p.strength;
+      if (p.vbeam) b *= p.vbeam[idx];
       if (b > best) { best = b; scanAge = age; scanFade = fade; scanIdx = i; }
     }
     return best;
@@ -241,7 +287,7 @@
       let idx = Math.round(a / TWO_PI * n);
       if (idx >= n) idx -= n;
       if (Math.sqrt(dh2) > vis[idx] + TOL) continue;
-      const mul = p.strength === undefined ? 1 : p.strength;
+      const mul = (p.strength === undefined ? 1 : p.strength) * (p.vbeam ? p.vbeam[idx] : 1);
       for (let e = 0; e < 2; e++) {
         const dz = e - pz;
         const d2 = dh2 + dz * dz;
@@ -374,7 +420,71 @@
     return (2 * d) / v;
   }
 
+  function rayIndex(pulse, angle) {
+    const n = pulse.vis.length;
+    let a = angle % TWO_PI;
+    if (a < 0) a += TWO_PI;
+    let i = Math.round((a / TWO_PI) * n);
+    if (i >= n) i -= n;
+    return i;
+  }
+
+  /** Mouth-beam brightness factor (0.15..1) the pulse has toward world angle `angle`; 1 for pulses without a beam. */
+  function beamAt(pulse, angle) {
+    return pulse && pulse.vbeam ? pulse.vbeam[rayIndex(pulse, angle)] : 1;
+  }
+
+  /**
+   * Surface hit along world angle `angle` (nearest ray) for visuals and audio. Writes out {hit, dist, mat, rough, nx, ny, cosInc, beam}
+   * (cosInc = incidence cosine of the ray on the surface; beam = visual factor) and returns out. No allocation when out is given.
+   */
+  function hitInfo(pulse, angle, out) {
+    const o = out || {};
+    const i = rayIndex(pulse, angle);
+    const d = pulse.vis[i];
+    const code = pulse.vnorm ? pulse.vnorm[i] : NO_HIT;
+    const A = acoustics();
+    o.hit = code !== NO_HIT;
+    o.dist = d;
+    o.mat = o.hit ? MATS[pulse.vmat[i]] : null;
+    o.rough = o.hit && A ? A.roughOf(o.mat) : 0;
+    o.nx = code === 0 ? 1 : code === 1 ? -1 : 0;
+    o.ny = code === 2 ? 1 : code === 3 ? -1 : 0;
+    const ra = (i / pulse.vis.length) * TWO_PI;
+    o.cosInc = o.hit ? Math.max(0, -(Math.cos(ra) * o.nx + Math.sin(ra) * o.ny)) : 0;
+    o.beam = pulse.vbeam ? pulse.vbeam[i] : 1;
+    return o;
+  }
+
+  /**
+   * The loudest wall return of a pulse heard from its origin: scans the rays, level = wall formula (beam, spread, material, air) plus an
+   * incidence term 20 log10(max(cosInc, 0.25)). Returns {dist, angle, theta, mat, rough, level, cosInc} or null (no wall in range).
+   * facing (radians) defaults to the pulse facing.
+   */
+  function strongestEcho(pulse, facing) {
+    const A = acoustics();
+    if (!pulse || !pulse.vis || !A) return null;
+    const f = typeof facing === 'number' ? facing : typeof pulse.facing === 'number' ? pulse.facing : 0;
+    const n = pulse.vis.length;
+    const h = {};
+    let best = null;
+    for (let i = 0; i < n; i++) {
+      const d = pulse.vis[i];
+      if (!(d > 0) || d >= pulse.range - 1e-4) continue;
+      const angle = (i / n) * TWO_PI;
+      hitInfo(pulse, angle, h);
+      if (!h.hit) continue;
+      const theta = angle - f;
+      const L = A.echoLevel('wall', d, theta, h.mat) + 20 * Math.log10(Math.max(h.cosInc, 0.25));
+      if (!best || L > best.level) {
+        best = { dist: d, angle: angle, theta: theta, mat: h.mat, rough: h.rough, level: L, cosInc: h.cosInc };
+      }
+    }
+    return best;
+  }
+
   const Sonar = {
+    MATS: MATS, beamAt: beamAt, hitInfo: hitInfo, strongestEcho: strongestEcho,
     SONAR_SPEED: SONAR_SPEED, echoDelay: echoDelay,
     DEFAULTS: DEFAULTS, create: create, emit: emit, emitSound: emitSound, wallArc: wallArc, nearestDist: nearestDist,
     brightnessAt: brightnessAt, ageAt: ageAt, brightnessAt3: brightnessAt3, sample2: sample2, sample3: sample3, ageAt3: ageAt3, heightBand: heightBand, visibleFrom: visibleFrom, litAt: litAt, ringRadius: ringRadius, prune: prune, reset: reset, cooldownLeft: cooldownLeft

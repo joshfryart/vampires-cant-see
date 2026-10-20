@@ -40,6 +40,7 @@
         name: 'crypt',
         kind: 'indoor',
         floor: 'stone',
+        materials: { '#': 'roughStone' }, // rough hewn crypt walls (diffuse echo grain)
         rows: [
           '##############',
           '#............#',

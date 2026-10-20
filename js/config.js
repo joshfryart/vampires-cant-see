@@ -40,6 +40,7 @@
     reduceMotion: false,
     largeText: false,
     ambienceGain: 0.6,
+    pingBip: false,
     devButton: true
   });
 
@@ -76,6 +77,7 @@
     reduceMotion: Object.freeze({ type: 'boolean' }),
     largeText: Object.freeze({ type: 'boolean' }),
     ambienceGain: Object.freeze({ type: 'number', min: 0, max: 1 }),
+    pingBip: Object.freeze({ type: 'boolean' }),
     devButton: Object.freeze({ type: 'boolean' })
   });
 

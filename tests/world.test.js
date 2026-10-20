@@ -642,3 +642,47 @@ describe('world-v06.test.js', () => {
 
 });
 
+
+
+describe('world-materials.test.js (v0.11)', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const World = require('../js/world.js');
+  const SoundData = require('../js/data/sounds.js');
+  globalThis.VCS = globalThis.VCS || {};
+  globalThis.VCS.SoundData = SoundData;
+  const rows = ['#####', '#@.BW', '#..Iw', '#####'];
+
+  test('wall materials, MATERIALS list and cobble/roughStone floors', () => {
+    const w = World.load({ name: 'm', rows: rows });
+    assert.strictEqual(w.materialAt(0, 0), 'stone');
+    assert.strictEqual(w.materialAt(3, 1), 'brick');
+    assert.strictEqual(w.materialAt(4, 1), 'wood');
+    assert.strictEqual(w.materialAt(3, 2), 'iron');
+    assert.strictEqual(w.materialAt(4, 2), 'glass');
+    for (const m of ['stone', 'brick', 'wood', 'iron', 'glass', 'grass', 'cobble', 'roughStone']) assert.ok(World.MATERIALS.indexOf(m) >= 0, m);
+    const c = World.load({ name: 'c', floor: 'cobble', rows: rows });
+    assert.strictEqual(c.floor, 'cobble');
+    const bad = World.load({ name: 'b', floor: 'lava', rows: rows });
+    assert.strictEqual(bad.floor, 'stone');
+  });
+
+  test('a map can re-skin a tile character (roughStone crypt walls); bad names are ignored', () => {
+    const w = World.load({ name: 'r', materials: { '#': 'roughStone', B: 'plasma', Z: 'wood' }, rows: rows });
+    assert.strictEqual(w.materialAt(0, 0), 'roughStone');
+    assert.strictEqual(w.materialAt(3, 1), 'brick', 'unknown material name ignored');
+    const maps = require('../js/data/maps.js');
+    const all = maps.MAPS || maps.maps || maps;
+    const crypt = all.crypt || (Array.isArray(all) ? all.find((m) => m.name === 'crypt') : null);
+    assert.ok(crypt && crypt.materials && crypt.materials['#'] === 'roughStone');
+  });
+
+  test('roughnessAt follows the acoustics table: glass smooth, roughStone and cobble rough', () => {
+    const w = World.load({ name: 'm', materials: { '#': 'roughStone' }, rows: rows });
+    const A = SoundData.acoustics;
+    assert.strictEqual(w.roughnessAt(4, 2), A.roughOf('glass'));
+    assert.strictEqual(w.roughnessAt(0, 0), A.roughOf('roughStone'));
+    assert.ok(A.roughOf('glass') < A.roughOf('stone') && A.roughOf('stone') < A.roughOf('roughStone') && A.roughOf('roughStone') < A.roughOf('cobble'));
+    assert.ok(A.roughOf('grass') >= A.roughOf('cobble'));
+  });
+});
