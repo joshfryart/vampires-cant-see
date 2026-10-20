@@ -119,6 +119,41 @@
   /** Pre-built colour string for brightness b in 0..1. */
   function styleFor(b) { return STYLES[Math.max(0, Math.min(STYLE_N, Math.round(b * STYLE_N)))]; }
 
+  // ---- Mouth beam: the ping leaves the mouth as a beam aimed where you face ----
+  /** Beam level in dB at 0/30/60/90/120/150/180 degrees off the aim. */
+  const BEAM_DB = [0, -1, -3, -8, -14, -18, -20];
+  /** Linear gain per whole degree off axis (0..180), built once. */
+  const BEAM_LUT = new Float32Array(181);
+  for (let d = 0; d <= 180; d++) {
+    const i = Math.min(5, Math.floor(d / 30));
+    const f = d / 30 - i;
+    BEAM_LUT[d] = Math.pow(10, (BEAM_DB[i] + (BEAM_DB[i + 1] - BEAM_DB[i]) * f) / 20);
+  }
+  /** Linear beam gain (1 on axis, 0.1 behind) for an angle in radians off the aim. */
+  function beamGain(rel) {
+    if (!(rel === rel)) return 1;
+    let a = Math.abs(rel) % TWO_PI;
+    if (a > Math.PI) a = TWO_PI - a;
+    const x = a * 57.29578;
+    const i = Math.floor(x);
+    if (i >= 180) return BEAM_LUT[180];
+    return BEAM_LUT[i] + (BEAM_LUT[i + 1] - BEAM_LUT[i]) * (x - i);
+  }
+  /** Reach of a ping (cells) at beam gain gb: 30% of range behind, full range on axis. */
+  function beamReach(range, gb) { return range * (0.3 + 0.7 * gb); }
+  /** Facing of a ping, fixed the first time it is seen (pu.aim if the sim set one). */
+  function aimOf(pu, player) {
+    if (typeof pu.aim === 'number' && isFinite(pu.aim)) return pu.aim;
+    if (typeof pu._aim !== 'number') pu._aim = player.angle;
+    return pu._aim;
+  }
+  /** True when the player stands indoors (ceiling ring exists); unknown worlds count as indoors. */
+  function isIndoor(world, player) {
+    if (!world) return true;
+    if (typeof world.kindAt === 'function') return world.kindAt(player.x, player.y) !== 'outdoor';
+    return world.kind !== 'outdoor';
+  }
+
   /** Prefers-reduced-motion flag (false outside browsers). */
   function reducedMotion() {
     try {
@@ -158,6 +193,9 @@
     r.wcolU = new Float32Array(n);
     r.tch = new Uint8Array(n);
     if (typeof r.matDetail !== 'boolean') r.matDetail = true;
+    r.vbK = new Float32Array(n);
+    r.vbX = new Float32Array(n);
+    r.vbY = new Float32Array(n);
     r.arcLo = new Float32Array(MAX_TRAIL);
     r.arcHi = new Float32Array(MAX_TRAIL);
     r.arcP = new Int16Array(MAX_TRAIL);
@@ -1042,7 +1080,7 @@
   }
 
   /** Draw each pulse ring as a wavy dotted arc on the floor and a fainter one on the ceiling. */
-  function drawRipple(r, sonar, t, player, tanHalf) {
+  function drawRipple(r, world, sonar, t, player, tanHalf) {
     const pulses = sonar.pulses;
     if (!pulses || !pulses.length) return;
     const Sonar = VCS.Sonar;
@@ -1057,6 +1095,8 @@
     const dot = 2.2 * r.wscale;
     const hd = dot / 2;
     const boil = r.boilOn;
+    // The ceiling ring only exists indoors (sky outdoors).
+    const indoor = isIndoor(world, player);
     for (let k = 0; k < pulses.length; k++) {
       const pu = pulses[k];
       // Footsteps are drawn as floor ripples (drawFootRings), never as a body-high ring.
@@ -1081,12 +1121,21 @@
       const wphase = t * 1.4 + k;
       const ceilOk = !(typeof pu.z === 'number' && pu.z < 0.3);
       ctx.fillStyle = bounce ? COL_BOUNCE : '#e8f2ff';
-      for (let pass = 0; pass < (r.quality >= 2 && !bounce && ceilOk ? 2 : 1); pass++) {
+      const beamed = pu.kind === 'ping' && !bounce;
+      const aim = beamed ? aimOf(pu, player) : 0;
+      for (let pass = 0; pass < (r.quality >= 2 && !bounce && ceilOk && indoor ? 2 : 1); pass++) {
         ctx.globalAlpha = pass === 0 ? alpha : alpha * 0.4;
         ctx.beginPath();
         let any = false;
         for (let s = 0; s < samples; s++) {
           const th = (s / samples) * TWO_PI;
+          let dk = dotk;
+          if (beamed) {
+            // Mouth beam: dimmer, shorter-reaching toward the sides and back.
+            const gb = beamGain(th - aim);
+            if (R > beamReach(pu.range, gb) || alpha * gb < 0.03) continue;
+            dk = dotk * (0.55 + 0.45 * gb);
+          }
           const Rw = Ripple.wavyRadius(R, th, wphase, wk, 0.04);
           const wx = pu.x + Math.cos(th) * Rw;
           const wy = pu.y + Math.sin(th) * Rw;
@@ -1104,13 +1153,196 @@
           const y = (pass === 0 ? horizon + off : horizon - off) + (boil ? J(r, s + k * 17, 1) * 0.5 * r.wscale : 0);
           if (y < 0 || y >= r.oh) continue;
           const xj = boil ? J(r, s + k * 17, 0) * 0.5 * r.wscale : 0;
-          ctx.rect(sx + xj - hd * dotk, y - hd * dotk, dot * dotk, dot * dotk);
+          ctx.rect(sx + xj - hd * dk, y - hd * dk, dot * dk, dot * dk);
           any = true;
         }
         if (any) ctx.fill();
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  // ---- Air rings (v0.11): three hollow circles leave the mouth and open across the view ----
+  const AIR_OFFS = [0, 1.1, 2.2];
+  const AIR_ALPHA = [1, 0.65, 0.35];
+  const AIR_GROW = 11 * Math.PI / 180; // radians of opening per cell travelled
+  const AIR_MAX = 58 * Math.PI / 180;
+  const VIB_DUR = 0.9;
+  const VIB_HZ = 7;
+  const VIB_DAMP = 2.6;
+  const VIB_ROWS = [0, 0.25, 0.5, 0.75, 1];
+
+  /** Swell factor 0.3..1.8 of one dot: its own rhythm (1.2-5.4 Hz), also drifting with distance. */
+  function airSwell(i, n, Rr, ph, t) {
+    const key = Math.floor(i / n * 140) * 7 + ph * 131;
+    const f = 1.2 + hash01(key, 11) * 4.2;
+    const p0 = hash01(key, 12) * TWO_PI;
+    const g = 0.8 + hash01(key, 13) * 2.2;
+    return 0.3 + 1.5 * (0.5 + 0.5 * Math.sin(t * f + Rr * g + p0));
+  }
+  /** True when the air-ring / surface-vibration detail is allowed (quality and the matDetail auto-off). */
+  function airOn(r) {
+    return r.quality >= 2 && r.matDetail !== false && !(r.config && r.config.materialDetail === false);
+  }
+
+  /**
+   * Air rings: a ping shows as 3 hollow circles leaving the mouth (just below the horizon, screen centre)
+   * and opening outward. A dot vanishes where its ray meets a wall (that surface vibrates instead, see
+   * drawWallVibe) and is dimmed/shortened by the mouth beam. Circles swell and shrink at random unless
+   * motion is reduced.
+   */
+  function drawAirRings(r, world, sonar, t, player, tanHalf) {
+    const pulses = sonar.pulses;
+    if (!pulses || !pulses.length || !airOn(r)) return;
+    const Sonar = VCS.Sonar;
+    const ctx = r.octx;
+    const halfW = r.ow / 2;
+    const focal = halfW / tanHalf;
+    const half = r.oh / 2;
+    const mouthY = r.horizon + half * 0.5;
+    const ca = Math.cos(player.angle);
+    const sa = Math.sin(player.angle);
+    const sc = r.ow / 800;
+    const indoor = isIndoor(world, player);
+    ctx.lineWidth = Math.max(1, 1.2 * sc);
+    ctx.strokeStyle = '#9fe6ff';
+    for (let k = 0; k < pulses.length; k++) {
+      const pu = pulses[k];
+      if (pu.kind !== 'ping' || pu.gen > 0) continue;
+      const R = Sonar.ringRadius(pu, t);
+      if (R < 0.3 || R > pu.range) continue;
+      const str = typeof pu.strength === 'number' ? pu.strength : 1;
+      const fade = (1 - R / pu.range) * Math.min(1, str * 1.2);
+      const rel0 = player.angle - aimOf(pu, player);
+      for (let ri = 0; ri < 3; ri++) {
+        const Rr = R - AIR_OFFS[ri];
+        const al = Rr * AIR_GROW;
+        if (Rr < 0.3 || al < 0.02 || al > AIR_MAX) continue;
+        const a0 = AIR_ALPHA[ri] * fade;
+        if (a0 < 0.03) continue;
+        const ta = Math.tan(al);
+        const sal = Math.sin(al);
+        const zD = Rr * Math.cos(al);
+        const n = Math.min(160, Math.max(48, Math.round(al * focal * TWO_PI / (9 * sc))));
+        ctx.globalAlpha = Math.min(1, a0);
+        ctx.beginPath();
+        let any = false;
+        for (let i = 0; i < n; i++) {
+          const phi = i / n * TWO_PI + ri * 0.25 * Math.PI;
+          const cp = Math.cos(phi);
+          const sp = Math.sin(phi);
+          const x = Rr * sal * cp;
+          const v = -0.3 + Rr * sal * sp / 0.5;
+          if (v < -1 || (indoor && v > 1)) continue;
+          const gb = beamGain(rel0 + Math.atan2(x, zD));
+          if (Rr > beamReach(pu.range, gb) || a0 * gb < 0.03) continue;
+          const sx = halfW + ta * cp * focal;
+          const sy = mouthY - ta * sp * focal;
+          if (sx < 0 || sx >= r.ow || sy < 0 || sy >= r.oh) continue;
+          const col = Math.min(r.cols - 1, Math.floor(sx / r.colW));
+          if (zD > r.zbuf[col] + 0.05) continue; // ray met a wall: that surface lights instead
+          const wx = player.x + zD * ca - x * sa;
+          const wy = player.y + zD * sa + x * ca;
+          if (!Sonar.visibleFrom(pu, wx, wy)) continue;
+          let sz = 3.2 * sc * (0.55 + 0.45 * gb) * Math.min(1.4, 0.7 + al * 2.2);
+          if (!r.reduced) sz *= airSwell(i, n, Rr, ri + k, t);
+          if (sz < 0.6) continue;
+          ctx.moveTo(sx + sz, sy);
+          ctx.arc(sx, sy, sz, 0, TWO_PI);
+          any = true;
+        }
+        if (any) ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Struck surfaces: where a ping's front has just passed a wall, horizontal contour lines (and the run
+   * edges) light up and shiver, a damped 7 Hz sine for ~0.9 s clocked per column from the moment the front
+   * arrived, shaken along the wall normal. Strength follows the mouth beam, distance and wall incidence.
+   */
+  function drawWallVibe(r, hits, sonar, t, player, tanHalf) {
+    const pulses = sonar.pulses;
+    if (!pulses || !pulses.length || !airOn(r)) return;
+    const Sonar = VCS.Sonar;
+    const n = r.cols;
+    const cw = r.colW;
+    const kk = r.vbK;
+    const vx = r.vbX;
+    const vy = r.vbY;
+    const focal = r.ow / 2 / tanHalf;
+    const sc = r.ow / 800;
+    const ca = Math.cos(player.angle);
+    const sa = Math.sin(player.angle);
+    const still = r.reduced;
+    let any = false;
+    for (let k = 0; k < pulses.length; k++) {
+      const pu = pulses[k];
+      if (pu.kind !== 'ping' || pu.gen > 0) continue;
+      const el = t - pu.t0;
+      if (el < 0 || el > pu.range / pu.speed + VIB_DUR) continue;
+      const aim = aimOf(pu, player);
+      const str = typeof pu.strength === 'number' ? pu.strength : 1;
+      let lit = 0;
+      for (let i = 0; i < n; i++) {
+        kk[i] = 0;
+        const h = hits[i];
+        if (!h.hit || r.dcol[i] || r.bcol[i] < 0.04) continue;
+        const dx = h.hitX - pu.x;
+        const dy = h.hitY - pu.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const age = el - d / pu.speed;
+        if (age < 0 || age > VIB_DUR) continue;
+        const gb = beamGain(Math.atan2(dy, dx) - aim);
+        if (d > beamReach(pu.range, gb) || !Sonar.visibleFrom(pu, h.hitX, h.hitY)) continue;
+        const cinc = Math.abs(h.side === 0 ? Math.cos(h.rayAngle) : Math.sin(h.rayAngle));
+        const incK = Math.max(0.25, 1 - (cinc === cinc ? cinc : 0));
+        const env = Math.exp(-age * VIB_DAMP) * (1 - age / VIB_DUR);
+        const kv = env * gb * Math.max(0, 1 - d / pu.range) * (0.5 + 0.5 * incK) * Math.min(1, str);
+        if (kv < 0.015) continue;
+        kk[i] = kv;
+        lit++;
+        if (still) { vx[i] = 0; vy[i] = 0; continue; }
+        const s = Math.sin(TWO_PI * VIB_HZ * age);
+        // The wall normal faces the viewer: shake sideways by its right component, up/down by its depth component.
+        const sg = h.side === 0 ? (Math.cos(h.rayAngle) > 0 ? -1 : 1) : (Math.sin(h.rayAngle) > 0 ? -1 : 1);
+        const nxw = h.side === 0 ? sg : 0;
+        const nyw = h.side === 0 ? 0 : sg;
+        const amp = Math.min(14 * sc, 0.11 * focal / Math.max(0.3, h.dist)) * s;
+        vx[i] = (-nxw * sa + nyw * ca) * amp;
+        vy[i] = (nxw * ca + nyw * sa) * 0.8 * amp;
+      }
+      if (!lit) continue;
+      any = true;
+      for (let i = 0; i < n; i++) {
+        const k1 = kk[i];
+        if (k1 <= 0) continue;
+        const conn = i > 0 && kk[i - 1] > 0 && connected(hits, i);
+        const xc = (i + 0.5) * cw;
+        const yt = r.ytopD[i];
+        const yh = r.ybotD[i] - yt;
+        if (conn) {
+          const yt0 = r.ytopD[i - 1];
+          const yh0 = r.ybotD[i - 1] - yt0;
+          const a = Math.min(1, (k1 + kk[i - 1]) * 1.1);
+          for (let j = 0; j < 5; j++) {
+            const f = VIB_ROWS[j];
+            const pth = pathForC(5, a, 2);
+            pth.moveTo(xc - cw + vx[i - 1], yt0 + f * yh0 + vy[i - 1]);
+            pth.lineTo(xc + vx[i], yt + f * yh + vy[i]);
+          }
+        }
+        const endRun = i === n - 1 || kk[i + 1] <= 0 || !connected(hits, i + 1);
+        if (!conn || endRun) {
+          const xe = conn ? xc : xc - cw / 2;
+          const pth = pathForC(5, Math.min(1, k1 * 1.6), 2);
+          pth.moveTo(xe + vx[i], yt + vy[i]);
+          pth.lineTo(xe + vx[i], yt + yh + vy[i]);
+        }
+      }
+    }
+    if (any) flushBuckets(r, r.octx, false);
   }
 
   const FRONT_SEG = 40;
@@ -3041,7 +3273,9 @@
     r.bf = r.boilOn ? VCS.Ripple.boilFrame(t) : 0;
     r.frameNo = (r.frameNo | 0) + 1;
     drawWalls(r, world, hits, sonar, t);
-    drawRipple(r, sonar, t, player, tanHalf);
+    drawRipple(r, world, sonar, t, player, tanHalf);
+    drawAirRings(r, world, sonar, t, player, tanHalf);
+    drawWallVibe(r, hits, sonar, t, player, tanHalf);
     drawFloorFront(r, sonar, t, player, tanHalf);
     drawFootRings(r, sonar, t, player, tanHalf);
     const ripple = opts && opts.ripple;
@@ -3340,7 +3574,9 @@
     glowDur: glowDur,
     glow: glow,
     edgeGlowAlpha: edgeGlowAlpha,
-    edgeZoneAlpha: edgeZoneAlpha
+    edgeZoneAlpha: edgeZoneAlpha,
+    beamGain: beamGain,
+    beamReach: beamReach
   };
   VCS.Render = Render;
   if (typeof module !== 'undefined' && module.exports) module.exports = Render;

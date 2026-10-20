@@ -356,6 +356,81 @@ describe('render-feed.test.js', () => {
     assert.ok(r.octx.calls.some((c) => c.fn === 'stroke' && c.stroke === 'rgb(255,176,64)'), 'flame drawn while the wavefront passes');
   }));
 
+  test('mouth beam gain follows 0/-1/-3/-8/-14/-18/-20 dB', () => {
+    const db = [0, -1, -3, -8, -14, -18, -20];
+    for (let i = 0; i < db.length; i++) {
+      const g = Render.beamGain(i * 30 * Math.PI / 180);
+      assert.ok(Math.abs(20 * Math.log10(g) - db[i]) < 0.05, 'dB at ' + i * 30);
+    }
+    assert.ok(Math.abs(Render.beamGain(-Math.PI / 2) - Render.beamGain(Math.PI / 2)) < 1e-6, 'symmetric');
+    assert.ok(Math.abs(Render.beamGain(2 * Math.PI) - 1) < 1e-6, 'wraps');
+    assert.ok(Render.beamReach(16, 1) > Render.beamReach(16, 0.1));
+  });
+
+  function airArcs(f) { return f.r.octx.calls.filter((c) => c.fn === 'arc' && c.args[2] > 0).length; }
+
+  test('air rings: 3 hollow circles leave the mouth, aimed by the beam, gated by matDetail', () => withPath2D(() => {
+    const f = setup();
+    f.r.quality = 3;
+    VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, { range: 12 });
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.02, {}); // fixes the aim at the player's facing
+    f.r.octx.calls.length = 0;
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.25, {});
+    const ahead = airArcs(f);
+    assert.ok(ahead > 0, 'rings drawn');
+    f.r.octx.calls.length = 0;
+    Render.drawFirstPerson(f.r, f.world, { x: 5.5, y: 5.5, angle: Math.PI }, f.sonar, 100.25, {});
+    assert.ok(airArcs(f) < ahead, 'turned away from the aim: dimmer, shorter');
+    f.r.matDetail = false;
+    f.r.octx.calls.length = 0;
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.25, {});
+    assert.strictEqual(airArcs(f), 0, 'matDetail auto-off removes the rings');
+  }));
+
+  test('air rings and wall vibration survive reduced motion', () => withPath2D(() => {
+    const f = setup();
+    f.r.quality = 3;
+    f.r.reduced = true;
+    VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, { range: 12 });
+    for (let t = 100.05; t < 101.2; t += 0.1) assert.doesNotThrow(() => Render.drawFirstPerson(f.r, f.world, player, f.sonar, t, {}));
+  }));
+
+  test('struck walls light and vibrate; matDetail off removes it', () => withPath2D(() => {
+    const f = setup();
+    f.r.quality = 3;
+    VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, { range: 12 });
+    const strokes = () => f.r.octx.calls.filter((c) => c.fn === 'stroke' && c.stroke === '#e8f2ff' && c.lw < 1).length;
+    let on = 0;
+    let off = 0;
+    for (let t = 100.1; t < 101.5; t += 0.05) {
+      f.r.matDetail = true;
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, t, {});
+      on += strokes();
+      f.r.matDetail = false;
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, t, {});
+      off += strokes();
+    }
+    assert.ok(on > off, 'vibration contours drawn only with detail on');
+  }));
+
+  test('ceiling ring is drawn indoors only', () => withPath2D(() => {
+    const f = setup();
+    f.r.quality = 3;
+    VCS.Sonar.emit(f.sonar, f.world, 5.5, 5.5, 100, { range: 12 });
+    const rects = () => f.r.octx.calls.filter((c) => c.fn === 'rect').length;
+    f.r.matDetail = false; // isolate drawRipple
+    f.r.octx.calls.length = 0;
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100.5, {});
+    const inside = rects();
+    const w2 = Object.create(f.world);
+    w2.kindAt = () => 'outdoor';
+    f.r.octx.calls.length = 0;
+    Render.drawFirstPerson(f.r, w2, player, f.sonar, 100.5, {});
+    assert.ok(inside > rects(), 'outdoors draws fewer ring dots (no ceiling pass)');
+  }));
+
   test('weak pulse flicker is slow and shallow; reduced motion is a static dim', () => {
     for (const reduced of [false, true]) {
       const f = setup();
