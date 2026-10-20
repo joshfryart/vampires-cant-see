@@ -170,21 +170,15 @@
     r.glow.width = Math.max(1, ow >> 1);
     r.glow.height = Math.max(1, oh >> 1);
     r.gctx = r.glow.getContext('2d');
-    // Vignette: transparent centre, dark edges (made once).
+    // Vignette (transparent centre, dark edges) is a CSS overlay (#vignette); see setVignette.
     const W = r.canvas.width;
     const H = r.canvas.height;
-    const vig = doc.createElement('canvas');
-    vig.width = W;
-    vig.height = H;
-    const vctx = vig.getContext('2d');
-    if (vctx) {
-      const g = vctx.createRadialGradient(W / 2, H / 2, H * 0.28, W / 2, H / 2, Math.hypot(W, H) * 0.52);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(1, 'rgba(0,0,0,0.75)');
-      vctx.fillStyle = g;
-      vctx.fillRect(0, 0, W, H);
+    try {
+      r.vignetteEl = typeof doc.getElementById === 'function' ? doc.getElementById('vignette') : null;
+      r.vignetteOn = null;
+    } catch (e) {
+      r.vignetteEl = null;
     }
-    r.vignette = vctx ? vig : null;
     // Warm edge vignette (shown when the player stands in light).
     const wv = doc.createElement('canvas');
     wv.width = W;
@@ -277,6 +271,20 @@
       el.style.opacity = String(o);
     } catch (e) {
       logOnce(r, 'setGrain', e);
+    }
+  }
+
+  /** Show or hide the CSS vignette overlay (#vignette) over the canvas; only touches the DOM on change; never throws. */
+  function setVignette(r, on) {
+    try {
+      if (!r) return;
+      const o = !!on;
+      if (r.vignetteOn === o) return;
+      r.vignetteOn = o;
+      const el = r.vignetteEl;
+      if (el && el.style) el.style.opacity = o ? '1' : '0';
+    } catch (e) {
+      logOnce(r, 'setVignette', e);
     }
   }
 
@@ -2848,12 +2856,12 @@
     return out;
   }
 
-  /** Draw vignette and faint animated film grain over the frame. */
+  /** Warm edge glow, and keep the CSS vignette overlay on (grain is a CSS overlay too). */
   function drawAtmosphere(r, lit, t, world, player) {
     const ctx = r.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
+    setVignette(r, true);
     if (world && player && r.warmSide) {
       // Zoned, directional edge glow (core + faint outer halo), steady.
       if (!r.edgeState) r.edgeState = { out: { left: 0, right: 0, top: 0 }, cos: 0, side: 0, init: false };
@@ -3101,6 +3109,7 @@
 
   /** Draw the top-down debug view (phase 1 look) plus pulse rings. */
   function drawTopDown(r, world, p, sonar, t, opts) {
+    setVignette(r, false);
     const ctx = r.ctx;
     const W = r.canvas.width;
     const H = r.canvas.height;
@@ -3324,6 +3333,7 @@
     drawHud: drawHud,
     drawWipe: drawWipe,
     setGrain: setGrain,
+    setVignette: setVignette,
     stats: stats,
     AFTERGLOW_K: AFTERGLOW_K,
     SWEEP: SWEEP,
