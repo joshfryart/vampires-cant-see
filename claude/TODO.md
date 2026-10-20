@@ -9,9 +9,13 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 4. [x] Drink grab (v0.10.14; v0.10.17: click/Space pings while holding, no longer lets go; light -35% playtested OK; v0.10.16: start blood 10%; v0.10.15: pools 30–50, rate 7→2.5/s ≈ 9 s per villager; smoke retuned and passing 249 on 2026-10-20; Playwright lives at %TEMP%audepw-tools
 ode_modules (NODE_PATH)): hold drink → victim pulled to 0.6 cells ahead, you move at 25% speed (full victim) → 55% (drained), look halved. Tune DRAG_* in game.js. Smoke needs a drag check.
 5. [x] Hidden "veil" meter (requested 2026-10-18 b): eye + 5 ticks beside the vial, smoothed `playerLit`; vignette tone-down/setting, fear tie-in and `tut:light` still open below. Same pass: gulp sound, victim struggle/break-free, drag scuffle sounds (untested in browser).
-6. [ ] Decide: v0.11 Echoes (sonar speed decided; next = stages S1–S10) vs. v0.11 Villagers.
-7. [ ] Fix `docs/SPEC-echoes.md` lines ~333 and ~386 (still mention `delayMul`).
+6. [x] v0.10.18 (2026-10-20): villager struggle animations (`js/struggle.js`: panic flail -> push-away -> limp by blood, startle spike per break-free attempt, perspective/yaw cheat in `put`), vampire arms drawn in the held victim's echo, hold E to restrain (no break-free, muffled, half drink speed), G throws a rock (3 per run, saved in snapshot, clatter sound + sonar pulse + startles), rocks HUD pebbles right of skills, veil meter beside vial with skills shifted right, drinking 25% faster (DRINK_BOOST 1.25, ~7 s per villager). Opus brainstormed the move set; GIFs in docs/struggle-*.gif. Untested by hand in browser beyond headless screenshots: playtest restrain/rock feel, pebble placement with 3 powers unlocked, large-text HUD.
+7. [ ] Decide: v0.11 Echoes (sonar speed decided; next = stages S1–S10) vs. v0.11 Villagers.
+8. [ ] Fix `docs/SPEC-echoes.md` lines ~333 and ~386 (still mention `delayMul`).
 
+- [ ] Smoke is flaky run to run (2026-10-20: meta-backup notice, tab-lock, occasional drink checks); pinned Math.random in the drink SETUP so break-free no longer fails drain checks. Playwright installed at %TEMP%cs-pw (NODE_PATH=...cs-pw
+ode_modules).
+- [ ] Ideas: visible flying rock arc; rock pickups instead of a fixed 3; struggle moves could drive sounds (kick = thud); restrain stamina/noise tradeoff tuning.
 - [x] Town light radius scale 0.6 → 0.39 (-35%) (v0.10.14); world tests use light 20
 
 ## Done 2026-10-18 night session (v0.10.4 → v0.10.10)

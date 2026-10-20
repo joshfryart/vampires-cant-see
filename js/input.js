@@ -3,7 +3,7 @@
   const VCS = (root.VCS = root.VCS || {});
 
   const PREVENT = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown',
-    'ArrowLeft', 'ArrowRight', 'Space', 'F3', 'KeyM', 'KeyF', 'KeyE', 'KeyR']);
+    'ArrowLeft', 'ArrowRight', 'Space', 'F3', 'KeyM', 'KeyF', 'KeyE', 'KeyR', 'KeyG']);
 
   // A single mouse delta larger than SPIKE_PX is clamped; larger than BOGUS_PX is dropped as a glitch.
   const SPIKE_PX = 300;

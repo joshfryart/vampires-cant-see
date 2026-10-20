@@ -18,6 +18,7 @@
       feed: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.15 },
       gulp: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.2 },
       struggle: { range: 2.8, strength: 0.4, z: 0.5, fade: 1.0, bounces: 0, gain: 0.16, hearDist: 10 },
+      clatter: { range: 7, strength: 0.55, z: 0.05, fade: 1.6, bounces: 1, gain: 0.26, hearDist: 22 },
       scuffle: { range: 1.4, strength: 0.28, z: 0.1, fade: 0.7, bounces: 0, gain: 0.1, hearDist: 8 },
       gasp: { range: 4, strength: 0.4, z: 0.8, fade: 1.2, bounces: 0, gain: 0.2, hearDist: 12 },
       miss: { range: 0, strength: 0, z: 0.5, fade: 0.5, bounces: 0, gain: 0.12 },

@@ -224,7 +224,7 @@ try {
         // v0.7: ignore the HUD (vial bottom-left, dial bottom-right) and the centred title card.
         const px = (i >> 2) % c.width;
         const py = Math.floor((i >> 2) / c.width);
-        if (py > 280 && (px < 70 || px > 560)) continue;
+        if (py > 280 && (px < 200 || px > 560)) continue;
         if (py > 130 && py < 230 && px > 130 && px < 510) continue;
         n++;
       }
@@ -705,6 +705,7 @@ try {
   // In-page helper: put the player 1.2 cells behind (outside the 1-cell bump distance) (or in front of) a person, aimed at it; returns the id or -1.
   const SETUP = `(function () {
     const G = window.VCS.Game;
+    Math.random = function () { return 0.99; }; // victims never tear free mid-test (struggle() break-free roll)
     // Pin every victim's blood pool high so a real-time drink cannot finish between evaluates.
     window.__pin = function () { for (const p of G.debugPeopleState().people) { p.pool = 120; p.left = 120; } };
     window.__place = function (mode, skip) {
@@ -747,9 +748,9 @@ try {
     const s = G.debugState();
     return { ok: true, id: id2, pool, secs: steps / 60, gasp: 0, b0, b1: s.night.blood, state: s.state, fed: s.fed, victim: s.victim, scream, flee, maxDrunk, gaspSeen: 0 };
   });
-  const tExp = drain.ok ? (drain.pool / 4.5) * Math.log(7 / (2.5 + 2.25 / drain.pool)) : 0;
+  const tExp = drain.ok ? (drain.pool / (4.5 * 1.25)) * Math.log(7 / (2.5 + 2.25 / drain.pool)) : 0;
   check('v0.7.2: grab from behind starts a drink', drain.ok, JSON.stringify(drain));
-  check('v0.7.2: full drain takes ~9 s at its pool', drain.ok && Math.abs(drain.secs - tExp) < 0.3 && drain.secs > 5 && drain.secs < 14, 'secs=' + (drain.secs && drain.secs.toFixed(2)) + ' expected=' + tExp.toFixed(2) + ' pool=' + (drain.pool && drain.pool.toFixed(1)));
+  check('v0.7.2: full drain takes ~7 s at its pool (DRINK_BOOST 1.25)', drain.ok && Math.abs(drain.secs - tExp) < 0.3 && drain.secs > 5 && drain.secs < 14, 'secs=' + (drain.secs && drain.secs.toFixed(2)) + ' expected=' + tExp.toFixed(2) + ' pool=' + (drain.pool && drain.pool.toFixed(1)));
   check('v0.7.2: full drain ends fed (+pool blood, fed count 1)', drain.ok && drain.victim.mode === 'fed' && drain.fed === 1 && drain.state === 'playing' && drain.b1 - drain.b0 > drain.pool - 8, JSON.stringify({ v: drain.victim, f: drain.fed, gain: drain.b1 - drain.b0 }));
   check('v0.7.2: dark drain, no screams, nobody flees', drain.scream === 0 && drain.flee === 0, 'scream=' + drain.scream + ' flee=' + drain.flee);
   // Gasp: front grab emits a gasp pulse; from behind none.

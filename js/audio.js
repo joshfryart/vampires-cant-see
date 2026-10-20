@@ -535,6 +535,15 @@
       noise(ctx, out, t, 0.28, peak * 0.8, 'bandpass', 1100 * k, 0.03);
       noise(ctx, out, t + 0.12, 0.14, peak * 0.5, 'highpass', 2500, 0.02);
     },
+    // a thrown rock hitting stone: sharp crack, then two skittering clicks that die away
+    clatter: function (ctx, out, t, peak, v) {
+      const k = v.pitch;
+      noise(ctx, out, t, 0.05, peak, 'bandpass', 2400 * k, 0.005);
+      tone(ctx, out, 'triangle', 900 * k, 380 * k, t, 0.002, 0.07, peak * 0.6);
+      noise(ctx, out, t + 0.09, 0.04, peak * 0.55, 'bandpass', 3000 * k, 0.004);
+      tone(ctx, out, 'triangle', 700 * k, 340 * k, t + 0.09, 0.002, 0.05, peak * 0.35);
+      noise(ctx, out, t + 0.17, 0.03, peak * 0.3, 'bandpass', 3400 * k, 0.003);
+    },
     // boots and cloth scraping while a victim is hauled along
     scuffle: function (ctx, out, t, peak, v) {
       noise(ctx, out, t, 0.11, peak, 'bandpass', 1300 * v.pitch, 0.01);
@@ -612,7 +621,7 @@
 
   /**
    * Plays a movement/interaction sound. Kinds: step, personStep, doorOpen, doorClose, interact, creak, scream, startle,
-   * chime, heartbeat, feed, gulp, struggle, scuffle, yawn, gasp, miss, shriek, mist, still, gift, overflow, whimper, dog, bell.
+   * chime, heartbeat, feed, gulp, struggle, scuffle, clatter, yawn, gasp, miss, shriek, mist, still, gift, overflow, whimper, dog, bell.
    * No-op when not ready or the kind is unknown.
    * @param {object} a Audio state.
    * @param {string} kind Sound kind.

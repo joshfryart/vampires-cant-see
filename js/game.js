@@ -81,6 +81,9 @@
     drink: null,
     lastVictim: null,
     landings: [],
+    rocks: [],
+    rockCool: 0,
+    rocksLeft: 3, // = ROCKS_PER_RUN (reset on new run)
     vialPulse: 0,
     veilK: 0,
     fovK: 0,
@@ -154,6 +157,13 @@
   const STRUGGLE_GAP =0.9; // seconds between struggle attempts
   const STRUGGLE_START = 0.7; // grace after the grab before the first attempt
   const STRUGGLE_WEAK = 0.45; // below this share of blood left the victim is too weak to break free
+  const DRINK_BOOST = 1.25; // v0.10.18: drinking ~20% quicker (~7 s per villager)
+  const RESTRAIN_DRINK = 0.5; // drink rate while you hold E to restrain (your hands are busy)
+  const RESTRAIN_NOISE = 0.35; // struggle noise left while restrained
+  const ROCKS_PER_RUN = 3; // rocks you can throw in one run
+  const ROCK_RANGE = 10; // cells a thrown rock can fly
+  const ROCK_SPEED = 14; // cells per second
+  const ROCK_COOL = 1.0; // seconds between throws
   const STRUGGLE_FREE = 0.4; // chance an attempt breaks free at a full victim (scales to 0 at STRUGGLE_WEAK)
   const SCUFFLE_GAP = 0.38; // seconds of being dragged between scuff sounds
   const FEED_ARC = Math.PI / 3;
@@ -447,6 +457,8 @@
       }
     }
     if (S.cool > 0) S.cool -= dt;
+    if (S.rockCool > 0) S.rockCool -= dt;
+    stepRocks();
     S.playerLit = safeLight(S.world, S.player.x, S.player.y);
     S.veilK += (clamp(S.playerLit, 0, 1) - S.veilK) * (1 - Math.exp(-dt / 0.3)); // veil meter: same light value villagers spot with
     if (S.grace > 0) S.grace -= dt;
@@ -454,6 +466,7 @@
       if (checkLinkDoor()) return;
       followRoom();
       if (pressed.has('KeyE')) interact();
+      if (pressed.has('KeyG')) throwRock();
       if (feeds > 0 && S.state === 'playing' && !startDrink(false)) missFeed();
       if (feedTog > 0 && S.state === 'playing' && cfgOn('feedToggle') && !S.drink && !startDrink(false)) missFeed();
     } else if (feedTog > 0 && S.drink && cfgOn('feedToggle') && !S.drink.forced) {
@@ -567,7 +580,7 @@
       L().warn('People.sees failed', err);
     }
     if (!VCS.People.grab(S.people, target.id)) return false;
-    S.drink = { id: target.id, person: target, people: S.people, pool: target.pool > 0 ? target.pool : 40, left: target.left, drunk: 0, beatAt: 0.1, t: 0, forced: !!forced, interrupt: false, struggleAt: STRUGGLE_START, scuffAcc: 0 };
+    S.drink = { id: target.id, person: target, people: S.people, pool: target.pool > 0 ? target.pool : 40, left: target.left, drunk: 0, beatAt: 0.1, t: 0, forced: !!forced, interrupt: false, struggleAt: STRUGGLE_START, lastStruggle: -99, rs: 0, scuffAcc: 0 };
     S.lastVictim = { id: target.id, people: S.people };
     if (S.hunger) VCS.Hunger.onGrab(S.hunger, S.mapName + ':' + target.id);
     S.overAcc = 0;
@@ -631,10 +644,12 @@
     if (d.interrupt) return endDrink('witness');
     if (!d.forced && d.t > dt * 1.5 && S.input && typeof S.input.feedHeld === 'function' && !S.input.feedHeld() && !cfgOn('feedToggle')) return endDrink('released');
     if (Math.hypot(p.x - S.player.x, p.y - S.player.y) > cfgNum('feedReach', FEED_REACH) + 0.3) return endDrink('reach');
+    const wantRs = S.input && S.input.keys && S.input.keys.has('KeyE') ? 1 : 0;
+    d.rs += (wantRs - d.rs) * (1 - Math.exp(-dt / 0.12));
     if (d.t >= d.struggleAt && struggle(d)) return;
     const ovOpen = !!S.hunger && VCS.Hunger.isOpen(S.hunger);
     if (n.blood >= n.bloodMax && !ovOpen) return endDrink('cap');
-    const rate = (2.5 + 4.5 * clamp(d.left / d.pool, 0, 1)) * fxv('drinkRate'); // v0.10.15: ~8 s per villager (was 6..20/s, ~2.5 s)
+    const rate = (2.5 + 4.5 * clamp(d.left / d.pool, 0, 1)) * fxv('drinkRate') * DRINK_BOOST * (1 - (1 - RESTRAIN_DRINK) * d.rs); // v0.10.15: ~8 s per villager (was 6..20/s, ~2.5 s)
     let gain = 0;
     let over = 0;
     let ready = false;
@@ -682,14 +697,16 @@
     const v = d.person;
     const frac = clamp(d.left / d.pool, 0, 1);
     d.struggleAt += STRUGGLE_GAP * (0.8 + 0.4 * Math.random());
+    d.lastStruggle = d.t;
     const strong = clamp((frac - STRUGGLE_WEAK) / (1 - STRUGGLE_WEAK), 0, 1);
-    const k = 0.35 + 0.65 * Math.max(strong, 0.3); // weak victims thrash quieter
+    const rs = d.rs > 0.5 ? 1 : 0; // restrained (holding E): pinned down, muffled, cannot tear free
+    const k = (0.35 + 0.65 * Math.max(strong, 0.3)) * (1 - (1 - RESTRAIN_NOISE) * rs); // weak victims thrash quieter
     emitSound('struggle', v.x, v.y, { rangeMul: k, strengthMul: k });
     reactTo(v.x, v.y, 'struggle', level('struggle').range * k + 0.5);
     if (S.audio) VCS.Audio.play(S.audio, 'struggle', spatial(v.x, v.y, level('struggle').gain * k));
     if (S.ripple) VCS.Ripple.spawn(S.ripple, v.x, v.y, S.clock, { kind: 'person', maxR: 0.9 + 0.6 * k, life: 0.45, strength: 0.7 });
     pushVictimEcho(v);
-    if (strong <= 0 || Math.random() >= STRUGGLE_FREE * strong) return false;
+    if (rs || strong <= 0 || Math.random() >= STRUGGLE_FREE * strong) return false;
     L().info('Person ' + d.id + ' broke free (left ' + d.left.toFixed(1) + ')');
     endDrink('broke');
     if (v.mode === 'dazed') v.dazedLeft = Math.min(v.dazedLeft, 0.15); // bolts at once instead of standing dazed
@@ -697,6 +714,53 @@
     if (S.audio) VCS.Audio.play(S.audio, 'scream', spatial(v.x, v.y, level('scream').gain));
     reactTo(v.x, v.y, 'scream', 5);
     return true;
+  }
+
+  /** Throw a rock along your facing: it flies until a wall or person and clatters down there after its flight time. */
+  function throwRock() {
+    if (S.state !== 'playing' || S.drink || !S.world || !S.player || S.rockCool > 0) return false;
+    if (S.rocksLeft <= 0) {
+      S.rockCool = ROCK_COOL;
+      showCard('No rocks left', 0);
+      if (S.audio) VCS.Audio.play(S.audio, 'miss', { gain: 0.06, pan: 0 });
+      return false;
+    }
+    S.rocksLeft--;
+    const p = S.player;
+    const w = S.world;
+    const dx = Math.cos(p.angle);
+    const dy = Math.sin(p.angle);
+    const ppl = S.people ? S.people.people : [];
+    let d = 0;
+    while (d < ROCK_RANGE) {
+      const nx = p.x + dx * (d + 0.1);
+      const ny = p.y + dy * (d + 0.1);
+      if (typeof w.blocks === 'function' ? w.blocks(nx, ny, 0.05) : w.isSolid(nx, ny)) break;
+      d += 0.1;
+      let hit = false;
+      for (let i = 0; i < ppl.length; i++) if (Math.hypot(ppl[i].x - nx, ppl[i].y - ny) < 0.3) hit = true;
+      if (hit) break;
+    }
+    d = Math.max(0.4, d);
+    S.rocks.push({ x: p.x + dx * d, y: p.y + dy * d, at: S.clock + d / ROCK_SPEED });
+    S.rockCool = ROCK_COOL;
+    if (S.audio) VCS.Audio.play(S.audio, 'miss', { gain: 0.1, pan: 0 });
+    L().debug('Rock thrown (' + S.rocksLeft + ' left), lands in ' + (d / ROCK_SPEED).toFixed(2) + ' s');
+    return true;
+  }
+
+  /** Land any rocks whose flight is over: a loud clatter, sound waves, ripple ring, nearby villagers startle. */
+  function stepRocks() {
+    const rs = S.rocks;
+    for (let i = rs.length - 1; i >= 0; i--) {
+      const r = rs[i];
+      if (r.at > S.clock) continue;
+      rs.splice(i, 1);
+      emitSound('clatter', r.x, r.y);
+      reactTo(r.x, r.y, 'clatter', level('clatter').range * 0.7);
+      if (S.audio) VCS.Audio.play(S.audio, 'clatter', spatial(r.x, r.y, level('clatter').gain, { material: stepMaterial(r.x, r.y) }));
+      if (S.ripple) VCS.Ripple.spawn(S.ripple, r.x, r.y, S.clock, { kind: 'person', maxR: 1.1, life: 0.5, strength: 0.7 });
+    }
   }
 
   /** One heartbeat: sonar pulse from the victim, startle radius, audio, rings, echo refresh, gulp landing. */
@@ -949,6 +1013,8 @@
     applyFx();
     S.runOn = true;
     S.autoAcc = 0;
+    S.rocksLeft = ROCKS_PER_RUN;
+    S.rocks.length = 0;
     L().info('New run seed ' + seed);
     initAmbient();
     tutStart();
@@ -1509,7 +1575,7 @@
       const wr = fxv('warmRadius');
       if (wr > 0 && S.people) ro.warm = { radius: wr, people: S.people.people.map(function (p) { return { x: p.x, y: p.y }; }) };
       const dk = S.drink;
-      if (dk) ro.feedLock = { id: dk.id, k: clamp(dk.drunk / dk.pool, 0, 1), age: dk.t };
+      if (dk) ro.feedLock = { id: dk.id, k: clamp(dk.drunk / dk.pool, 0, 1), age: dk.t, sp: dk.t - dk.lastStruggle, rs: dk.rs };
       if (S.reduced) {
         if (dk) ro.vignette = 0.3;
       } else if (S.fovK > 0) {
@@ -1605,6 +1671,7 @@
     hs.vialPulse = S.vialPulse;
     hs.feeding = !!S.drink;
     hs.veil = S.veilK;
+    hs.rocks = S.rocksLeft;
     feedHunger(hs, n);
     Hud.drawHud(S.hud, c, hs);
     if (S.cardText !== null) Hud.drawCard(S.hud, c, S.cardText, S.cardAge, S.clock, boil, S.cardSub || undefined, HOPTS);
@@ -3846,6 +3913,7 @@
     S.landings.length = 0;
     const old = S.people;
     if (old) VCS.People.clearEchoes(old);
+    S.rocks.length = 0;
     VCS.Sonar.reset(S.sonar);
     if (S.ripple) S.ripple.rings.length = 0;
     if (S.audio) VCS.Audio.stopAll(S.audio, 0.15);
@@ -3930,6 +3998,7 @@
     const p = S.player || { x: 0, y: 0, angle: 0 };
     const snap = { v: 4, map: S.mapName, player: { x: p.x, y: p.y, angle: p.angle }, doors: doors, people: people };
     if (S.night) snap.night = VCS.Night.serialize(S.night);
+    snap.rocks = S.rocksLeft;
     snap.run = cloneRun(S.run);
     snap.run.hunger = S.hunger ? VCS.Hunger.serialize(S.hunger) : null;
     return snap;
@@ -3944,6 +4013,7 @@
       }
       const fin = function (v) { return typeof v === 'number' && isFinite(v); };
       const has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+      S.rocksLeft = fin(snap.rocks) ? clamp(Math.round(snap.rocks), 0, ROCKS_PER_RUN) : ROCKS_PER_RUN;
       if (typeof snap.map !== 'string' || !has(S.worlds, snap.map)) {
         L().warn('applySnapshot: unknown map ' + String(snap.map));
         return false;

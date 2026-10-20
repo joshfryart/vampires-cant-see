@@ -8,7 +8,7 @@ describe('render-feed.test.js', () => {
   const assert = require('node:assert');
 
   const R = '../js/';
-  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'data/maps']) require(R + m + '.js');
+  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps']) require(R + m + '.js');
   const Render = require(R + 'render.js');
   const VCS = globalThis.VCS;
 
@@ -82,7 +82,7 @@ describe('render-feed.test.js', () => {
     Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100, { people, feedLock: { id: 7, k: 0.5, age: 1 } });
     const s = personStrokes(f.r);
     assert.ok(s.length > 0, 'victim drawn in lock colour');
-    assert.ok(s.every((c) => c.alpha >= 0.9 - 1e-9), 'alpha >= 0.9');
+    assert.ok(s.some((c) => c.alpha >= 0.9 - 1e-9), 'victim alpha >= 0.9 (the vampire arms are dimmer)');
     assert.ok(s.some((c) => Math.abs(c.lw - 1.6 * f.r.wscale * 1.7) < 1e-6 || Math.abs(c.lw - 1.6 * f.r.wscale) < 1e-6));
   });
 
@@ -366,7 +366,7 @@ describe('render-warm.test.js', () => {
   const assert = require('node:assert');
 
   const R = '../js/';
-  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'data/maps']) require(R + m + '.js');
+  for (const m of ['log', 'ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps']) require(R + m + '.js');
   const Render = require(R + 'render.js');
   const VCS = globalThis.VCS;
 

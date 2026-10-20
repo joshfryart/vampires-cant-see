@@ -1608,7 +1608,8 @@
   const STRIP_A = new Float32Array(STRIP_Z.length - 1);
   const PX = new Float32Array(24);
   const PY = new Float32Array(24);
-  const fig = { cx: 0, floorY: 0, hs: 0, vs: 0, sr: 0, cr: 0, sx: 1, sy: 1, age: -1, H: 1, fid: 0, A: 0, sway: 0 };
+  const fig = { cx: 0, floorY: 0, hs: 0, vs: 0, sr: 0, cr: 0, sx: 1, sy: 1, age: -1, H: 1, fid: 0, A: 0, sway: 0, persp: 0, hz: 0 };
+  const STRUGGLE_POSE = VCS.Struggle ? VCS.Struggle.create() : null;
 
   /** Lateral ripple -1..1 at normalised height zn (0 feet .. 1 head) while the band sweeps past; 0 elsewhere. */
   function sweepWave(zn, age) {
@@ -1625,8 +1626,16 @@
     const wv = fig.age >= 0 ? sweepWave(u / (fig.H * 1.1), fig.age) * 0.02 : 0;
     const ff = f * fig.sx;
     const ss = s * fig.sx;
-    PX[k] = fig.cx + (ff * fig.sr + ss * fig.cr + wv + fig.sway * u) * fig.hs + J(r, fig.fid + k, 0) * fig.A;
-    PY[k] = fig.floorY - u * fig.sy * fig.vs + J(r, fig.fid + k, 1) * fig.A;
+    let px = (ff * fig.sr + ss * fig.cr + wv + fig.sway * u) * fig.hs;
+    let py = fig.floorY - u * fig.sy * fig.vs;
+    if (fig.persp > 0) {
+      // Head-on victim: forward offsets point at the camera, so scale about the view centre like a real perspective.
+      const kP = fig.persp / Math.max(0.25, fig.persp + f * fig.cr);
+      px *= kP;
+      py = fig.hz + (py - fig.hz) * kP;
+    }
+    PX[k] = fig.cx + px + J(r, fig.fid + k, 0) * fig.A;
+    PY[k] = py + J(r, fig.fid + k, 1) * fig.A;
   }
 
   /** Rounded-square head outline (used for the 'square' head). */
@@ -1647,6 +1656,49 @@
     c.quadraticCurveTo(bl[0], bl[1], g[0], g[1]);
     c.lineTo(h[0], h[1]);
     c.quadraticCurveTo(tl[0], tl[1], a[0], a[1]);
+  }
+
+  /**
+   * The vampire's own arms, drawn into the held victim's echo: two forearms reach up from below the view and clamp the
+   * victim's shoulders, shaking with the victim's struggle (jolt 0..1).
+   */
+  function drawGrabArms(r, X, Y, hs, lw, alpha, jolt, tN, pid, style, rs) {
+    const c = r.octx;
+    const W = r.ow;
+    const H = r.oh;
+    const left = X[2] <= X[3] ? 2 : 3;
+    const shake = jolt * hs * 0.05;
+    c.save();
+    c.globalAlpha = Math.min(1, alpha * 0.7);
+    c.strokeStyle = style;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    for (let k = 0; k < 2; k++) {
+      const idx = k === 0 ? left : 5 - left;
+      const sgn = k === 0 ? -1 : 1;
+      // Restraining: the grip slides in and down to pin the victim's upper arms against their body.
+      const tx = X[idx] + (X[14] - X[idx]) * 0.35 * rs + sgn * hs * 0.03 + Math.sin(tN * 37 + k * 2 + pid) * shake;
+      const ty = Y[idx] + (Y[14] - Y[idx]) * 0.35 * rs + hs * 0.02 + Math.cos(tN * 29 + k * 3 + pid) * shake;
+      const sx = W * 0.5 + sgn * W * 0.3;
+      const sy = H + 12 * r.wscale;
+      const cx = (sx + tx) * 0.5 + sgn * W * 0.1;
+      const cy = (sy + ty) * 0.5 + (sy - ty) * 0.05;
+      c.lineWidth = lw * (3.2 + 1.4 * rs);
+      c.beginPath();
+      c.moveTo(sx, sy);
+      c.quadraticCurveTo(cx, cy, tx, ty);
+      c.stroke();
+      c.lineWidth = lw;
+      c.beginPath();
+      const gr = Math.max(2, hs * 0.012);
+      c.arc(tx, ty, gr, 0, TWO_PI);
+      for (let f = -1; f <= 1; f++) {
+        c.moveTo(tx, ty - gr * 0.6);
+        c.lineTo(tx + f * gr * 0.9 - sgn * gr * 0.3, ty - gr * 2);
+      }
+      c.stroke();
+    }
+    c.restore();
   }
 
   /**
@@ -1697,6 +1749,11 @@
     fig.fid = (pid * 29 + 11) * 24;
     fig.A = 0.7 * r.wscale;
     fig.sway = 0;
+    fig.persp = locked ? depth : 0;
+    fig.hz = r.horizon;
+    let yawU = 0;
+    let yawL = 0;
+    let gJolt = 0;
     if (locked) {
       // Feeding lock: tension boil for the first 0.35 s, then the victim goes still as k rises.
       let bm = 1;
@@ -1726,7 +1783,23 @@
     let eyesX = false;
     let handsOverHead = false;
     const modeAge = typeof e.modeAge === 'number' ? e.modeAge : 9;
-    if (mode === 'grapple') {
+    if (mode === 'grapple' && STRUGGLE_POSE) {
+      // Held by the vampire: panic flailing, then pushing away, then slack as the blood goes (see struggle.js).
+      const sp = STRUGGLE_POSE;
+      VCS.Struggle.pose(sp, { t: tN, g: r.lockAge, bl: 1 - r.lockK, sp: r.lockSp, pid: pid, lh: lh, bw: bw, shS: shS, hipS: hipS, anim: anim, rs: r.lockRs || 0 });
+      hipU = sp.hipU; shU = sp.shU; headU = sp.headU;
+      lean = sp.lean; headF = sp.headF; headS = sp.headS; tilt = sp.tilt; sq = sp.sq; fig.sway = sp.sway;
+      const yawB = ((pid & 1) ? 1 : -1) * 0.18;
+      yawU = sp.yawU + yawB; yawL = sp.yawL + yawB; gJolt = sp.jolt;
+      for (let sd = 0; sd < 2; sd++) {
+        const sg = sd === 0 ? 1 : -1;
+        handF[sd] = sp.hf[sd]; handS[sd] = sp.hs[sd]; handU[sd] = sp.hu[sd];
+        const bo = 0.22 * lh * sp.hb[sd];
+        elbF[sd] = (lean + handF[sd]) * 0.5; elbS[sd] = (sg * shS + handS[sd]) * 0.5 + sg * bo * 0.8; elbU[sd] = (shU + handU[sd]) * 0.5 - bo * 0.5;
+        footF[sd] = sp.ff[sd]; footS[sd] = sp.fs[sd]; footU[sd] = sp.fu[sd];
+        kneeF[sd] = sp.ff[sd] * 0.5 + sp.kb[sd]; kneeS[sd] = (sg * hipS + sp.fs[sd]) * 0.5 + sg * sp.kb[sd] * 0.5; kneeU[sd] = 0;
+      }
+    } else if (mode === 'grapple') {
       hipU = 0.3 * lh; shU = 0.5 * lh; headU = 0.6 * lh;
       lean = 0.02 * lh; headF = 0.03 * lh; headS = 0.05 * bw;
       tilt = 0.55 + 0.03 * Math.sin(tN * 0.8 + pid);
@@ -1850,9 +1923,12 @@
     fig.sy = sq;
     fig.sx = 1 / sq;
     for (let side = 0; side < 2; side++) {
+      // A held victim twists the trunk more than the hips (yawU vs yawL); everyone else has both at zero.
+      fig.sr = Math.sin(rel + yawL); fig.cr = Math.cos(rel + yawL);
       put(r, 4 + side, 0, (side === 0 ? 1 : -1) * hipS, hipU);
       put(r, 8 + side, footF[side], footS[side], footU[side]);
       put(r, 12 + side, kneeF[side], kneeS[side], kneeU[side] > 0 ? kneeU[side] : (hipU + footU[side]) * 0.5);
+      fig.sr = Math.sin(rel + yawU); fig.cr = Math.cos(rel + yawU);
       put(r, 2 + side, lean, (side === 0 ? 1 : -1) * shS, shU);
       put(r, 6 + side, handF[side], handS[side], handU[side]);
       put(r, 10 + side, elbF[side], elbS[side], elbU[side]);
@@ -2250,6 +2326,7 @@
       }
     };
     clippedDraw(r, minX - lw, maxX + lw, depth, wrapped);
+    if (locked) drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
     ctx.globalAlpha = 1;
     return true;
   }
@@ -2967,6 +3044,8 @@
       r.lockK = typeof fl.k === 'number' && isFinite(fl.k) ? fl.k : 0;
       const la = typeof fl.age === 'number' ? fl.age : fl.t0age;
       r.lockAge = typeof la === 'number' && isFinite(la) ? la : 1;
+      r.lockSp = typeof fl.sp === 'number' && isFinite(fl.sp) ? fl.sp : 9;
+      r.lockRs = typeof fl.rs === 'number' && isFinite(fl.rs) ? Math.max(0, Math.min(1, fl.rs)) : 0;
     } else {
       r.lockId = -1;
     }

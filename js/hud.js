@@ -171,7 +171,7 @@
   let feedDim = 1; // dial + clock alpha multiplier (0.5 while feeding)
 
   // ---- veil meter: how visible you are (eye icon + 5 ticks), cold blue-grey hidden -> candle gold exposed ----
-  const VEIL_X = 58;
+  const VEIL_X = 56;
   const VEIL_MID = 319;
 
   /** Blend of hidden and exposed colours as 'rgb(r,g,b)' for k 0..1. */
@@ -291,8 +291,8 @@
   }
 
   // ---- hunger extras (v0.9): all optional, dim, drawn only when their field is present ----
-  const PW_X0 = 62;
-  const PW_X0_LG = 70;
+  const PW_X0 = 84;
+  const PW_X0_LG = 94;
   const PW_DX_LG = 30;   // powers row: right of the vial (x 21..38) and its gift ring (r 24), left of centre
   const PW_Y = 318;
   const PW_DX = 24;
@@ -367,6 +367,29 @@
     }
   }
 
+  /** Rocks left: three small pebbles just right of the powers row; spent ones are a faint dotted outline. */
+  function drawRocks(h, ctx, n, max) {
+    const x0 = (lg > 1 ? PW_X0_LG + POWER_MAX * PW_DX_LG : PW_X0 + POWER_MAX * PW_DX) + 4;
+    ctx.strokeStyle = COL_LINE;
+    ctx.lineWidth = 1;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < max; i++) {
+      const x = x0 + i * 9 * lg;
+      const y = PW_Y;
+      const on = i < n;
+      ctx.globalAlpha = on ? 0.6 : 0.18;
+      ctx.beginPath();
+      ctx.moveTo(x - 3 * lg + J(h, 60 + i, 0) * 0.3, y + 2 * lg);
+      ctx.lineTo(x - 2 * lg, y - 2 * lg);
+      ctx.lineTo(x + 1 * lg, y - 3 * lg + J(h, 60 + i, 1) * 0.3);
+      ctx.lineTo(x + 3.5 * lg, y);
+      ctx.lineTo(x + 2 * lg, y + 3 * lg);
+      ctx.lineTo(x - 2 * lg, y + 3 * lg);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+
   function drawFear(h, ctx, fear) {
     const n = Math.ceil(fear / 3);
     ctx.strokeStyle = COL_BLUE;
@@ -430,6 +453,7 @@
   function drawHunger(h, ctx, o, t, reduced) {
     if (o.over01 !== undefined || o.overOpen === true) drawOver(h, ctx, o, t, reduced);
     if (o.powers !== undefined) drawPowers(h, ctx, o.powers, t, reduced);
+    if (typeof o.rocks === 'number') drawRocks(h, ctx, Math.max(0, Math.min(9, Math.floor(o.rocks))), 3);
     const fear = num(o.fear, 0, 0, 15);
     if (fear > 0) drawFear(h, ctx, fear);
     const still = num(o.still01, 0, 0, 1);

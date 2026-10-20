@@ -5,7 +5,7 @@ each click sends out a sonar pulse that lights up the walls around you.
 At night, go out to find people and get back to your crypt or a safe dark
 space before dawn, so you can sleep through the day.
 
-Current build (v0.10.17): sonar pulse, first-person outline view, settings, people
+Current build (v0.10.18): sonar pulse, first-person outline view, settings, people
 who walk set paths through the maps, one night at a time (feed, sleep
 and dawn; see Night rules below), a main menu, an upgrade shop, night boons,
 random runs and saves. You never see a person directly:
@@ -37,6 +37,10 @@ Double-click `index.html` to open the game. No install or server is needed.
   Space still pings while you hold them; you drag your victim slowly while drinking (full victims resist; look is halved). With "Click to
   start/stop drinking" on in Settings, click instead of holding. Drinking with
   nobody in reach plays a soft miss sound
+- Hold E while drinking: restrain your victim. Your arms pin theirs, they cannot break free and their struggling is muffled,
+  but you drink at half speed while your hands are busy
+- G: throw a rock where you face (3 rocks per run, 1 s between throws). It lands with a loud clatter, sending sound waves that light up the
+  surroundings and startle villagers nearby: use it to lure them or cover your tracks
 - Q shriek · Shift or C mist · F still: use a power (see Powers)
 - M: toggle the top-down map view (debug builds only, `?debug=1`)
 - W / S: move forward / back
