@@ -352,6 +352,84 @@ describe('render-feed.test.js', () => {
     }
   });
 
+  // --- CSS vignette overlay (attachVignette) ---
+  function fakeDomCanvas(w, h) {
+    const kids = [];
+    const mkEl = (tag) => {
+      const el = { tag, className: '', attrs: {}, props: {}, style: { opacity: '', setProperty(k, v) { el.props[k] = v; } }, setAttribute(k, v) { el.attrs[k] = v; } };
+      return el;
+    };
+    const parent = {
+      children: kids,
+      insertBefore(el, ref) { const i = ref ? kids.indexOf(ref) : -1; if (i < 0) kids.push(el); else kids.splice(i, 0, el); return el; }
+    };
+    const c = fakeCanvas(w, h);
+    c.parentNode = parent;
+    c.nextSibling = null;
+    kids.push(c);
+    c.ownerDocument.createElement = (tag) => (tag === 'canvas' ? fakeCanvas(w, h) : mkEl(tag));
+    return c;
+  }
+
+  test('attachVignette: bad input returns codes, never throws', () => {
+    Render._resetVignetteForTest();
+    assert.deepStrictEqual(Render.attachVignette(null), { ok: false, code: 'no-canvas' });
+    const c = fakeCanvas(640, 360);
+    assert.deepStrictEqual(Render.attachVignette(c), { ok: false, code: 'no-parent' });
+    const c2 = fakeDomCanvas(640, 360);
+    c2.ownerDocument = {};
+    assert.deepStrictEqual(Render.attachVignette(c2), { ok: false, code: 'no-document' });
+  });
+
+  test('attachVignette inserts overlays after the canvas; overlay replaces canvas vignette draws', () => {
+    Render._resetVignetteForTest();
+    const canvas = fakeDomCanvas(640, 360);
+    const res = Render.attachVignette(canvas);
+    assert.deepStrictEqual(res, { ok: true, code: 'ok' });
+    assert.strictEqual(Render.attachVignette(canvas).code, 'already');
+    const kids = canvas.parentNode.children;
+    assert.strictEqual(kids.length, 3);
+    assert.strictEqual(kids[1].className, 'vig vig-base');
+    assert.strictEqual(kids[2].className, 'vig vig-feed');
+    assert.strictEqual(kids[1].attrs['aria-hidden'], 'true');
+    const edge = parseFloat(kids[1].props['--vig-edge']);
+    assert.ok(edge > 0.6 && edge < 0.75, 'edge alpha ' + edge);
+    const r = Render.create(canvas, {});
+    r.reduced = false;
+    const world = VCS.World.load(VCS.MapData.maps[VCS.MapData.startMap]);
+    const sonar = VCS.Sonar.create();
+    Render.drawFirstPerson(r, world, player, sonar, 1, { vignette: 0.8 });
+    assert.strictEqual(kids[1].style.opacity, '1');
+    assert.strictEqual(kids[2].style.opacity, '0.4');
+    assert.strictEqual(r.feedVig, undefined, 'no canvas feed vignette built');
+    assert.ok(!canvas._ctx.calls.some((c) => c.fn === 'drawImage' && c.args[0] === r.vignette), 'no canvas vignette draw');
+    Render.drawFirstPerson(r, world, player, sonar, 1.1, { vignette: 0 });
+    assert.strictEqual(kids[2].style.opacity, '0');
+    Render.setVignetteVisible(false);
+    assert.strictEqual(kids[1].style.opacity, '0');
+    Render.setVignetteVisible(true);
+    assert.strictEqual(kids[1].style.opacity, '1');
+    Render._resetVignetteForTest();
+  });
+
+  test('without an overlay the canvas vignette path is used (fallback)', () => {
+    Render._resetVignetteForTest();
+    const f = setup();
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 1, { vignette: 1 });
+    assert.ok(f.canvas._ctx.calls.some((c) => c.fn === 'drawImage' && c.args[0] === f.r.vignette));
+    assert.ok(f.r.feedVig);
+    assert.doesNotThrow(() => Render.setVignetteVisible(false));
+  });
+
+  test('overlay for a different canvas does not suppress canvas drawing', () => {
+    Render._resetVignetteForTest();
+    Render.attachVignette(fakeDomCanvas(640, 360));
+    const f = setup();
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 1, { vignette: 1 });
+    assert.ok(f.r.feedVig);
+    Render._resetVignetteForTest();
+  });
+
 });
 
 describe('render-warm.test.js', () => {

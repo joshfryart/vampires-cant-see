@@ -1103,7 +1103,7 @@
       VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
       e.pan = clamp(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), -1, 1);
       if (S.audio) {
-        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), clamp(0.7 * e.strength, 0.1, 0.7), e.pan);
+        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), echoStrength('person', e.dist, Math.atan2(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), Math.cos(Math.atan2(e.y - p.y, e.x - p.x) - p.angle)) * 180 / Math.PI, clamp(0.7 * e.strength, 0.1, 0.7)), e.pan);
       }
     }
     markerRipples(tPrev, S.clock);
@@ -1176,7 +1176,7 @@
     if (lp) {
       const nearest = VCS.Sonar.nearestDist(lp);
       const range = lp.range || 10;
-      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
+      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), echoStrength('wall', nearest, nearestAngleDeg(lp), clamp(1 - nearest / range, 0.15, 1)), echoPan(lp));
     }
     bounceEchoes();
     return true;
@@ -1217,6 +1217,42 @@
       if (delay > 2) continue;
       VCS.Audio.echo(S.audio, delay, clamp(0.35 * (c.strength || 0.4), 0.05, 0.3), panTo(c.x, c.y));
     }
+  }
+
+  /** Echo strength 0..1. Flag acoustics.echoLevel off (default): returns the legacy value. On: Eq. W/O from VCS.Acoustics; acoustics.beam adds B_tx once. */
+  function echoStrength(cls, distCells, thetaDeg, legacy) {
+    try {
+      const A = VCS.Acoustics;
+      const F = VCS.Flags;
+      if (!A || !F || !F.get('acoustics.echoLevel')) return legacy;
+      const d = VCS.SoundData && VCS.SoundData.acoustics;
+      if (!d) return legacy;
+      const r = A.toMeters(distCells, d.cellM);
+      const th = F.get('acoustics.beam') ? thetaDeg : 0;
+      const m = d.mat && d.mat.stone ? d.mat.stone : { alpha: 0.03, s: 0.1 };
+      const L = cls === 'wall'
+        ? A.levelWall({ thetaDeg: th, rM: r, alpha: m.alpha, s: m.s })
+        : A.levelObject({ thetaDeg: th, rM: r, ts: d.TS && d.TS[cls] != null ? d.TS[cls] : -15 });
+      const amp = A.dbToAmp(A.gameLevel(L, cls, d.kappa));
+      return isFinite(amp) ? clamp(amp, 0.05, 1) : legacy;
+    } catch (err) {
+      L().warn('echoStrength failed', err);
+      return legacy;
+    }
+  }
+
+  /** Angle (deg, -180..180) from facing to the nearest sonar hit in a pulse. */
+  function nearestAngleDeg(lp) {
+    try {
+      const v = lp && lp.vis;
+      if (!v || !v.length || !S.player) return 0;
+      let bi = -1;
+      let bd = Infinity;
+      for (let i = 0; i < v.length; i++) if (v[i] > 0 && v[i] < bd) { bd = v[i]; bi = i; }
+      if (bi < 0) return 0;
+      const a = (bi / v.length) * Math.PI * 2 - S.player.angle;
+      return Math.atan2(Math.sin(a), Math.cos(a)) * 180 / Math.PI;
+    } catch (err) { return 0; }
   }
 
   /** Stereo pan (-1..1): 1/dist-weighted circular mean of visible walls within 60 deg of facing (0 if none). */
@@ -3070,6 +3106,8 @@
       try {
         if (VCS.Flags) {
           VCS.Flags.register('dev.showFps', false, 'Show the FPS/debug overlay');
+          VCS.Flags.register('acoustics.echoLevel', false, 'Echo level from distance, target strength and game calibration');
+          VCS.Flags.register('acoustics.beam', false, 'Mouth beam: echoes from behind are quieter (needs echoLevel)');
           VCS.Flags.load(root.location.search, debug);
           if (VCS.Flags.get('dev.showFps')) S.debugOn = true;
           VCS.Flags.onChange(function (ev) {
@@ -3159,6 +3197,12 @@
       S.people = peopleFor(startName);
       S.ripple = VCS.Ripple.create();
       S.renderer = VCS.Render.create(S.canvas, c);
+      try {
+        if (VCS.Render.attachVignette) {
+          const av = VCS.Render.attachVignette(S.canvas);
+          if (av && av.ok === false) L().warn('vignette overlay not attached (' + av.code + '); canvas fallback');
+        }
+      } catch (err) { L().warn('vignette attach failed', err); }
       applyMotion();
       if (S.state === 'title' && typeof VCS.Render.setGrain === 'function') VCS.Render.setGrain(S.renderer, 0);
       try {

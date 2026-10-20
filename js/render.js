@@ -2665,8 +2665,87 @@
     return n;
   }
 
+  /** CSS vignette overlays (see attachVignette); null until attached, then the canvas fallback is skipped. */
+  let vigOverlay = null;
+
+  function vigLog(msg, e) {
+    try {
+      const log = VCS.Log && VCS.Log.get('render');
+      if (log) log.error(msg, e);
+    } catch (e2) { /* logging must never throw */ }
+  }
+
+  /** True when the CSS overlay is attached to this renderer's canvas (so the canvas path is skipped). */
+  function overlayFor(r) {
+    return !!(vigOverlay && vigOverlay.canvas === r.canvas);
+  }
+
+  /** Set an overlay layer's opacity (only touches the style when the value changed). */
+  function setVigOpacity(layer, o) {
+    try {
+      const v = o <= 0.001 ? 0 : o >= 1 ? 1 : Math.round(o * 1000) / 1000;
+      if (layer.applied === v) return;
+      layer.applied = v;
+      layer.el.style.opacity = String(v);
+    } catch (e) {
+      vigLog('vignette opacity failed', e);
+      vigOverlay = null;
+    }
+  }
+
+  /**
+   * Create the CSS vignette overlays (static black edge + feed vignette) and insert them right after the canvas.
+   * The gradients reproduce the canvas ones; stops are percentages of the farthest-corner radius so they
+   * scale with the CSS size of the canvas. Optional: without it the renderer draws the vignettes on the canvas.
+   * Returns { ok, code } (code: ok | already | no-canvas | no-document | no-parent | error).
+   */
+  function attachVignette(canvasEl) {
+    try {
+      if (!canvasEl) return { ok: false, code: 'no-canvas' };
+      if (vigOverlay && vigOverlay.canvas === canvasEl) return { ok: true, code: 'already' };
+      const doc = canvasEl.ownerDocument || root.document;
+      if (!doc || typeof doc.createElement !== 'function') return { ok: false, code: 'no-document' };
+      const parent = canvasEl.parentNode;
+      if (!parent || typeof parent.insertBefore !== 'function') return { ok: false, code: 'no-parent' };
+      const W = canvasEl.width > 0 ? canvasEl.width : BASE_W;
+      const H = canvasEl.height > 0 ? canvasEl.height : BASE_H;
+      const rFar = Math.hypot(W, H) / 2;
+      const rIn = H * 0.28;
+      const rOut = Math.hypot(W, H) * 0.52;
+      const inPct = (rIn / rFar) * 100;
+      const edgeA = 0.75 * (rFar - rIn) / (rOut - rIn);
+      const mk = function (cls) {
+        const el = doc.createElement('div');
+        el.className = cls;
+        el.setAttribute('aria-hidden', 'true');
+        el.style.opacity = '0';
+        return { el: el, applied: 0 };
+      };
+      const base = mk('vig vig-base');
+      const feed = mk('vig vig-feed');
+      base.el.style.setProperty('--vig-in', inPct.toFixed(3) + '%');
+      base.el.style.setProperty('--vig-edge', edgeA.toFixed(4));
+      parent.insertBefore(base.el, canvasEl.nextSibling || null);
+      parent.insertBefore(feed.el, base.el.nextSibling || null);
+      vigOverlay = { canvas: canvasEl, base: base, feed: feed };
+      return { ok: true, code: 'ok' };
+    } catch (e) {
+      vigOverlay = null;
+      vigLog('attachVignette failed', e);
+      return { ok: false, code: 'error' };
+    }
+  }
+
+  /** Show or hide the CSS vignettes for non-first-person views (no-op without an overlay). */
+  function setVignetteVisible(visible) {
+    if (!vigOverlay) return;
+    setVigOpacity(vigOverlay.base, visible ? 1 : 0);
+    if (!visible) setVigOpacity(vigOverlay.feed, 0);
+  }
+
   /** Cached radial vignette canvas (transparent centre, black edge); rebuilt only when the size changes. */
   function drawFeedVignette(r, v) {
+    if (overlayFor(r)) { setVigOpacity(vigOverlay.feed, 0.5 * v); return; }
     try {
       const ctx = r.ctx;
       const W = r.canvas.width;
@@ -2774,7 +2853,8 @@
     const ctx = r.ctx;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
+    if (overlayFor(r)) setVigOpacity(vigOverlay.base, 1);
+    else if (r.vignette) ctx.drawImage(r.vignette, 0, 0);
     if (world && player && r.warmSide) {
       // Zoned, directional edge glow (core + faint outer halo), steady.
       if (!r.edgeState) r.edgeState = { out: { left: 0, right: 0, top: 0 }, cos: 0, side: 0, init: false };
@@ -3015,11 +3095,13 @@
     if (opts && opts.warm) { try { drawWarm(r, player, tanHalf, opts.warm); } catch (e) { logOnce(r, 'warm', e); } }
     drawAtmosphere(r, opts && typeof opts.lit === 'number' ? opts.lit : 0, t, world, player);
     if (opts && typeof opts.vignette === 'number' && opts.vignette > 0.001) drawFeedVignette(r, Math.min(1, opts.vignette));
+    else if (overlayFor(r)) setVigOpacity(vigOverlay.feed, 0);
     adapt(r, !!anyPulse && r.litColumns > 0);
   }
 
   /** Draw the top-down debug view (phase 1 look) plus pulse rings. */
   function drawTopDown(r, world, p, sonar, t, opts) {
+    if (overlayFor(r)) setVignetteVisible(false);
     const ctx = r.ctx;
     const W = r.canvas.width;
     const H = r.canvas.height;
@@ -3243,6 +3325,9 @@
     drawHud: drawHud,
     drawWipe: drawWipe,
     setGrain: setGrain,
+    attachVignette: attachVignette,
+    setVignetteVisible: setVignetteVisible,
+    _resetVignetteForTest: function () { vigOverlay = null; },
     stats: stats,
     AFTERGLOW_K: AFTERGLOW_K,
     SWEEP: SWEEP,

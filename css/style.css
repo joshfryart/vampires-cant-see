@@ -51,6 +51,24 @@ body {
   background: #000;
 }
 
+/* Vignettes: CSS overlays over the canvas (Render.attachVignette); opacity is driven per frame from JS. Same alpha curves as the old canvas gradients. */
+.vig {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100vw, calc(100vh * 16 / 9));
+  aspect-ratio: 640 / 360;
+  pointer-events: none;
+  opacity: 0;
+}
+.vig-base {
+  background: radial-gradient(circle farthest-corner at 50% 50%, rgba(0, 0, 0, 0) var(--vig-in, 30%), rgba(0, 0, 0, var(--vig-edge, 0.7)) 100%);
+}
+.vig-feed {
+  background: radial-gradient(circle farthest-corner at 50% 50%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.85) 100%);
+}
+
 /* Film grain: a tiled noise overlay over the canvas (normal blend: screen blending cost ~15 fps in software compositing); opacity is set from JS (Render.setGrain). Steps at 2 Hz. */
 #grain {
   position: fixed;

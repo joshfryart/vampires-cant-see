@@ -46,6 +46,42 @@
     maxBounceEchoes: 4
   };
 
+  // Echo acoustics constants (docs/SPEC-echoes.md section 3). Pure data, deep-frozen. Consumed by js/acoustics.js.
+  // [estimate] tags: alpha for roughStone/cobble/iron/plaster, s for plaster, all sigmaH, plank/glass mass per area.
+  SoundData.acoustics = (function deepFreeze(o) {
+    Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === 'object') deepFreeze(o[k]); });
+    return Object.freeze(o);
+  })({
+    cellM: 1.0, c: 343, rMin: 0.5, rpMaxM: 2.0, kappa: 0.5,
+    G: { wall: 0, prop: 6, person: 12 },
+    TS: { person: -15, prop: -16.5 },
+    maekawaCap: 24, Dvis: 36, vmin: 0.15,
+    // alpha at 2 kHz, s (table model), sigmaH metres (kirchhoff model), m kg/m2 (mass law), tlCap dB (flat gain)
+    mat: {
+      stone: { alpha: 0.03, s: 0.1, sigmaH: 0.002, tlCap: 65 },
+      brick: { alpha: 0.03, s: 0.15, sigmaH: 0.002, tlCap: 55 },
+      plaster: { alpha: 0.04, s: 0.1, sigmaH: 0.002 },
+      glass: { alpha: 0.02, s: 0.05, sigmaH: 0.002, m: 15, peak: { f: 2000, gainDb: 10, q: 1.4 } },
+      wood: { alpha: 0.1, s: 0.3, sigmaH: 0.002 },
+      roughStone: { alpha: 0.03, s: 0.35, sigmaH: 0.015, tlCap: 65 },
+      cobble: { alpha: 0.05, s: 0.6, sigmaH: 0.025 },
+      grass: { alpha: 0.6, s: 0.7, sigmaH: 0.04 },
+      iron: { alpha: 0.02, s: 0.5, sigmaH: 0.002 },
+      door: { alpha: 0.1, s: 0.3, sigmaH: 0.002, m: 24 },
+      plank: { alpha: 0.1, s: 0.3, sigmaH: 0.002, m: 12 }
+    },
+    occlusion: { f0: 125 },
+    // room T60 inputs: cells (Lc x Wc), height m, mean alpha
+    zones: {
+      crypt: { Lc: 12, Wc: 7, H: 3.0, alpha: 0.04 },
+      tavern: { Lc: 18, Wc: 12, H: 3.5, alpha: 0.15 },
+      church: { Lc: 16, Wc: 14, H: 8.0, alpha: 0.06 },
+      house1: { Lc: 10, Wc: 8, H: 2.7, alpha: 0.12 }
+    },
+    t60Clamp: { min: 0.4, max: 2.5 },
+    comb: { indoorMs: [37, 61, 97], outdoorMs: [19, 31, 47] }
+  });
+
   VCS.SoundData = SoundData;
   if (typeof module !== 'undefined' && module.exports) module.exports = SoundData;
 })(typeof window !== 'undefined' ? window : globalThis);
