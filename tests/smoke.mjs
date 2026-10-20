@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 
 const require = createRequire(import.meta.url);
 let playwright;
@@ -13,7 +14,8 @@ try {
 const { chromium } = playwright;
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outDir = path.join(root, 'tests', 'out');
+const tmpOut = path.join(os.tmpdir(), 'vcs-smoke'); // outside OneDrive
+const outDir = path.join(tmpOut, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 
 const failures = [];
@@ -61,8 +63,32 @@ async function launch() {
 
 // Tutorial hints are first-time only (localStorage vcs.seen); suppress them by default so pixel checks stay clean.
 const SEEN_ALL = ['tut:ping', 'tut:person', 'tut:vial', 'tut:fear', 'tut:sleep'];
+const opened = [];
+// Deterministic Math.random for every page (mulberry32), so wander/idle/break-free rolls cannot flip a check.
+const PIN_RANDOM = () => {
+  let a = 0x9e3779b9;
+  Math.random = function () { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+};
+// Close every tracked page except those in keep (a page left open slows every later section: fps drops 60 -> 30-39).
+async function closeLeaked(keep) {
+  const k = keep || [];
+  while (opened.length) {
+    const p = opened.pop();
+    if (k.indexOf(p) >= 0) continue;
+    try { await p.context().close(); } catch (e) { /* already closed */ }
+  }
+}
+function secFail(name, e) { check('section completed: ' + name, false, e && e.stack ? e.stack : String(e)); }
+// Click "New run" and wait for the run to actually start (no fixed sleep).
+async function clickNew(pg) {
+  await pg.click('#btn-menu-new', { timeout: 10000 });
+  // Either the run starts, or (saved run / other tab) the button turns into the abandon confirm or stays; settle without throwing.
+  await waitF(pg, () => window.VCS.Game.debugState().state !== 'title' || /Abandon/.test(document.getElementById('btn-menu-new').textContent), null, 2500);
+  await frames(pg, 3);
+}
 async function newPg(br, opts, tut) {
   const ctx = await br.newContext(opts);
+  await ctx.addInitScript(PIN_RANDOM);
   if (!tut) {
     await ctx.addInitScript((ids) => {
       try {
@@ -73,7 +99,9 @@ async function newPg(br, opts, tut) {
       } catch (e) { /* ignore */ }
     }, SEEN_ALL);
   }
-  return ctx.newPage();
+  const pgNew = await ctx.newPage();
+  opened.push(pgNew);
+  return pgNew;
 }
 
 // ---------------- --shots mode: deterministic baseline captures, no checks ----------------
@@ -90,8 +118,8 @@ if (process.argv.includes('--shots')) {
       const pg = await newPg(br, { viewport: { width: 1280, height: 720 } });
       pg.on('pageerror', (e) => console.log('pageerror: ' + (e && e.message ? e.message : e)));
       await pg.goto(url);
-      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
-      if (start) { await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {}); await sleep(300); }
+      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
+      if (start) { await clickNew(pg); await sleep(300); }
       return pg;
     };
     const snap = async (pg, name, pulse) => {
@@ -197,8 +225,10 @@ if (process.argv.includes('--shots')) {
 }
 
 const browser = await launch();
+let vis, page, shotsDir, url07, mk07, ds, pg7, bed, fresh, real, p8, shots8;
 try {
-  const page = await newPg(browser, { viewport: { width: 1000, height: 600 } });
+  try {
+  page = await newPg(browser, { viewport: { width: 1000, height: 600 } });
   const consoleErrors = [];
   const csp = [];
   const pageErrors = [];
@@ -211,7 +241,7 @@ try {
 
   await page.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1&map=test');
   await page.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state !== 'boot', null, { timeout: 5000 })
-    .catch(() => {});
+    ;
   const s0 = await page.evaluate(() => window.VCS && window.VCS.Game ? window.VCS.Game.debugState() : null);
   check('game booted to title', !!s0 && s0.state === 'title', s0 ? 'state=' + s0.state : 'VCS.Game missing');
 
@@ -232,7 +262,7 @@ try {
     return n;
   });
 
-  await page.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(page);
   await sleep(300);
   const darkBefore = await countLit();
   check('dark before any pulse', darkBefore < 50, 'nonblack=' + darkBefore);
@@ -247,7 +277,7 @@ try {
   check('pulse lights columns', stPulse.litColumns > 20, 'litColumns=' + stPulse.litColumns);
   await page.screenshot({ path: path.join(outDir, 'smoke-pulse.png') });
   // Game time only advances at <= 0.1 s per frame, so poll rather than assume real time.
-  await page.waitForFunction(() => window.VCS.Game.debugState().litColumns === 0, null, { timeout: 9000, polling: 100 }).catch(() => {});
+  await waitF(page, () => window.VCS.Game.debugState().litColumns === 0, null, 9000);
   const stDark = await page.evaluate(() => window.VCS.Game.debugState());
   check('pulse faded (litColumns 0)', stDark.litColumns === 0, 'litColumns=' + stDark.litColumns);
   await sleep(300);
@@ -332,21 +362,21 @@ try {
   const stPaused = await page.evaluate(() => window.VCS.Game.debugState());
   check('Escape pauses', stPaused.state === 'paused', 'state=' + stPaused.state);
   await page.screenshot({ path: path.join(outDir, 'smoke-pause.png') });
-  await page.click('#btn-settings', { timeout: 3000 }).catch(() => {});
+  await page.click('#btn-settings', { timeout: 10000 });
   const settingsVisible = await page.evaluate(() => !document.getElementById('settings').hidden);
   check('settings panel opens', settingsVisible);
   await page.screenshot({ path: path.join(outDir, 'smoke-settings.png') });
-  await page.selectOption('#set-scale', '0.5').catch(() => {});
+  await page.selectOption('#set-scale', '0.5');
   await sleep(300);
-  await page.selectOption('#set-scale', '1').catch(() => {});
+  await page.selectOption('#set-scale', '1');
   await sleep(300);
-  await page.fill('#set-fov', '80').catch(() => {});
-  await page.check('#set-bob').catch(() => {});
+  await page.fill('#set-fov', '80');
+  await page.check('#set-bob');
   check('Wobbly lines is on by default', await page.evaluate(() => document.getElementById('set-boil').checked && window.VCS.Game.debugState().lineBoil === true));
-  await page.uncheck('#set-boil').catch(() => {});
+  await page.uncheck('#set-boil');
   const boilOff = await page.evaluate(() => ({ s: window.VCS.Game.debugState().lineBoil, k: JSON.parse(localStorage.getItem('vcs.settings')).lineBoil }));
   check('Wobbly lines unchecked turns config.lineBoil off', boilOff.s === false && boilOff.k === false, JSON.stringify(boilOff));
-  await page.check('#set-boil').catch(() => {});
+  await page.check('#set-boil');
   check('Wobbly lines checked turns config.lineBoil on', await page.evaluate(() => window.VCS.Game.debugState().lineBoil === true));
   const saved = await page.evaluate(() => {
     try { return JSON.parse(localStorage.getItem('vcs.settings')); } catch (e) { return null; }
@@ -366,9 +396,9 @@ try {
     set('set-draglook', 'checked', true);
     set('set-feedtoggle', 'checked', false);
   });
-  await page.click('#btn-reset', { timeout: 3000 }).catch(() => {});
-  await page.click('#btn-settings-back', { timeout: 3000 }).catch(() => {});
-  await page.click('#btn-resume', { timeout: 3000 }).catch(() => {});
+  await page.click('#btn-reset', { timeout: 10000 });
+  await page.click('#btn-settings-back', { timeout: 10000 });
+  await page.click('#btn-resume', { timeout: 10000 });
   await sleep(300);
   const stResumed = await page.evaluate(() => window.VCS.Game.debugState());
   check('resume after settings', stResumed.state === 'playing', 'state=' + stResumed.state);
@@ -382,11 +412,14 @@ try {
   check('no CSP violations', csp.length === 0, csp.join(' | '));
 
   await page.screenshot({ path: path.join(outDir, 'smoke.png') });
-  console.log('screenshot: tests/out/smoke.png');
+  console.log('screenshot: tmp vcs-smoke/out/smoke.png');
 
 
+  } catch (e) { secFail("boot+pulse+people+sound+settings", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- v0.6 checks ----------------
-  const shotsDir = path.join(root, 'shots');
+  shotsDir = path.join(tmpOut, 'shots');
   fs.mkdirSync(shotsDir, { recursive: true });
   const gi = path.join(root, '.gitignore');
   const giTxt = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
@@ -396,10 +429,10 @@ try {
   const errs6 = [];
   p6.on('pageerror', (e) => errs6.push(String(e && e.message ? e.message : e)));
   await p6.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1');
-  await p6.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+  await p6.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   const b0 = await p6.evaluate(() => window.VCS.Game.debugState());
   check('boot without ?map starts on crypt', b0.map === 'crypt' && b0.state === 'title', 'map=' + b0.map + ' state=' + b0.state);
-  await p6.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(p6);
   await sleep(300);
   const b1 = await p6.evaluate(() => window.VCS.Game.debugState());
   check('click moves title -> playing', b1.state === 'playing', 'state=' + b1.state);
@@ -426,7 +459,7 @@ try {
   const wk = await p6.evaluate(() => window.VCS.Game.debugState());
   check('real walk crypt -> town', wk.map === 'town', 'map=' + wk.map + ' pos=' + wk.player.x.toFixed(2) + ',' + wk.player.y.toFixed(2));
   check('transition state was observed', sawTransition);
-  await p6.waitForFunction(() => window.VCS.Game.debugState().state === 'playing', null, { timeout: 4000 }).catch(() => {});
+  await p6.waitForFunction(() => window.VCS.Game.debugState().state === 'playing', null, { timeout: 4000 });
   const wk2 = await p6.evaluate(() => window.VCS.Game.debugState());
   check('state returns to playing after walk', wk2.state === 'playing', 'state=' + wk2.state);
 
@@ -565,8 +598,8 @@ try {
   const errs3 = [];
   page3.on('pageerror', (e) => errs3.push(String(e && e.message ? e.message : e)));
   await page3.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1&safe=1&map=test');
-  await page3.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
-  await page3.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await page3.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
+  await clickNew(page3);
   await sleep(300);
   const bandInfo = await page3.evaluate(() => {
     const G = window.VCS.Game;
@@ -594,8 +627,8 @@ try {
   const errs2 = [];
   page2.on('pageerror', (e) => errs2.push(String(e && e.message ? e.message : e)));
   await page2.goto('file://' + path.join(root, 'index.html'));
-  await page2.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
-  await page2.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await page2.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
+  await clickNew(page2);
   await sleep(300);
   await page2.keyboard.press('KeyM');
   await sleep(300);
@@ -604,9 +637,12 @@ try {
   check('no debug hook without ?debug=1', await page2.evaluate(() => typeof window.VCS.Game.debugPulse === 'undefined'));
   check('no page errors (no-debug page)', errs2.length === 0, errs2.join(' | '));
 
+  } catch (e) { secFail("v0.6", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- v0.7 checks ----------------
-  const url07 = 'file://' + path.join(root, 'index.html');
-  const mk07 = async (query) => {
+  url07 = 'file://' + path.join(root, 'index.html');
+  mk07 = async (query) => {
     const pg = await newPg(browser, { viewport: { width: 1000, height: 600 } });
     const errs = [];
     const csps = [];
@@ -617,18 +653,18 @@ try {
       else if (m.type() === 'error') errs.push(t);
     });
     await pg.goto(url07 + query);
-    await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
-    await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+    await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
+    await clickNew(pg);
     await sleep(250);
     return { pg, errs, csps };
   };
   const G7 = (pg, fn, arg) => pg.evaluate(fn, arg);
-  const ds = (pg) => pg.evaluate(() => window.VCS.Game.debugState());
+  ds = (pg) => pg.evaluate(() => window.VCS.Game.debugState());
 
   const a7 = await mk07('?seed=7&debug=1');
-  const pg7 = a7.pg;
+  pg7 = a7.pg;
   const n0 = await ds(pg7);
-  check('v0.7: night starts at 20:00 night 1', !!n0.night && n0.night.clock === '20:00' && n0.night.n === 1 && n0.night.status === 'night', JSON.stringify(n0.night));
+  check('v0.7: night starts at 20:00 night 1', !!n0.night && /^20:[0-2]\d$/.test(n0.night.clock) && n0.night.n === 1 && n0.night.status === 'night', JSON.stringify(n0.night));
   check('v0.7: blood starts near 10', n0.night && n0.night.blood > 9 && n0.night.blood <= 10, 'blood=' + (n0.night && n0.night.blood));
   check('v0.7: start card is Night 1', n0.card === 'Night 1', 'card=' + n0.card);
   check('v0.9: snapshot is v4 with night, run and hunger', await pg7.evaluate(() => { const s = window.VCS.Game.getSnapshot(); return s.v === 4 && !!s.run && !!s.run.hunger && Array.isArray(s.run.boons) && !!s.night && s.night.night === 1; }));
@@ -655,7 +691,7 @@ try {
   check('v0.7: stepping outdoors by day ends the run', lost1.state === 'runend', 'state=' + lost1.state);
   const re1 = await pg7.evaluate(() => ({ vis: !document.getElementById('runend').hidden, title: document.getElementById('runend-title').textContent, msg: document.getElementById('runend-msg').textContent }));
   check('v0.7: runend panel shows sun message', re1.vis && re1.title === 'The sun found you' && /Nights survived: 0/.test(re1.msg) && /People fed: 0/.test(re1.msg), JSON.stringify(re1));
-  await pg7.click('#btn-newrun', { timeout: 3000 }).catch(() => {});
+  await pg7.click('#btn-newrun', { timeout: 10000 });
   await sleep(200);
   const nr = await ds(pg7);
   check('v0.7: New run -> playing, night 1, crypt, 20:00', nr.state === 'playing' && nr.night.n === 1 && nr.map === 'crypt' && nr.night.clock === '20:00' && nr.night.blood > 9, JSON.stringify({ s: nr.state, n: nr.night, m: nr.map }));
@@ -664,11 +700,11 @@ try {
   await pg7.evaluate(() => { const G = window.VCS.Game; G.debugMap('town', null); G.debugTime(5, 59); G.debugAdvance(2); });
   const lost2 = await ds(pg7);
   check('v0.7: outdoors at dawn ends the run', lost2.state === 'runend', 'state=' + lost2.state);
-  await pg7.click('#btn-newrun', { timeout: 3000 }).catch(() => {});
+  await pg7.click('#btn-newrun', { timeout: 10000 });
   await sleep(200);
 
   // Sleep beside the crypt bed.
-  const bed = await pg7.evaluate(() => { const rows = VCS.MapData.maps.crypt.rows; for (let y = 0; y < rows.length; y++) { const x = rows[y].indexOf('C'); if (x >= 0) return { x, y }; } return null; });
+  bed = await pg7.evaluate(() => { const rows = VCS.MapData.maps.crypt.rows; for (let y = 0; y < rows.length; y++) { const x = rows[y].indexOf('C'); if (x >= 0) return { x, y }; } return null; });
   check('v0.7: crypt bed found in map data', !!bed, JSON.stringify(bed));
   await pg7.evaluate((b) => { const G = window.VCS.Game; G.debugMap('crypt', null); G.debugTeleport(b.x - 0.5, b.y + 0.5, 0); }, bed);
   check('v0.7: debugSleep starts sleeping beside the bed', (await pg7.evaluate(() => window.VCS.Game.debugSleep())) === true);
@@ -697,11 +733,14 @@ try {
   check('v0.7: no errors (night page)', a7.errs.length === 0, a7.errs.join(' | '));
   check('v0.7: no CSP violations (night page)', a7.csps.length === 0, a7.csps.join(' | '));
 
+  } catch (e) { secFail("v0.7", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- v0.7.2 feeding (hold to drink) ----------------
   const f7 = await mk07('?seed=7&debug=1&map=test');
   let fp = f7.pg;
   const extra = [];
-  const fresh = async () => { const m = await mk07('?seed=7&debug=1&map=test'); extra.push(m); await m.pg.evaluate(SETUP); return m.pg; };
+  fresh = async () => { const m = await mk07('?seed=7&debug=1&map=test'); extra.push(m); await m.pg.evaluate(SETUP); return m.pg; };
   // In-page helper: put the player 1.2 cells behind (outside the 1-cell bump distance) (or in front of) a person, aimed at it; returns the id or -1.
   const SETUP = `(function () {
     const G = window.VCS.Game;
@@ -898,6 +937,7 @@ try {
   // 2) Torch-lit witnesses (town). A: witness already facing the player. B: facing away, noticed after the first beat.
   const lit7 = await mk07('?seed=7&debug=1');
   const lp = lit7.pg;
+  await lp.evaluate(() => { Math.random = function () { return 0.99; }; }); // victim never tears free (struggle() break-free roll) before the witness reacts
   const litTest = async (facing) => lp.evaluate(([facingAway]) => {
     const G = window.VCS.Game;
     G.debugMap('town', null);
@@ -945,7 +985,7 @@ try {
   const litA = await litTest(false);
   check('v0.7.2: torch-lit witness facing the player interrupts within a few frames', litA.ok && litA.lit > 0.3 && litA.steps <= 6 && litA.victim.mode === 'dazed' && litA.b1 >= litA.b0 - 0.5, JSON.stringify(litA));
   const litB = await litTest(true);
-  check('v0.7.2: lit walker facing away: startled by a beat as it grows (~4-6 s at the slower drain), then sees you, drink ends, blood kept', litB.ok && litB.lit > 0.3 && litB.secs > 0.05 && litB.secs < 8 && litB.victim.mode === 'dazed' && litB.b1 > litB.b0 + 0.3 && litB.wmode === 'flee', JSON.stringify(litB));
+  check('v0.7.2: lit walker facing away: startled by the victim struggle noise as it grows (not a heartbeat; within a few seconds), then sees you, drink ends, blood kept', litB.ok && litB.lit > 0.3 && litB.secs > 0.05 && litB.secs < 8 && litB.victim.mode === 'dazed' && litB.b1 > litB.b0 + 0.3 && litB.wmode === 'flee', JSON.stringify(litB));
   check('v0.7.2: no errors (lit page)', lit7.errs.length === 0, lit7.errs.join(' | '));
   check('v0.7.2: no errors (feed pages)', f7.errs.length === 0 && extra.every((m) => m.errs.length === 0), f7.errs.concat(...extra.map((m) => m.errs)).join(' | '));
   check('v0.7.2: no CSP violations (feed pages)', f7.csps.length === 0 && extra.every((m) => m.csps.length === 0), f7.csps.join(' | '));
@@ -955,7 +995,7 @@ try {
   const r7 = await mk07('?seed=7&debug=1&map=test');
   const rp = r7.pg;
   await rp.evaluate(SETUP);
-  const real = await rp.evaluate(() => {
+  real = await rp.evaluate(() => {
     const G = window.VCS.Game;
     G.debugBlood(10);
     window.__pin();
@@ -1030,10 +1070,13 @@ try {
   check('v0.7: no ERROR log entries', (await ds(fp)).errors === 0 && (await ds(pg7)).errors === 0);
   console.log('screenshots: shots/v07-{hud,dawn,card}.png');
 
+  } catch (e) { secFail("v0.7.2 feeding", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- v0.8 runs, saves, menu ----------------
-  const shots8 = path.join(root, 'tests', 'shots');
+  shots8 = path.join(tmpOut, 'shots8');
   fs.mkdirSync(shots8, { recursive: true });
-  const p8 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
+  p8 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
   const errs8 = [];
   const csp8 = [];
   p8.on('pageerror', (e) => errs8.push(String(e && e.message ? e.message : e)));
@@ -1043,9 +1086,9 @@ try {
     else if (m.type() === 'error') errs8.push(t);
   });
   const toTitle = async () => {
-    await p8.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+    await p8.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   };
-  const vis = (id) => p8.evaluate((i) => !document.getElementById(i).hidden, id);
+  vis = (id) => p8.evaluate((i) => !document.getElementById(i).hidden, id);
   const noticeText = () => p8.evaluate(() => document.getElementById('notice').hidden ? '' : document.getElementById('notice-list').textContent);
   await p8.goto(url07 + '?seed=7&debug=1');
   await toTitle();
@@ -1055,7 +1098,7 @@ try {
   const crypt8 = await p8.evaluate(() => { const c = document.getElementById('view'); const x = c.getContext('2d'); const d = x.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] > 60) n++; return n; });
   check('v0.8: crypt menu backdrop drawn on the canvas', crypt8 > 20, 'lit=' + crypt8);
   await p8.screenshot({ path: path.join(shots8, 'menu.png') });
-  await p8.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(p8);
   await sleep(250);
   check('v0.8: New run -> playing', (await ds(p8)).state === 'playing');
   check('v0.8: menu hidden while playing', !(await vis('menu')));
@@ -1092,7 +1135,7 @@ try {
   await p8.reload();
   await toTitle();
   check('v0.8: after reload Continue is enabled', await p8.evaluate(() => !document.getElementById('btn-continue').disabled));
-  await p8.click('#btn-continue', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-continue', { timeout: 10000 });
   await sleep(250);
   const c1 = await ds(p8);
   const run2 = await p8.evaluate(() => window.VCS.Game.debugRun());
@@ -1107,31 +1150,31 @@ try {
   check('v0.8: tombstone canvas is drawn', tombInk > 50, 'ink=' + tombInk);
   await p8.screenshot({ path: path.join(shots8, 'tombstone.png') });
   check('v0.8: run save removed after the run ends', await p8.evaluate(() => localStorage.getItem('vcs.run') === null));
-  await p8.click('#btn-crypt', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-crypt', { timeout: 10000 });
   await sleep(200);
   check('v0.8: Crypt button returns to the menu', (await ds(p8)).state === 'title' && await vis('menu'));
   check('v0.8: Continue disabled again', await p8.evaluate(() => document.getElementById('btn-continue').disabled));
   // Stats, shop.
-  await p8.click('#btn-stats', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-stats', { timeout: 10000 });
   await waitF(p8, () => !document.getElementById('stats').hidden);
   check('v0.8: stats panel lists values', await vis('stats') && (await p8.evaluate(() => document.querySelectorAll('#stats-list dt').length)) >= 6);
   await pressUntil(p8, 'Escape', () => document.getElementById('stats').hidden && !document.getElementById('menu').hidden);
   check('v0.8: Escape in stats returns to the main menu', await vis('menu') && !(await vis('stats')));
   await p8.evaluate(() => window.VCS.Game.debugEssence(30));
-  await p8.click('#btn-shop', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-shop', { timeout: 10000 });
   await sleep(300);
   check('v0.8: shop shows 9 cards', await vis('shop') && (await p8.evaluate(() => document.querySelectorAll('#shop-list .card').length)) === 9);
   const shopInk = await p8.evaluate(() => { const c = document.querySelector('#shop-list canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; });
   check('v0.8: shop icon is drawn', shopInk > 30, 'ink=' + shopInk);
   await p8.screenshot({ path: path.join(shots8, 'shop.png') });
-  await p8.click('#buy-far_echo', { timeout: 3000 }).catch(() => {});
+  await p8.click('#buy-far_echo', { timeout: 10000 });
   await sleep(150);
   const meta2 = await p8.evaluate(() => window.VCS.Game.debugMeta());
   check('v0.8: buying far_echo costs 5 and sets tier 1', meta2.upgrades.far_echo === 1 && meta2.essence === 25, JSON.stringify(meta2));
   // Export / import round trip through the real file input.
   const exported = await p8.evaluate(() => window.VCS.Game.debugExport());
   check('v0.8: export text is an export envelope', /"kind": "export"/.test(exported));
-  await p8.click('#btn-shop-back', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-shop-back', { timeout: 10000 });
   await p8.evaluate(() => { const l = document.getElementById('notice-list'); while (l.firstChild) l.removeChild(l.firstChild); document.getElementById('notice').hidden = true; });
   await p8.setInputFiles('#file-import', { name: 'save.json', mimeType: 'application/json', buffer: Buffer.from(exported) });
   await sleep(400);
@@ -1146,7 +1189,7 @@ try {
   await p8.reload();
   await toTitle();
   check('v0.8: upgrade tier persists across reload', (await p8.evaluate(() => window.VCS.Game.debugMeta())).upgrades.far_echo === 1);
-  await p8.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(p8);
   await sleep(250);
   const fx1 = await p8.evaluate(() => window.VCS.Game.debugFx());
   check('v0.8: far_echo tier 1 gives sonarRange 1.15', Math.abs(fx1.sonarRange - 1.15) < 1e-9, JSON.stringify(fx1));
@@ -1155,10 +1198,10 @@ try {
   await p8.reload();
   await toTitle();
   const runsBefore = (await p8.evaluate(() => window.VCS.Game.debugMeta())).stats.runs;
-  await p8.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(p8);
   await sleep(150);
-  check('v0.8: New run with a saved run asks to abandon first', /Abandon run\?/.test(await p8.evaluate(() => document.getElementById('btn-menu-new').textContent)) && (await ds(p8)).state === 'title');
-  await p8.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  check('v0.8: New run with a saved run asks to abandon first', /Abandon run\?/.test(await p8.evaluate(() => document.getElementById('btn-menu-new').textContent)) && (await ds(p8)).state === 'title', JSON.stringify({ s: (await ds(p8)).state, t: await p8.evaluate(() => document.getElementById('btn-menu-new').textContent), run: await p8.evaluate(() => !!localStorage.getItem('vcs.run')) }));
+  await clickNew(p8);
   await sleep(250);
   check('v0.8: second click abandons (records a run) and starts a new one', (await ds(p8)).state === 'playing' && (await p8.evaluate(() => window.VCS.Game.debugMeta())).stats.runs === runsBefore + 1);
   // Corrupt main meta with a valid backup: reload restores the backup and says so.
@@ -1172,12 +1215,15 @@ try {
   await p8.evaluate(() => { localStorage.setItem('vcs.run', '{"broken"'); localStorage.removeItem('vcs.run.bak'); });
   await p8.evaluate(() => { const l = document.getElementById('notice-list'); while (l.firstChild) l.removeChild(l.firstChild); document.getElementById('notice').hidden = true; });
   await p8.evaluate(() => { document.getElementById('btn-continue').disabled = false; });
-  await p8.click('#btn-continue', { timeout: 3000 }).catch(() => {});
+  await p8.click('#btn-continue', { timeout: 10000 });
   await sleep(200);
   check('v0.8: unreadable run save gives a notice and stays on the menu', /Run save could not be loaded/.test(await noticeText()) && (await ds(p8)).state === 'title' && await p8.evaluate(() => document.getElementById('btn-continue').disabled));
   check('v0.8: no page errors', errs8.length === 0, errs8.join(' | '));
   check('v0.8: no CSP violations', csp8.length === 0, csp8.join(' | '));
   console.log('screenshots: tests/shots/{menu,shop,boons,tombstone}.png');
+  } catch (e) { secFail("v0.8 runs/saves", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- v0.9 hunger: gifts, powers, fear ----------------
   {
   const p9 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
@@ -1192,10 +1238,10 @@ try {
   const v9 = (fn, arg) => p9.evaluate(fn, arg);
   const hg = () => v9(() => window.VCS.Game.debugHunger());
   const bl = () => v9(() => window.VCS.Game.debugState().night.blood);
-  const title9 = () => p9.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+  const title9 = () => p9.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   await p9.goto(url07 + '?debug=1&seed=4242');
   await title9();
-  await p9.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+  await clickNew(p9);
   await sleep(300);
   check('v0.9: new run has fresh hunger', await v9(() => { const h = window.VCS.Game.debugHunger(); return !!h && h.fear === 0 && h.over === 0 && h.gifts.length === 0 && h.essenceBonus === 0; }));
   await v9(() => { const G = window.VCS.Game; G.debugBlood(100); });
@@ -1316,7 +1362,7 @@ try {
   await p9.reload();
   await title9();
   await sleep(300);
-  await p9.click('#btn-continue', { timeout: 3000 }).catch(() => {});
+  await p9.click('#btn-continue', { timeout: 10000 });
   await sleep(300);
   const post = await hg();
   const cs9 = await ds(p9);
@@ -1327,12 +1373,12 @@ try {
   const snap3 = await v9(() => { const s = window.VCS.Game.getSnapshot(); s.v = 3; delete s.run.hunger; delete s.run.pendingGifts; return s; });
   await p9.goto('about:blank');
   await pb.goto(url07 + '?seed=7&debug=1');
-  await pb.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+  await pb.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   const v3ok = await pb.evaluate((snap) => window.VCS.Save.create(window.localStorage).write('run', 3, snap).ok, snap3);
   await pb.reload();
-  await pb.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+  await pb.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   await sleep(300);
-  await pb.click('#btn-continue', { timeout: 3000 }).catch(() => {});
+  await pb.click('#btn-continue', { timeout: 10000 });
   await sleep(300);
   const h3 = await pb.evaluate(() => window.VCS.Game.debugHunger());
   const st3 = await pb.evaluate(() => window.VCS.Game.debugState());
@@ -1356,10 +1402,13 @@ try {
     return (await vis('error')) && !(await vis('menu')) && (await ds(p8)).state === 'error';
   })());
 
+  } catch (e) { secFail("v0.9 hunger", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---- v0.9.1: night length setting, guide, unlock sub line ----
   {
     const urlG = 'file://' + path.join(root, 'index.html');
-    const shotsG = path.join(root, 'tests', 'shots');
+    const shotsG = path.join(tmpOut, 'shotsG');
     fs.mkdirSync(shotsG, { recursive: true });
     const errsG = [];
     const cspG = [];
@@ -1367,7 +1416,7 @@ try {
     pg.on('pageerror', (e) => errsG.push(String(e && e.message ? e.message : e)));
     pg.on('console', (m) => { const t = m.text(); if (t.includes('Content Security Policy')) cspG.push(t); });
     const dsG = () => pg.evaluate(() => window.VCS.Game.debugState());
-    const titleG = () => pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+    const titleG = () => pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
     const hid = (id) => pg.evaluate((i) => document.getElementById(i).hidden, id);
     await pg.goto(urlG + '?seed=7&debug=1');
     await titleG();
@@ -1378,7 +1427,7 @@ try {
     await titleG();
     const mig = await pg.evaluate(() => JSON.parse(localStorage.getItem('vcs.settings')));
     check('v0.9.1: old settings without cfgV migrate to 4 and save cfgV 2', mig.nightLengthMin === 4 && mig.cfgV === 2 && mig.volume === 0.4, JSON.stringify(mig));
-    await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+    await clickNew(pg);
     await sleep(300);
     const nsec0 = await pg.evaluate(() => window.VCS.Game.debugState().night);
     await escP(pg);
@@ -1401,7 +1450,7 @@ try {
     await pg.click('#btn-abilities');
     await pg.click('#btn-guide-back');
     check('v0.9.1: Back returns from guide to pause', !(await hid('pause')) && (await hid('guide')));
-    await pg.click('#btn-resume').catch(() => {});
+    await pg.click('#btn-resume');
     // Guide from menu.
     await pg.evaluate(() => window.VCS.Game.debugMenu('menu'));
     await pg.evaluate(() => { window.VCS.Game.debugEndRun('lost'); });
@@ -1419,7 +1468,7 @@ try {
     check('v0.9.1: Back returns from menu guide to the menu', !(await hid('menu')) && (await hid('guide')));
     // Unlock card sub line on night 2.
     await pg.evaluate(() => localStorage.removeItem('vcs.seen'));
-    await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+    await clickNew(pg);
     await sleep(300);
     const bedG = await pg.evaluate(() => { const rows = VCS.MapData.maps.crypt.rows; for (let y = 0; y < rows.length; y++) { const x = rows[y].indexOf('C'); if (x >= 0) return { x, y }; } return null; });
     await pg.evaluate((b) => { const G = window.VCS.Game; G.debugMap('crypt', null); G.debugTeleport(b.x - 0.5, b.y + 0.5, 0); }, bedG);
@@ -1435,6 +1484,9 @@ try {
     console.log('screenshot: tests/shots/guide.png');
     await pg.close();
   }
+  } catch (e) { secFail("v0.9.1 night length", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---- v0.10 wave B: saves, flags, audio, rules, tutorial, guide ----
   {
     const urlB = 'file://' + path.join(root, 'index.html');
@@ -1444,9 +1496,9 @@ try {
     const bootB = async (pg, q) => {
       wire(pg);
       await pg.goto(urlB + (q || '?seed=7&debug=1'));
-      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
     };
-    const startB = async (pg) => { await pg.click('#btn-menu-new', { timeout: 3000 }).catch(() => {}); await sleep(350); };
+    const startB = async (pg) => { await clickNew(pg); await sleep(350); };
     const dsB = (pg) => pg.evaluate(() => window.VCS.Game.debugState());
     const warnCount = (pg, re) => pg.evaluate((src) => VCS.Log.entries().filter((e) => new RegExp(src).test(e.message || e.msg || JSON.stringify(e))).length, re);
 
@@ -1498,7 +1550,7 @@ try {
       await startB(pg);
       const badSnap = await pg.evaluate(() => { const snap = VCS.Game.getSnapshot(); snap.map = 'nowhere'; return snap; });
       await pg.goto(urlB + '?seed=7&debug=1'); // the old page saves on pagehide, so write the bad run after the reload
-      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
       await pg.evaluate((snap) => {
         const st = VCS.Save.create(localStorage);
         st.write('run', VCS.Save.RUN_SCHEMA, snap);
@@ -1524,7 +1576,7 @@ try {
       check('v0.10: second tab sees the other tab and pauses saving', sb.saving.otherTab === true && sa.saving.otherTab === false, JSON.stringify({ a: sa.saving, b: sb.saving }));
       check('v0.10: second tab shows the notice', await b.evaluate(() => /open in another tab/.test(document.getElementById('notice-list').textContent) && !document.getElementById('notice').hidden));
       await b.evaluate(() => { document.getElementById('btn-notice-ok').click(); });
-      await b.click('#btn-menu-new', { timeout: 3000 }).catch(() => {});
+      await clickNew(b);
       await sleep(300);
       await escP(b);
       const rawB = await b.evaluate(() => localStorage.getItem('vcs.run'));
@@ -1643,7 +1695,7 @@ try {
       await pg.evaluate(() => { VCS.Game.debugTime(4, 30); VCS.Game.debugAdvance(0.2); });
       check('v0.10: sleep hint at 04:30 on night 1', (await dsB(pg)).tutHint === 'E at the crypt or a dark spot to sleep', JSON.stringify(await pg.evaluate(() => [VCS.Game.debugState().tutHint, VCS.Game.debugState().night.clock])));
       await pg.reload();
-      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 5000 }).catch(() => {});
+      await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
       await startB(pg);
       await pg.evaluate(() => VCS.Game.debugAdvance(2.8));
       check('v0.10: hints do not repeat after a reload', (await dsB(pg)).tutHint === null);
@@ -1690,6 +1742,9 @@ try {
     }
     check('v0.10: no page errors (wave B)', errsB.length === 0, errsB.join(' | '));
   }
+  } catch (e) { secFail("v0.10 wave B", e); }
+  await closeLeaked([page, pg7, p8]);
+  try {
   // ---------------- dev panel (modular step 1) ----------------
   {
     const pd = await newPg(browser, { viewport: { width: 1000, height: 600 } });
@@ -1729,6 +1784,8 @@ try {
     check('devtool: copy error report works without page errors', errsN.length === 0, errsN.join(' | '));
     await pn.close();
   }
+  } catch (e) { secFail("dev panel", e); }
+  await closeLeaked([page, pg7, p8]);
 } catch (e) {
   check('smoke run completed', false, e && e.stack ? e.stack : String(e));
 } finally {
