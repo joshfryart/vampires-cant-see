@@ -158,6 +158,7 @@
   const STRUGGLE_START = 0.7; // grace after the grab before the first attempt
   const STRUGGLE_WEAK = 0.45; // below this share of blood left the victim is too weak to break free
   const DRINK_BOOST = 1.25; // v0.10.18: drinking ~20% quicker (~7 s per villager)
+  const DRAIN_BASE = 1.3; // v0.10.20: blood drains 30% faster before upgrades and boons
   const RESTRAIN_DRINK = 0.5; // drink rate while you hold E to restrain (your hands are busy)
   const RESTRAIN_NOISE = 0.35; // struggle noise left while restrained
   const ROCKS_PER_RUN = 3; // rocks you can throw in one run
@@ -288,7 +289,7 @@
   function newNightState() {
     try {
       const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4;
-      return VCS.Night.create({ nightSec: m * 60 * fxv('nightLen'), bloodStart: Math.min(100, 10 + fxv('startBlood')), drainMul: fxv('drain'), ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0 });
+      return VCS.Night.create({ nightSec: m * 60 * fxv('nightLen'), bloodStart: Math.min(100, 10 + fxv('startBlood')), drainMul: fxv('drain') * DRAIN_BASE, ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0 });
     } catch (err) {
       L().error('Night.create failed', err);
       return null;
@@ -3051,7 +3052,7 @@
     if (S.night) {
       const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4;
       S.night.nightSec = m * 60 * fxv('nightLen');
-      S.night.drainMul = fxv('drain');
+      S.night.drainMul = fxv('drain') * DRAIN_BASE;
     }
     L().info('Boon taken: ' + id);
     nextNight();
@@ -4075,7 +4076,7 @@
         const cur = S.night;
         const rn = VCS.Night.restore(snap.night, {
           nightSec: (S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4) * 60 * fxv('nightLen'),
-          drainMul: fxv('drain'),
+          drainMul: fxv('drain') * DRAIN_BASE,
           ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0,
           nights: cur ? cur.nights : undefined,
           bloodMax: cur ? cur.bloodMax : undefined

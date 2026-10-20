@@ -1,0 +1,44 @@
+DEVLOG: v0.10.4 to v0.10.20 - the village wakes up, and it fights back
+
+Since the dev panel and test hooks landed (open the page with ?debug=1 or press F9; there is a "Copy error report" button for bug reports), this build has been a long stretch of tuning how you SEE and HEAR the night, and then a big change to who is in it.
+
+
+WHAT YOU SEE AND HEAR
+- Torches hide until a pulse touches them. Flames, glow and holders only show under a ripple, and flames no longer flicker. Light now has a bright core and a faint outer halo, and a warm edge glow tells you which side the light is on. Light radius was retuned several times; the town is now properly dark.
+- Windows are hidden until a ripple reveals them, and linger a bit longer than walls because glass rings.
+- One sonar speed: rings and echoes travel at 12 cells per second, and an echo arrives after its round trip. Far walls answer later than near ones. The echo pans toward where you face.
+- Villager footsteps sound like steps (heel and scuff) and change with grass, wood and stone, and with sneaking, walking or running. Their floor rings are smaller.
+- Menu cursor stays visible: pointer lock only in play.
+
+
+FEEDING GOT PHYSICAL
+- Drink drag: while you drink you pull your victim along (full villagers resist), so you can drag them into shadow. You can still ping while holding.
+- Victims struggle: panic flail, then push-away, then limp as they weaken, with kicks that startle people nearby. A full victim can tear free and scream.
+- Hold E to restrain: your arms pin theirs and the noise is muffled, at half drink speed. Your arms show in the victim's echo.
+- G throws a rock (3 per run): a loud clatter, a sonar pulse and a distraction. Pebbles show on the HUD.
+- A veil meter (eye plus five ticks) beside the blood vial shows how exposed you are. New gulp sound. Drinking is about 25% faster.
+- Pacing changes: you start nights at 10% blood, pools are 30 to 50 per villager, and the drain was just raised 30% for more pressure.
+- Sleep is only possible from 04:30; before that the crypt warns you instead.
+
+
+V1: VILLAGER NIGHT SCHEDULES (headline change in v0.10.19)
+Villagers used to walk fixed loops. Now every one has a role, a home and a schedule across the night, built fresh each night and walked along lit streets.
+- The 01:00 curfew: all but the watch and a few night owls are indoors by 01:00, then asleep.
+- Two watchmen patrol eight posts around town all night, in opposite directions.
+- Night owls: an insomniac and a gravedigger stay out until about 03:30. The drunk leaves the tavern around 22:30 and staggers home.
+- Home life: the mother draws water, then cooks, eats and spins; the regular drinks, then mends; the farmer, elder, innkeeper and priest each have their own routine, and sleepers sit on benches until dawn.
+- If you scare someone, they flee, then re-plan their night from wherever they ended up.
+- Debug data: ?debug=1 exposes each villager's role, current and next stop, current act and ETA.
+Known limits: no beds or lying pose yet (sleepers sit), hearths give no light, and the watch carries no lanterns. Those are next.
+
+
+FIXES AND TOOLING
+- The run save was silently dropping your rock count; fixed, with a test.
+- Version string and README build number are now tied together by a test.
+- Night length smoke check updated for the 4-minute default.
+- Secret scanner (tools/check-secrets.mjs) now works on Windows paths.
+- 544 unit tests pass. The browser smoke test drives the real game in Chromium but has become flaky under load; I am treating it as advisory until I harden it.
+
+
+WHAT'S NEXT
+Villager interactions (meetings, gossip that spreads fear, children and drunks with their own movement), heartbeat audio when you are near someone, listening at windows, and then the Echoes acoustics pass (materials, room tails, mouth beam). Tell me which of these you'd play first.
