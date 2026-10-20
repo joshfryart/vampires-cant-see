@@ -18,6 +18,8 @@
   const COL_WIN_DARK = '#c4e2ff';
   /** Candle glow in lit window panes: max alpha (steady, no flicker). */
   const WIN_GLOW_MAX = 0.25;
+  /** Windows stay lit under a ripple this much longer than walls (glass rings). */
+  const WIN_LINGER = 1.5;
   /** Warm screen-edge glow: alpha at full light (lightAt = 1). */
   const EDGE_GLOW_MAX = 1;
   /** Door lines are drawn this much brighter than wall lines (alpha multiplier, clamped to 1). */
@@ -760,7 +762,7 @@
     }
   }
 
-  /** Candle glow in the panes of a lit window column (visible without a ring) plus a faint floor spill. */
+  /** Candle glow in the panes of a lit window column, drawn only while a ripple passes (v scales with ripple brightness). */
   function drawWindowGlow(r, i, v, dist, t, hx) {
     const ctx = r.octx;
     const hp = r.ybot[i] - r.ytop[i];
@@ -807,6 +809,7 @@
       let b0 = 0;
       let b1 = 0;
       let age = -1;
+      const tcode = h.hit && world.tileAt ? world.tileAt(h.cellX, h.cellY).charCodeAt(0) : 0;
       if (h.hit) {
         let pf = sonar.fade;
         if (s2) {
@@ -828,7 +831,7 @@
         }
         // Ripple-only vision: keep the brightness only for a short afterglow behind the front.
         if (b > 0.01) {
-          const g = glowMul(age, pf);
+          const g = glowMul(age, tcode === 119 ? pf * WIN_LINGER : pf);
           b0 *= g;
           b1 *= g;
           b *= g;
@@ -839,7 +842,6 @@
       r.bbot[i] = b0;
       r.btop[i] = b1;
       r.acol[i] = age;
-      const tcode = h.hit && world.tileAt ? world.tileAt(h.cellX, h.cellY).charCodeAt(0) : 0;
       const isDoor = tcode === 68 || tcode === 71;
       r.tch[i] = tcode;
       r.dcol[i] = isDoor ? (tcode === 71 ? 2 : 1) : 0;
@@ -859,7 +861,7 @@
       const tilt = isDoor ? hp * 0.05 * (h.wallX * (1 - h.wallX) * 4) * (0.4 + 0.6 * h.wallX) : 0;
       r.ytopD[i] = r.ytop[i] - dy + tilt + (boil && b > 0.01 ? wallJit(r, i, 0, 0) * A : 0);
       r.ybotD[i] = r.ybot[i] + dy + (boil && b > 0.01 ? wallJit(r, i, 1, 64) * A : 0);
-      if (r.wlit[i] > 0) { r.wcolU[i] = h.wallX; drawWindowGlow(r, i, r.wlit[i], d, t, h.hitX + h.hitY); }
+      if (r.wlit[i] > 0 && b > 0.01) { r.wcolU[i] = h.wallX; drawWindowGlow(r, i, r.wlit[i] * (b > 1 ? 1 : b), d, t, h.hitX + h.hitY); }
     }
     r.litColumns = lit;
     if (!lit) return;

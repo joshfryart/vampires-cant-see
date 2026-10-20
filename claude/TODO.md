@@ -3,7 +3,7 @@
 Each version: Opus pulls src → contract → agents → tests + smoke + screenshot review → publish → update `src/`, HANDOFF.md, TODO.md.
 
 ## Next (in order)
-1. [ ] Playtest v0.10.11 in browser: echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
+1. [ ] Playtest v0.10.12 in browser: windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
 2. [ ] Smoke test runs on a real machine (times out in sandbox). Run `node tests/smoke.mjs` before the next release.
 3. [ ] Perf: street 44–52 fps headless → hold ≥50 (vignette → CSS overlay first).
 4. [ ] Drink grab: victim pulled toward player, resists, resistance falls with blood (requested 2026-10-18).
@@ -24,6 +24,8 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 - [x] Devtool (`?debug=1`): core + outer light rings on the floor under ripple (v0.10.9)
 - [x] Town dark-route test: every door, gate and safe spot reachable under 0.6 and 0.3; tavern south door torches moved (v0.10.10)
 - [x] Echo timing: one sonar speed 12 cells/s, echo delay = round trip (2d/12), delay cap 6 s, old 34 cells/s audio speed removed (v0.10.11, 3559222, 42d4ada)
+- [x] W1 windows ripple-only: no always-on glow; frame + panes show only under a ripple, linger 1.5× wall afterglow; floor spill and test updated (v0.10.12)
+- [x] Villager footstep sound: heel thump + scuff per floor (grass/wood/stone), feet alternate (v0.10.12). Ring shrink/scuff still open below.
 - [x] Itch zip + playable artifact republished at each release
 
 ## Done
@@ -153,9 +155,9 @@ Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big 
 
 ## Requested 2026-10-18 (c) — windows + eavesdropping, todo only
 ### W1 Windows hidden (like lights)
-- [ ] Window frame/panes not drawn by default. Only a sonar ripple reveals them, lingering a bit longer than walls (≈1.5× afterglow) since glass rings.
+- [x] (v0.10.12) Window frame/panes not drawn by default. Only a sonar ripple reveals them, lingering a bit longer than walls (≈1.5× afterglow) since glass rings.
 - [ ] Keep the candle-gold / cold-glass tint on the revealed outline; keep floor light spill always (that's light, not the window).
-- [ ] Remove the always-on window glow (render.js window glow, 0.7 Hz) → glow only shows as the lit spill.
+- [x] (v0.10.12) Remove the always-on window glow (render.js window glow, 0.7 Hz) → glow only shows as the lit spill.
 ### W2 Listen at windows (mechanic)
 - [ ] Stand at a lit window, hold E (or crouch) → "listening": muffled voices from the room behind.
 - [ ] Glass muffles: lowpass ~1.2 kHz + TL gain (v0.11 Echoes glass row). Open/broken window = clearer.

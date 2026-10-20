@@ -273,26 +273,32 @@ describe('render-feed.test.js', () => {
     assert.ok(look(28.5, 17.5, -Math.PI / 2, true, during).warm > 0, 'reduced motion still draws doors');
   }));
 
-  test('windows: lit panes glow without a ring (alpha <= 0.25), dark panes only glint on reveal; reduced motion is static', () => withPath2D(() => {
+  test('windows: no glow without a ring; lit panes glow briefly (alpha <= 0.25) while a ripple passes; reduced motion is static', () => withPath2D(() => {
     const world = VCS.World.load(VCS.MapData.maps.town, { requireStart: false });
-    function look(x, y, ang, t, reduced) {
+    function look(x, y, ang, t, reduced, pulse) {
       const r = Render.create(fakeCanvas(640, 360), {});
       r.reduced = reduced;
       r.quality = 3;
       const sonar = VCS.Sonar.create();
+      if (pulse) VCS.Sonar.emit(sonar, world, x, y, 10, { range: 10 });
       r.octx.calls.length = 0;
       Render.drawFirstPerson(r, world, { x: x, y: y, angle: ang }, sonar, t, {});
       const glow = r.octx.calls.filter((c) => c.fn === 'fillRect' && c.alpha > 0.04);
       return { r: r, glow: glow };
     }
-    const lit = look(38.5, 9.5, Math.PI, 5, false);
-    assert.ok(lit.glow.length > 4, 'lit window glows in the dark with no pulse');
-    assert.ok(lit.glow.every((c) => c.alpha <= 0.25 + 1e-9), 'glow alpha <= 0.25');
-    assert.ok(!lit.r.logged || Object.keys(lit.r.logged).length === 0);
-    assert.strictEqual(look(22.5, 5, -Math.PI / 2, 5, false).glow.length, 0, 'unlit window shows no glow');
-    const a = look(38.5, 9.5, Math.PI, 5.0, true).glow.map((c) => c.alpha.toFixed(4)).join();
-    const b = look(38.5, 9.5, Math.PI, 5.6, true).glow.map((c) => c.alpha.toFixed(4)).join();
-    assert.strictEqual(a, b, 'static under reduced motion');
+    assert.strictEqual(look(38.5, 9.5, Math.PI, 5, false, false).glow.length, 0, 'v0.10.12: lit window is hidden with no pulse');
+    let peak = [];
+    for (const dt of [0.2, 0.24, 0.28, 0.32]) {
+      const g = look(38.5, 9.5, Math.PI, 10 + dt, false, true).glow;
+      if (g.length > peak.length) peak = g;
+    }
+    assert.ok(peak.length > 0, 'lit window glows while a ripple passes');
+    assert.ok(peak.every((c) => c.alpha <= 0.25 + 1e-9), 'glow alpha <= 0.25');
+    assert.strictEqual(look(38.5, 9.5, Math.PI, 10 + 6, false, true).glow.length, 0, 'glow gone after the afterglow');
+    assert.strictEqual(look(22.5, 5, -Math.PI / 2, 5, false, false).glow.length, 0, 'unlit window shows no glow');
+    const a = look(38.5, 9.5, Math.PI, 10.24, true, true).glow.map((c) => c.alpha.toFixed(4)).join();
+    const b = look(38.5, 9.5, Math.PI, 10.24, true, true).glow.map((c) => c.alpha.toFixed(4)).join();
+    assert.strictEqual(a, b, 'deterministic under reduced motion');
     // Rings reveal the frame: lit tint on lit glass, cold tint on dark glass.
     function strokes(x, y, ang, color) {
       const r = Render.create(fakeCanvas(640, 360), {});

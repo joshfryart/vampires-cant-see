@@ -439,16 +439,26 @@
       tone(ctx, out, 'triangle', f * 3, f * 2, t, 0.004, 0.035, peak * 0.4);
       noise(ctx, out, t, 0.03, peak * 0.5, 'bandpass', 700, 0.003);
     },
-    // lighter, higher tick
+    // villager footstep: shoe heel thump + scuff noise by floor; feet alternate in tone
     personStep: function (ctx, out, t, peak, v) {
-      if (v.material === 'grass' || v.material === 'wood') {
-        KINDS.step(ctx, out, t, peak * 0.9, v);
+      const k = v.pitch * (v.foot ? 1.08 : 1);
+      const m = v.material;
+      if (m === 'grass') {
+        if (noise(ctx, out, t, 0.11, peak * 1.3, 'lowpass', 800 * k, 0.02)) {
+          noise(ctx, out, t + 0.01, 0.07, peak * 0.5, 'bandpass', 2200, 0.015);
+          return;
+        }
+      } else if (m === 'wood') {
+        tone(ctx, out, 'triangle', 140 * k, 70 * k, t, 0.004, 0.09, peak * 1.1);
+        noise(ctx, out, t, 0.04, peak * 0.5, 'bandpass', 900 * k, 0.003);
+        return;
+      } else if (noise(ctx, out, t, 0.035, peak * 1.2, 'bandpass', 1500 * k, 0.002)) {
+        // stone: crisp heel click, then a short scuff
+        tone(ctx, out, 'sine', 95 * k, 55 * k, t, 0.004, 0.06, peak * 0.8);
+        noise(ctx, out, t + 0.03, 0.06, peak * 0.35, 'highpass', 3000, 0.01);
         return;
       }
-      const f = 340 * v.pitch * (v.foot ? 1.1 : 1);
-      tone(ctx, out, 'triangle', f, f * 0.65, t, 0.004, 0.035, peak);
-      tone(ctx, out, 'triangle', f * 2, f * 1.3, t, 0.003, 0.03, peak * 0.5);
-      tone(ctx, out, 'triangle', f * 3, f * 2, t, 0.003, 0.02, peak * 0.3);
+      tone(ctx, out, 'sine', 110 * k, 60 * k, t, 0.004, 0.07, peak);
     },
     // cartoon creak: pitch bends up and wobbles back down through a band-pass
     doorOpen: function (ctx, out, t, peak, v) {
