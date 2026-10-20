@@ -1352,7 +1352,7 @@ try {
     const hid = (id) => pg.evaluate((i) => document.getElementById(i).hidden, id);
     await pg.goto(urlG + '?seed=7&debug=1');
     await titleG();
-    check('v0.9.1: default night length is 6 on a fresh profile', await pg.evaluate(() => VCS.Config.DEFAULTS.nightLengthMin === 4 && JSON.parse(localStorage.getItem('vcs.settings') || 'null') === null));
+    check('v0.9.1: default night length is 4 on a fresh profile', await pg.evaluate(() => VCS.Config.DEFAULTS.nightLengthMin === 4 && JSON.parse(localStorage.getItem('vcs.settings') || 'null') === null));
     // Old settings (no cfgV) migrate to 4.
     await pg.evaluate(() => localStorage.setItem('vcs.settings', JSON.stringify({ nightLengthMin: 8, volume: 0.4 })));
     await pg.goto(urlG + '?seed=7&debug=1');
@@ -1368,7 +1368,7 @@ try {
     await pg.evaluate(() => { const el = document.getElementById('set-night'); el.value = '10'; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
     const slid = await pg.evaluate(() => ({ out: document.getElementById('out-night').textContent, saved: JSON.parse(localStorage.getItem('vcs.settings')).nightLengthMin, cfg: VCS.Config.load().nightLengthMin }));
     check('v0.9.1: night length slider changes and saves the config', slid.saved === 10 && slid.cfg === 10 && /10/.test(slid.out), JSON.stringify(slid));
-    check('v0.9.1: slider does not rescale the running night', (await pg.evaluate(() => window.VCS.Game.debugState().night.nightSec)) === nsec0.nightSec && nsec0.nightSec === 360, 'nightSec0=' + nsec0.nightSec);
+    check('v0.9.1: slider does not rescale the running night', (await pg.evaluate(() => window.VCS.Game.debugState().night.nightSec)) === nsec0.nightSec && nsec0.nightSec === 240, 'nightSec0=' + nsec0.nightSec);
     await pg.click('#btn-settings-back');
     // Guide from pause.
     await pg.click('#btn-abilities');

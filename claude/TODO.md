@@ -4,7 +4,7 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 
 ## Next (in order)
 1. [ ] Playtest v0.10.13 in browser: step rings differ for sneak/run and grass/wood/stone; windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
-2. [ ] Smoke test runs on a real machine (times out in sandbox). Run `node tests/smoke.mjs` before the next release.
+2. [x] Smoke test runs on a real machine (2026-10-20, Windows): 249 pass. Fixed stale night-length check (360 → 240 s). Needs Playwright installed outside the repo, `NODE_PATH` set to its node_modules, then `node tests/smoke.mjs`. First run had one extra failure that did not repeat; watch for flakiness. Still run before each release.
 3. [ ] Perf: street 44–52 fps headless → hold ≥50 (vignette → CSS overlay first).
 4. [ ] Drink grab: victim pulled toward player, resists, resistance falls with blood (requested 2026-10-18).
 5. [ ] Hidden "veil" meter (requested 2026-10-18 b).
