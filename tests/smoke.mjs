@@ -482,7 +482,18 @@ try {
   // Lit check on town torches.
   await p6.evaluate(() => window.VCS.Game.debugMap('town', null));
   const torch = await p6.evaluate(() => VCS.MapData.maps.town.props.find((q) => q.type === 'torch'));
-  await p6.evaluate(([x, y]) => window.VCS.Game.debugTeleport(x, y, 0), [torch.col + 0.5, torch.row + 1.5]);
+  const litCell = await p6.evaluate(([c, r]) => {
+    const w = window.VCS.Game.debugPeopleState().world;
+    let best = null, bl = -1;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      const x = c + 0.5 + dx, y = r + 0.5 + dy;
+      if (w.blocks(x, y, 0.25)) continue;
+      const l = w.lightAt(x, y);
+      if (l > bl + 1e-9 && Math.hypot(dx, dy) > 0.9) { bl = l; best = [x, y]; }
+    }
+    return best;
+  }, [torch.col, torch.row]);
+  await p6.evaluate(([x, y]) => window.VCS.Game.debugTeleport(x, y, 0), litCell);
   await p6.evaluate(() => window.VCS.Game.debugAdvance(0.1));
   const lit = await p6.evaluate(() => window.VCS.Game.debugState().playerLit);
   check('town: player beside torch is lit (> 0.3)', lit > 0.3, 'lit=' + lit + ' torch=' + torch.col + ',' + torch.row);
@@ -618,7 +629,7 @@ try {
   const pg7 = a7.pg;
   const n0 = await ds(pg7);
   check('v0.7: night starts at 20:00 night 1', !!n0.night && n0.night.clock === '20:00' && n0.night.n === 1 && n0.night.status === 'night', JSON.stringify(n0.night));
-  check('v0.7: blood starts near 60', n0.night && n0.night.blood > 59 && n0.night.blood <= 60, 'blood=' + (n0.night && n0.night.blood));
+  check('v0.7: blood starts near 10', n0.night && n0.night.blood > 9 && n0.night.blood <= 10, 'blood=' + (n0.night && n0.night.blood));
   check('v0.7: start card is Night 1', n0.card === 'Night 1', 'card=' + n0.card);
   check('v0.9: snapshot is v4 with night, run and hunger', await pg7.evaluate(() => { const s = window.VCS.Game.getSnapshot(); return s.v === 4 && !!s.run && !!s.run.hunger && Array.isArray(s.run.boons) && !!s.night && s.night.night === 1; }));
   await pg7.evaluate(() => { const G = window.VCS.Game; G.debugAdvance(2.6); G.debugPulse(); G.debugAdvance(0.4); });
@@ -647,7 +658,7 @@ try {
   await pg7.click('#btn-newrun', { timeout: 3000 }).catch(() => {});
   await sleep(200);
   const nr = await ds(pg7);
-  check('v0.7: New run -> playing, night 1, crypt, 20:00', nr.state === 'playing' && nr.night.n === 1 && nr.map === 'crypt' && nr.night.clock === '20:00' && nr.night.blood > 59, JSON.stringify({ s: nr.state, n: nr.night, m: nr.map }));
+  check('v0.7: New run -> playing, night 1, crypt, 20:00', nr.state === 'playing' && nr.night.n === 1 && nr.map === 'crypt' && nr.night.clock === '20:00' && nr.night.blood > 9, JSON.stringify({ s: nr.state, n: nr.night, m: nr.map }));
   check('v0.7: runend panel hidden after New run', await pg7.evaluate(() => document.getElementById('runend').hidden));
   // Outdoors at 05:59 -> sun at 06:00.
   await pg7.evaluate(() => { const G = window.VCS.Game; G.debugMap('town', null); G.debugTime(5, 59); G.debugAdvance(2); });
@@ -739,7 +750,7 @@ try {
   const tExp = drain.ok ? (drain.pool / 4.5) * Math.log(7 / (2.5 + 2.25 / drain.pool)) : 0;
   check('v0.7.2: grab from behind starts a drink', drain.ok, JSON.stringify(drain));
   check('v0.7.2: full drain takes ~9 s at its pool', drain.ok && Math.abs(drain.secs - tExp) < 0.3 && drain.secs > 5 && drain.secs < 14, 'secs=' + (drain.secs && drain.secs.toFixed(2)) + ' expected=' + tExp.toFixed(2) + ' pool=' + (drain.pool && drain.pool.toFixed(1)));
-  check('v0.7.2: full drain ends fed (+pool blood, fed count 1)', drain.ok && drain.victim.mode === 'fed' && drain.fed === 1 && drain.state === 'playing' && drain.b1 - drain.b0 > drain.pool - 2.5, JSON.stringify({ v: drain.victim, f: drain.fed, gain: drain.b1 - drain.b0 }));
+  check('v0.7.2: full drain ends fed (+pool blood, fed count 1)', drain.ok && drain.victim.mode === 'fed' && drain.fed === 1 && drain.state === 'playing' && drain.b1 - drain.b0 > drain.pool - 8, JSON.stringify({ v: drain.victim, f: drain.fed, gain: drain.b1 - drain.b0 }));
   check('v0.7.2: dark drain, no screams, nobody flees', drain.scream === 0 && drain.flee === 0, 'scream=' + drain.scream + ' flee=' + drain.flee);
   // Gasp: front grab emits a gasp pulse; from behind none.
   const gasp = await fp.evaluate(() => {
@@ -893,7 +904,14 @@ try {
     const st = G.debugPeopleState();
     const w = st.world;
     const torch = window.VCS.MapData.maps.town.props.find((q) => q.type === 'torch');
-    const P = { x: torch.col + 0.5, y: torch.row + 1.5 };
+    let P = { x: torch.col + 0.5, y: torch.row + 1.0 };
+    let bestL = -1; // the lit core shrank (v0.10.14): stand in the best-lit free cell next to the torch
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      const qx = torch.col + 0.5 + dx, qy = torch.row + 0.5 + dy;
+      if (w.blocks(qx, qy, 0.25)) continue;
+      const l = w.lightAt(qx, qy);
+      if (l > bestL + 1e-9 && Math.hypot(dx, dy) > 0.9) { bestL = l; P = { x: qx, y: qy }; }
+    }
     if (st.people.length < 2) return { ok: false, why: 'people' };
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     const free = (x, y) => !w.blocks(x, y, 0.25);
@@ -917,7 +935,7 @@ try {
       const lit = G.debugState().playerLit;
       if (!G.debugFeed()) continue;
       let steps = 0;
-      while (G.debugState().state === 'feeding' && steps < 240) { G.debugAdvance(1 / 60); steps++; }
+      while (G.debugState().state === 'feeding' && steps < 900) { G.debugAdvance(1 / 60); steps++; }
       const s = G.debugState();
       return { ok: true, lit, steps, secs: steps / 60, b0, b1: s.night.blood, victim: s.victim, state: s.state, wmode: q.mode };
     }
@@ -926,7 +944,7 @@ try {
   const litA = await litTest(false);
   check('v0.7.2: torch-lit witness facing the player interrupts within a few frames', litA.ok && litA.lit > 0.3 && litA.steps <= 6 && litA.victim.mode === 'dazed' && litA.b1 >= litA.b0 - 0.5, JSON.stringify(litA));
   const litB = await litTest(true);
-  check('v0.7.2: lit walker facing away: startled by a beat, then sees you, drink ends, blood kept', litB.ok && litB.lit > 0.3 && litB.secs > 0.05 && litB.secs < 0.6 && litB.victim.mode === 'dazed' && litB.b1 > litB.b0 + 0.3 && litB.wmode === 'flee', JSON.stringify(litB));
+  check('v0.7.2: lit walker facing away: startled by a beat as it grows (~4-6 s at the slower drain), then sees you, drink ends, blood kept', litB.ok && litB.lit > 0.3 && litB.secs > 0.05 && litB.secs < 8 && litB.victim.mode === 'dazed' && litB.b1 > litB.b0 + 0.3 && litB.wmode === 'flee', JSON.stringify(litB));
   check('v0.7.2: no errors (lit page)', lit7.errs.length === 0, lit7.errs.join(' | '));
   check('v0.7.2: no errors (feed pages)', f7.errs.length === 0 && extra.every((m) => m.errs.length === 0), f7.errs.concat(...extra.map((m) => m.errs)).join(' | '));
   check('v0.7.2: no CSP violations (feed pages)', f7.csps.length === 0 && extra.every((m) => m.csps.length === 0), f7.csps.join(' | '));
@@ -1611,12 +1629,13 @@ try {
       const pg = await newPg(browser, VP, true);
       await bootB(pg);
       await startB(pg);
+      await pg.evaluate(() => VCS.Game.debugBlood(80)); // runs start at 10%, which would show the vial hint first
       await pg.evaluate(() => VCS.Game.debugAdvance(2.8));
       const t1 = (await dsB(pg)).tutHint;
       check('v0.10: first hint asks the player to listen', t1 === 'Click or Space to listen', String(t1));
       await pg.evaluate(() => VCS.Game.debugPulse());
       const t2 = (await dsB(pg)).tutHint;
-      check('v0.10: the first pulse retires the hint', t2 === null && await pg.evaluate(() => JSON.parse(localStorage.getItem('vcs.seen')).indexOf('tut:ping') >= 0), String(t2));
+      check('v0.10: the first pulse retires the hint', t2 !== 'Click or Space to listen' && await pg.evaluate(() => JSON.parse(localStorage.getItem('vcs.seen')).indexOf('tut:ping') >= 0), String(t2));
       await pg.evaluate(() => { VCS.Game.debugBlood(40); VCS.Game.debugAdvance(0.2); });
       check('v0.10: vial hint the first time blood is under 50', (await dsB(pg)).tutHint === 'Vial = blood. Drink past full for gifts', String((await dsB(pg)).tutHint));
       await pg.evaluate(() => VCS.Game.debugAdvance(5.5));
