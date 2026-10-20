@@ -52,6 +52,7 @@
     mapName: '',
     baseSonar: null,
     roomKind: null,
+    roomZone: null,
     transition: null,
     pausedFrom: '',
     pendingPause: false,
@@ -1084,21 +1085,64 @@
     return clamp(Math.sin(Math.atan2(y - p.y, x - p.x) - p.angle), -1, 1);
   }
 
-  /** True when a solid cell lies on the line from the player to (x,y) (sampled every 0.25 cell, up to 25 cells). */
-  function occludedTo(x, y) {
+  /** First solid point on the segment (x0,y0)-(x1,y1) (sampled every 0.25 cell, up to 25 cells): {x, y} or null when the line is clear. */
+  function firstSolid(x0, y0, x1, y1) {
     const w = S.world;
-    const p = S.player;
-    if (!w || !p || typeof w.isSolid !== 'function') return false;
-    const dx = x - p.x;
-    const dy = y - p.y;
+    if (!w || typeof w.isSolid !== 'function') return null;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
     const d = Math.hypot(dx, dy);
-    if (!(d > 0.5)) return false;
+    if (!(d > 0.5)) return null;
     const n = Math.min(d, 25) / 0.25;
     for (let i = 1; i < n; i++) {
       const k = (i * 0.25) / d;
-      if (w.isSolid(p.x + dx * k, p.y + dy * k)) return true;
+      if (w.isSolid(x0 + dx * k, y0 + dy * k)) return { x: x0 + dx * k, y: y0 + dy * k };
     }
-    return false;
+    return null;
+  }
+
+  /** Acoustic material of the solid cell at (x,y): door (closed D), or the world material (stone, brick, wood, iron, glass). */
+  function blockMaterial(x, y) {
+    const w = S.world;
+    try {
+      if (typeof w.tileAt === 'function' && w.tileAt(x, y) === 'D') return 'door';
+      if (typeof w.materialAt === 'function') return w.materialAt(x, y) || 'stone';
+    } catch (err) { /* stone */ }
+    return 'stone';
+  }
+
+  /** True when a solid cell lies on the line from the player to (x,y). */
+  function occludedTo(x, y) {
+    const p = S.player;
+    return !!(p && firstSolid(p.x, p.y, x, y));
+  }
+
+  /**
+   * Occlusion detail for a world sound at (x,y): null when the line is clear, else {mat, diff}. mat is the first blocking material;
+   * diff is the least Maekawa loss (dB) over open doorways that both the player and the sound can see (null when none).
+   */
+  function occlusionTo(x, y) {
+    const w = S.world;
+    const p = S.player;
+    if (!w || !p) return null;
+    const hit = firstSolid(p.x, p.y, x, y);
+    if (!hit) return null;
+    const out = { mat: blockMaterial(hit.x, hit.y), diff: null };
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const doors = w.spots && w.spots.doors;
+    if (!A || !doors || typeof w.isDoorOpen !== 'function') return out;
+    const direct = Math.hypot(x - p.x, y - p.y);
+    for (let i = 0; i < doors.length; i++) {
+      const dr = doors[i];
+      if (!w.isDoorOpen(Math.floor(dr.x), Math.floor(dr.y))) continue;
+      const d1 = Math.hypot(dr.x - p.x, dr.y - p.y);
+      const d2 = Math.hypot(x - dr.x, y - dr.y);
+      if (d1 > A.doorwayReach || d1 + d2 > direct + 12) continue;
+      if (firstSolid(p.x, p.y, dr.x, dr.y) || firstSolid(dr.x, dr.y, x, y)) continue;
+      const loss = A.maekawa((d1 + d2 - direct) * A.cellM, A.maekawaHz);
+      if (out.diff === null || loss < out.diff) out.diff = loss;
+    }
+    return out;
   }
 
   /** Audio.play options for a world sound at (x,y): gain, pan, dist, behind, occluded (+ extra fields). */
@@ -1110,7 +1154,9 @@
       const dy = y - p.y;
       o.dist = Math.hypot(dx, dy);
       o.behind = Math.cos(Math.atan2(dy, dx) - p.angle) < 0;
-      o.occluded = occludedTo(x, y);
+      const occ = occlusionTo(x, y);
+      o.occluded = !!occ;
+      if (occ) o.occ = occ;
     }
     if (extra) Object.assign(o, extra);
     return o;
@@ -1284,7 +1330,7 @@
       VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
       e.pan = clamp(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), -1, 1);
       if (S.audio) {
-        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), clamp(0.7 * e.strength, 0.1, 0.7), e.pan);
+        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), clamp(0.7 * e.strength, 0.1, 0.7), e.pan, { voice: 'person' });
       }
     }
     markerRipples(tPrev, S.clock);
@@ -1342,7 +1388,7 @@
       sn.bounces = Math.min(b.bounces, room.bounceCap);
       sn.fade = b.fade * room.fadeMul * fxv('sonarFade') * (1 - 0.3 * weak) * (1 - 0.6 * wash);
     }
-    const fired = VCS.Sonar.emit(sn, S.world, p.x, p.y, S.clock, { z: level('ping').z });
+    const fired = VCS.Sonar.emit(sn, S.world, p.x, p.y, S.clock, { z: level('ping').z, facing: p.angle });
     sn.range = keep.range;
     sn.bounces = keep.bounces;
     sn.fade = keep.fade;
@@ -1355,9 +1401,17 @@
     VCS.Audio.ping(a);
     const lp = S.sonar.lastPulse;
     if (lp) {
-      const nearest = VCS.Sonar.nearestDist(lp);
-      const range = lp.range || 10;
-      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
+      const A = VCS.SoundData && VCS.SoundData.acoustics;
+      // v0.11: the loudest wall return (beam B(theta) once, spread, material, air) with its material voice, grain tail and near-wall comb.
+      const best = A ? VCS.Sonar.strongestEcho(lp, p.angle) : null;
+      if (best) {
+        const opts = { voice: A.matOf(best.mat).voice, rough: best.rough, rp: A.repetition(best.dist) };
+        VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(best.dist, S.sonar.speed), 0, 6), A.gameAmp(best.level), echoPan(lp), opts);
+      } else {
+        const nearest = VCS.Sonar.nearestDist(lp);
+        const range = lp.range || 10;
+        VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
+      }
     }
     bounceEchoes();
     return true;
@@ -1396,7 +1450,8 @@
       const dc = Math.sqrt((c.x - S.player.x) * (c.x - S.player.x) + (c.y - S.player.y) * (c.y - S.player.y));
       const delay = c.t0 - S.clock + dc / (c.speed || S.sonar.speed);
       if (delay > 2) continue;
-      VCS.Audio.echo(S.audio, delay, clamp(0.35 * (c.strength || 0.4), 0.05, 0.3), panTo(c.x, c.y));
+      const A = VCS.SoundData && VCS.SoundData.acoustics;
+      VCS.Audio.echo(S.audio, delay, clamp(0.35 * (c.strength || 0.4), 0.05, 0.3), panTo(c.x, c.y), A ? { voice: A.matOf(c.mat).voice } : undefined);
     }
   }
 
@@ -1832,6 +1887,7 @@
     set('set-draglook', 'checked', c.dragLook !== false);
     set('set-feedtoggle', 'checked', c.feedToggle === true);
     set('set-reduce', 'checked', c.reduceMotion === true);
+    set('set-bip', 'checked', c.pingBip === true);
     set('set-large', 'checked', c.largeText === true);
     set('set-ambience', 'value', String(typeof c.ambienceGain === 'number' ? c.ambienceGain : 0.6));
     const out = function (id, text) {
@@ -1864,6 +1920,7 @@
   /** Combine the OS reduced-motion preference with the setting; push it to the renderer; toggle large text. */
   function applyMotion() {
     S.reduced = S.osReduced || cfgOn('reduceMotion');
+    if (S.audio && typeof VCS.Audio.setPingStyle === 'function') VCS.Audio.setPingStyle(S.audio, cfgOn('pingBip'));
     if (S.renderer) S.renderer.reduced = S.reduced;
     try {
       const b = root.document && root.document.body;
@@ -1913,6 +1970,7 @@
     flag('set-draglook', 'dragLook');
     flag('set-feedtoggle', 'feedToggle');
     flag('set-reduce', 'reduceMotion');
+    flag('set-bip', 'pingBip');
     flag('set-large', 'largeText');
     bind('btn-reset', 'click', function () {
       Object.assign(S.config, VCS.Config.DEFAULTS);
@@ -3429,7 +3487,16 @@
       if (typeof b.cooldown === 'number') S.sonar.cooldown = b.cooldown * fxv('sonarCooldown');
     }
     S.roomKind = k;
-    if (S.audio && typeof VCS.Audio.setRoom === 'function') VCS.Audio.setRoom(S.audio, k);
+    applyReverb(w, k);
+  }
+
+  /** Reverb for the player's zone: T60 from Sabine per zone name (map name when the zone is unnamed), clamped 0.4-2.5 s. */
+  function applyReverb(w, k) {
+    const p = S.player;
+    const zone = p && w && typeof w.zoneAt === 'function' ? w.zoneAt(p.x, p.y) : null;
+    S.roomZone = zone || (w && w.name) || null;
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    if (S.audio && typeof VCS.Audio.setRoom === 'function') VCS.Audio.setRoom(S.audio, k, A ? A.t60For(S.roomZone, k) : undefined);
   }
 
   /** Sound kind at the player (zone kind, else map kind). */
@@ -3441,7 +3508,13 @@
   /** Follow the player's zone kind; only touches Audio/sonar when it changes. */
   function followRoom() {
     if (!S.world) return;
-    if (playerKind(S.world) !== S.roomKind) applyRoom(S.world);
+    const k = playerKind(S.world);
+    if (k !== S.roomKind) applyRoom(S.world);
+    else {
+      const p = S.player;
+      const z = p && typeof S.world.zoneAt === 'function' ? S.world.zoneAt(p.x, p.y) : null;
+      if ((z || S.world.name || null) !== S.roomZone) applyReverb(S.world, k);
+    }
   }
 
   /** Test hook: name of the zone at the player, or null. */
@@ -4104,6 +4177,19 @@
   }
 
   /** State snapshot for tests and debugging. */
+  /** Distinct wall materials the last ping's rays hit (names), for smoke checks of the per-hit material data. */
+  function pingMaterials() {
+    const lp = S.sonar && S.sonar.lastPulse;
+    if (!lp || !lp.vmat || !VCS.Sonar.hitInfo) return [];
+    const seen = {};
+    const h = {};
+    for (let i = 0; i < lp.vis.length; i++) {
+      VCS.Sonar.hitInfo(lp, (i / lp.vis.length) * Math.PI * 2, h);
+      if (h.hit) seen[h.mat] = true;
+    }
+    return Object.keys(seen);
+  }
+
   function debugState() {
     const p = S.player || { x: 0, y: 0, angle: 0 };
     return {
@@ -4113,6 +4199,8 @@
       errors: errorCount(),
       view: S.view,
       pulses: S.sonar ? S.sonar.pulses.length : 0,
+      voices: S.audio && S.audio.ctx && S.audio.ctx.__vcsVoices ? S.audio.ctx.__vcsVoices.length : 0,
+      pingMats: pingMaterials(),
       litColumns: S.renderer ? VCS.Render.stats(S.renderer).litColumns : 0,
       people: S.people ? VCS.People.snapshot(S.people) : [],
       echoes: S.people ? S.people.echoes.length : 0,

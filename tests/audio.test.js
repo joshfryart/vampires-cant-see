@@ -178,7 +178,7 @@ describe('audio.test.js', () => {
   test('ping creates an oscillator and a gain wired to the destination', () => {
     const { FakeAudioContext } = makeFakeContext();
     setGlobal('AudioContext', FakeAudioContext);
-    const a = Audio.create();
+    const a = Audio.create({ pingBip: true }); // the old bip is the pingBip setting
     Audio.unlock(a);
     Audio.ping(a);
     const ctx = a.ctx;
@@ -273,7 +273,7 @@ describe('audio.test.js', () => {
   test('setVolume clamps to 0..1 and scales the next ping', () => {
     const { FakeAudioContext } = makeFakeContext();
     setGlobal('AudioContext', FakeAudioContext);
-    const a = Audio.create();
+    const a = Audio.create({ pingBip: true });
     Audio.unlock(a);
 
     Audio.setVolume(a, 2);
@@ -815,6 +815,220 @@ describe('audio-a2.test.js', () => {
     a.ctx.createOscillator = () => { oscs++; return orig(); };
     Audio.play(a, 'step');
     assert.ok(oscs >= 3, 'fundamental plus 2x and 3x');
+  });
+
+  // ---- v0.11 echo acoustics ---------------------------------------------------
+  const A = SoundData.acoustics;
+  /** Context whose oscillators/gains/delays record what was set on them. */
+  function recCtx() {
+    const a = mk();
+    const c = a.ctx;
+    c.oscs = [];
+    c.delays = [];
+    c.srcCount = 0;
+    c.createOscillator = () => {
+      const n = node('osc');
+      n.type = 'sine';
+      n.freqs = [];
+      n.frequency = { value: 1, setValueAtTime(v) { n.freqs.push(v); }, exponentialRampToValueAtTime(v) { n.freqs.push(v); } };
+      n.start = (t) => { n.t = t; };
+      n.stop = () => {};
+      c.oscs.push(n);
+      return n;
+    };
+    c.createGain = () => {
+      const n = node('gain');
+      n.peak = 0;
+      n.gain = { value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime(v) { n.peak = v; } };
+      return n;
+    };
+    const cd = c.createDelay;
+    c.createDelay = () => { const n = cd(); c.delays.push(n); return n; };
+    const cb = c.createBufferSource;
+    c.createBufferSource = () => { c.srcCount++; return cb(); };
+    c.createBiquadFilter = () => { const n = node('filter'); n.frequency = param(1); n.gain = param(0); n.type = ''; c.made.push(n); return n; };
+    return a;
+  }
+
+  test('acoustics: beam table 0/-1/-3/-8/-14/-18/-20, symmetric, interpolated, non-increasing', () => {
+    const want = [0, -1, -3, -8, -14, -18, -20];
+    for (let i = 0; i < want.length; i++) {
+      const th = (i * 30 * Math.PI) / 180;
+      assert.ok(Math.abs(A.beam(th) - want[i]) < 1e-9, 'node ' + i * 30);
+      assert.ok(Math.abs(A.beam(-th) - want[i]) < 1e-9, 'symmetric ' + i * 30);
+    }
+    assert.ok(Math.abs(A.beam((45 * Math.PI) / 180) + 2) < 1e-9, 'linear between nodes');
+    let prev = 1;
+    for (let d = 0; d <= 180; d += 5) {
+      const b = A.beam((d * Math.PI) / 180);
+      assert.ok(b <= prev + 1e-9, 'non-increasing at ' + d);
+      prev = b;
+    }
+    assert.ok(Math.abs(A.beam(Math.PI * 2) - 0) < 1e-9, 'wraps');
+  });
+
+  test('acoustics: echo level formula (wall 2r image source, object sonar equation, beam once)', () => {
+    const air = (r) => 2 * r * A.airDbPerM;
+    const wall = (r) => -20 * Math.log10(2 * r) + 10 * Math.log10((1 - 0.03) * (1 - 0.1)) - air(r);
+    assert.ok(Math.abs(A.echoLevel('wall', 3, 0, 'stone') - wall(3)) < 1e-9);
+    assert.ok(Math.abs(A.echoLevel('wall', 10, 0, 'stone') - wall(10)) < 1e-9);
+    assert.ok(Math.abs(A.echoLevel('wall', 3, Math.PI / 2, 'stone') - A.echoLevel('wall', 3, 0, 'stone') + 8) < 1e-9, 'beam applied once');
+    const obj = (r, ts) => -40 * Math.log10(r) + ts - air(r);
+    assert.ok(Math.abs(A.echoLevel('person', 3, 0) - obj(3, A.ts.person)) < 1e-9);
+    assert.ok(Math.abs(A.echoLevel('prop', 3, 0) - obj(3, A.ts.prop)) < 1e-9);
+    assert.ok(A.echoLevel('wall', 1, 0, 'grass') < A.echoLevel('wall', 1, 0, 'stone') - 3, 'grass absorbs');
+    assert.ok(A.gameAmp(A.echoLevel('wall', 1, 0, 'stone')) > A.gameAmp(A.echoLevel('wall', 9, 0, 'stone')));
+    assert.ok(A.gameAmp(-200) >= A.gameMin && A.gameAmp(50) <= 1);
+  });
+
+  test('acoustics: Sabine T60 per zone is clamped 0.4-2.5 s; comb gain 10^(-3 tau / T60)', () => {
+    assert.ok(Math.abs(A.sabine(18, 12, 3.5, 0.15) - 1.26) < 0.01, 'tavern');
+    assert.ok(Math.abs(A.sabine(10, 8, 2.7, 0.12) - 1.13) < 0.01, 'house1');
+    assert.strictEqual(A.t60For('church', 'indoor'), 2.5, 'church capped');
+    assert.strictEqual(A.t60For('crypt', 'indoor'), 2.5, 'crypt capped');
+    assert.strictEqual(A.t60For('nowhere', 'indoor'), A.t60Indoor);
+    assert.strictEqual(A.t60For(null, 'outdoor'), A.t60Outdoor);
+    assert.strictEqual(A.sabine(2, 2, 2, 0.9), 0.4, 'floor clamp');
+    assert.ok(Math.abs(A.combGain(0.037, 1) - 0.774) < 0.001);
+    assert.ok(Math.abs(A.combGain(0.097, 2.5) - 0.765) < 0.001);
+    assert.strictEqual(A.combGain(0.037, 99), A.combGain(0.037, 2.5), 'T60 clamped');
+  });
+
+  test('acoustics: transmission loss, Maekawa and occlusion', () => {
+    assert.ok(Math.abs(A.maekawa(0) - 4.771) < 0.001, 'grazing N=0');
+    assert.strictEqual(A.maekawa(100), A.maekawaCapDb);
+    assert.ok(A.maekawa(0.4) > A.maekawa(0.1));
+    const cut = (m) => A.occlusion(m).lpHz;
+    assert.ok(cut('iron') > 4000, 'iron gate nearly open');
+    assert.ok(cut('glass') < cut('door') + 600 && cut('door') > 1000 && cut('door') < 2000, 'door ~1.4 kHz');
+    assert.ok(cut('brick') > 300 && cut('brick') < 380, 'brick ~340 Hz');
+    assert.ok(A.occlusion('brick').gain < A.occlusion('door').gain && A.occlusion('door').gain < A.occlusion('iron').gain);
+    A.mat.__gap = { alpha: 0, s: 0, rough: 0, tl500: 25, voice: 'hollow', gap: 0.01 };
+    assert.ok(A.tlOf('__gap') < 20 && A.tlOf('__gap') > 17, 'a 1 % gap caps TL near 19 dB');
+    delete A.mat.__gap;
+    const d = A.occlusion('brick', 6);
+    assert.strictEqual(d.diffracted, true, 'a doorway beats brick');
+    assert.ok(d.gain > A.occlusion('brick').gain && d.lpHz > cut('brick'));
+    assert.strictEqual(A.occlusion('iron', 40).diffracted, false, 'diffraction worse than TL is ignored');
+    assert.ok(A.occlusion('glass').peakHz === 2000 && A.occlusion('brick').peakHz === 0);
+  });
+
+  test('acoustics: repetition pitch only inside rp.maxM, tau = 2r/c', () => {
+    assert.strictEqual(A.repetition(2.01), null);
+    assert.strictEqual(A.repetition(0), null);
+    const r = A.repetition(1.3);
+    assert.ok(Math.abs(r.tau - (2 * 1.3) / 343) < 1e-12);
+    assert.ok(Math.abs(A.repetition(1).tau * 1000 - 5.831) < 0.001);
+  });
+
+  test('ping is a short ~8 ms 3.2 kHz click; pingBip / setPingStyle restore the old bip', () => {
+    const a = recCtx();
+    Audio.ping(a);
+    assert.ok(a.ctx.oscs[0].freqs[0] > 3000 && a.ctx.oscs[0].freqs[0] < 3400, 'click near 3.2 kHz');
+    assert.strictEqual(a.ctx.oscs[0].freqs.length, 1, 'no sweep');
+    const b = recCtx();
+    Audio.setPingStyle(b, true);
+    Audio.ping(b);
+    assert.ok(b.ctx.oscs[0].freqs[0] < 2000, 'bip');
+    assert.strictEqual(Audio.create({ pingBip: true }).pingBip, true);
+    assert.strictEqual(Audio.create({}).pingBip, false);
+  });
+
+  test('echo voices differ by material; grass is nearly silent; pingBip keeps the old chirp', () => {
+    const peakOf2 = (voice) => {
+      const a = recCtx();
+      let pk = 0;
+      const cg = a.ctx.createGain;
+      a.ctx.createGain = () => { const n = cg(); const o = n.gain.linearRampToValueAtTime; n.gain.linearRampToValueAtTime = (v) => { pk = Math.max(pk, v); o(v); }; return n; };
+      Audio.echo(a, 0.2, 0.8, 0, { voice });
+      return { pk, f: a.ctx.oscs.map((o) => o.freqs[0]), types: a.ctx.oscs.map((o) => o.type) };
+    };
+    const crisp = peakOf2('crisp');
+    const hollow = peakOf2('hollow');
+    const ring = peakOf2('ring');
+    const soft = peakOf2('soft');
+    assert.ok(crisp.f[0] > 3000 && hollow.f[0] < 1000, 'stone crisp high, wood hollow low');
+    assert.strictEqual(ring.f.length, 2, 'iron rings with an extra partial');
+    assert.ok(soft.pk < crisp.pk * 0.25, 'grass nearly silent');
+    assert.ok(peakOf2('tick').f[0] > 4500, 'glass tick');
+    const a = recCtx();
+    Audio.setPingStyle(a, true);
+    Audio.echo(a, 0.2, 0.8, 0, { voice: 'crisp' });
+    assert.strictEqual(a.ctx.oscs[0].freqs[0], 1800, 'old chirp when pingBip');
+    const l = recCtx();
+    Audio.echo(l, 0.2, 0.8, 0);
+    assert.strictEqual(l.ctx.oscs[0].freqs[0], 1800, 'no voice, legacy');
+  });
+
+  test('echo: repetition-pitch comb is feed-forward at tau; rough hits add a grain tail', () => {
+    const a = recCtx();
+    Audio.echo(a, 0.2, 0.8, 0, { voice: 'crisp', rp: { tau: 0.0058, gain: 0.5 } });
+    const rpDelays = a.ctx.delays.filter((d) => d.delayTime.value === 0.0058);
+    assert.strictEqual(rpDelays.length, 1);
+    const d = rpDelays[0];
+    assert.ok(!d.outputs.includes(d), 'no self loop');
+    const g = d.outputs[0];
+    assert.ok(!g.outputs.some((x) => x === d), 'no feedback to the delay');
+    const smooth = recCtx();
+    Audio.echo(smooth, 0.2, 0.8, 0, { voice: 'crisp', rough: 0.1 });
+    const rough = recCtx();
+    Audio.echo(rough, 0.2, 0.8, 0, { voice: 'crisp', rough: 0.7 });
+    assert.strictEqual(smooth.ctx.srcCount, 0);
+    assert.strictEqual(rough.ctx.srcCount, 4, 'four grains');
+    const mid = recCtx();
+    Audio.echo(mid, 0.2, 0.8, 0, { voice: 'crisp', rough: 0.4 });
+    assert.strictEqual(mid.ctx.srcCount, 2);
+  });
+
+  test('echo and ping feed the reverb send (so zone reverb colours them)', () => {
+    const a = recCtx();
+    Audio.play(a, 'step'); // builds the master chain
+    const send = a.ctx.__vcsMaster.send;
+    assert.ok(send);
+    const before = a.ctx.gains ? 0 : 0;
+    Audio.echo(a, 0.2, 0.8, 0, { voice: 'crisp' });
+    const filt = a.ctx.made[a.ctx.made.length - 1];
+    assert.ok(filt.outputs.includes(send), 'echo send');
+    assert.strictEqual(before, 0);
+  });
+
+  test('setRoom with a T60 sets comb feedback 10^(-3 tau / T60), clamped; later-built master starts tuned', () => {
+    const a = mk();
+    Audio.play(a, 'step');
+    Audio.setRoom(a, 'indoor', 1.0);
+    const m = a.ctx.__vcsMaster;
+    for (let i = 0; i < m.delays.length; i++) {
+      assert.ok(Math.abs(m.fbs[i].gain.value - Math.pow(10, (-3 * m.delays[i].delayTime.value) / 1.0)) < 1e-9);
+    }
+    Audio.setRoom(a, 'indoor', 99);
+    assert.ok(Math.abs(m.fbs[0].gain.value - Math.pow(10, (-3 * m.delays[0].delayTime.value) / 2.5)) < 1e-9, 'clamped to 2.5 s');
+    Audio.setRoom(a, 'outdoor');
+    assert.strictEqual(m.fbs[0].gain.value, 0.25, 'no T60: old fixed outdoor gain');
+    const b = mk(); // room set before any sound: the chain built later starts tuned
+    Audio.setRoom(b, 'indoor', 0.8);
+    Audio.play(b, 'step');
+    const mb = b.ctx.__vcsMaster;
+    assert.ok(Math.abs(mb.fbs[1].gain.value - Math.pow(10, (-3 * mb.delays[1].delayTime.value) / 0.8)) < 1e-9);
+  });
+
+  test('play with occ: lowpass cutoff and gain follow the blocking material; no double cut with occluded', () => {
+    const cut = (opts) => {
+      const a = mk();
+      Audio.play(a, 'doorClose');
+      const n0 = a.ctx.made.length;
+      Audio.play(a, 'doorClose', opts);
+      return { lp: a.ctx.made.slice(n0).map((f) => f.frequency.value), n: a.ctx.made.length - n0 };
+    };
+    const brick = cut({ occluded: true, occ: { mat: 'brick' } });
+    assert.strictEqual(brick.n, 1, 'one filter, not two');
+    assert.ok(Math.abs(brick.lp[0] - A.occlusion('brick').lpHz) < 1e-6);
+    const door = cut({ occluded: true, occ: { mat: 'door' } });
+    assert.ok(door.lp[0] > brick.lp[0] * 3, 'door passes more than brick');
+    const dif = cut({ occluded: true, occ: { mat: 'brick', diff: 5 } });
+    assert.ok(dif.lp[0] > brick.lp[0] * 3, 'open doorway diffraction beats brick');
+    assert.strictEqual(cut({ occluded: true }).lp[0], 600, 'bare occluded keeps the old lowpass');
+    const glass = cut({ occluded: true, occ: { mat: 'glass' } });
+    assert.strictEqual(glass.n, 2, 'glass adds its peak filter');
   });
 
   test('setRoom retunes the shared reverb', () => {

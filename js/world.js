@@ -18,7 +18,9 @@
     '#': 'stone', B: 'brick', W: 'wood', I: 'iron', w: 'glass',
     '.': 'stone', ',': 'wood', g: 'grass', D: 'wood', G: 'iron'
   };
-  const FLOOR_MATS = ['stone', 'wood', 'grass'];
+  const FLOOR_MATS = ['stone', 'wood', 'grass', 'cobble', 'roughStone'];
+  // Every surface material the acoustics know (walls, floors, doors); see SoundData.acoustics.mat.
+  const MATERIALS = ['stone', 'brick', 'roughStone', 'cobble', 'wood', 'glass', 'iron', 'grass'];
   const PROP_TYPES = ['gravestone', 'cross', 'barrel', 'table', 'chair', 'bench', 'well', 'torch', 'brazier'];
   const NON_SOLID = { cross: true, torch: true };
   const DEFAULT_LIGHT = { torch: 3, brazier: 3.5 };
@@ -471,9 +473,21 @@
       return { x: d.col + 0.5 + f[0], y: d.row + 0.5 + f[1], angle: f[2] };
     }
 
+    // A map may re-skin a tile character (mapDef.materials, e.g. '#' -> 'roughStone'); unknown names are ignored.
+    const matTable = Object.assign({}, MATERIAL);
+    if (mapDef.materials && typeof mapDef.materials === 'object') {
+      Object.keys(mapDef.materials).forEach(function (ch) {
+        if (Object.prototype.hasOwnProperty.call(MATERIAL, ch) && MATERIALS.indexOf(mapDef.materials[ch]) >= 0) matTable[ch] = mapDef.materials[ch];
+      });
+    }
     function materialAt(x, y) {
-      const m = MATERIAL[tileAt(x, y)];
+      const m = matTable[tileAt(x, y)];
       return m || floor;
+    }
+    /** Roughness 0..1 of the surface at (x,y) (SoundData.acoustics.rough by material; 0.2 without data). */
+    function roughnessAt(x, y) {
+      const sd = root.VCS && root.VCS.SoundData;
+      return sd && sd.acoustics ? sd.acoustics.roughOf(materialAt(x, y)) : 0.2;
     }
 
     // Props.
@@ -631,6 +645,7 @@
       height: height,
       tileAt: tileAt,
       materialAt: materialAt,
+      roughnessAt: roughnessAt,
       isSolid: isSolid,
       isDoorOpen: isDoorOpen,
       setDoor: setDoor,
@@ -668,7 +683,7 @@
   }
 
   const World = {
-    TILES: TILES, MATERIAL: MATERIAL, WALLS: WALLS, FLOORS: FLOORS, DOORS: DOORS,
+    TILES: TILES, MATERIAL: MATERIAL, MATERIALS: MATERIALS, WALLS: WALLS, FLOORS: FLOORS, DOORS: DOORS,
     validate: validate, validateAll: validateAll, reachable: reachable, load: load, loadAll: loadAll
   };
   VCS.World = World;

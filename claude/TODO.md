@@ -72,10 +72,10 @@ ode_modules).
 - [x] Onboarding: hints, guide Basics, reduce motion, large text
 
 ## v0.11 Echoes (proposed, awaiting go)
-- [ ] Per-material echo voices (stone/brick crisp, wood hollow, glass tick, iron ring, grass ~silent, people dull) + matching wave tint
-- [ ] Transmission by material: TL = 20·log10(m·f) − 47 dB; cutoff ≈ 6000·10^(−TL500/40) Hz (wood door ~1.4 kHz, glass ~1.1 kHz, brick ~340 Hz); iron gate ≈ open; open door = Maekawa ΔL=10·log10(3+20N)
-- [ ] Room tail from Sabine RT60 = 0.161·V/A (cap 2.5 s); corridor flutter (period 2w/c); near-object repetition pitch (<2 m)
-- [ ] Mouth beam: click emitted from mouth on front of head (z≈0.58), gain(θ) = 0/−1/−3/−8/−14/−18/−20 dB at 0/30/60/90/120/150/180°; high band narrower than low; slender body = small extra rear shadow; apply to sonar ray strength + echo gain (Thaler 2017 modified-cardioid; mouth ka≈0.9 @3.4 kHz → head/body do the beaming)
+- [x] Per-material echo voices (stone/brick crisp, wood hollow, glass tick, iron ring, grass ~silent, people dull) + matching wave tint
+- [x] Transmission by material: TL = 20·log10(m·f) − 47 dB; cutoff ≈ 6000·10^(−TL500/40) Hz (wood door ~1.4 kHz, glass ~1.1 kHz, brick ~340 Hz); iron gate ≈ open; open door = Maekawa ΔL=10·log10(3+20N)
+- [x] (Sabine zone T60 done; corridor flutter and per-zone door coupling not done) Room tail from Sabine RT60 = 0.161·V/A (cap 2.5 s); corridor flutter (period 2w/c); near-object repetition pitch (<2 m)
+- [x] (audio+sonar brightness done; corridor flutter, high-band narrowing and rear body shadow not done) Mouth beam: click emitted from mouth on front of head (z≈0.58), gain(θ) = 0/−1/−3/−8/−14/−18/−20 dB at 0/30/60/90/120/150/180°; high band narrower than low; slender body = small extra rear shadow; apply to sonar ray strength + echo gain (Thaler 2017 modified-cardioid; mouth ka≈0.9 @3.4 kHz → head/body do the beaming)
 
 ## Round 2 candidates
 - [x] Guide Mist card "Shift or C" (0.10.3)
@@ -104,32 +104,32 @@ Decide first (blocks numbers):
 - [x] One sonarSpeed: rings and echoes arrive together at 12 cells/s (decided 2026-10-19, v0.10.11). 34 cells/s audio speed removed.
 
 Data:
-- [ ] NEW `SoundData.acoustics` block (cellM, beamDb, spread, airDbPerM, mat.*, zone.t60, rp, rough) — sounds.js
-- [ ] UPGRADE materials: world.materialAt exists (floor grass/stone/wood for steps) → add wall materials + `cobble`, `roughStone`
+- [x] NEW `SoundData.acoustics` block (cellM, beamDb, spread, airDbPerM, mat.*, zone.t60, rp, rough) — sounds.js
+- [x] (0.11 audio agent: map `materials` re-skin + `cobble`/`roughStone` names, crypt walls roughStone; no new tile chars yet) UPGRADE materials: world.materialAt exists (floor grass/stone/wood for steps) → add wall materials + `cobble`, `roughStone`
 
 Beam + level:
-- [ ] NEW beam table B(θ) on outgoing rays — sonar.js
-- [ ] UPGRADE `behind` (now gain ×0.7 / dull buffer) → replace with B(θ). REMOVE old, else double-cut
-- [ ] UPGRADE echo level: audio.echo(delay, strength, pan) exists → L_e formula (wall −20log2d, object −40logd, air)
-- [ ] UPGRADE raycast: has side + cellX/Y → derive normal + material per hit (no new raycast)
+- [x] NEW beam table B(θ) on outgoing rays — sonar.js
+- [x] (done for echoes/pings; kept as the listener rear shadow for world sounds, not a mouth cut, so no double cut) UPGRADE `behind` (now gain ×0.7 / dull buffer) → replace with B(θ). REMOVE old, else double-cut
+- [x] UPGRADE echo level: audio.echo(delay, strength, pan) exists → L_e formula (wall −20log2d, object −40logd, air)
+- [x] UPGRADE raycast: has side + cellX/Y → derive normal + material per hit (no new raycast)
 - [ ] REUSE wall-arc incidence (render v0.10) for the angle term; don't add a second
 
 Through walls:
-- [ ] UPGRADE occlusion: yes/no → lowpass 600 Hz now → per-material TL filter + G gain, door gap, glass peak
-- [ ] NEW Maekawa for open doorways (diffraction)
+- [x] UPGRADE occlusion: yes/no → lowpass 600 Hz now → per-material TL filter + G gain, door gap, glass peak
+- [x] NEW Maekawa for open doorways (diffraction)
 - [ ] NOTE glass light pass-through (v0.10 world.js) is visual only; sound TL for glass is separate. No conflict
 
 Rooms:
-- [ ] UPGRADE reverb: tuneReverb has 2 kinds (indoor fb 0.58 / outdoor 0.25) + setRoom → per-zone T60 → fb = 10^(−3τ/T60), clamp 0.4–2.5 s
+- [x] UPGRADE reverb: tuneReverb has 2 kinds (indoor fb 0.58 / outdoor 0.25) + setRoom → per-zone T60 → fb = 10^(−3τ/T60), clamp 0.4–2.5 s
 
 Near + rough:
-- [ ] NEW repetition-pitch comb (< 1.3 cells, physical delay)
-- [ ] NEW diffuse grain tail on rough hits — audio.js
+- [x] NEW repetition-pitch comb (< 1.3 cells, physical delay)
+- [x] NEW diffuse grain tail on rough hits — audio.js
 - [ ] UPGRADE visual speckles: ring stipple dots already exist (render.js, seeded) → scale count/linger by roughness, don't add a 2nd pass
 - [ ] REUSE matDetail/fps auto-off (render.js) as the gate for speckles
 
 Ping:
-- [ ] UPGRADE ping: shorter ~8 ms 3.2 kHz click, old bip as an option (setting)
+- [x] UPGRADE ping: shorter ~8 ms 3.2 kHz click, old bip as an option (setting)
 - [ ] REUSE footstep timbres (audio.js grass/wood/stone) as the base for mat.voice
 
 Tests (extend existing files, no new): audio/sonar/render/world tests per the Docs test plan (10 items) + smoke: all materials in view, no errors, ≤96 voices.

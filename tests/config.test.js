@@ -85,6 +85,7 @@ test('DEFAULTS is frozen and has the contract values', () => {
     reduceMotion: false,
     largeText: false,
     ambienceGain: 0.6,
+    pingBip: false,
     devButton: true
   });
 });
@@ -189,6 +190,7 @@ test('sanitize keeps valid values, including range bounds', () => {
     reduceMotion: true,
     largeText: true,
     ambienceGain: 1,
+    pingBip: true,
     devButton: false
   };
   const r = sanitize(input);

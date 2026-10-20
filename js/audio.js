@@ -65,6 +65,24 @@
   }
 
   const ROOMS = { indoor: { gainMul: 1, cutoff: 2200 }, outdoor: { gainMul: 0.7, cutoff: 1400 } };
+
+  /** Acoustics data block (SoundData.acoustics) or null. */
+  function acoustics() {
+    const sd = root.VCS && root.VCS.SoundData;
+    return sd && sd.acoustics ? sd.acoustics : null;
+  }
+
+  // Per-material echo voices (v0.11). f0->f1 sweep over sec, tail = full decay, lp = lowpass Hz, gain = level scale, type = oscillator, partials = extra ring partials.
+  // stone/brick crisp, wood hollow, glass tick, iron ring, grass nearly silent, people dull. 'legacy' is the old chirp (pingBip setting).
+  const ECHO_VOICES = {
+    legacy: { f0: PING_START_HZ, f1: PING_END_HZ, sec: PING_SEC, tail: TAIL_SEC, lp: ECHO_FILTER_HZ, gain: 1, type: 'sine' },
+    crisp: { f0: 3200, f1: 2700, sec: 0.012, tail: 0.05, lp: 6500, gain: 1, type: 'sine' },
+    hollow: { f0: 720, f1: 480, sec: 0.05, tail: 0.15, lp: 1500, gain: 0.95, type: 'triangle' },
+    tick: { f0: 5200, f1: 4800, sec: 0.004, tail: 0.02, lp: 9000, gain: 0.8, type: 'sine' },
+    ring: { f0: 2400, f1: 2400, sec: 0.02, tail: 0.45, lp: 5500, gain: 0.8, type: 'sine', partials: [2.76] },
+    soft: { f0: 900, f1: 600, sec: 0.04, tail: 0.09, lp: 700, gain: 0.12, type: 'sine' },
+    person: { f0: 600, f1: 420, sec: 0.06, tail: 0.16, lp: 900, gain: 0.85, type: 'triangle' }
+  };
   const MAX_VOICES = 96;
 
   /** Remember a voice (osc + its gain) so stopAll can fade it. Never throws. */
@@ -140,17 +158,26 @@
       m.send = null;
     }
     ctx.__vcsMaster = m;
+    if (ctx.__vcsRoom) tuneReverb({ ctx: ctx }, ctx.__vcsRoom.kind, ctx.__vcsRoom.t60);
     return m;
   }
 
   /** Retunes the reverb for a room kind. Never throws. */
-  function tuneReverb(a, kind) {
+  function tuneReverb(a, kind, t60) {
     try {
-      if (!a || !a.ctx || !a.ctx.__vcsMaster) return;
+      if (!a || !a.ctx) return;
+      a.ctx.__vcsRoom = { kind: kind, t60: t60 }; // remembered so a master chain built later starts tuned
+      if (!a.ctx.__vcsMaster) return;
       const m = a.ctx.__vcsMaster;
       const r = REVERB[kind] || REVERB.indoor;
-      for (let i = 0; i < m.delays.length; i++) m.delays[i].delayTime.value = r.times[i % r.times.length];
-      for (let i = 0; i < m.fbs.length; i++) m.fbs[i].gain.value = r.fb;
+      const A = acoustics();
+      // Per-zone T60 (Sabine, clamped 0.4-2.5 s): each comb feeds back 10^(-3 tau / T60). Without data/T60 the old fixed gain is kept.
+      const useT60 = A && typeof t60 === 'number' && isFinite(t60);
+      for (let i = 0; i < m.delays.length; i++) {
+        const tau = r.times[i % r.times.length];
+        m.delays[i].delayTime.value = tau;
+        if (m.fbs[i]) m.fbs[i].gain.value = useT60 ? A.combGain(tau, t60) : r.fb;
+      }
       if (m.lp) m.lp.frequency.value = r.cutoff;
       if (m.send) m.send.gain.value = r.send;
     } catch (e) {
@@ -200,6 +227,23 @@
     track(ctx, osc, gain, startAt + TAIL_SEC);
   }
 
+  /** One echo voice partial (oscillator sweep f0->f1 through a short enveloped gain) at frequency ratio k. */
+  function voiceChirp(ctx, startAt, peak, target, v, k) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = v.type;
+    osc.frequency.setValueAtTime(v.f0 * k, startAt);
+    if (v.f1 !== v.f0) osc.frequency.exponentialRampToValueAtTime(v.f1 * k, startAt + v.sec);
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(peak, startAt + Math.min(ATTACK_SEC, v.sec * 0.3));
+    gain.gain.exponentialRampToValueAtTime(FLOOR_GAIN, startAt + v.tail);
+    osc.connect(gain);
+    gain.connect(target);
+    osc.start(startAt);
+    osc.stop(startAt + v.tail);
+    track(ctx, osc, gain, startAt + v.tail);
+  }
+
   /** Peak gain for a chirp at the given strength (0..1) and the current volume. @returns {number} */
   function peakFor(a, strength) {
     return a.volume * BASE_PEAK * strength;
@@ -216,9 +260,9 @@
       if (config && typeof config.volume === 'number' && Number.isFinite(config.volume)) {
         volume = clamp01(config.volume);
       }
-      return { ok: true, ctx: null, volume, warned: false };
+      return { ok: true, ctx: null, volume, warned: false, pingBip: !!(config && config.pingBip === true) };
     } catch (e) {
-      return { ok: true, ctx: null, volume: DEFAULT_VOLUME, warned: false };
+      return { ok: true, ctx: null, volume: DEFAULT_VOLUME, warned: false, pingBip: false };
     }
   }
 
@@ -238,6 +282,7 @@
       if (typeof Ctor !== 'function') throw new Error('Web Audio is not available');
       a.ctx = new Ctor();
       a.ok = true;
+      if (a.room) a.ctx.__vcsRoom = { kind: a.room, t60: a.t60 };
       log().info('Audio unlocked');
       resumeCtx(a);
     } catch (e) {
@@ -257,9 +302,32 @@
     return Math.random();
   }
 
+  /** The v0.11 ping: a short (~8 ms) 3.2 kHz click with a touch of high noise, into the master and the reverb send. */
+  function clickPing(a, ctx, t) {
+    const A = acoustics();
+    const dur = A.ping.clickMs / 1000;
+    const wob = 1 + (rnd(a) - 0.5) * 0.04;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(A.ping.clickHz * wob, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(peakFor(a, 1) * 1.5, t + 0.001);
+    gain.gain.exponentialRampToValueAtTime(FLOOR_GAIN, t + dur);
+    osc.connect(gain);
+    const m = master(ctx);
+    gain.connect(m.out);
+    if (m.send) gain.connect(m.send);
+    osc.start(t);
+    osc.stop(t + dur);
+    track(ctx, osc, gain, t + dur);
+    noise(ctx, m.out, t, 0.004, peakFor(a, 1) * 0.5, 'highpass', 2500, 0.001);
+    log().debug('ping click');
+  }
+
   /**
-   * Plays the short, cartoon "bip" ping now (rises, then drops, tiny pitch wobble).
-   * No-op when audio is not ready.
+   * Plays the ping now: the short ~8 ms click by default, or the old cartoon "bip" (rises, then drops, tiny pitch wobble)
+   * when the pingBip setting is on (create(config.pingBip) / setPingStyle). No-op when audio is not ready.
    * @param {object} a Audio state.
    */
   function ping(a) {
@@ -267,6 +335,10 @@
       if (!ready(a)) return;
       const ctx = a.ctx;
       const t = ctx.currentTime;
+      if (a.pingBip !== true && acoustics()) {
+        clickPing(a, ctx, t);
+        return;
+      }
       const wob = 1 + (rnd(a) - 0.5) * 0.04;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -294,8 +366,10 @@
    * @param {number} delaySec Seconds after now (0..2).
    * @param {number} strength Echo loudness, 0..1.
    * @param {number} [pan] Stereo position -1 (left) .. 1 (right); skipped if unsupported.
+   * @param {{voice?: string, rp?: {tau: number, gain: number}, rough?: number}} [opts] voice crisp|hollow|tick|ring|soft|person (v0.11 material voice; ignored with pingBip),
+   *   rp repetition-pitch comb (tau seconds), rough 0..1 adds a diffuse grain tail above 0.25.
    */
-  function echo(a, delaySec, strength, pan) {
+  function echo(a, delaySec, strength, pan, opts) {
     try {
       if (!ready(a)) return;
       if (!(delaySec >= 0 && delaySec <= MAX_ECHO_DELAY)) return;
@@ -303,11 +377,15 @@
       const s = clamp01(strength * (ROOMS[a.room] || ROOMS.indoor).gainMul);
       if (s <= 0 || strength <= 0) return;
       const ctx = a.ctx;
+      const o = opts || {};
+      // v0.11 per-material voice (the old chirp is kept when no material is given or the pingBip setting is on).
+      const voice = a.pingBip !== true && typeof o.voice === 'string' && ECHO_VOICES[o.voice] ? ECHO_VOICES[o.voice] : null;
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
       const room = ROOMS[a.room] || ROOMS.indoor;
-      filter.frequency.value = a.room === 'outdoor' ? room.cutoff : ECHO_FILTER_HZ;
-      const dest = master(ctx).out;
+      filter.frequency.value = voice ? (a.room === 'outdoor' ? Math.min(voice.lp, 2.4 * room.cutoff) : voice.lp) : a.room === 'outdoor' ? room.cutoff : ECHO_FILTER_HZ;
+      const m = master(ctx);
+      const dest = m.out;
       let out = dest;
       if (typeof pan === 'number' && Number.isFinite(pan) && typeof ctx.createStereoPanner === 'function') {
         const panner = ctx.createStereoPanner();
@@ -318,7 +396,34 @@
         }
       }
       filter.connect(out);
-      chirp(ctx, ctx.currentTime + delaySec, peakFor(a, s), filter);
+      if (m.send && voice) filter.connect(m.send);
+      const t0 = ctx.currentTime + delaySec;
+      if (!voice) {
+        chirp(ctx, t0, peakFor(a, s), filter);
+        return;
+      }
+      const peak = peakFor(a, s) * voice.gain;
+      voiceChirp(ctx, t0, peak, filter, voice, 1);
+      if (voice.partials) for (let i = 0; i < voice.partials.length; i++) voiceChirp(ctx, t0, peak * 0.4, filter, voice, voice.partials[i]);
+      // Repetition pitch: a feed-forward comb (direct + the same click delayed 2r/c) for reflectors closer than rp.maxM.
+      if (o.rp && o.rp.tau > 0 && o.rp.tau < 0.05 && typeof ctx.createDelay === 'function') {
+        const d = ctx.createDelay(0.05);
+        d.delayTime.value = o.rp.tau;
+        const g = ctx.createGain();
+        g.gain.value = clamp01(o.rp.gain);
+        filter.connect(d);
+        d.connect(g);
+        g.connect(out);
+      }
+      // Diffuse grain tail on rough hits: a few short noise grains smeared over a physical-scale window.
+      const rough = typeof o.rough === 'number' && o.rough > 0.25 ? Math.min(1, o.rough) : 0;
+      if (rough) {
+        const n = rough > 0.55 ? 4 : 2;
+        for (let i = 0; i < n; i++) {
+          const at = t0 + 0.004 + rnd(a) * 0.03 * rough + i * 0.006;
+          noise(ctx, out, at, 0.012, peak * 0.4 * (1 - i / (n + 1)) * rough, 'bandpass', Math.min(voice.lp, 3000), 0.002);
+        }
+      }
     } catch (e) {
       reportFailure(a, 'Sound failed to play an echo', e);
     }
@@ -625,7 +730,7 @@
    * No-op when not ready or the kind is unknown.
    * @param {object} a Audio state.
    * @param {string} kind Sound kind.
-   * @param {{gain?: number, pan?: number, delay?: number, dist?: number, occluded?: boolean, behind?: boolean, material?: string}} [opts] gain 0..1, pan -1..1, delay s (0..2), dist cells (attenuates; beyond hearDist drops and returns false), occluded (lowpass 600), behind (lowpass 1200, x0.7), material stone|grass|wood.
+   * @param {{gain?: number, pan?: number, delay?: number, dist?: number, occluded?: boolean, behind?: boolean, material?: string}} [opts] gain 0..1, pan -1..1, delay s (0..2), dist cells (attenuates; beyond hearDist drops and returns false), occluded (lowpass 600), occ {mat, diff} (v0.11 transmission-loss filter + gain by blocking material, diff = doorway Maekawa dB), behind (lowpass 1200, x0.7; the listener's rear shadow for world sounds), material stone|grass|wood.
    * @returns {boolean} true when played.
    */
   function play(a, kind, opts) {
@@ -657,11 +762,27 @@
         gain *= 0.7;
         lpHz = 1200;
       }
-      if (o.occluded) lpHz = 600;
+      // Occlusion (v0.11): o.occ = {mat, diff} -> transmission-loss filter by material (or a doorway's Maekawa loss when smaller).
+      // A bare o.occluded keeps the old fixed 600 Hz lowpass.
+      let fx = null;
+      const A = acoustics();
+      if (o.occ && typeof o.occ.mat === 'string' && A) {
+        fx = A.occlusion(o.occ.mat, o.occ.diff);
+        gain *= fx.gain;
+        lpHz = fx.lpHz;
+      } else if (o.occluded) lpHz = 600;
       const ctx = a.ctx;
       const bus = ctx.createGain();
       bus.gain.value = 1;
-      routeOut(ctx, bus, o.pan, lpHz);
+      if (fx && fx.peakHz > 0) {
+        const pk = ctx.createBiquadFilter();
+        pk.type = 'peaking';
+        pk.frequency.value = fx.peakHz;
+        if (pk.Q) pk.Q.value = 1.4;
+        if (pk.gain) pk.gain.value = fx.peakDb;
+        bus.connect(pk);
+        routeOut(ctx, pk, o.pan, lpHz);
+      } else routeOut(ctx, bus, o.pan, lpHz);
       const foot = a.foot ? 1 : 0;
       if (kind === 'step' || kind === 'personStep') a.foot = !a.foot;
       const mat = o.material === 'grass' || o.material === 'wood' || o.material === 'stone' ? o.material : 'stone';
@@ -949,11 +1070,12 @@
    * @param {object} a Audio state.
    * @param {string} kind Room kind.
    */
-  function setRoom(a, kind) {
+  function setRoom(a, kind, t60) {
     try {
       if (!a || !Object.prototype.hasOwnProperty.call(ROOMS, kind)) return;
       a.room = kind;
-      tuneReverb(a, kind);
+      a.t60 = typeof t60 === 'number' && isFinite(t60) ? t60 : undefined;
+      tuneReverb(a, kind, a.t60);
     } catch (e) {
       // never throws
     }
@@ -1053,7 +1175,12 @@
     }
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, stopAll, ambience, oneShotFar, breath, fireBed };
+  /** Chooses the ping: true = the old cartoon bip (and the old echo chirp), false = the ~8 ms click with material echo voices. */
+  function setPingStyle(a, bip) {
+    if (a) a.pingBip = bip === true;
+  }
+
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, fireBed };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;

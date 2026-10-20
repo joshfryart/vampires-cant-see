@@ -338,6 +338,25 @@ try {
   await page.evaluate(() => window.VCS.Game.debugAdvance(0.3));
   const stB = await page.evaluate(() => window.VCS.Game.debugState());
   check('ping creates bounce pulses (gen>0)', (stB.sounds.bounce || 0) > 0 || !(await page.evaluate(() => typeof window.VCS.Sonar.emitSound === 'function')), JSON.stringify(stB.sounds));
+  // v0.11 echoes: per-hit materials on the ping, mouth beam, voices stay bounded over a ping burst across the town.
+  check('v0.11: ping rays carry hit materials', Array.isArray(stB.pingMats) && stB.pingMats.length >= 1, JSON.stringify(stB.pingMats));
+  const mats11 = new Set(stB.pingMats);
+  let maxVoices = stB.voices || 0;
+  for (const [tx, ty, ta] of [[5.5, 8.5, 0], [20.5, 8.5, 1.57], [30.5, 5.5, 3.14], [10.5, 26.5, 0], [44.5, 10.5, 2], [20.5, 20.5, 4.7]]) {
+    await page.evaluate(([x, y, a]) => window.VCS.Game.debugTeleport(x, y, a), [tx, ty, ta]);
+    for (let k = 0; k < 4; k++) {
+      await page.evaluate(() => window.VCS.Game.debugAdvance(0.85));
+      await page.evaluate(() => window.VCS.Game.debugPulse());
+      const sv = await page.evaluate(() => window.VCS.Game.debugState());
+      (sv.pingMats || []).forEach((m) => mats11.add(m));
+      maxVoices = Math.max(maxVoices, sv.voices || 0);
+    }
+  }
+  await page.evaluate(() => window.VCS.Game.debugTeleport(5.5, 8.5, 0)); // back where the later checks expect the player
+  check('v0.11: more than one wall material reached by pings', mats11.size >= 2, JSON.stringify([...mats11]));
+  check('v0.11: voices stay <= 96 over a ping burst', maxVoices <= 96, 'max=' + maxVoices);
+  const stV = await page.evaluate(() => window.VCS.Game.debugState());
+  check('v0.11: no errors after the ping burst', stV.errors === 0, 'errors=' + stV.errors);
   let personSteps = 0;
   for (let i = 0; i < 5; i++) {
     await page.evaluate(() => window.VCS.Game.debugAdvance(1));

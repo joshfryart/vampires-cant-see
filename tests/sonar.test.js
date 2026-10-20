@@ -416,3 +416,130 @@ describe('sonar-reset.test.js', () => {
   });
 
 });
+
+
+describe('sonar-echo.test.js (v0.11 materials, beam, strongest echo)', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const World = require('../js/world.js');
+  const Sonar = require('../js/sonar.js');
+  const SoundData = require('../js/data/sounds.js');
+  globalThis.VCS = globalThis.VCS || {};
+  globalThis.VCS.SoundData = SoundData;
+  const A = SoundData.acoustics;
+
+  // Glass pane north, iron gate south, stone elsewhere.
+  const mats = World.load({
+    name: 'mats',
+    rows: [
+      '###########',
+      '#####w#####',
+      '#@........#',
+      '#.........#',
+      '#.........#',
+      '#.........#',
+      '#.........#',
+      '####I######',
+      '###########'
+    ]
+  });
+  const hall = World.load({
+    name: 'hall',
+    rows: [
+      '###########',
+      '#.........#',
+      '#.........#',
+      '#....@....#',
+      '#.........#',
+      '#.........#',
+      '###########'
+    ]
+  });
+  const tube = World.load({ name: 'tube', rows: ['#########', '#.......#', '#...@...#', '#.......#', '#########'] });
+
+  test('pulses expose per-ray material, normal code and roughness', () => {
+    const s = Sonar.create({ bounces: 0, visRays: 360 });
+    Sonar.emit(s, hall, 5.5, 3.5, 0, { facing: 0 });
+    const p = s.lastPulse;
+    assert.ok(p.vmat instanceof Uint8Array && p.vnorm instanceof Uint8Array && p.vmat.length === p.vis.length);
+    const east = Sonar.hitInfo(p, 0);
+    assert.strictEqual(east.hit, true);
+    assert.strictEqual(east.mat, 'stone');
+    assert.strictEqual(east.nx, -1);
+    assert.ok(Math.abs(east.cosInc - 1) < 1e-9, 'head-on');
+    assert.ok(Math.abs(east.rough - A.roughOf('stone')) < 1e-12);
+    const out = {};
+    Sonar.hitInfo(p, Math.PI / 2, out); // +y: bottom wall
+    assert.strictEqual(out.ny, -1);
+    Sonar.hitInfo(p, Math.PI / 4, out);
+    assert.ok(out.cosInc > 0 && out.cosInc < 1, 'oblique hit has a partial incidence cosine');
+  });
+
+  test('every wall material is reported by name and has a roughness', () => {
+    const s = Sonar.create({ bounces: 0, visRays: 720 });
+    Sonar.emit(s, mats, 5.5, 4.5, 0);
+    const seen = {};
+    const p = s.lastPulse;
+    for (let i = 0; i < p.vis.length; i++) {
+      const h = Sonar.hitInfo(p, (i / p.vis.length) * Math.PI * 2);
+      if (h.hit) seen[h.mat] = h.rough;
+    }
+    assert.ok('glass' in seen && 'iron' in seen && 'stone' in seen, Object.keys(seen).join());
+    assert.ok(seen.glass < seen.stone && seen.iron > seen.stone);
+    for (const m of Sonar.MATS) assert.ok(typeof A.matOf(m).rough === 'number', m);
+  });
+
+  test('mouth beam: pings facing +x are brighter ahead than behind; no facing means no beam', () => {
+    const s = Sonar.create({ bounces: 0, visRays: 360, speed: 10, fade: 2, range: 10 });
+    Sonar.emit(s, hall, 5.5, 3.5, 0, { facing: 0 });
+    const p = s.lastPulse;
+    assert.ok(p.vbeam && p.facing === 0);
+    const ahead = Sonar.brightnessAt(s, 8.5, 3.5, 0.4);
+    const behind = Sonar.brightnessAt(s, 2.5, 3.5, 0.4);
+    assert.ok(ahead > 0 && behind > 0);
+    assert.ok(Math.abs(behind / ahead - A.visFactor(-20)) < 0.05, 'rear is about the 180 degree value: ' + behind / ahead);
+    assert.ok(Math.abs(Sonar.beamAt(p, 0) - 1) < 1e-9);
+    assert.ok(Math.abs(Sonar.beamAt(p, Math.PI / 2) - A.visFactor(-8)) < 0.01);
+    const s2 = Sonar.create({ bounces: 0, visRays: 360 });
+    Sonar.emit(s2, hall, 5.5, 3.5, 0);
+    assert.strictEqual(s2.lastPulse.vbeam, undefined);
+    assert.strictEqual(Sonar.beamAt(s2.lastPulse, 1), 1);
+  });
+
+  test('beam is applied once: bounce children inherit it through their strength, not a second table', () => {
+    const s = Sonar.create({ bounces: 1, visRays: 360 });
+    Sonar.emit(s, hall, 5.5, 3.5, 0, { facing: 0 });
+    const kids = s.pulses.filter((p) => p.gen === 1);
+    assert.ok(kids.length > 0);
+    for (const k of kids) {
+      assert.strictEqual(k.vbeam, undefined, 'children have no beam of their own');
+      assert.ok(k.mat && Sonar.MATS.indexOf(k.mat) >= 0);
+      assert.ok(k.strength <= 0.45 + 1e-9);
+    }
+    const back = kids.filter((k) => k.x < 2.5).map((k) => k.strength);
+    const front = kids.filter((k) => k.x > 8.5).map((k) => k.strength);
+    if (back.length && front.length) assert.ok(Math.max.apply(null, back) < Math.max.apply(null, front), 'a wall behind the head re-radiates less');
+  });
+
+  test('strongestEcho: perpendicular near wall wins; level follows the formula; null without a pulse', () => {
+    const s = Sonar.create({ bounces: 0, visRays: 720 });
+    Sonar.emit(s, tube, 4.5, 2.5, 0, { facing: 0 });
+    const e = Sonar.strongestEcho(s.lastPulse, 0);
+    assert.ok(e && e.mat === 'stone');
+    assert.ok(e.dist >= 1.5 && e.dist < 2, 'a near side wall, tilted toward the beam axis: ' + e.dist);
+    assert.ok(Math.cos(e.theta) > 0,'the beam pulls the loudest return toward the facing side');
+    const want = A.echoLevel('wall', e.dist, e.theta, 'stone') + 20 * Math.log10(Math.max(e.cosInc, 0.25));
+    assert.ok(Math.abs(e.level - want) < 1e-9);
+    const e2 = Sonar.strongestEcho(s.lastPulse, Math.PI);
+    assert.ok(e2.dist >= 1.5 && e2.dist < 2);
+    assert.ok(Math.cos(e2.angle - Math.PI) > 0, 'facing west favours the west half');
+    assert.strictEqual(Sonar.strongestEcho(null), null);
+  });
+
+  test('echo timing stays 2d / v at the one sonar speed for the strongest echo', () => {
+    const s = Sonar.create({ bounces: 0, visRays: 360 });
+    Sonar.emit(s, tube, 4.5, 2.5, 0, { facing: 0 });
+    const e = Sonar.strongestEcho(s.lastPulse, 0);
+    assert.ok(Math.abs(Sonar.echoDelay(e.dist, s.speed) - (2 * e.dist) / Sonar.SONAR_SPEED) < 1e-12);
+  });
+});

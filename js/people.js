@@ -1110,7 +1110,8 @@
         if (dist > pu.range) continue;
         if (str < 0.12 && dist > 6) continue;
         if (!Sonar.visibleFrom(pu, p.x, p.y)) continue;
-        const strength = Math.min(1, (1 - 0.5 * dist / pu.range) * str);
+        // Mouth beam (v0.11): pings are dimmer off the facing axis; other sounds have no beam (factor 1).
+        const strength = Math.min(1, (1 - 0.5 * dist / pu.range) * str * Sonar.beamAt(pu, Math.atan2(ey, ex)));
         // Bounce children and overlapping sounds: keep only the stronger snapshot of the same moment.
         let dup = -1;
         for (let m = es.length - 1; m >= 0; m--) {

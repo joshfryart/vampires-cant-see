@@ -62,3 +62,23 @@ test('open-ended world does not hang', () => {
   const axis = Raycast.castOne(open, 1.5, 1.5, 0, 1e9);
   assert.strictEqual(axis.hit, false);
 });
+
+test('v0.11: hits carry the surface normal and hitOne fills the material', () => {
+  const w = World.load({ name: 'mats', rows: ['#######', '#@...BW', '#.....w', '#######'] });
+  let h = Raycast.castOne(w, 2.5, 1.5, 0, 20);
+  assert.strictEqual(h.nx, -1, 'east-going ray hits a west face: normal points back at the ray');
+  assert.strictEqual(h.ny, 0);
+  h = Raycast.castOne(w, 2.5, 1.5, Math.PI / 2, 20);
+  assert.strictEqual(h.ny, -1, 'a ray going +y hits the north face of the bottom wall');
+  h = Raycast.castOne(w, 2.5, 1.5, -Math.PI / 2, 20);
+  assert.strictEqual(h.ny, 1);
+  h = Raycast.castOne(w, 3.5, 1.5, Math.PI, 20);
+  assert.strictEqual(h.nx, 1, 'west-going ray: normal +x');
+  const out = Raycast.blank();
+  assert.strictEqual(Raycast.hitOne(w, 2.5, 1.5, 0, 20, out).mat, 'brick');
+  assert.strictEqual(Raycast.hitOne(w, 5.5, 2.5, 0, 20, out).mat, 'glass');
+  assert.strictEqual(Raycast.hitOne(w, 2.5, 1.5, -Math.PI / 2, 20, out).mat, 'stone');
+  Raycast.hitOne(w, 2.5, 1.5, 0, 2, out);
+  assert.strictEqual(out.hit, false);
+  assert.strictEqual(out.nx, 0);
+});
