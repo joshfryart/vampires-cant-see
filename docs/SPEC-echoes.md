@@ -235,18 +235,17 @@ g_i=10^{-3\tau_i/T_{60}}
 
 ### 2.8 Speeds and timing
 
-Physical speed: c = 343 m/s [verified-source], which at cellM = 1 is 343 cells/s. Game speeds, both [tuning] and unchanged:
+Physical speed: c = 343 m/s [verified-source], which at cellM = 1 is 343 cells/s. Game speed [tuning] (single sonar speed since v0.10.11):
 
-- Visual wavefront v_vis = 12 cells/s (`sonar.js:7`), 28.6× slower than physical at 1.0 m/cell.
-- Audio echo speed v_aud = 34 cells/s, 10.1× slower than physical.
+- Sonar speed v = 12 cells/s (`sonar.js:7` SONAR_SPEED, `config.js` sonarSpeed), 28.6× slower than physical at 1.0 m/cell. It drives both the visual wavefront and echo timing; the old separate 34 cells/s audio speed and `delayMul` are gone.
 
-Canonical game arrival law, flag `echoTiming`, default off: an echo plays when the visual ring reaches the reflector, then travels back at v_aud.
+Game arrival law (current code, no flag): the echo is the round trip at the one sonar speed, `Sonar.echoDelay(d, speed)`. Delay is capped at 6 s (`MAX_ECHO_DELAY`, `audio.js:15`).
 
 ```latex
-t_{echo}=\frac{d_{out}}{v_{vis}}+\frac{d_{back}}{v_{aud}}
+t_{echo}=\frac{2d}{v}
 ```
 
-At 1/5/10 cells this gives 0.113/0.564/1.127 s. Today the three paths give, at 5 cells, 0.294 (wall), 0.584 (person) and 0.417 s (bounce).
+At 1/5/10 cells this gives 0.167/0.833/1.667 s.
 
 Physical time is used **only** for micro-structure under 30 ms: comb delay τ = 2r/c and diffuse smear windows. At 1.0 m/cell, τ is 5.831 ms at 1 cell, 7.580 ms at 1.3 cells and 11.662 ms at 2 cells.
 
@@ -289,8 +288,7 @@ v=\mathrm{clamp}\!\left(1+\frac{L_{game}}{D_{vis}},\,v_{min},\,1\right)
 |---|---|---|---|---|---|
 | cellM | 1.0 | m/cell | [design decision] | user | everywhere r = d·cellM |
 | c | 343 | m/s | [verified-source] | [12][15] | delays, f_rp, Sabine 0.161 |
-| v_vis | 12 | cells/s | [tuning] | `sonar.js:7` | rings, t_echo |
-| v_aud | 34 | cells/s | [tuning] | `game.js:1109,1182` | t_echo |
+| v | 12 | cells/s | [tuning] | `sonar.js:7` | rings, t_echo (one speed) |
 | moveSpeed / sonarRange | 3 / 10 | cells/s / cells | [tuning] unchanged | `config.js:13,22` | — |
 | r_ref | 1 | m | [verified-source] convention | [6] | all L |
 | r_min | 0.5 | m | [tuning] | — | Eq. W/O/D |
@@ -330,7 +328,7 @@ v=\mathrm{clamp}\!\left(1+\frac{L_{game}}{D_{vis}},\,v_{min},\,1\right)
 | Path (file:line) | Current behaviour | Stage that changes it |
 |---|---|---|
 | `audio.js:8-14` | Ping and echo constants: 1800→1100 Hz, 70 ms, tail 120 ms, `ECHO_FILTER_HZ` 2200 | S9 |
-| `audio.js:67` ROOMS | indoor/outdoor `delayMul` 1/1.8, `gainMul` 1/0.7, cutoff 2200/1400. Outdoor echoes are delayed ×1.8, which is another timing law | S5 (gain), S11 (delay) |
+| `audio.js:67` ROOMS | indoor/outdoor `gainMul` 1/0.7, cutoff 2200/1400. `delayMul` was removed in v0.10.11; outdoor echoes use the same timing as indoor | S5 (gain) |
 | `audio.js:87-90` REVERB | 3 combs with fixed fb 0.58 / 0.25 | S5 |
 | `audio.js:94-145` master | Compressor (−18 dB, 4:1). Combs `send→d→fb→d→lp→out` | S5 |
 | `audio.js:147-159` tuneReverb(kind) | Two presets only | S5 (per-zone g_i) |
@@ -346,9 +344,9 @@ v=\mathrm{clamp}\!\left(1+\frac{L_{game}}{D_{vis}},\,v_{min},\,1\right)
 | `game.js:912-926` occludedTo | Boolean solid-cell sampling every 0.25 cell. Glass and closed doors count like brick | S4 (returns `{material, edgeDelta}`) |
 | `game.js:929-941` spatial | Builds dist/behind/occluded | S4 |
 | `game.js:944-950` stepMaterial | `materialAt` → stone/grass/wood | none |
-| `game.js:1093-1113` simulateWorld | Person echo: delay = d/34 + 0.02 after the visual hit; strength = clamp(0.7·e.strength, 0.1, 0.7) | S2 (Eq. O), S11 |
-| `game.js:1152-1186` pulse | Wall echo: one echo for the nearest wall; delay 2d/34; strength = clamp(1 − d/range, 0.15, 1); pan to the nearest wall | S2 (Eq. W at the perpendicular foot), S3, S11 |
-| `game.js:1205-1222` bounceEchoes | Up to 4 echoes; delay = child t0 (d/12); strength = clamp(0.35·0.45^gen …) | S2, S11 |
+| `game.js:1093-1113` simulateWorld | Person echo: delay = e.dist / sonar speed, clamped 0-6 s; strength = clamp(0.7·e.strength, 0.1, 0.7) | S2 (Eq. O), S11 |
+| `game.js:1152-1186` pulse | Wall echo: one echo for the nearest wall; delay `Sonar.echoDelay(d, speed)` = 2d/12, clamped 0-6 s; strength = clamp(1 − d/range, 0.15, 1); pan to the nearest wall | S2 (Eq. W at the perpendicular foot), S3, S11 |
+| `game.js:1205-1222` bounceEchoes | Up to 4 echoes; delay = child t0 - clock + d/speed; strength = clamp(0.35·0.45^gen …) | S2, S11 |
 | `game.js:3194-3218` roomProfile / setRoom | kind only | S5 |
 | `sonar.js:7` | speed 12, range 10 | none |
 | `sonar.js:52-54, 87-128` | Pulse strength ∈ [0,1], children ×0.45, no material or normal | S3 (optional B_tx on visual), S7 |
@@ -369,7 +367,7 @@ v=\mathrm{clamp}\!\left(1+\frac{L_{game}}{D_{vis}},\,v_{min},\,1\right)
 
 ## 5. Staged implementation plan
 
-Every stage has a flag in `SoundData.acoustics.flags`. **All flags default to `false`**, which reproduces today's behaviour bit for bit. No stage changes movement, sonar range, cooldown or `v_vis`.
+Every stage has a flag in `SoundData.acoustics.flags`. **All flags default to `false`**, which reproduces today's behaviour bit for bit. No stage changes movement, sonar range, cooldown or the sonar speed.
 
 | Stage | Files | Behaviour when the flag is on | Flag | Tests |
 |---|---|---|---|---|
@@ -383,7 +381,7 @@ Every stage has a flag in `SoundData.acoustics.flags`. **All flags default to `f
 | **S8** repetition pitch | `audio.js` feed-forward comb | Comb at τ = 2r/c for r ≤ 2 m | `repPitch` | T19, T20 |
 | **S9** ping option | `audio.js` ping/chirp, ECHO_FILTER_HZ | `'measured'` 3 ms / `'stylised'` 8 ms (labelled non-physical) | `clickPing` (`'chirp'` default) | audio.test: duration, centre frequency, echo LP ≥ 5 kHz when not chirp |
 | **S10** visuals | `sonar.js`/`people.js` strength from L_game, `render.js`, `ripple.js` | v = clamp(1 + L_game/36, 0.15, 1); speckles on rough cells (`matOn` gate) | `visuals` | T21; render.test seeded speckles; smoke ≤ 96 voices |
-| **S11** echo timing | `game.js` (three echo paths), `audio.js` ROOMS.delayMul | t_echo = d/v_vis + d/v_aud for all three | `echoTiming` | T22 |
+| **S11** echo timing | `game.js` (three echo paths) | t_echo = 2d/v at one sonar speed (12 cells/s), cap 6 s; implemented v0.10.11 | none | T22 |
 
 Order: S1 → S2 → S3 → S11 → S4 → S5 → (S6, S7, S8, S9, S10 in any order). Each stage merges with its flag off and is switched on separately after the user approves it.
 
@@ -419,7 +417,7 @@ All tests run with cellM = 1.0 unless stated, κ = 1, G_class = 0 and B_rx = 0. 
 | T19 | Physical delay 2r/c at cellM 1.0: d = 1 / 1.3 / 2 cells | 5.831 / 7.580 / 11.662 ms; f_rp = 171.5 / 131.9 / 85.8 Hz |
 | T20 | Comb gating: r = 2.0 m → on; 2.01 m → off; comb node graph has no cycle (feed-forward) | — |
 | T21 | Visual v: L_game = 0 → 1.000; −18 → 0.500; −36 → 0.150 (floor); person r = 10, κ 0.5, G +12 → L −15.5, v 0.569 | ±0.001 |
-| T22 | Timing (S11): d = 1 / 5 / 10 cells → 0.113 / 0.564 / 1.127 s; and t_echo ≥ d/v_vis always | ±0.001 |
+| T22 | Timing (S11): d = 1 / 5 / 10 cells → 0.167 / 0.833 / 1.667 s; and t_echo = 2d/v, never above 6 s | ±0.001 |
 | T23 | Flags: with all flags false, `game.js` echo calls receive the same (delay, strength, pan) as today for a fixed seed (golden record) | equal |
 
 ---
@@ -435,7 +433,7 @@ All tests run with cellM = 1.0 unless stated, κ = 1, G_class = 0 and B_rx = 0. 
 5. Walls are treated as infinite planes for Eq. W. A short wall segment (Fresnel zone radius √(λr/2) ≈ 0.50 m at 3.4 kHz and 5 m) gives less than the image-source level. This is not modelled.
 6. Maekawa assumes a thin semi-infinite edge, with the single least-loss edge for doorways. Room-to-room transmission through open doors (coupled spaces) is not modelled. Zone T60 assumes diffuse fields, which a 12 × 7 m crypt only roughly satisfies.
 7. Sabine and Eyring with a single ᾱ at 2 kHz, applied to a stylised 3-comb reverb, give only the decay *rate*. The combs also impose flutter-like periodicity that a real room lacks.
-8. Game timing (v_vis, v_aud) is deliberately non-physical, 10–29× slower than sound. Mixing physical micro-timing (comb, smear) with game macro-timing is a documented stylisation.
+8. Game timing (one sonar speed, 12 cells/s) is deliberately non-physical, ~29× slower than sound. Mixing physical micro-timing (comb, smear) with game macro-timing is a documented stylisation.
 9. Air absorption is audible only with an HF ping (S9). With the default chirp, S6 is a no-op by design.
 10. New tiles (`cobble`, `roughStone`) need map and level edits outside this spec, plus save-compatibility checks.
 11. Open decisions for the user:
