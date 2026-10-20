@@ -20,7 +20,12 @@ test.beforeEach(() => {
   delete globalThis.localStorage;
 });
 
-test('version', () => assert.strictEqual(Log.VERSION, '0.10.4'));
+test('version matches the README current build', () => {
+  const readme = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'README.md'), 'utf8');
+  const m = /Current build \(v([\d.]+)\)/.exec(readme);
+  assert.ok(m, 'README has a Current build line');
+  assert.strictEqual(Log.VERSION, m[1]);
+});
 
 test('ring buffer caps at 500 and keeps newest', () => {
   const l = Log.get('t');
@@ -87,7 +92,7 @@ test('report contains version and last lines', () => {
   const l = Log.get('t');
   for (let i = 0; i < 60; i++) l.info('row' + i);
   const r = Log.report({ code: 'E_TEST', message: 'hello' });
-  assert.ok(r.includes('0.10.4'));
+  assert.ok(r.includes(Log.VERSION));
   assert.ok(r.includes('E_TEST'));
   assert.ok(r.includes('hello'));
   assert.ok(r.includes('row59'));
