@@ -12,7 +12,7 @@
   const BAD_KEYS = ['__proto__', 'constructor', 'prototype'];
   const ENV_KEYS = ['app', 'kind', 'v', 'game', 'sum', 'data'];
   const IMPORT_KEYS = ['app', 'kind', 'v', 'game', 'meta', 'run'];
-  const RUN_KEYS = ['v', 'map', 'player', 'doors', 'people', 'night', 'run'];
+  const RUN_KEYS = ['v', 'map', 'player', 'doors', 'people', 'night', 'run', 'rocks'];
   const RUN_RUN_KEYS = ['seed', 'boons', 'closedSafe', 'pendingBoons'];
 
   function logger() {
@@ -504,6 +504,7 @@
         doors: doors,
         people: people
       };
+      if (isInt(data.rocks) && data.rocks >= 0 && data.rocks <= 99) out.rocks = data.rocks;
       if (hasOwn(data, 'night') && data.night !== undefined) {
         if (!isPlain(data.night)) { warn('night is not an object'); return null; }
         const n = cloneJson(data.night, 1);

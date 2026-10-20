@@ -262,6 +262,13 @@ describe('save.test.js', () => {
     assert.strictEqual(Save.sanitizeRun(m2.data) !== null, true);
   });
 
+  test('sanitizeRun keeps the rocks count and drops a bad one', () => {
+    const r = validRun();
+    r.rocks = 2;
+    assert.strictEqual(Save.sanitizeRun(r).rocks, 2);
+    r.rocks = -1;
+    assert.strictEqual('rocks' in Save.sanitizeRun(r), false);
+  });
   test('sanitizeRun keeps valid v3 exactly', () => {
     assert.deepStrictEqual(Save.sanitizeRun(validRun()), validRun());
     const noNight = validRun();
