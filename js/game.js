@@ -197,6 +197,7 @@
     if (next === 'paused') showSettings(false);
     show(S.els.error, next === 'error');
     if (S.renderer && VCS.Render && typeof VCS.Render.setGrain === 'function') VCS.Render.setGrain(S.renderer, next === 'title' || next === 'error' ? 0 : 1);
+    if (S.renderer && VCS.Render && typeof VCS.Render.setVignette === 'function' && (next === 'title' || next === 'error')) VCS.Render.setVignette(S.renderer, false);
     syncPanels();
     if (next !== 'error' && next !== 'paused') hideReportBox();
   }
@@ -3343,7 +3344,7 @@
       S.ripple = VCS.Ripple.create();
       S.renderer = VCS.Render.create(S.canvas, c);
       applyMotion();
-      if (S.state === 'title' && typeof VCS.Render.setGrain === 'function') VCS.Render.setGrain(S.renderer, 0);
+      if (S.state === 'title' && typeof VCS.Render.setGrain === 'function') { VCS.Render.setGrain(S.renderer, 0); VCS.Render.setVignette(S.renderer, false); }
       try {
         S.hud = VCS.Hud.create();
       } catch (err) {

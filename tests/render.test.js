@@ -144,6 +144,22 @@ describe('render-feed.test.js', () => {
     assert.doesNotThrow(() => Render.setGrain({}, 1));
   });
 
+  test('static vignette is a CSS overlay: not drawn on the canvas, setVignette toggles #vignette, never throws', () => {
+    const f = setup();
+    const el = { style: {} };
+    f.r.vignetteEl = el;
+    f.r.vignetteOn = null;
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 1, {});
+    assert.strictEqual(el.style.opacity, '1');
+    assert.ok(!f.canvas._ctx.calls.some((c) => c.fn === 'createRadialGradient' && c.args[2] === 360 * 0.28), 'no canvas vignette gradient');
+    Render.setVignette(f.r, false);
+    assert.strictEqual(el.style.opacity, '0');
+    Render.setVignette(f.r, true);
+    assert.strictEqual(el.style.opacity, '1');
+    assert.doesNotThrow(() => Render.setVignette(null, true));
+    assert.doesNotThrow(() => Render.setVignette({}, true));
+  });
+
   test('floor front: a pulse over open floor draws a 1.5px arc and a few stipple dots', () => {
     const f = setup();
     f.r.quality = 3;

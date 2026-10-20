@@ -66,6 +66,20 @@ body {
   animation: grain-shift 1s steps(2, jump-none) infinite;
 }
 
+/* Vignette: transparent centre, dark edges, over the canvas (was drawn on the canvas, ~1.5 ms/frame). Same gradient as the old canvas one: inner radius 0.28 H, outer 0.52 * diagonal, alpha 0 -> 0.75. With W = the overlay width: 0.28 H = 0.1575 W, 0.52 * diagonal = 0.5967 W. Opacity (0/1) is set from JS (Render.setVignette). */
+#vignette {
+  --vw: min(100vw, calc(100vh * 16 / 9));
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--vw);
+  aspect-ratio: 640 / 360;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) calc(var(--vw) * 0.1575), rgba(0, 0, 0, 0.75) calc(var(--vw) * 0.5967));
+}
+
 @keyframes grain-shift {
   from { background-position: 0 0; }
   to { background-position: 37% 61%; }
