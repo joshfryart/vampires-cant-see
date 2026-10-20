@@ -8,7 +8,7 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 3. [ ] Perf: street 44–52 fps headless (60 fps on real playthrough) → hold ≥50 (vignette → CSS overlay first).
 4. [x] Drink grab (v0.10.14; v0.10.17: click/Space pings while holding, no longer lets go; light -35% playtested OK; v0.10.16: start blood 10%; v0.10.15: pools 30–50, rate 7→2.5/s ≈ 9 s per villager; smoke retuned and passing 249 on 2026-10-20; Playwright lives at %TEMP%audepw-tools
 ode_modules (NODE_PATH)): hold drink → victim pulled to 0.6 cells ahead, you move at 25% speed (full victim) → 55% (drained), look halved. Tune DRAG_* in game.js. Smoke needs a drag check.
-5. [ ] Hidden "veil" meter (requested 2026-10-18 b).
+5. [x] Hidden "veil" meter (requested 2026-10-18 b): eye + 5 ticks beside the vial, smoothed `playerLit`; vignette tone-down/setting, fear tie-in and `tut:light` still open below. Same pass: gulp sound, victim struggle/break-free, drag scuffle sounds (untested in browser).
 6. [ ] Decide: v0.11 Echoes (sonar speed decided; next = stages S1–S10) vs. v0.11 Villagers.
 7. [ ] Fix `docs/SPEC-echoes.md` lines ~333 and ~386 (still mention `delayMul`).
 

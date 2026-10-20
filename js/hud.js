@@ -170,6 +170,66 @@
   let lg = 1;      // text/icon scale for this draw call (1 or LARGE_K)
   let feedDim = 1; // dial + clock alpha multiplier (0.5 while feeding)
 
+  // ---- veil meter: how visible you are (eye icon + 5 ticks), cold blue-grey hidden -> candle gold exposed ----
+  const VEIL_X = 58;
+  const VEIL_MID = 319;
+
+  /** Blend of hidden and exposed colours as 'rgb(r,g,b)' for k 0..1. */
+  function veilColor(k) {
+    const r = Math.round(143 + (255 - 143) * k);
+    const g = Math.round(168 + (210 - 168) * k);
+    const b = Math.round(200 + (122 - 200) * k);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  function drawVeil(h, ctx, k, t, reduced) {
+    const col = veilColor(k);
+    const sc = 0.45;
+    // gentle 0.5 Hz breathe at full exposure only
+    const breathe = k > 0.95 && !reduced ? 0.85 + 0.15 * Math.sin(t * Math.PI) : 1;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.6 * breathe;
+    // eye: lid opens from closed (flat line) to wide with exposure
+    const open = k < 0.1 ? 0 : k < 0.5 ? 2.5 : 4.5;
+    const ex = VEIL_X;
+    const ey = VEIL_MID - 9;
+    ctx.beginPath();
+    ctx.moveTo(ex - 7 + J(h, 20, 0) * sc, ey + J(h, 20, 1) * sc);
+    if (open === 0) {
+      ctx.quadraticCurveTo(ex, ey + 2.5, ex + 7 + J(h, 21, 0) * sc, ey + J(h, 21, 1) * sc); // closed: drooping lid
+    } else {
+      ctx.quadraticCurveTo(ex, ey - open * 2, ex + 7 + J(h, 21, 0) * sc, ey + J(h, 21, 1) * sc);
+      ctx.quadraticCurveTo(ex, ey + open * 2, ex - 7, ey);
+    }
+    ctx.stroke();
+    if (open > 0) {
+      ctx.beginPath();
+      ctx.arc(ex, ey, open > 3 ? 1.8 : 1.2, 0, TWO_PI);
+      ctx.stroke();
+    }
+    if (open > 3) {
+      // lashes
+      ctx.beginPath();
+      for (let i = -1; i <= 1; i++) {
+        ctx.moveTo(ex + i * 3.5, ey - open + 0.5);
+        ctx.lineTo(ex + i * 4.5, ey - open - 2.5);
+      }
+      ctx.stroke();
+    }
+    // five ticks, lit left to right by exposure
+    for (let i = 0; i < 5; i++) {
+      const on = k * 5 - i;
+      const fill = on >= 1 ? 1 : on > 0 ? on : 0;
+      ctx.globalAlpha = (0.2 + 0.5 * fill) * breathe;
+      ctx.beginPath();
+      const x = ex - 8 + i * 4 + J(h, 30 + i, 0) * sc;
+      ctx.moveTo(x, VEIL_MID + 5);
+      ctx.lineTo(x, VEIL_MID + 5 - 3 - 3 * fill);
+      ctx.stroke();
+    }
+  }
+
   function drawDial(h, ctx, frac, hour, minute, t) {
     const sunK = frac <= 0.9 ? 0 : frac >= 1 ? 1 : (frac - 0.9) / 0.1;
     ctx.lineCap = 'round';
@@ -417,6 +477,7 @@
         const fa = o.feeding === true;
         const vp = reduced ? 0 : num(o.vialPulse, 0, 0, 1);
         drawVial(h, ctx, blood, weak, t, reduced, vp);
+        if (typeof o.veil === 'number') drawVeil(h, ctx, num(o.veil, 0, 0, 1), t, reduced);
         feedDim = fa ? 0.5 : 1;
         drawDial(h, ctx, frac, hour, minute, t);
         feedDim = 1;

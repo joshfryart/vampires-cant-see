@@ -520,6 +520,26 @@
     feed: function (ctx, out, t, peak) {
       tone(ctx, out, 'sine', 180, 90, t, 0.02, 0.25, peak);
     },
+    // wet gulp: low throat thump, a swallowed noise burst, then a smaller second "glk"
+    gulp: function (ctx, out, t, peak, v) {
+      const k = v.pitch;
+      tone(ctx, out, 'sine', 150 * k, 70 * k, t, 0.01, 0.13, peak);
+      noise(ctx, out, t + 0.01, 0.1, peak * 0.7, 'lowpass', 520 * k, 0.02);
+      tone(ctx, out, 'sine', 230 * k, 120 * k, t + 0.14, 0.008, 0.08, peak * 0.6);
+      noise(ctx, out, t + 0.14, 0.05, peak * 0.3, 'bandpass', 900 * k, 0.01);
+    },
+    // victim thrashing in your grip: muffled "mmph" with a cloth-rustle burst
+    struggle: function (ctx, out, t, peak, v) {
+      const k = v.pitch;
+      bend(ctx, out, 'triangle', [240 * k, 330 * k, 200 * k], t, 0.03, 0.3, peak * 0.7);
+      noise(ctx, out, t, 0.28, peak * 0.8, 'bandpass', 1100 * k, 0.03);
+      noise(ctx, out, t + 0.12, 0.14, peak * 0.5, 'highpass', 2500, 0.02);
+    },
+    // boots and cloth scraping while a victim is hauled along
+    scuffle: function (ctx, out, t, peak, v) {
+      noise(ctx, out, t, 0.11, peak, 'bandpass', 1300 * v.pitch, 0.01);
+      tone(ctx, out, 'triangle', 120 * v.pitch, 70 * v.pitch, t, 0.005, 0.06, peak * 0.5);
+    },
     // breathy gasp: short rising bend 400 -> 900 Hz with a detuned partner for a noisy edge
     gasp: function (ctx, out, t, peak, v) {
       const k = v.pitch;
@@ -592,7 +612,7 @@
 
   /**
    * Plays a movement/interaction sound. Kinds: step, personStep, doorOpen, doorClose, interact, creak, scream, startle,
-   * chime, heartbeat, feed, yawn, gasp, miss, shriek, mist, still, gift, overflow, whimper, dog, bell.
+   * chime, heartbeat, feed, gulp, struggle, scuffle, yawn, gasp, miss, shriek, mist, still, gift, overflow, whimper, dog, bell.
    * No-op when not ready or the kind is unknown.
    * @param {object} a Audio state.
    * @param {string} kind Sound kind.

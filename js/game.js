@@ -82,6 +82,7 @@
     lastVictim: null,
     landings: [],
     vialPulse: 0,
+    veilK: 0,
     fovK: 0,
     reactCfg: null,
     reactDazed: -1,
@@ -129,6 +130,7 @@
     farRng: null,
     farSpot: null,
     sleepDenied: false,
+    cryptWarnUntil: 0,
     tutQ: [],
     tutCur: null,
     tutAge: 0,
@@ -148,6 +150,12 @@
   const DRAG_EMPTY = 0.55; // ... and a nearly drained one
   const DRAG_HOLD = 0.6; // victim is held this far in front of you
   const DRAG_PULL = 2.4; // cells/s the victim is pulled toward the hold point
+  const SLEEP_MIN = 510; // night minute (04:30) from which sleeping is allowed
+  const STRUGGLE_GAP =0.9; // seconds between struggle attempts
+  const STRUGGLE_START = 0.7; // grace after the grab before the first attempt
+  const STRUGGLE_WEAK = 0.45; // below this share of blood left the victim is too weak to break free
+  const STRUGGLE_FREE = 0.4; // chance an attempt breaks free at a full victim (scales to 0 at STRUGGLE_WEAK)
+  const SCUFFLE_GAP = 0.38; // seconds of being dragged between scuff sounds
   const FEED_ARC = Math.PI / 3;
   const GRAB_FOV = 54 / 66;
   const SLEEP_DUR = 2.2;
@@ -440,6 +448,7 @@
     }
     if (S.cool > 0) S.cool -= dt;
     S.playerLit = safeLight(S.world, S.player.x, S.player.y);
+    S.veilK += (clamp(S.playerLit, 0, 1) - S.veilK) * (1 - Math.exp(-dt / 0.3)); // veil meter: same light value villagers spot with
     if (S.grace > 0) S.grace -= dt;
     if (!wasDrinking) {
       if (checkLinkDoor()) return;
@@ -558,7 +567,7 @@
       L().warn('People.sees failed', err);
     }
     if (!VCS.People.grab(S.people, target.id)) return false;
-    S.drink = { id: target.id, person: target, people: S.people, pool: target.pool > 0 ? target.pool : 40, left: target.left, drunk: 0, beatAt: 0.1, t: 0, forced: !!forced, interrupt: false };
+    S.drink = { id: target.id, person: target, people: S.people, pool: target.pool > 0 ? target.pool : 40, left: target.left, drunk: 0, beatAt: 0.1, t: 0, forced: !!forced, interrupt: false, struggleAt: STRUGGLE_START, scuffAcc: 0 };
     S.lastVictim = { id: target.id, people: S.people };
     if (S.hunger) VCS.Hunger.onGrab(S.hunger, S.mapName + ':' + target.id);
     S.overAcc = 0;
@@ -602,6 +611,13 @@
       v.angle = Math.atan2(p.y - v.y, p.x - v.x);
       d.pullEcho = (d.pullEcho || 0) + dt;
       if (d.pullEcho >= 0.1) { d.pullEcho = 0; pushVictimEcho(v); }
+      d.scuffAcc += dt;
+      if (d.scuffAcc >= SCUFFLE_GAP) {
+        d.scuffAcc = 0;
+        emitSound('scuffle', v.x, v.y);
+        reactTo(v.x, v.y, 'scuffle', level('scuffle').range);
+        if (S.audio) VCS.Audio.play(S.audio, 'scuffle', spatial(v.x, v.y, level('scuffle').gain, { material: stepMaterial(v.x, v.y) }));
+      }
     }
   }
 
@@ -615,6 +631,7 @@
     if (d.interrupt) return endDrink('witness');
     if (!d.forced && d.t > dt * 1.5 && S.input && typeof S.input.feedHeld === 'function' && !S.input.feedHeld() && !cfgOn('feedToggle')) return endDrink('released');
     if (Math.hypot(p.x - S.player.x, p.y - S.player.y) > cfgNum('feedReach', FEED_REACH) + 0.3) return endDrink('reach');
+    if (d.t >= d.struggleAt && struggle(d)) return;
     const ovOpen = !!S.hunger && VCS.Hunger.isOpen(S.hunger);
     if (n.blood >= n.bloodMax && !ovOpen) return endDrink('cap');
     const rate = (2.5 + 4.5 * clamp(d.left / d.pool, 0, 1)) * fxv('drinkRate'); // v0.10.15: ~8 s per villager (was 6..20/s, ~2.5 s)
@@ -655,6 +672,31 @@
       d.beatAt += 60 / bpm;
     }
     if (n.blood >= n.bloodMax && !(S.hunger && VCS.Hunger.isOpen(S.hunger))) endDrink('cap');
+  }
+
+  /**
+   * One struggle attempt: the victim thrashes (noise, ripple, startles neighbours). While they still hold enough blood
+   * there is a chance they tear free, scream and run; below STRUGGLE_WEAK they are too weak and only twitch. True if they broke free.
+   */
+  function struggle(d) {
+    const v = d.person;
+    const frac = clamp(d.left / d.pool, 0, 1);
+    d.struggleAt += STRUGGLE_GAP * (0.8 + 0.4 * Math.random());
+    const strong = clamp((frac - STRUGGLE_WEAK) / (1 - STRUGGLE_WEAK), 0, 1);
+    const k = 0.35 + 0.65 * Math.max(strong, 0.3); // weak victims thrash quieter
+    emitSound('struggle', v.x, v.y, { rangeMul: k, strengthMul: k });
+    reactTo(v.x, v.y, 'struggle', level('struggle').range * k + 0.5);
+    if (S.audio) VCS.Audio.play(S.audio, 'struggle', spatial(v.x, v.y, level('struggle').gain * k));
+    if (S.ripple) VCS.Ripple.spawn(S.ripple, v.x, v.y, S.clock, { kind: 'person', maxR: 0.9 + 0.6 * k, life: 0.45, strength: 0.7 });
+    pushVictimEcho(v);
+    if (strong <= 0 || Math.random() >= STRUGGLE_FREE * strong) return false;
+    L().info('Person ' + d.id + ' broke free (left ' + d.left.toFixed(1) + ')');
+    endDrink('broke');
+    if (v.mode === 'dazed') v.dazedLeft = Math.min(v.dazedLeft, 0.15); // bolts at once instead of standing dazed
+    emitSound('scream', v.x, v.y);
+    if (S.audio) VCS.Audio.play(S.audio, 'scream', spatial(v.x, v.y, level('scream').gain));
+    reactTo(v.x, v.y, 'scream', 5);
+    return true;
   }
 
   /** One heartbeat: sonar pulse from the victim, startle radius, audio, rings, echo refresh, gulp landing. */
@@ -704,14 +746,39 @@
     while (ls.length && ls[0] <= S.clock) {
       ls.shift();
       S.vialPulse = 1;
-      if (S.audio) VCS.Audio.play(S.audio, 'feed', { gain: level('feed').gain, pan: 0 });
+      if (S.audio) VCS.Audio.play(S.audio, 'gulp', { gain: level('gulp').gain, pan: 0 });
     }
   }
 
   /** Try to go to sleep at a crypt or safe spot in reach. True if the sequence started. */
-  function trySleep() {
+  function trySleep(force) {
     if (S.state !== 'playing' || !S.night || !S.world || !S.player) return false;
     const p = S.player;
+    S.sleepDenied = false;
+    // Safe spots open at SLEEP_MIN (04:30, as the tutorial hint says). The crypt bed works any time, but the first early
+    // press only warns (nights get harder); a second press within 4 s sleeps. Debug sleep ignores all of this.
+    if (force !== true && S.night.min < SLEEP_MIN) {
+      const reach0 = (VCS.SoundData && VCS.SoundData.reach) || 1.3;
+      const near = function (sp) { return Math.hypot(sp.x - p.x, sp.y - p.y) <= reach0; };
+      const nearCrypt = (S.world.spots.crypt || []).some(near);
+      const nearSafe = (S.world.spots.safe || []).some(near);
+      if (nearCrypt && S.clock < S.cryptWarnUntil) {
+        S.cryptWarnUntil = 0; // confirmed: fall through to sleep
+      } else if (nearCrypt || nearSafe) {
+        S.sleepDenied = true;
+        if (nearCrypt) {
+          S.cryptWarnUntil = S.clock + 4;
+          showCard('Sleep early?', CARD_LEN - 1, 'Each night grows harder. Press E again to sleep.');
+        } else {
+          showCard('Not tired yet', CARD_LEN - 1, 'Wait until the night is nearly spent, or sleep in the crypt.');
+        }
+        if (S.audio) VCS.Audio.play(S.audio, 'miss', { gain: level('miss').gain, pan: 0 });
+        L().info('Sleep too early (min ' + Math.floor(S.night.min) + ')');
+        return false;
+      } else {
+        return false;
+      }
+    }
     const reach = (VCS.SoundData && VCS.SoundData.reach) || 1.3;
     const w = S.world;
     const lists = [w.spots.crypt || [], w.spots.safe || []];
@@ -1537,6 +1604,7 @@
     hs.pulse01 = S.hudA > 0.01 ? S.hudA * S.hudFrac : 0;
     hs.vialPulse = S.vialPulse;
     hs.feeding = !!S.drink;
+    hs.veil = S.veilK;
     feedHunger(hs, n);
     Hud.drawHud(S.hud, c, hs);
     if (S.cardText !== null) Hud.drawCard(S.hud, c, S.cardText, S.cardAge, S.clock, boil, S.cardSub || undefined, HOPTS);
@@ -3239,7 +3307,7 @@
         };
         Game.debugFeedHold = debugFeedHold;
         Game.debugPeopleState = function () { return S.people; };
-        Game.debugSleep = trySleep;
+        Game.debugSleep = function () { return trySleep(true); };
         Game.debugNight = function () { return S.night ? VCS.Night.serialize(S.night) : null; };
       }
 
