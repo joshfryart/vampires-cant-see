@@ -37,7 +37,7 @@ ode_modules).
 - [x] Villager footstep sound: heel thump + scuff per floor (grass/wood/stone), feet alternate (v0.10.12). Ring shrink/scuff still open below.
 - [x] Villager step ring scaled by gait (sneak/walk/run from wary/flee) and floor (grass/wood/stone) and pace; base ring shrunk 0.7→0.4 range, 0.35→0.25 strength; room indoor/outdoor still applied on top (v0.10.13)
 - [x] Version numbers go up one patch at a time (0.10.12 → 0.10.13 → ...)
-- [ ] Version rule (confirmed 2026-10-20): patch is a single digit 0–9; after x.y.9 the next release is x.(y+1).0 (0.1.9 → 0.2.0). Current 0.10.20 is past the cap, so next release is 0.11.0.
+- [x] Version rule (confirmed 2026-10-20): patch is a single digit 0–9; after x.y.9 the next release is x.(y+1).0 (0.1.9 → 0.2.0). Bumped to 0.11.0.
 - [x] `VCS.Log.VERSION` (js/log.js) was stuck at 0.10.4; now 0.10.13 and a log test checks it matches README "Current build". Bump both each release.
 - [ ] Footstep ring look: flattened floor "scuff" ellipse, left/right offset (render, still open)
 - [x] Itch zip + playable artifact republished at each release
