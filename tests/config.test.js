@@ -75,8 +75,8 @@ test('DEFAULTS is frozen and has the contract values', () => {
     maxMapH: 48,
     feedReach: 1.5,
     feedArcDeg: 60,
-    poolMin: 18,
-    poolMax: 32,
+    poolMin: 30,
+    poolMax: 50,
     dazedTime: 3,
     autosaveSec: 20,
     keyTurnSpeed: 3.2,
@@ -375,7 +375,7 @@ test('feeding settings are range-checked', () => {
   const bad = sanitize({ feedReach: 0.5, feedArcDeg: 121, poolMin: 4, poolMax: 151, dazedTime: 0.1 });
   assert.strictEqual(bad.warnings.length, 5);
   assert.strictEqual(bad.config.feedArcDeg, 60);
-  assert.strictEqual(bad.config.poolMax, 32);
+  assert.strictEqual(bad.config.poolMax, 50);
   assert.strictEqual(sanitize({ dazedTime: '3' }).config.dazedTime, 3);
 });
 

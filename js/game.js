@@ -144,6 +144,10 @@
 
   const HOPTS = { largeText: false, reduced: false, dur: 4 };
   const FEED_REACH = 1.5;
+  const DRAG_FULL = 0.25; // v0.10.14: move speed fraction while dragging a full victim
+  const DRAG_EMPTY = 0.55; // ... and a nearly drained one
+  const DRAG_HOLD = 0.6; // victim is held this far in front of you
+  const DRAG_PULL = 2.4; // cells/s the victim is pulled toward the hold point
   const FEED_ARC = Math.PI / 3;
   const GRAB_FOV = 54 / 66;
   const SLEEP_DUR = 2.2;
@@ -266,7 +270,7 @@
   function newNightState() {
     try {
       const m = S.config && typeof S.config.nightLengthMin === 'number' ? S.config.nightLengthMin : 4;
-      return VCS.Night.create({ nightSec: m * 60 * fxv('nightLen'), bloodStart: Math.min(100, 60 + fxv('startBlood')), drainMul: fxv('drain'), ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0 });
+      return VCS.Night.create({ nightSec: m * 60 * fxv('nightLen'), bloodStart: Math.min(100, 10 + fxv('startBlood')), drainMul: fxv('drain'), ramp: VCS.HungerData ? VCS.HungerData.RAMP : 0 });
     } catch (err) {
       L().error('Night.create failed', err);
       return null;
@@ -402,9 +406,18 @@
     if (!wasDrinking && S.state === 'playing') powerKeys(pressed);
     if (S.mistVis > 0) S.mistVis = Math.max(0, S.mistVis - dt / 0.45);
     if (wasDrinking) {
-      // Drinking: no move, no look, no bob; the world, clock and night keep running.
-      updateBob(dt, 0);
-      playerSteps(dt, 0);
+      // Drinking: you drag the victim slowly (the fuller they are, the harder they resist); look is halved.
+      const dk = S.drink;
+      const inp = VCS.Player.inputFromKeys(input.keys, mouse.dx * 0.5);
+      const px = S.player.x;
+      const py = S.player.y;
+      const k = dragSpeedK(dk);
+      const cfg = Object.assign({}, S.config, { moveSpeed: cfgNum('moveSpeed', 3) * k });
+      VCS.Player.update(S.player, S.world, inp, dt, cfg);
+      const moved = Math.hypot(S.player.x - px, S.player.y - py);
+      stepVictimPull(dk, dt);
+      updateBob(dt, moved);
+      playerSteps(dt, moved);
     } else {
       const inp = VCS.Player.inputFromKeys(input.keys, mouse.dx);
       const px = S.player.x;
@@ -437,10 +450,7 @@
     } else if (feedTog > 0 && S.drink && cfgOn('feedToggle') && !S.drink.forced) {
       endDrink('release');
     }
-    if (clicks > 0) {
-      if (wasDrinking) endDrink('click');
-      else pulse();
-    }
+    if (clicks > 0) pulse(); // v0.10.17: echolocate while holding a victim (click no longer lets go)
     VCS.Sonar.prune(S.sonar, S.clock);
     simulateWorld(dt);
     stepAmbient(dt);
@@ -563,6 +573,38 @@
     return true;
   }
 
+  /** Player speed fraction while dragging: DRAG_FULL with a full victim, DRAG_EMPTY as they run dry (resistance falls with blood). */
+  function dragSpeedK(d) {
+    const f = d && d.pool > 0 ? clamp(d.left / d.pool, 0, 1) : 0;
+    return DRAG_EMPTY + (DRAG_FULL - DRAG_EMPTY) * f;
+  }
+
+  /** Ease the victim to DRAG_HOLD cells in front of the player, without walking through walls. */
+  function stepVictimPull(d, dt) {
+    const v = d.person;
+    const p = S.player;
+    const tx = p.x + Math.cos(p.angle) * DRAG_HOLD;
+    const ty = p.y + Math.sin(p.angle) * DRAG_HOLD;
+    const dx = tx - v.x;
+    const dy = ty - v.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.02) return;
+    const step = Math.min(dist, DRAG_PULL * dt);
+    const mx = dx / dist * step;
+    const my = dy / dist * step;
+    const w = S.world;
+    const r = 0.2;
+    const free = function (x, y) { return typeof w.blocks === 'function' ? !w.blocks(x, y, r) : !w.isSolid(x, y); };
+    let moved = false;
+    if (free(v.x + mx, v.y)) { v.x += mx; moved = true; }
+    if (free(v.x, v.y + my)) { v.y += my; moved = true; }
+    if (moved) {
+      v.angle = Math.atan2(p.y - v.y, p.x - v.x);
+      d.pullEcho = (d.pullEcho || 0) + dt;
+      if (d.pullEcho >= 0.1) { d.pullEcho = 0; pushVictimEcho(v); }
+    }
+  }
+
   /** One drinking tick: blood flows, beats fire, stop rules run. */
   function stepDrink(dt) {
     const d = S.drink;
@@ -575,7 +617,7 @@
     if (Math.hypot(p.x - S.player.x, p.y - S.player.y) > cfgNum('feedReach', FEED_REACH) + 0.3) return endDrink('reach');
     const ovOpen = !!S.hunger && VCS.Hunger.isOpen(S.hunger);
     if (n.blood >= n.bloodMax && !ovOpen) return endDrink('cap');
-    const rate = (6 + 14 * clamp(d.left / d.pool, 0, 1)) * fxv('drinkRate');
+    const rate = (2.5 + 4.5 * clamp(d.left / d.pool, 0, 1)) * fxv('drinkRate'); // v0.10.15: ~8 s per villager (was 6..20/s, ~2.5 s)
     let gain = 0;
     let over = 0;
     let ready = false;

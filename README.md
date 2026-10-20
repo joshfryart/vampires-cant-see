@@ -5,7 +5,7 @@ each click sends out a sonar pulse that lights up the walls around you.
 At night, go out to find people and get back to your crypt or a safe dark
 space before dawn, so you can sleep through the day.
 
-Current build (v0.10.13): sonar pulse, first-person outline view, settings, people
+Current build (v0.10.17): sonar pulse, first-person outline view, settings, people
 who walk set paths through the maps, one night at a time (feed, sleep
 and dawn; see Night rules below), a main menu, an upgrade shop, night boons,
 random runs and saves. You never see a person directly:
@@ -33,8 +33,8 @@ Double-click `index.html` to open the game. No install or server is needed.
   opens it); sleep at your crypt or a safe spot (crypt and safe spots
   answer with a knock)
 - Hold right-click or R: grab and drink from a person within 1.5 cells in front
-  of you (even one who has noticed you or is cowering). Let go, left-click,
-  Space or Esc to stop; you cannot move or look while drinking. With "Click to
+  of you (even one who has noticed you or is cowering). Let go or press Esc to stop; left-click or
+  Space still pings while you hold them; you drag your victim slowly while drinking (full victims resist; look is halved). With "Click to
   start/stop drinking" on in Settings, click instead of holding. Drinking with
   nobody in reach plays a soft miss sound
 - Q shriek · Shift or C mist · F still: use a power (see Powers)

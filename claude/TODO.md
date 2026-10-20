@@ -3,13 +3,15 @@
 Each version: Opus pulls src → contract → agents → tests + smoke + screenshot review → publish → update `src/`, HANDOFF.md, TODO.md.
 
 ## Next (in order)
-1. [ ] Playtest v0.10.13 in browser: step rings differ for sneak/run and grass/wood/stone; windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
+1. [ ] Playtest v0.10.14 in browser (new: drink drag, town lights -35%; v0.10.13 items still apply; last playthrough ran 60 fps): step rings differ for sneak/run and grass/wood/stone; windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
 2. [x] Smoke test runs on a real machine (2026-10-20, Windows): 249 pass. Fixed stale night-length check (360 → 240 s). Needs Playwright installed outside the repo, `NODE_PATH` set to its node_modules, then `node tests/smoke.mjs`. First run had one extra failure that did not repeat; watch for flakiness. Still run before each release.
-3. [ ] Perf: street 44–52 fps headless → hold ≥50 (vignette → CSS overlay first).
-4. [ ] Drink grab: victim pulled toward player, resists, resistance falls with blood (requested 2026-10-18).
+3. [ ] Perf: street 44–52 fps headless (60 fps on real playthrough) → hold ≥50 (vignette → CSS overlay first).
+4. [x] Drink grab (v0.10.14; v0.10.17: click/Space pings while holding, no longer lets go; light -35% playtested OK; v0.10.16: start blood 10%; v0.10.15: pools 30–50, rate 7→2.5/s ≈ 9 s per villager; smoke drain/hold checks retuned but NOT run): hold drink → victim pulled to 0.6 cells ahead, you move at 25% speed (full victim) → 55% (drained), look halved. Tune DRAG_* in game.js. Smoke needs a drag check.
 5. [ ] Hidden "veil" meter (requested 2026-10-18 b).
 6. [ ] Decide: v0.11 Echoes (sonar speed decided; next = stages S1–S10) vs. v0.11 Villagers.
 7. [ ] Fix `docs/SPEC-echoes.md` lines ~333 and ~386 (still mention `delayMul`).
+
+- [x] Town light radius scale 0.6 → 0.39 (-35%) (v0.10.14); world tests use light 20
 
 ## Done 2026-10-18 night session (v0.10.4 → v0.10.10)
 - [x] Night default 6 → 4 min (v0.10.4)

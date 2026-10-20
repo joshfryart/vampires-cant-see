@@ -62,7 +62,7 @@ Source: `js/night.js`, `js/config.js`, `js/game.js`, `js/data/hunger.js`.
 | Clock | 20:00 to 06:00 = 600 game minutes. Minute 540 = 05:00, 570 = 05:30 |
 | Night length | `config.nightLengthMin` (default 4, schema 2..30) x 60 x `fx.nightLen` real seconds. The settings slider offers 4..12 |
 | Nights per run | 5 (win after sleeping through night 5) |
-| Blood max / start | 100 / `min(100, 60 + fx.startBlood)` |
+| Blood max / start | 100 / `min(100, 10 + fx.startBlood)` |
 | Base drain | `bloodMax / nightSec` per real second x `fx.drain` x ramp |
 | Drain ramp | `RAMP` 0.12: x `(1 + 0.12 x (night - 1))`. N1 1.00, N2 1.12, N3 1.24, N4 1.36, N5 1.48. Set per run in `Night.create` (`ramp`, not serialized) |
 | Weak | blood < 25: `weak = 1 - blood/25`. Pulse range and strength x `(1 - 0.4 weak)`, fade x `(1 - 0.3 weak)`; outline flickers, pulse gets `weak` |
@@ -91,12 +91,12 @@ Right mouse button held, or R held (`debugFeed` for tests). Source: `game.js` st
 | Pool | `poolMin + (poolMax - poolMin) x rng` blood per person; config `poolMin` 18, `poolMax` 32 (ranges 5..100 and 5..150). Seeded per map and night |
 | Drink rate | `(6 + 14 x left/pool) x fx.drinkRate` blood/s; real per tick via `Night.addBlood` (returns actual gain, clamps at max) |
 | Empty | `left <= 0.5` -> person `fed` (inert), `fedCount++` |
-| While drinking | Player input zeroed (no move, look, bob); clock and world keep running |
+| While drinking | Drag: move at 25% (full victim) to 55% (drained) speed, look halved; victim held 0.6 cells ahead; clock and world keep running |
 | Heartbeat | bpm `50 + 70 x left/pool`. Each beat: `heartbeat` pulse at the victim, range `(1.5 + 2.5 x drunk/pool) x (1 - 0.4 weak)`, z 0.55, strength 0.45; also the `react` radius. Outward chest ring + inward ring (R 1.4 -> 0.15 over 0.4 s) whose landing plays `feed` gulp. Reduced motion: fixed static ring R 0.8 |
 | Gasp | If the victim `sees()` the player at grab: `gasp` (range 4, z 0.8, strength 0.4, fade 1.2, gain 0.2). Grab from behind = silent |
 | No target | `miss` sound only |
 | Visual | Victim drawn `#ff8a78` (1.6 px, alpha 0.9) with `feedLock`; FOV 66 -> 54 over 0.35 s, back over 0.4 s; cached radial vignette alpha 0.5; dial dims to 0.5; vial scale 1.08 per beat. Reduced motion: no FOV/yaw change, fixed vignette 0.3, no vial pulse |
-| Stop (first true) | Button or key released (toggle: second press), click or Space, blood at max (with overflow closed), victim empty, victim out of reach (> reach + 0.3), a non-victim person sees you or enters `flee`, Escape / lock loss / blur, run end, map change, overflow gift ready |
+| Stop (first true) | Button or key released (toggle: second press), blood at max (with overflow closed), victim empty, victim out of reach (> reach + 0.3), a non-victim person sees you or enters `flee`, Escape / lock loss / blur, run end, map change, overflow gift ready |
 | On release (not empty) | Victim -> `dazed` for `dazedTime` 3 s (config 0.5..10), keeps `left`, then flees silently (`quiet`) |
 | Witnesses | Dark neighbours only startle (freeze, turn); lit (>= 0.3) neighbours in view see you and flee: that ends the drink. Rule: drink in the dark |
 | Saves | Never written while `feeding` |

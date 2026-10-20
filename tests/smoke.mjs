@@ -736,9 +736,9 @@ try {
     const s = G.debugState();
     return { ok: true, id: id2, pool, secs: steps / 60, gasp: 0, b0, b1: s.night.blood, state: s.state, fed: s.fed, victim: s.victim, scream, flee, maxDrunk, gaspSeen: 0 };
   });
-  const tExp = drain.ok ? (drain.pool / 14) * Math.log(20 / (6 + 7 / drain.pool)) : 0;
+  const tExp = drain.ok ? (drain.pool / 4.5) * Math.log(7 / (2.5 + 2.25 / drain.pool)) : 0;
   check('v0.7.2: grab from behind starts a drink', drain.ok, JSON.stringify(drain));
-  check('v0.7.2: full drain takes ~3.4 s at its pool', drain.ok && Math.abs(drain.secs - tExp) < 0.2 && drain.secs > 1.5 && drain.secs < 4.6, 'secs=' + (drain.secs && drain.secs.toFixed(2)) + ' expected=' + tExp.toFixed(2) + ' pool=' + (drain.pool && drain.pool.toFixed(1)));
+  check('v0.7.2: full drain takes ~9 s at its pool', drain.ok && Math.abs(drain.secs - tExp) < 0.3 && drain.secs > 5 && drain.secs < 14, 'secs=' + (drain.secs && drain.secs.toFixed(2)) + ' expected=' + tExp.toFixed(2) + ' pool=' + (drain.pool && drain.pool.toFixed(1)));
   check('v0.7.2: full drain ends fed (+pool blood, fed count 1)', drain.ok && drain.victim.mode === 'fed' && drain.fed === 1 && drain.state === 'playing' && drain.b1 - drain.b0 > drain.pool - 2.5, JSON.stringify({ v: drain.victim, f: drain.fed, gain: drain.b1 - drain.b0 }));
   check('v0.7.2: dark drain, no screams, nobody flees', drain.scream === 0 && drain.flee === 0, 'scream=' + drain.scream + ' flee=' + drain.flee);
   // Gasp: front grab emits a gasp pulse; from behind none.
@@ -788,7 +788,7 @@ try {
     }
     if (id < 0) return { ok: false, why: 'place' };
     const b0 = G.debugState().night.blood;
-    if (!G.debugFeedHold(1.0)) return { ok: false, why: 'start' };
+    if (!G.debugFeedHold(2.5)) return { ok: false, why: 'start' };
     const s1 = G.debugState();
     const gain1 = s1.night.blood - b0;
     let scream = 0;
@@ -808,7 +808,7 @@ try {
     }
     return { ok: true, id, gain1, victim1: s1.victim, mid, after: modes[modes.length - 1], scream, left1: s1.victim.left, pool: s1.victim.pool, state: s1.state };
   });
-  check('v0.7.2: release after 1 s gives ~+15..25 blood', hold1.ok && hold1.gain1 > 14 && hold1.gain1 < 25, JSON.stringify(hold1));
+  check('v0.7.2: release after 2.5 s gives ~+15..25 blood', hold1.ok && hold1.gain1 > 14 && hold1.gain1 < 25, JSON.stringify(hold1));
   check('v0.7.2: released victim is dazed (keeps its remainder)', hold1.ok && hold1.victim1.mode === 'dazed' && hold1.left1 > 10 && hold1.left1 < hold1.pool - 12 && hold1.state === 'playing', JSON.stringify(hold1.victim1));
   check('v0.7.2: dazed ~1 s later, then flees after ~3 s with no scream', hold1.ok && hold1.mid === 'dazed' && hold1.after === 'flee' && hold1.scream === 0, JSON.stringify({ mid: hold1.mid, after: hold1.after, scream: hold1.scream }));
   fp = await fresh();
