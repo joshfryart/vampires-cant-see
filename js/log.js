@@ -103,7 +103,7 @@
   }
 
   const Log = {
-    VERSION: '0.13.1',
+    VERSION: '0.13.2',
     LEVELS: LEVELS,
 
     /** Set the minimum level by name (DEBUG/INFO/WARN/ERROR). */

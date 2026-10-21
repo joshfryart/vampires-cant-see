@@ -193,7 +193,7 @@
     if (S.state === next) return;
     L().info('State ' + S.state + ' -> ' + next);
     S.state = next;
-    if (next !== 'playing') { endListen(); endBarks(); }
+    if (next !== 'playing') { endListen(); if (next !== 'feeding') endBarks(); } // feeding keeps barks: the victim cries out while held
     if (next !== 'paused') S.guideOpen = false;
     show(S.els.pause, next === 'paused' && !S.guideOpen);
     if (next === 'paused') showSettings(false);
@@ -555,7 +555,7 @@
   function stepBarks(dt) {
     try {
       const p = S.player;
-      if (!VCS.Barks || !p || S.state !== 'playing' || !S.world || !S.people) return;
+      if (!VCS.Barks || !p || (S.state !== 'playing' && S.state !== 'feeding') || !S.world || !S.people) return; // feeding too: the grabbed victim's struggle cries
       if (!S.barks) S.barks = { st: VCS.Barks.create(S.mapName ? S.mapName.length * 131 + 7 : 1), spk: [], sub: null, logAt: S.clock + 60, lastTotal: 0 };
       const B = S.barks;
       const on = S.config.villagerVoices !== false && !(S.listen && S.listen.active) && !S.mist;
