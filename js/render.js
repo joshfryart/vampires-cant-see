@@ -2061,9 +2061,89 @@
   /** Strip edges (z units, 0 feet .. 1 head top .. FIG_ZTOP hat) used to light a figure piecewise. */
   const STRIP_Z = [0, 0.25, 0.45, 0.65, 0.85, 1.05, FIG_ZTOP];
   const STRIP_A = new Float32Array(STRIP_Z.length - 1);
-  const PX = new Float32Array(24);
-  const PY = new Float32Array(24);
+  const PX = new Float32Array(28);
+  const PY = new Float32Array(28);
+  /** Depth per slot: positive = away from the camera (same sign as the persp term in put). */
+  const PZ = new Float32Array(28);
   const fig = { cx: 0, floorY: 0, hs: 0, vs: 0, sr: 0, cr: 0, sx: 1, sy: 1, age: -1, H: 1, fid: 0, A: 0, sway: 0, persp: 0, hz: 0 };
+  /** Scratch pose written by posePerson and read by drawLineFigure / drawPerson (one figure at a time, no allocation). */
+  const pose = { hipU: 0, shU: 0, headU: 0, hr: 0, hry: 0, bodyRx: 0, bodyRy: 0, tilt: 0, lean: 0, lod: 0, depth: 0, hs: 0, vs: 0, mode: 'path', moving: false, seated: false, flee: false, prop: 'none', hat: 'none', headKind: 'round', bodyKind: 'bean', stars: false, eyesX: false, handsOverHead: false, jump: 0, noseX: 0, faceVis: false, eyesVis: false, gJolt: 0, minX: 0, maxX: 0, hipS: 0, lh: 1, look: null, acc: undefined, pid: 0, tN: 0, anim: true, sweeping: false, dur: 0, alpha: 1, lw: 1, vol: false, sr: 0, cr: 1, vsy: 0, t: 0 };
+  /** Slot set handed to VCS.Figure ({X, Y, Z}); PPX is the same for callers that bring their own X and Y. */
+  const PP = { X: PX, Y: PY, Z: PZ };
+  const PPX = { X: null, Y: null, Z: null };
+  /** Per-figure option objects for VCS.Figure (reused, no allocation per frame). */
+  const RIM = { side: 1, k: 0 };
+  const FIGO = { fx: 0, lw: 1, alpha: 1, rim: RIM, depth: 0, reduced: false, front: false };
+  const EXO = { lw: 1, alpha: 1, sa: 1, style: '#ffffff' };
+  /** Vessel flush strength per node (temporal, carotid, radialL, radialR), written by drawVessels, read by drawVesselsSeen. */
+  const FLUSH = new Float32Array(4);
+  const FLO = { look: null, alpha: 1, sa: 1, reduced: false };
+  const FIG_BUDGET_MS = 2.5;
+  const FIG_VOL_DEPTH = 10;
+  const FIG_HIST = 30;
+  const FIG_HIST_OVER = 20;
+  const FIG_CAP_SECONDS = 10;
+  /** Chat gesture frequency (Hz): the side-0 hand rises and falls. Well under 3 Hz. */
+  const CHAT_HZ = 0.6;
+
+  /** Height offset of the chatting hand (lh units already applied); reduced motion holds a static 0.03. */
+  function chatLift(tN, pid, lh, anim) {
+    if (!anim) return 0.03 * lh;
+    return 0.06 * lh * (0.5 + 0.5 * Math.sin(tN * TWO_PI * CHAT_HZ + pid));
+  }
+
+  function nowMs() {
+    try {
+      if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') return performance.now();
+    } catch (e) { /* fall through */ }
+    return Date.now();
+  }
+
+  function figBudget() {
+    const F = VCS.Flags;
+    const v = F && F.tun ? F.tun('figure', 'budgetMs') : undefined;
+    return typeof v === 'number' && isFinite(v) && v > 0 ? v : FIG_BUDGET_MS;
+  }
+
+  /** Nearest world light within 3 radii of the echo: fills out {side, k} (k 0 = none). Steady, never flickers. */
+  function rimLight(r, e, player, out) {
+    out.k = 0;
+    out.side = 1;
+    const w = r.visWorld;
+    const L = w && w.lights;
+    if (!L || !L.length || !player) return out;
+    let bd = Infinity;
+    let bl = null;
+    for (let i = 0; i < L.length; i++) {
+      const l = L[i];
+      const rad = l && l.radius;
+      if (!(rad > 0)) continue;
+      const d = Math.sqrt((l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y));
+      if (d < 3 * rad && d < bd) { bd = d; bl = l; }
+    }
+    if (!bl) return out;
+    out.k = Math.max(0, Math.min(1, 1 - bd / (3 * bl.radius)));
+    const s = (bl.x - e.x) * -Math.sin(player.angle) + (bl.y - e.y) * Math.cos(player.angle);
+    out.side = s < 0 ? -1 : 1;
+    return out;
+  }
+
+  /** End of the echo pass: record whether the frame went over budget; 20 of the last 30 drops High to Low for 10 s. */
+  function figureFrameEnd(r, t) {
+    if (!(r.figVol + r.figLine > 0)) return;
+    if (!r.figHist) { r.figHist = new Uint8Array(FIG_HIST); r.figHi = 0; r.figOver = 0; }
+    const over = r.figVol > 0 && r.figMs > r.figBudget ? 1 : 0;
+    r.figOver += over - r.figHist[r.figHi];
+    r.figHist[r.figHi] = over;
+    r.figHi = (r.figHi + 1) % FIG_HIST;
+    if (r.figOver >= FIG_HIST_OVER && !r.fxCap && r.fxCfg >= 2) {
+      r.fxCap = 1;
+      r.fxCapUntil = t + FIG_CAP_SECONDS;
+      r.figHist.fill(0);
+      r.figOver = 0;
+      try { const lg = VCS.Log && VCS.Log.get('render'); if (lg) lg.info('effects capped to Low for ' + FIG_CAP_SECONDS + ' s (figures over budget)'); } catch (e) { /* ignore */ }
+    }
+  }
   const STRUGGLE_POSE = VCS.Struggle ? VCS.Struggle.create() : null;
 
   /** Lateral ripple -1..1 at normalised height zn (0 feet .. 1 head) while the band sweeps past; 0 elsewhere. */
@@ -2091,6 +2171,7 @@
     }
     PX[k] = fig.cx + px + J(r, fig.fid + k, 0) * fig.A;
     PY[k] = py + J(r, fig.fid + k, 1) * fig.A;
+    PZ[k] = ff * fig.cr - ss * fig.sr;
   }
 
   /** Rounded-square head outline (used for the 'square' head). */
@@ -2157,14 +2238,16 @@
   }
 
   /**
-   * Draw one villager echo e {x,y,angle,lookAngle,phase,phaseRate,look,mode,sit,wary,modeAge,zMin,zMax,personId}.
-   * b = strength 0..1, age = seconds since the wavefront reached them (-1 = already lit, e.g. the feed lock).
-   * Only the strips the band has swept over are drawn; each fades on its own afterglow. True when drawn.
+   * Pose one villager echo e {x,y,angle,lookAngle,phase,phaseRate,look,mode,sit,wary,modeAge,zMin,zMax,personId}.
+   * Fills PX/PY/PZ and the module-level `pose`. age = seconds since the wavefront reached them (-1 = already lit).
+   * `volWant` asks for the volumetric figure; it applies (pose.vol) only closer than FIG_VOL_DEPTH, and brings the vol-only
+   * pose tweaks (elder stoop, chat gesture, role item slots 24/25). False when the figure is off screen.
    */
-  function drawPerson(r, player, tanHalf, e, b, age, flashWhite, now, locked) {
+  function posePerson(r, player, tanHalf, e, age, locked, now, volWant) {
     const halfW = r.ow / 2;
     if (!project(player, e.x, e.y, halfW, tanHalf)) return false;
     const depth = proj.fwd;
+    const vol = !!volWant && depth < FIG_VOL_DEPTH;
     const vs = r.oh / depth;
     const hs = halfW / tanHalf / depth;
     const cx0 = proj.sx;
@@ -2375,6 +2458,38 @@
         }
       }
     }
+    // ---- Volumetric-only pose tweaks (never run at effects 0 or for line figures) ----
+    let exF = 0; let exS = 0; let exU = 0;
+    if (vol) {
+      const free = mode !== 'grapple' && mode !== 'fed' && mode !== 'cower';
+      const stoop = typeof look.stoop === 'number' && isFinite(look.stoop) ? Math.max(0, Math.min(0.4, look.stoop)) : 0;
+      if (stoop > 0 && free) {
+        lean += stoop * 0.1 * lh; headF += stoop * 0.06 * lh; shU -= stoop * 0.04 * lh; headU -= stoop * 0.05 * lh;
+      }
+      if (e.chat && !moving && free) {
+        const lift = chatLift(tN, pid, lh, anim);
+        handU[0] += lift; handF[0] += 0.05 * lh; elbU[0] += lift * 0.5;
+      }
+      const ex = typeof look.extra === 'string' ? look.extra : 'none';
+      if (ex === 'shovel' && moving) {
+        // Over the shoulder: the hand rises to the shoulder, the blade end sits up and behind it.
+        handF[0] = 0.03 * lh; handS[0] = shS * 1.25; handU[0] = shU - 0.04 * lh;
+        elbF[0] = 0; elbS[0] = shS * 1.7; elbU[0] = shU - 0.1 * lh;
+        exF = -0.1 * lh; exS = shS * 0.9; exU = shU + 0.3 * lh;
+      } else if (ex === 'shovel') {
+        // Planted beside foot 8, the hand resting on the shaft.
+        exF = footF[0] + 0.02 * lh; exS = footS[0] + 0.05 * bw; exU = footU[0];
+      } else if (ex === 'bundle' && mode === 'flee') {
+        // Clutched to the chest, midway between the neck and the torso centre.
+        exF = lean * 0.75 + 0.05 * lh; exS = 0; exU = ((shU + 0.02 * lh) + (shU + hipU) * 0.5) * 0.5;
+        handF[0] = exF; handS[0] = shS * 0.4; handU[0] = exU + 0.03 * lh;
+        elbF[0] = 0.02 * lh; elbS[0] = shS * 1.4; elbU[0] = (shU + exU) * 0.5;
+      } else if (ex === 'bundle') {
+        exF = handF[0] + 0.03 * lh; exS = handS[0] * 0.9; exU = handU[0] - 0.04 * lh;
+      } else {
+        exF = handF[0]; exS = handS[0]; exU = handU[0] + 0.05 * lh;
+      }
+    }
     fig.sy = sq;
     fig.sx = 1 / sq;
     for (let side = 0; side < 2; side++) {
@@ -2392,6 +2507,11 @@
     put(r, 0, lean + headF, headS, headU);
     put(r, 1, lean, 0, shU + 0.02 * lh);
     put(r, 23, lean + headF, headS, headU + 0.1 * lh);
+    if (vol) {
+      // Extra item: slot 24 grips (the side-0 hand), slot 25 is its tip.
+      put(r, 24, handF[0], handS[0], handU[0]);
+      put(r, 25, exF, exS, exU);
+    }
     const X = PX;
     const Y = PY;
     const hr0 = 0.088 * lh * Math.sqrt(bw) * hs;
@@ -2424,6 +2544,319 @@
     else if (prop === 'lantern') put(r, 20, handF[1] + (moving ? 0.04 * lagA : 0.01 * Math.sin(tN * 1.9 + pid)), handS[1] * 1.05, handU[1] - 0.09 * lh);
     else if (prop === 'basket') put(r, 20, handF[1], handS[1] * 1.1, handU[1] - 0.1 * lh);
     else put(r, 20, handF[1] + 0.01 * lh, handS[1] * 1.02, 0);
+    const lod = (function () { const figPx = 0.8 * lh * vs; return r.quality < 1 ? 0 : figPx > 70 ? 2 : figPx > 34 ? 1 : 0; })();
+    let minX = X[0];
+    let maxX = X[0];
+    const kMax = vol ? 26 : 24;
+    for (let k = 0; k < kMax; k++) { if (X[k] < minX) minX = X[k]; if (X[k] > maxX) maxX = X[k]; }
+    minX -= hr * 2.4 + 0.1 * hs;
+    maxX += hr * 2.4 + 0.1 * hs;
+    const P = pose;
+    P.hipU = hipU; P.shU = shU; P.headU = headU; P.hr = hr; P.hry = hry; P.bodyRx = bodyRx; P.bodyRy = bodyRy;
+    P.tilt = tilt; P.lean = lean; P.lod = lod; P.depth = depth; P.hs = hs; P.vs = vs; P.mode = mode;
+    P.moving = moving; P.seated = seated; P.flee = flee; P.prop = prop; P.hat = hat; P.headKind = headKind; P.bodyKind = bodyKind;
+    P.stars = stars; P.eyesX = eyesX; P.handsOverHead = handsOverHead; P.jump = jump; P.noseX = noseX;
+    P.faceVis = faceVis; P.eyesVis = eyesVis; P.gJolt = gJolt; P.minX = minX; P.maxX = maxX;
+    P.hipS = hipS; P.lh = lh; P.look = look; P.acc = acc; P.pid = pid; P.tN = tN; P.anim = anim; P.sweeping = sweeping; P.dur = dur;
+    P.vol = vol; P.sr = Math.sin(rel); P.cr = Math.cos(rel); P.vsy = vs * fig.sy; P.t = tN;
+    return true;
+  }
+
+  /** The classic line figure: today's drawAll, reading the module-level `pose` and PX/PY. */
+  function drawLineFigure(c, sa, style) {
+    const P = pose;
+    const X = PX;
+    const Y = PY;
+    const hipU = P.hipU; const shU = P.shU; const headU = P.headU; const hr = P.hr; const hry = P.hry;
+    const bodyRx = P.bodyRx; const bodyRy = P.bodyRy; const tilt = P.tilt; const lod = P.lod; const hs = P.hs; const vs = P.vs;
+    const mode = P.mode; const seated = P.seated; const flee = P.flee; const prop = P.prop; const hat = P.hat;
+    const headKind = P.headKind; const bodyKind = P.bodyKind; const stars = P.stars; const eyesX = P.eyesX;
+    const handsOverHead = P.handsOverHead; const jump = P.jump; const noseX = P.noseX; const faceVis = P.faceVis;
+    const eyesVis = P.eyesVis; const look = P.look; const acc = P.acc; const pid = P.pid; const tN = P.tN; const anim = P.anim;
+    const alpha = P.alpha; const lw = P.lw; const lh = P.lh;
+    const bw = typeof look.build === 'number' ? look.build : 1;
+    const moving = P.moving;
+    c.globalAlpha = Math.min(1, alpha * sa);
+    c.strokeStyle = style;
+    // Limbs: single thicker hose lines with round caps (no hinges).
+    c.lineWidth = lw * 1.7;
+    c.beginPath();
+    for (let side = 0; side < 2; side++) {
+      c.moveTo(X[4 + side], Y[4 + side]);
+      c.quadraticCurveTo(X[12 + side], Y[12 + side], X[8 + side], Y[8 + side]);
+      c.moveTo(X[2 + side], Y[2 + side]);
+      c.quadraticCurveTo(X[10 + side], Y[10 + side], X[6 + side], Y[6 + side]);
+    }
+    if (prop === 'cane' && mode !== 'fed') {
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(X[20], Y[20]);
+    }
+    c.stroke();
+    // Outlines: head, torso, shoes, gloves, face, hair, hat, coat, scarf, prop.
+    c.lineWidth = lw;
+    c.beginPath();
+    const hx = X[0];
+    const hy = Y[0];
+    if (headKind === 'square') squareHead(c, hx, hy, hr, hry, tilt * 0.6);
+    else { c.moveTo(hx + hr, hy); c.ellipse(hx, hy, hr, hry, tilt * 0.6, 0, TWO_PI); }
+    const bx = X[14];
+    const by = Y[14];
+    if (bodyKind === 'box') {
+      // Boxy coat: a slightly bulging quad.
+      c.moveTo(bx - bodyRx, by - bodyRy);
+      c.quadraticCurveTo(bx, by - bodyRy * 1.1, bx + bodyRx, by - bodyRy);
+      c.quadraticCurveTo(bx + bodyRx * 1.2, by, bx + bodyRx * 1.05, by + bodyRy);
+      c.quadraticCurveTo(bx, by + bodyRy * 1.1, bx - bodyRx * 1.05, by + bodyRy);
+      c.quadraticCurveTo(bx - bodyRx * 1.2, by, bx - bodyRx, by - bodyRy);
+    } else if (bodyKind === 'pear') {
+      c.moveTo(bx - bodyRx * 0.7, by - bodyRy);
+      c.quadraticCurveTo(bx, by - bodyRy * 1.15, bx + bodyRx * 0.7, by - bodyRy);
+      c.quadraticCurveTo(bx + bodyRx * 1.4, by + bodyRy * 0.3, bx + bodyRx * 1.1, by + bodyRy);
+      c.quadraticCurveTo(bx, by + bodyRy * 1.25, bx - bodyRx * 1.1, by + bodyRy);
+      c.quadraticCurveTo(bx - bodyRx * 1.4, by + bodyRy * 0.3, bx - bodyRx * 0.7, by - bodyRy);
+    } else {
+      c.moveTo(bx + bodyRx, by);
+      c.ellipse(bx, by, bodyRx, bodyRy, -tilt * 0.4, 0, TWO_PI);
+    }
+    if (bodyKind === 'stick' && lod >= 1) {
+      // A little paunch bump and a belt line.
+      c.moveTo(bx - bodyRx * 1.6, by + bodyRy * 0.3);
+      c.quadraticCurveTo(bx, by + bodyRy * 0.55, bx + bodyRx * 1.6, by + bodyRy * 0.3);
+    }
+    for (let side = 0; side < 2; side++) {
+      const shoeR = hs * (0.032 + 0.03 * Math.abs(fig.sr)) * fig.sx + 1;
+      const shoeY = Math.max(1.2, vs * 0.02 * fig.sy);
+      c.moveTo(X[8 + side] + shoeR, Y[8 + side]);
+      c.ellipse(X[8 + side] + fig.sr * hs * 0.03, Y[8 + side], shoeR, shoeY, 0, 0, TWO_PI);
+      if (lod >= 2) {
+        const hr2 = Math.max(1.3, hs * 0.02);
+        c.moveTo(X[6 + side] + hr2, Y[6 + side]);
+        c.arc(X[6 + side], Y[6 + side], hr2, 0, TWO_PI);
+      }
+    }
+    if (lod >= 1 && faceVis) {
+      const nz = (typeof look.nose === 'number' ? look.nose : 1);
+      c.moveTo(hx + noseX * hr * 0.55, hy + hry * 0.12);
+      c.lineTo(hx + noseX * hr * (0.75 + 0.25 * nz), hy + hry * (0.2 + 0.14 * nz));
+      if (look.beard && lod >= 2) {
+        c.moveTo(hx - hr * 0.55, hy + hry * 0.55);
+        c.lineTo(hx - hr * 0.3, hy + hry * 1.1);
+        c.lineTo(hx, hy + hry * 0.8);
+        c.lineTo(hx + hr * 0.3, hy + hry * 1.1);
+        c.lineTo(hx + hr * 0.55, hy + hry * 0.55);
+      }
+    }
+    if (lod >= 1 && eyesVis) {
+      for (let side = -1; side <= 1; side += 2) {
+        const ex = hx + side * hr * 0.4 + noseX * hr * 0.2;
+        if (eyesX) {
+          const q = Math.max(1.2, hr * 0.14);
+          c.moveTo(ex - q, hy - hry * 0.2); c.lineTo(ex + q, hy);
+          c.moveTo(ex + q, hy - hry * 0.2); c.lineTo(ex - q, hy);
+        } else {
+          c.moveTo(ex, hy - hry * 0.2);
+          c.lineTo(ex, hy - hry * 0.02);
+        }
+      }
+    }
+    // Hair (only when no hat hides it).
+    const hair = hat === 'none' || hat === 'cap' || hat === 'bonnet' ? look.hair : 'none';
+    if (lod >= 1 && hair && hair !== 'none') {
+      const ty = hy - hry;
+      if (hair === 'tuft') {
+        for (let k = -1; k <= 1; k++) {
+          c.moveTo(hx + k * hr * 0.3, ty + hry * 0.08);
+          c.lineTo(hx + k * hr * 0.45 + hr * 0.12, ty - hry * 0.28);
+        }
+      } else if (hair === 'bun') {
+        const bxr = hx - noseX * hr * 0.5;
+        const br2 = Math.max(1.5, hr * 0.32);
+        c.moveTo(bxr + br2, ty - hry * 0.05);
+        c.arc(bxr, ty - hry * 0.05, br2, 0, TWO_PI);
+      } else if (hair === 'spiky') {
+        c.moveTo(hx - hr * 0.85, ty + hry * 0.3);
+        for (let k = 0; k < 5; k++) {
+          const u0 = -0.85 + k * 0.42;
+          c.lineTo(hx + (u0 + 0.21) * hr, ty - hry * 0.3);
+          c.lineTo(hx + (u0 + 0.42) * hr, ty + hry * 0.25);
+        }
+      } else if (hair === 'curls') {
+        for (let k = -1; k <= 1; k++) {
+          const cxr = hx + k * hr * 0.55;
+          const rr = Math.max(1.3, hr * 0.26);
+          c.moveTo(cxr + rr, ty + hry * 0.05);
+          c.arc(cxr, ty + hry * 0.05, rr, 0, TWO_PI);
+        }
+      } else if (hair === 'bob') {
+        c.moveTo(hx - hr * 1.05, hy + hry * 0.5);
+        c.quadraticCurveTo(hx - hr * 1.15, ty - hry * 0.1, hx, ty - hry * 0.15);
+        c.quadraticCurveTo(hx + hr * 1.15, ty - hry * 0.1, hx + hr * 1.05, hy + hry * 0.5);
+      }
+    }
+    // Hats (a fed villager's hat lies on the floor beside them).
+    const fedHat = mode === 'fed' && hat !== 'hood';
+    const hhx = fedHat ? X[9] + hr * 2.6 : X[0];
+    const hhy = fedHat ? fig.floorY - hry * 0.35 : Y[0];
+    const hatTilt = fedHat ? 0.9 : tilt;
+    if (hat === 'tophat') {
+      const hy2 = hhy - hry * 0.78;
+      const bw2 = hr * 1.25;
+      const th = vs * 0.14 * lh * fig.sy;
+      const lean2 = hatTilt * th * 1.2 + (flee ? -hr * 0.6 : 0);
+      const lift = flee ? -th * 0.35 : jump > 0 ? -jump * vs * 0.8 : 0;
+      c.moveTo(hhx + bw2, hy2 + lift);
+      c.ellipse(hhx, hy2 + lift, bw2, Math.max(1.2, vs * 0.012), 0, 0, TWO_PI);
+      c.moveTo(hhx - hr * 0.78, hy2 + lift);
+      c.lineTo(hhx - hr * 0.7 + lean2, hy2 - th + lift);
+      c.lineTo(hhx + hr * 0.7 + lean2, hy2 - th + lift);
+      c.lineTo(hhx + hr * 0.78, hy2 + lift);
+      c.moveTo(hhx - hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
+      c.lineTo(hhx + hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
+    } else if (hat === 'nightcap') {
+      const hy2 = hhy - hry * 0.7;
+      c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
+      c.quadraticCurveTo(X[18], Y[18] - hry * 0.4, X[17], Y[17] - hry * 0.2);
+      c.quadraticCurveTo(hhx + hr * 0.3, hy2 - hry * 0.2, hhx + hr * 0.95, hy2 + hry * 0.2);
+      const pr = Math.max(1.5, hs * 0.022);
+      c.moveTo(X[17] + pr, Y[17] - hry * 0.2);
+      c.arc(X[17], Y[17] - hry * 0.2, pr, 0, TWO_PI);
+      c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
+      c.lineTo(hhx + hr * 0.95, hy2 + hry * 0.2);
+    } else if (hat === 'bonnet') {
+      c.moveTo(hhx - hr * 1.1, hhy + hry * 0.1);
+      c.ellipse(hhx, hhy, hr * 1.12, hry * 1.1, hatTilt * 0.6, Math.PI * 0.95, Math.PI * 2.1);
+      const ky = hhy + hry * 1.05;
+      c.moveTo(hhx - hr * 0.9, hhy + hry * 0.6);
+      c.quadraticCurveTo(hhx, ky + hry * 0.25, hhx + hr * 0.9, hhy + hry * 0.6);
+      c.moveTo(hhx, ky);
+      c.lineTo(hhx - hr * 0.5, ky + hry * 0.4);
+      c.moveTo(hhx, ky);
+      c.lineTo(hhx + hr * 0.5, ky + hry * 0.4);
+    } else if (hat === 'cap') {
+      // Flat cap: a low dome with a brim poking out the front.
+      const ty = hhy - hry * 0.55;
+      const lift = jump > 0 ? -jump * vs * 0.6 : 0;
+      c.moveTo(hhx - hr * 1.05, ty + lift);
+      c.quadraticCurveTo(hhx, ty - hry * 0.75 + lift, hhx + hr * 1.05, ty + lift);
+      c.moveTo(hhx - hr * 1.05, ty + lift);
+      c.lineTo(hhx + hr * 1.05, ty + lift);
+      const bdir = noseX >= 0 ? 1 : -1;
+      c.moveTo(hhx + bdir * hr * 0.9, ty + lift);
+      c.lineTo(hhx + bdir * hr * 1.45 + noseX * hr * 0.1, ty + hry * 0.12 + lift);
+    } else if (hat === 'hood') {
+      // Pointed hood running into the shoulders.
+      const ty = hhy - hry;
+      c.moveTo(X[2] - hr * 0.2, Y[2]);
+      c.quadraticCurveTo(hhx - hr * 1.35, hhy - hry * 0.2, hhx - hr * 0.2 + (moving ? -hr * 0.3 : 0), ty - hry * 0.45);
+      c.quadraticCurveTo(hhx + hr * 1.35, hhy - hry * 0.2, X[3] + hr * 0.2, Y[3]);
+    }
+    // Coat hem.
+    if (lod >= 1 && look.coat && mode !== 'fed') {
+      const cy0 = by + bodyRy * 0.35;
+      c.moveTo(bx + bodyRx * 0.98, cy0);
+      c.quadraticCurveTo(X[21] + bodyRx * 0.2, (cy0 + Y[21]) * 0.5, X[21] + bodyRx * 0.1, Y[21]);
+      c.quadraticCurveTo((X[21] + X[22]) * 0.5, Y[21] + vs * 0.02, X[22] - bodyRx * 0.1, Y[22]);
+      c.quadraticCurveTo(X[22] - bodyRx * 0.2, (cy0 + Y[22]) * 0.5, bx - bodyRx * 0.98, cy0);
+    }
+    // Seated: the edge of the bench or stool under them.
+    if (seated) {
+      const sw = hs * 0.26 * bw;
+      c.moveTo(X[14] - sw, Y[4] + vs * 0.01);
+      c.lineTo(X[14] + sw, Y[5] + vs * 0.01);
+    }
+    // Scarf.
+    if (acc === 'scarf') {
+      const nyy = Y[1] - bodyRy * 0.1;
+      c.moveTo(X[1] - bodyRx * 0.8, nyy);
+      c.quadraticCurveTo(X[1], nyy + hry * 0.5, X[1] + bodyRx * 0.8, nyy);
+      c.moveTo(X[1] + bodyRx * 0.55, nyy + hry * 0.15);
+      c.quadraticCurveTo(X[16], Y[16], X[15], Y[15]);
+    }
+    // Props carried in the right hand.
+    if (prop === 'cane' && mode !== 'fed') {
+      c.moveTo(X[20], Y[20]);
+      c.lineTo(X[19], Y[19] - vs * 0.03);
+      c.arc(X[19] - hs * 0.015, Y[19] - vs * 0.03, hs * 0.015 + 1, 0, Math.PI, true);
+    } else if (prop === 'lantern') {
+      const lx = X[20];
+      const ly = Y[20];
+      const lw2 = Math.max(1.5, hs * 0.03);
+      const lh2 = Math.max(2, vs * 0.05);
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(lx, ly - lh2 * 0.6);
+      c.moveTo(lx - lw2, ly - lh2 * 0.5);
+      c.lineTo(lx + lw2, ly - lh2 * 0.5);
+      c.lineTo(lx + lw2 * 0.8, ly + lh2 * 0.5);
+      c.lineTo(lx - lw2 * 0.8, ly + lh2 * 0.5);
+      c.closePath();
+    } else if (prop === 'basket') {
+      const kx = X[20];
+      const ky = Y[20];
+      const kw = Math.max(2, hs * 0.045);
+      const kh = Math.max(1.5, vs * 0.035);
+      c.moveTo(kx - kw * 0.8, ky - kh * 0.5);
+      c.quadraticCurveTo(kx, ky - kh * 2.2, kx + kw * 0.8, ky - kh * 0.5);
+      c.moveTo(kx - kw, ky - kh * 0.5);
+      c.lineTo(kx + kw, ky - kh * 0.5);
+      c.lineTo(kx + kw * 0.7, ky + kh * 0.5);
+      c.lineTo(kx - kw * 0.7, ky + kh * 0.5);
+      c.closePath();
+    } else if (prop === 'umbrella' && mode !== 'fed' && mode !== 'cower') {
+      const ux = X[20];
+      const uy = Y[20];
+      const uw = hr * 2.6;
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(ux, uy);
+      c.moveTo(ux - uw, uy + hry * 0.9);
+      c.quadraticCurveTo(ux, uy - hry * 1.2, ux + uw, uy + hry * 0.9);
+      for (let k = 0; k < 3; k++) {
+        const x0 = ux - uw + (k * 2 * uw) / 3;
+        const x1 = x0 + (2 * uw) / 3;
+        c.moveTo(x0, uy + hry * 0.9);
+        c.quadraticCurveTo((x0 + x1) * 0.5, uy + hry * 1.25, x1, uy + hry * 0.9);
+      }
+    }
+    // Hands over the head (cower): small fingers.
+    if (handsOverHead && lod >= 2) {
+      for (let side = 0; side < 2; side++) {
+        c.moveTo(X[6 + side], Y[6 + side]);
+        c.lineTo(X[6 + side] + (side ? -1 : 1) * hr * 0.3, Y[6 + side] - hry * 0.25);
+      }
+    }
+    c.stroke();
+    // Dazed: three little stars circling the head (0.4 Hz).
+    if (stars) {
+      c.beginPath();
+      const rr = Math.max(1.2, hr * 0.13);
+      for (let k = 0; k < 3; k++) {
+        const a = (anim ? tN * 2.5 : 0) + k * 2.094 + pid;
+        const sx = X[23] + Math.cos(a) * hr * 1.7;
+        const sy = Y[23] - hry * 0.25 + Math.sin(a) * hry * 0.35;
+        c.moveTo(sx - rr, sy); c.lineTo(sx + rr, sy);
+        c.moveTo(sx, sy - rr); c.lineTo(sx, sy + rr);
+      }
+      c.stroke();
+    }
+  }
+
+  /**
+   * Draw one villager echo e. b = strength 0..1, age = seconds since the wavefront reached them (-1 = already lit, e.g. the feed lock).
+   * Only the strips the band has swept over are drawn; each fades on its own afterglow. True when drawn.
+   */
+  function drawPerson(r, player, tanHalf, e, b, age, flashWhite, now, locked) {
+    // Volumetric figure: effects >= 1, quality >= 1, nearer than FIG_VOL_DEPTH (checked in posePerson), within the frame
+    // budget. The held victim is exempt from the budget cut.
+    const Figure = VCS.Figure;
+    const volWant = !!Figure && r.fx >= 1 && r.quality >= 1 && (locked || !(r.figMs > r.figBudget));
+    if (!posePerson(r, player, tanHalf, e, age, locked, now, volWant)) return false;
+    const P = pose;
+    const vol = P.vol;
+    const X = PX;
+    const Y = PY;
+    const depth = P.depth; const hs = P.hs; const vs = P.vs; const lh = P.lh; const pid = P.pid; const tN = P.tN;
+    const hipU = P.hipU; const shU = P.shU; const headU = P.headU; const hipS = P.hipS; const hr = P.hr; const bodyRx = P.bodyRx;
+    const minX = P.minX; const maxX = P.maxX; const gJolt = P.gJolt; const sweeping = P.sweeping; const dur = P.dur;
+    const Ripple = VCS.Ripple;
     // Gentler depth cue than walls so a far villager still reads.
     let alpha = Math.min(1, 1.15 * Math.pow(b, 0.65)) / (1 + 0.07 * depth) * 1.25;
     let lw = (depth < 1.5 ? 1.5 : 1) * r.wscale;
@@ -2444,279 +2877,9 @@
     ctx.strokeStyle = baseStyle;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    let minX = X[0];
-    let maxX = X[0];
-    for (let k = 0; k < 24; k++) { if (X[k] < minX) minX = X[k]; if (X[k] > maxX) maxX = X[k]; }
-    minX -= hr * 2.4 + 0.1 * hs;
-    maxX += hr * 2.4 + 0.1 * hs;
+    P.alpha = alpha;
+    P.lw = lw;
     if (maxX < -lw || minX > r.ow + lw) return false;
-    // Level of detail by on-screen size (figure px height ~ 0.8 * lh * vs).
-    const figPx = 0.8 * lh * vs;
-    const lod = r.quality < 1 ? 0 : figPx > 70 ? 2 : figPx > 34 ? 1 : 0;
-
-    const drawAll = function (c, sa, style) {
-      c.globalAlpha = Math.min(1, alpha * sa);
-      c.strokeStyle = style;
-      // Limbs: single thicker hose lines with round caps (no hinges).
-      c.lineWidth = lw * 1.7;
-      c.beginPath();
-      for (let side = 0; side < 2; side++) {
-        c.moveTo(X[4 + side], Y[4 + side]);
-        c.quadraticCurveTo(X[12 + side], Y[12 + side], X[8 + side], Y[8 + side]);
-        c.moveTo(X[2 + side], Y[2 + side]);
-        c.quadraticCurveTo(X[10 + side], Y[10 + side], X[6 + side], Y[6 + side]);
-      }
-      if (prop === 'cane' && mode !== 'fed') {
-        c.moveTo(X[19], Y[19]);
-        c.lineTo(X[20], Y[20]);
-      }
-      c.stroke();
-      // Outlines: head, torso, shoes, gloves, face, hair, hat, coat, scarf, prop.
-      c.lineWidth = lw;
-      c.beginPath();
-      const hx = X[0];
-      const hy = Y[0];
-      if (headKind === 'square') squareHead(c, hx, hy, hr, hry, tilt * 0.6);
-      else { c.moveTo(hx + hr, hy); c.ellipse(hx, hy, hr, hry, tilt * 0.6, 0, TWO_PI); }
-      const bx = X[14];
-      const by = Y[14];
-      if (bodyKind === 'box') {
-        // Boxy coat: a slightly bulging quad.
-        c.moveTo(bx - bodyRx, by - bodyRy);
-        c.quadraticCurveTo(bx, by - bodyRy * 1.1, bx + bodyRx, by - bodyRy);
-        c.quadraticCurveTo(bx + bodyRx * 1.2, by, bx + bodyRx * 1.05, by + bodyRy);
-        c.quadraticCurveTo(bx, by + bodyRy * 1.1, bx - bodyRx * 1.05, by + bodyRy);
-        c.quadraticCurveTo(bx - bodyRx * 1.2, by, bx - bodyRx, by - bodyRy);
-      } else if (bodyKind === 'pear') {
-        c.moveTo(bx - bodyRx * 0.7, by - bodyRy);
-        c.quadraticCurveTo(bx, by - bodyRy * 1.15, bx + bodyRx * 0.7, by - bodyRy);
-        c.quadraticCurveTo(bx + bodyRx * 1.4, by + bodyRy * 0.3, bx + bodyRx * 1.1, by + bodyRy);
-        c.quadraticCurveTo(bx, by + bodyRy * 1.25, bx - bodyRx * 1.1, by + bodyRy);
-        c.quadraticCurveTo(bx - bodyRx * 1.4, by + bodyRy * 0.3, bx - bodyRx * 0.7, by - bodyRy);
-      } else {
-        c.moveTo(bx + bodyRx, by);
-        c.ellipse(bx, by, bodyRx, bodyRy, -tilt * 0.4, 0, TWO_PI);
-      }
-      if (bodyKind === 'stick' && lod >= 1) {
-        // A little paunch bump and a belt line.
-        c.moveTo(bx - bodyRx * 1.6, by + bodyRy * 0.3);
-        c.quadraticCurveTo(bx, by + bodyRy * 0.55, bx + bodyRx * 1.6, by + bodyRy * 0.3);
-      }
-      for (let side = 0; side < 2; side++) {
-        const shoeR = hs * (0.032 + 0.03 * Math.abs(fig.sr)) * fig.sx + 1;
-        const shoeY = Math.max(1.2, vs * 0.02 * fig.sy);
-        c.moveTo(X[8 + side] + shoeR, Y[8 + side]);
-        c.ellipse(X[8 + side] + fig.sr * hs * 0.03, Y[8 + side], shoeR, shoeY, 0, 0, TWO_PI);
-        if (lod >= 2) {
-          const hr2 = Math.max(1.3, hs * 0.02);
-          c.moveTo(X[6 + side] + hr2, Y[6 + side]);
-          c.arc(X[6 + side], Y[6 + side], hr2, 0, TWO_PI);
-        }
-      }
-      if (lod >= 1 && faceVis) {
-        const nz = (typeof look.nose === 'number' ? look.nose : 1);
-        c.moveTo(hx + noseX * hr * 0.55, hy + hry * 0.12);
-        c.lineTo(hx + noseX * hr * (0.75 + 0.25 * nz), hy + hry * (0.2 + 0.14 * nz));
-        if (look.beard && lod >= 2) {
-          c.moveTo(hx - hr * 0.55, hy + hry * 0.55);
-          c.lineTo(hx - hr * 0.3, hy + hry * 1.1);
-          c.lineTo(hx, hy + hry * 0.8);
-          c.lineTo(hx + hr * 0.3, hy + hry * 1.1);
-          c.lineTo(hx + hr * 0.55, hy + hry * 0.55);
-        }
-      }
-      if (lod >= 1 && eyesVis) {
-        for (let side = -1; side <= 1; side += 2) {
-          const ex = hx + side * hr * 0.4 + noseX * hr * 0.2;
-          if (eyesX) {
-            const q = Math.max(1.2, hr * 0.14);
-            c.moveTo(ex - q, hy - hry * 0.2); c.lineTo(ex + q, hy);
-            c.moveTo(ex + q, hy - hry * 0.2); c.lineTo(ex - q, hy);
-          } else {
-            c.moveTo(ex, hy - hry * 0.2);
-            c.lineTo(ex, hy - hry * 0.02);
-          }
-        }
-      }
-      // Hair (only when no hat hides it).
-      const hair = hat === 'none' || hat === 'cap' || hat === 'bonnet' ? look.hair : 'none';
-      if (lod >= 1 && hair && hair !== 'none') {
-        const ty = hy - hry;
-        if (hair === 'tuft') {
-          for (let k = -1; k <= 1; k++) {
-            c.moveTo(hx + k * hr * 0.3, ty + hry * 0.08);
-            c.lineTo(hx + k * hr * 0.45 + hr * 0.12, ty - hry * 0.28);
-          }
-        } else if (hair === 'bun') {
-          const bxr = hx - noseX * hr * 0.5;
-          const br2 = Math.max(1.5, hr * 0.32);
-          c.moveTo(bxr + br2, ty - hry * 0.05);
-          c.arc(bxr, ty - hry * 0.05, br2, 0, TWO_PI);
-        } else if (hair === 'spiky') {
-          c.moveTo(hx - hr * 0.85, ty + hry * 0.3);
-          for (let k = 0; k < 5; k++) {
-            const u0 = -0.85 + k * 0.42;
-            c.lineTo(hx + (u0 + 0.21) * hr, ty - hry * 0.3);
-            c.lineTo(hx + (u0 + 0.42) * hr, ty + hry * 0.25);
-          }
-        } else if (hair === 'curls') {
-          for (let k = -1; k <= 1; k++) {
-            const cxr = hx + k * hr * 0.55;
-            const rr = Math.max(1.3, hr * 0.26);
-            c.moveTo(cxr + rr, ty + hry * 0.05);
-            c.arc(cxr, ty + hry * 0.05, rr, 0, TWO_PI);
-          }
-        } else if (hair === 'bob') {
-          c.moveTo(hx - hr * 1.05, hy + hry * 0.5);
-          c.quadraticCurveTo(hx - hr * 1.15, ty - hry * 0.1, hx, ty - hry * 0.15);
-          c.quadraticCurveTo(hx + hr * 1.15, ty - hry * 0.1, hx + hr * 1.05, hy + hry * 0.5);
-        }
-      }
-      // Hats (a fed villager's hat lies on the floor beside them).
-      const fedHat = mode === 'fed' && hat !== 'hood';
-      const hhx = fedHat ? X[9] + hr * 2.6 : X[0];
-      const hhy = fedHat ? fig.floorY - hry * 0.35 : Y[0];
-      const hatTilt = fedHat ? 0.9 : tilt;
-      if (hat === 'tophat') {
-        const hy2 = hhy - hry * 0.78;
-        const bw2 = hr * 1.25;
-        const th = vs * 0.14 * lh * fig.sy;
-        const lean2 = hatTilt * th * 1.2 + (flee ? -hr * 0.6 : 0);
-        const lift = flee ? -th * 0.35 : jump > 0 ? -jump * vs * 0.8 : 0;
-        c.moveTo(hhx + bw2, hy2 + lift);
-        c.ellipse(hhx, hy2 + lift, bw2, Math.max(1.2, vs * 0.012), 0, 0, TWO_PI);
-        c.moveTo(hhx - hr * 0.78, hy2 + lift);
-        c.lineTo(hhx - hr * 0.7 + lean2, hy2 - th + lift);
-        c.lineTo(hhx + hr * 0.7 + lean2, hy2 - th + lift);
-        c.lineTo(hhx + hr * 0.78, hy2 + lift);
-        c.moveTo(hhx - hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
-        c.lineTo(hhx + hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
-      } else if (hat === 'nightcap') {
-        const hy2 = hhy - hry * 0.7;
-        c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
-        c.quadraticCurveTo(X[18], Y[18] - hry * 0.4, X[17], Y[17] - hry * 0.2);
-        c.quadraticCurveTo(hhx + hr * 0.3, hy2 - hry * 0.2, hhx + hr * 0.95, hy2 + hry * 0.2);
-        const pr = Math.max(1.5, hs * 0.022);
-        c.moveTo(X[17] + pr, Y[17] - hry * 0.2);
-        c.arc(X[17], Y[17] - hry * 0.2, pr, 0, TWO_PI);
-        c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
-        c.lineTo(hhx + hr * 0.95, hy2 + hry * 0.2);
-      } else if (hat === 'bonnet') {
-        c.moveTo(hhx - hr * 1.1, hhy + hry * 0.1);
-        c.ellipse(hhx, hhy, hr * 1.12, hry * 1.1, hatTilt * 0.6, Math.PI * 0.95, Math.PI * 2.1);
-        const ky = hhy + hry * 1.05;
-        c.moveTo(hhx - hr * 0.9, hhy + hry * 0.6);
-        c.quadraticCurveTo(hhx, ky + hry * 0.25, hhx + hr * 0.9, hhy + hry * 0.6);
-        c.moveTo(hhx, ky);
-        c.lineTo(hhx - hr * 0.5, ky + hry * 0.4);
-        c.moveTo(hhx, ky);
-        c.lineTo(hhx + hr * 0.5, ky + hry * 0.4);
-      } else if (hat === 'cap') {
-        // Flat cap: a low dome with a brim poking out the front.
-        const ty = hhy - hry * 0.55;
-        const lift = jump > 0 ? -jump * vs * 0.6 : 0;
-        c.moveTo(hhx - hr * 1.05, ty + lift);
-        c.quadraticCurveTo(hhx, ty - hry * 0.75 + lift, hhx + hr * 1.05, ty + lift);
-        c.moveTo(hhx - hr * 1.05, ty + lift);
-        c.lineTo(hhx + hr * 1.05, ty + lift);
-        const bdir = noseX >= 0 ? 1 : -1;
-        c.moveTo(hhx + bdir * hr * 0.9, ty + lift);
-        c.lineTo(hhx + bdir * hr * 1.45 + noseX * hr * 0.1, ty + hry * 0.12 + lift);
-      } else if (hat === 'hood') {
-        // Pointed hood running into the shoulders.
-        const ty = hhy - hry;
-        c.moveTo(X[2] - hr * 0.2, Y[2]);
-        c.quadraticCurveTo(hhx - hr * 1.35, hhy - hry * 0.2, hhx - hr * 0.2 + (moving ? -hr * 0.3 : 0), ty - hry * 0.45);
-        c.quadraticCurveTo(hhx + hr * 1.35, hhy - hry * 0.2, X[3] + hr * 0.2, Y[3]);
-      }
-      // Coat hem.
-      if (lod >= 1 && look.coat && mode !== 'fed') {
-        const cy0 = by + bodyRy * 0.35;
-        c.moveTo(bx + bodyRx * 0.98, cy0);
-        c.quadraticCurveTo(X[21] + bodyRx * 0.2, (cy0 + Y[21]) * 0.5, X[21] + bodyRx * 0.1, Y[21]);
-        c.quadraticCurveTo((X[21] + X[22]) * 0.5, Y[21] + vs * 0.02, X[22] - bodyRx * 0.1, Y[22]);
-        c.quadraticCurveTo(X[22] - bodyRx * 0.2, (cy0 + Y[22]) * 0.5, bx - bodyRx * 0.98, cy0);
-      }
-      // Seated: the edge of the bench or stool under them.
-      if (seated) {
-        const sw = hs * 0.26 * bw;
-        c.moveTo(X[14] - sw, Y[4] + vs * 0.01);
-        c.lineTo(X[14] + sw, Y[5] + vs * 0.01);
-      }
-      // Scarf.
-      if (acc === 'scarf') {
-        const nyy = Y[1] - bodyRy * 0.1;
-        c.moveTo(X[1] - bodyRx * 0.8, nyy);
-        c.quadraticCurveTo(X[1], nyy + hry * 0.5, X[1] + bodyRx * 0.8, nyy);
-        c.moveTo(X[1] + bodyRx * 0.55, nyy + hry * 0.15);
-        c.quadraticCurveTo(X[16], Y[16], X[15], Y[15]);
-      }
-      // Props carried in the right hand.
-      if (prop === 'cane' && mode !== 'fed') {
-        c.moveTo(X[20], Y[20]);
-        c.lineTo(X[19], Y[19] - vs * 0.03);
-        c.arc(X[19] - hs * 0.015, Y[19] - vs * 0.03, hs * 0.015 + 1, 0, Math.PI, true);
-      } else if (prop === 'lantern') {
-        const lx = X[20];
-        const ly = Y[20];
-        const lw2 = Math.max(1.5, hs * 0.03);
-        const lh2 = Math.max(2, vs * 0.05);
-        c.moveTo(X[19], Y[19]);
-        c.lineTo(lx, ly - lh2 * 0.6);
-        c.moveTo(lx - lw2, ly - lh2 * 0.5);
-        c.lineTo(lx + lw2, ly - lh2 * 0.5);
-        c.lineTo(lx + lw2 * 0.8, ly + lh2 * 0.5);
-        c.lineTo(lx - lw2 * 0.8, ly + lh2 * 0.5);
-        c.closePath();
-      } else if (prop === 'basket') {
-        const kx = X[20];
-        const ky = Y[20];
-        const kw = Math.max(2, hs * 0.045);
-        const kh = Math.max(1.5, vs * 0.035);
-        c.moveTo(kx - kw * 0.8, ky - kh * 0.5);
-        c.quadraticCurveTo(kx, ky - kh * 2.2, kx + kw * 0.8, ky - kh * 0.5);
-        c.moveTo(kx - kw, ky - kh * 0.5);
-        c.lineTo(kx + kw, ky - kh * 0.5);
-        c.lineTo(kx + kw * 0.7, ky + kh * 0.5);
-        c.lineTo(kx - kw * 0.7, ky + kh * 0.5);
-        c.closePath();
-      } else if (prop === 'umbrella' && mode !== 'fed' && mode !== 'cower') {
-        const ux = X[20];
-        const uy = Y[20];
-        const uw = hr * 2.6;
-        c.moveTo(X[19], Y[19]);
-        c.lineTo(ux, uy);
-        c.moveTo(ux - uw, uy + hry * 0.9);
-        c.quadraticCurveTo(ux, uy - hry * 1.2, ux + uw, uy + hry * 0.9);
-        for (let k = 0; k < 3; k++) {
-          const x0 = ux - uw + (k * 2 * uw) / 3;
-          const x1 = x0 + (2 * uw) / 3;
-          c.moveTo(x0, uy + hry * 0.9);
-          c.quadraticCurveTo((x0 + x1) * 0.5, uy + hry * 1.25, x1, uy + hry * 0.9);
-        }
-      }
-      // Hands over the head (cower): small fingers.
-      if (handsOverHead && lod >= 2) {
-        for (let side = 0; side < 2; side++) {
-          c.moveTo(X[6 + side], Y[6 + side]);
-          c.lineTo(X[6 + side] + (side ? -1 : 1) * hr * 0.3, Y[6 + side] - hry * 0.25);
-        }
-      }
-      c.stroke();
-      // Dazed: three little stars circling the head (0.4 Hz).
-      if (stars) {
-        c.beginPath();
-        const rr = Math.max(1.2, hr * 0.13);
-        for (let k = 0; k < 3; k++) {
-          const a = (anim ? tN * 2.5 : 0) + k * 2.094 + pid;
-          const sx = X[23] + Math.cos(a) * hr * 1.7;
-          const sy = Y[23] - hry * 0.25 + Math.sin(a) * hry * 0.35;
-          c.moveTo(sx - rr, sy); c.lineTo(sx + rr, sy);
-          c.moveTo(sx, sy - rr); c.lineTo(sx, sy + rr);
-        }
-        c.stroke();
-      }
-    };
 
     // Lit height band [zMin, zMax] from the pulse, and the sweeping band front.
     let zMin = typeof e.zMin === 'number' ? e.zMin : 0;
@@ -2753,8 +2916,41 @@
     }
     const uniform = hi - lo < 0.03 && frontStrip < 0;
     const uToY = function (z) { return fig.floorY - z * FIG_H * lh * fig.sy * vs; };
+    let drawFig = drawLineFigure;
+    let volT0 = 0;
+    if (vol) {
+      const look = P.look;
+      FIGO.fx = r.fx; FIGO.lw = lw; FIGO.alpha = alpha; FIGO.depth = depth; FIGO.reduced = !!r.reduced;
+      rimLight(r, e, player, RIM);
+      EXO.lw = lw; EXO.alpha = alpha;
+      drawFig = function (c, sa, style) {
+        Figure.draw(c, sa, style, PP, P, look, FIGO);
+        EXO.sa = sa; EXO.style = style;
+        Figure.drawExtras(c, PP, P, look, EXO);
+      };
+      volT0 = nowMs();
+      r.figVol++;
+    } else {
+      r.figLine++;
+    }
+    // Capsule radius (px) of the figure at height u, for the band-front rings in volumetric mode.
+    const volRingRx = function (u) {
+      const lk = P.look;
+      const sho = typeof lk.shoulder === 'number' ? Math.max(0.8, Math.min(1.25, lk.shoulder)) : 1;
+      const bwv = typeof lk.build === 'number' ? lk.build : 1;
+      const asr = Math.abs(P.sr);
+      const hw = Math.abs(X[4] - X[5]) * 0.5;
+      if (u < hipU) return (hw + 0.045 * bwv * lh * hs) * 1.05;
+      if (u < shU) {
+        const sw = Math.abs(X[2] - X[3]) * 0.5 * sho + 0.05 * hs * asr;
+        const hw2 = hw * 1.1 + 0.035 * hs * asr;
+        return (hw2 + (sw - hw2) * ((u - hipU) / Math.max(1e-6, shU - hipU))) * 1.05;
+      }
+      if (u < headU - 0.06 * lh) return 0.022 * lh * hs * 1.3;
+      return hr * 0.95;
+    };
     const wrapped = function (c) {
-      if (uniform) { drawAll(c, hi, baseStyle); return; }
+      if (uniform) { drawFig(c, hi, baseStyle); return; }
       for (let s = 0; s < nStrips; s++) {
         const sa = STRIP_A[s];
         if (sa < 0.02) continue;
@@ -2766,7 +2962,7 @@
         const yBot = za <= 1e-3 ? fig.floorY + 30 * r.wscale : uToY(za);
         c.rect(minX, yTop, maxX - minX, yBot - yTop);
         c.clip();
-        drawAll(c, sa, s === frontStrip && !locked ? '#ffffff' : baseStyle);
+        drawFig(c, sa, s === frontStrip && !locked ? '#ffffff' : baseStyle);
         c.restore();
       }
       // The band front: thin rings wrapping the body where the wave is right now.
@@ -2778,8 +2974,13 @@
           const zn = f - m * 0.15;
           if (zn < 0 || zn > 1.05) continue;
           const u = zn * fig.H;
-          const rad = u < hipU ? hipS * 1.3 : u < shU ? bodyRx / hs / fig.sx : u < headU - 0.06 * lh ? 0.04 : hr / hs * 0.9;
-          const rx = rad * hs * 1.15;
+          let rx;
+          if (vol) {
+            rx = volRingRx(u);
+          } else {
+            const rad = u < hipU ? hipS * 1.3 : u < shU ? bodyRx / hs / fig.sx : u < headU - 0.06 * lh ? 0.04 : hr / hs * 0.9;
+            rx = rad * hs * 1.15;
+          }
           const g = (1 - age / SWEEP) * (1 - m * 0.3);
           c.globalAlpha = Math.min(1, alpha * g * 1.4);
           c.beginPath();
@@ -2789,6 +2990,7 @@
       }
     };
     clippedDraw(r, minX - lw, maxX + lw, depth, wrapped);
+    if (vol) r.figMs += nowMs() - volT0;
     // Circulatory overlay: after the outline, not limited to the chest strip (the outline stays chest-only).
     if (e.kind === 'vheart' && !locked && vesselsOn()) drawVesselsSeen(r, e, X, Y, age, minX - lw, maxX + lw, depth, player);
     // Held victim: the vessels beat with the drink pulse (the echo is rebuilt each beat, so its age is the beat age).
@@ -2796,7 +2998,10 @@
       const ve = Object.assign({}, e.vessel, { kind: 'vheart', x: e.x, y: e.y, strength: 1 });
       drawVesselsSeen(r, ve, X, Y, Math.max(0, now - e.t), minX - lw, maxX + lw, depth, player);
     }
-    if (locked) drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
+    if (locked) {
+      if (r.fx >= 1 && Figure) Figure.drawGrabArmsVol(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
+      else drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
+    }
     ctx.globalAlpha = 1;
     return true;
   }
@@ -2902,10 +3107,20 @@
    */
   function drawVesselsSeen(r, e, X, Y, age, x0, x1, depth, player) {
     let n = 0;
-    clippedDraw(r, x0, x1, depth, function () { n += drawVessels(r, e, X, Y, age); });
+    clippedDraw(r, x0, x1, depth, function () { const k = drawVessels(r, e, X, Y, age); n += k; if (k > 0) paintFlush(r, e, X, Y, 1); });
     const m = vesselWindowMute(r, e, player);
-    if (m > 0.01) windowDraw(r, x0, x1, depth, function () { n += drawVessels(r, e, X, Y, age, m); });
+    if (m > 0.01) windowDraw(r, x0, x1, depth, function () { const k = drawVessels(r, e, X, Y, age, m); n += k; if (k > 0) paintFlush(r, e, X, Y, 1); });
     return n;
+  }
+
+  /** Coral skin flush from the FLUSH values of the drawVessels call just made. Effects High only; never for the vampire. */
+  function paintFlush(r, e, X, Y, sa) {
+    if (r.fx !== 2 || !VCS.Figure || !VCS.Figure.drawFlush) return;
+    if (!(FLUSH[0] > 0 || FLUSH[1] > 0 || FLUSH[2] > 0 || FLUSH[3] > 0)) return;
+    let P = PP;
+    if (X !== PX || Y !== PY) { PPX.X = X; PPX.Y = Y; P = PPX; }
+    FLO.look = e.look || pose.look; FLO.alpha = 1; FLO.sa = sa; FLO.reduced = !!r.reduced;
+    VCS.Figure.drawFlush(r.octx, P, pose, FLUSH, FLO);
   }
 
   /** Per-node screen points and alphas for one drawVessels call (reused, no per-frame allocation). */
@@ -2971,6 +3186,7 @@
   function drawVessels(r, e, X, Y, age, mute) {
     const V = VCS.Vessels;
     const D = VCS.VesselData;
+    FLUSH[0] = 0; FLUSH[1] = 0; FLUSH[2] = 0; FLUSH[3] = 0;
     if (!V || !D || !e || e.kind !== 'vheart' || !vesselsOn()) return 0;
     const q = typeof r.quality === 'number' ? r.quality : 2;
     if (q < 1 || q < vesselTun('minQuality')) return 0;
@@ -3017,6 +3233,12 @@
         // Per-frame stats (Render.stats().vessels): brightest heart and foot this frame, for the smoke check.
         const ha = VESSEL_NA[0] * VESSEL_NE[0];
         if (ha > (r.vesselHeart || 0)) r.vesselHeart = ha;
+        // Skin flush reuses these node alphas (pulse x stateK x periph x strength x mute); drawVesselsSeen paints it at fx 2.
+        for (let i = 0; i < nodes.length; i++) {
+          const id = nodes[i].id;
+          const fi = id === 'temporal' ? 0 : id === 'carotid' ? 1 : id === 'radialL' ? 2 : id === 'radialR' ? 3 : -1;
+          if (fi >= 0) { const fv = VESSEL_NA[i] * VESSEL_NE[i]; FLUSH[fi] = fv > cap ? cap : fv; }
+        }
         for (let i = nodes.length - 2; i < nodes.length; i++) {
           const fa = VESSEL_NA[i] * VESSEL_NE[i];
           if (fa > (r.vesselFeet || 0)) r.vesselFeet = fa;
@@ -3804,6 +4026,19 @@
     r.vesselNodes = 0;
     r.vesselHeart = 0;
     r.vesselFeet = 0;
+    // Effects level (0 Off, 1 Low, 2 High) read once per frame; a missing or bad value means 0. The adaptive cap holds
+    // High at Low for FIG_CAP_SECONDS after sustained over-budget frames, then retries.
+    const efc = cfg.effects;
+    r.fxCfg = typeof efc === 'number' && isFinite(efc) ? Math.round(Math.max(0, Math.min(2, efc))) : 0;
+    if (r.fxCap && !(t < r.fxCapUntil && r.fxCapUntil - t <= FIG_CAP_SECONDS)) {
+      r.fxCap = 0;
+      try { const lg = VCS.Log && VCS.Log.get('render'); if (lg) lg.info('effects cap lifted, retrying High'); } catch (e) { /* ignore */ }
+    }
+    r.fx = r.fxCap && r.fxCfg > r.fxCap ? r.fxCap : r.fxCfg;
+    r.figMs = 0;
+    r.figVol = 0;
+    r.figLine = 0;
+    r.figBudget = figBudget();
     const hits = VCS.Raycast.cast(world, player.x, player.y, player.angle, fov, r.cols, MAX_DIST);
 
     const octx = r.octx;
@@ -3850,7 +4085,7 @@
       }
     }
     if (anyPulse) { try { drawn += drawProps(r, world, player, sonar, t, tanHalf); } catch (e) { logOnce(r, 'props', e); } }
-    if (anyPulse) echoes = drawEchoes(r, people, sonar, t, player, tanHalf);
+    if (anyPulse) { echoes = drawEchoes(r, people, sonar, t, player, tanHalf); figureFrameEnd(r, t); }
     if (opts && opts.debug) { try { drawLightRadiiDebug(r, world, sonar, t, player, tanHalf, true); } catch (e) { logOnce(r, 'lightdbg', e); } }
     r.echoesDrawn = echoes;
     r.sprites = drawn + echoes;
@@ -4099,9 +4334,13 @@
   function stats(r) {
     return {
       litColumns: r.litColumns, sprites: r.sprites, quality: r.quality, echoes: r.echoesDrawn || 0, rings: r.ringsDrawn || 0,
-      vessels: { nodes: r.vesselNodes || 0, heart: r.vesselHeart || 0, feet: r.vesselFeet || 0 }
+      vessels: { nodes: r.vesselNodes || 0, heart: r.vesselHeart || 0, feet: r.vesselFeet || 0 },
+      figure: { vol: r.figVol || 0, line: r.figLine || 0, ms: r.figMs || 0, cap: r.fxCap || 0 }
     };
   }
+
+  /** Test hook: the pose slots and scratch pose of the last figure posed (live arrays, read only). */
+  function poseDebug() { return { X: PX, Y: PY, Z: PZ, pose: pose }; }
 
   const Render = {
     create: create,
@@ -4114,6 +4353,10 @@
     setGrain: setGrain,
     setVignette: setVignette,
     stats: stats,
+    poseDebug: poseDebug,
+    chatLift: chatLift,
+    flushValues: FLUSH,
+    CHAT_HZ: CHAT_HZ,
     AFTERGLOW_K: AFTERGLOW_K,
     SWEEP: SWEEP,
     glowDur: glowDur,

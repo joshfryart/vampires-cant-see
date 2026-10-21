@@ -922,5 +922,287 @@ describe('render-vessels (circulatory P3)', () => {
   });
 });
 
+describe('render-figure (volumetric integration, B4)', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  require('../js/log.js');
+  for (const m of ['ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps', 'data/sounds', 'flags', 'data/vessels', 'data/archetypes', 'forge', 'figure']) require('../js/' + m + '.js');
+  const Render = require('../js/render.js');
+  const VCS = globalThis.VCS;
+  const Flags = VCS.Flags;
+  Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+  VCS.Log.setConsole(false);
+
+  // fakeCtx records fillStyle (fill) next to the stroke style, so occlusion fills (black) can be told from flush fills.
+  function fakeCtx(canvas) {
+    const calls = [];
+    const state = { globalAlpha: 1, fillStyle: '#000', strokeStyle: '#000', lineWidth: 1 };
+    return new Proxy({ calls, canvas }, {
+      get(t, p) {
+        if (p in t) return t[p];
+        if (p in state) return state[p];
+        return function () {
+          calls.push({ fn: String(p), args: Array.prototype.slice.call(arguments), stroke: state.strokeStyle, fill: state.fillStyle, alpha: state.globalAlpha, lw: state.lineWidth });
+          if (p === 'createRadialGradient' || p === 'createLinearGradient') return { addColorStop() {} };
+          if (p === 'createPattern') return {};
+          if (p === 'createImageData') return { data: new Uint8ClampedArray(128 * 128 * 4) };
+          return undefined;
+        };
+      },
+      set(t, p, v) { state[p] = v; return true; }
+    });
+  }
+  function fakeCanvas(w, h) {
+    const c = { width: w, height: h, ownerDocument: null };
+    c.ownerDocument = { createElement() { return fakeCanvas(w, h); } };
+    c._ctx = null;
+    c.getContext = function () { return c._ctx || (c._ctx = fakeCtx(c)); };
+    return c;
+  }
+  function setup(fx) {
+    const r = Render.create(fakeCanvas(640, 360), { effects: fx });
+    r.reduced = false;
+    const world = VCS.World.load(VCS.MapData.maps[VCS.MapData.startMap]);
+    return { r, world, sonar: VCS.Sonar.create() };
+  }
+  const player = { x: 5.5, y: 5.5, angle: 0 };
+  function echo(id, t, look, o) {
+    return Object.assign({ x: 7.5, y: 5.5, angle: Math.PI, lookAngle: 0, phase: 0, personId: id, t: t, strength: 1, zMin: 0, zMax: 2, look: look, fade: 3 }, o || {});
+  }
+  function lookOf(arch, seed) {
+    const g = VCS.Forge.generate({ archetype: arch, seed: seed }, { stateSeed: 99, index: seed, accOffset: 3 });
+    assert.ok(g.person && g.person.look, 'forge look for ' + arch);
+    return g.person.look;
+  }
+  const strokesOf = (r) => r.octx.calls.filter((c) => c.fn === 'stroke').length;
+
+  test('effects 0 stays hash-identical to the v0.14 line figure fixture', () => {
+    const root = path.resolve(__dirname, '..');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vcs-b4-'));
+    const out = path.join(dir, 'fig.json');
+    try {
+      execFileSync(process.execPath, [path.join(root, 'tools', 'figure-golden.mjs'), out], { cwd: root, stdio: 'pipe' });
+      const want = JSON.parse(fs.readFileSync(path.join(root, 'tests', 'fixtures', 'figure-line-v0140.json'), 'utf8'));
+      const got = JSON.parse(fs.readFileSync(out, 'utf8'));
+      assert.strictEqual(got.count, want.count);
+      for (let i = 0; i < want.entries.length; i++) assert.deepStrictEqual(got.entries[i], want.entries[i], want.entries[i].key);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('every archetype x seed x mode x effects x quality x reduced draws, plus the locked victim', () => {
+    const ids = VCS.Forge.list();
+    assert.ok(ids.length >= 13, 'archetypes: ' + ids.length);
+    const modes = [
+      ['moving', { mode: 'path', phase: 0.5, phaseRate: 6 }], ['idle', { mode: 'path' }], ['sit', { mode: 'path', sit: true }],
+      ['chat', { mode: 'path', chat: true }], ['startle', { mode: 'startle', modeAge: 0.1 }], ['flee', { mode: 'flee', phase: 0.5, phaseRate: 6 }],
+      ['cower', { mode: 'cower' }], ['dazed', { mode: 'dazed' }], ['grapple', { mode: 'grapple' }], ['fed', { mode: 'fed' }]
+    ];
+    const fs0 = [setup(0), setup(1), setup(2)];
+    let draws = 0;
+    for (let fx = 0; fx <= 2; fx++) {
+      const f = fs0[fx];
+      for (const reduced of [false, true]) {
+        for (const q of [0, 1, 3]) {
+          f.r.reduced = reduced;
+          f.r.quality = q;
+          for (const id of ids) {
+            for (const seed of [1, 2, 3]) {
+              const look = lookOf(id, seed);
+              for (const m of modes) {
+                const people = { echoes: [echo(seed, 60, look, m[1])] };
+                f.r.octx.calls.length = 0;
+                assert.doesNotThrow(() => Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.15, { people }), id + ' ' + m[0]);
+                // An unlocked 'grapple' echo is unlit in v0.14 too (the held pose is only drawn through feedLock, below).
+                if (m[0] !== 'grapple') assert.ok(strokesOf(f.r) > 0, 'strokes: fx' + fx + ' q' + q + ' ' + id + ' ' + m[0]);
+                draws++;
+              }
+            }
+            // The held victim, with the vampire's grab arms.
+            const people = { echoes: [echo(7, 100, lookOf(id, 1))] };
+            f.r.octx.calls.length = 0;
+            assert.doesNotThrow(() => Render.drawFirstPerson(f.r, f.world, player, f.sonar, 100, { people, feedLock: { id: 7, k: 0.5, age: 1, rs: 0.5 } }), 'lock ' + id);
+            assert.ok(strokesOf(f.r) > 0, 'lock strokes ' + id);
+          }
+        }
+      }
+    }
+    assert.ok(draws > 5000);
+    for (const f of fs0) assert.ok(!f.r.logged || Object.keys(f.r.logged).length === 0, 'nothing logged: ' + JSON.stringify(f.r.logged));
+  });
+
+  test('Low (fx 1) emits no black occlusion fills; High (fx 2) does; effects 0 and bad values never go volumetric', () => {
+    const look = lookOf('guard', 2);
+    function blackFills(fx) {
+      const f = setup(fx);
+      f.r.quality = 3;
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.4, { people: { echoes: [echo(1, 60, look)] } });
+      return { n: f.r.octx.calls.filter((c) => c.fn === 'fill' && String(c.fill).toLowerCase() === '#000000').length, st: Render.stats(f.r).figure };
+    }
+    assert.strictEqual(blackFills(1).n, 0);
+    assert.ok(blackFills(2).n > 0);
+    assert.strictEqual(blackFills(0).n, 0);
+    assert.strictEqual(blackFills(0).st.vol, 0);
+    assert.strictEqual(blackFills(1).st.vol, 1);
+    for (const bad of [undefined, NaN, '2', null]) {
+      const f = setup(bad);
+      f.r.quality = 3;
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.4, { people: { echoes: [echo(1, 60, look)] } });
+      assert.strictEqual(Render.stats(f.r).figure.vol, 0, 'bad effects ' + String(bad));
+    }
+    const f = setup(2);
+    f.r.quality = 0;
+    Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.4, { people: { echoes: [echo(1, 60, look)] } });
+    assert.strictEqual(Render.stats(f.r).figure.vol, 0, 'quality 0 is lines');
+  });
+
+  test('budget guard: over-budget figures fall back to lines; 20 over-frames cap High to Low for 10 s', () => {
+    const real = Object.getOwnPropertyDescriptor(globalThis.performance, 'now');
+    let clock = 0;
+    Object.defineProperty(globalThis.performance, 'now', { configurable: true, writable: true, value: () => { clock += 5; return clock; } });
+    try {
+      const f = setup(2);
+      f.r.quality = 3;
+      const look = lookOf('patron', 4);
+      const people = { echoes: [echo(1, 60, look, { x: 7.5, y: 5.2 }), echo(2, 60, look, { x: 7.5, y: 5.5 }), echo(3, 60, look, { x: 7.5, y: 5.8 })] };
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.15, { people });
+      const st = Render.stats(f.r).figure;
+      assert.strictEqual(st.vol, 1);
+      assert.ok(st.line >= 2, 'rest drawn as lines: ' + JSON.stringify(st));
+      assert.ok(st.ms > 2.5);
+      assert.strictEqual(st.cap, 0);
+      for (let i = 1; i < 20; i++) Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.15 + i * 0.005, { people });
+      assert.strictEqual(Render.stats(f.r).figure.cap, 1, 'capped after 20 over-frames');
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.3, { people });
+      assert.strictEqual(f.r.fx, 1, 'High runs as Low while capped');
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 80, { people });
+      assert.strictEqual(Render.stats(f.r).figure.cap, 0, 'cap lifts after 10 s');
+      assert.strictEqual(f.r.fx, 2);
+    } finally {
+      if (real) Object.defineProperty(globalThis.performance, 'now', real); else delete globalThis.performance.now;
+    }
+  });
+
+  test('PZ: head forward of a fleeing echo facing the camera is nearer than the torso centre; vol tweaks stay out of fx 0', () => {
+    const look = lookOf('elder', 1);
+    assert.ok(look.stoop > 0, 'elder stoops');
+    function pose(fx, o) {
+      const f = setup(fx);
+      f.r.quality = 3;
+      Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60.4, { people: { echoes: [echo(1, 60, look, o)] } });
+      const d = Render.poseDebug();
+      return { Y0: d.Y[0], Y6: d.Y[6], Z0: d.Z[0], Z14: d.Z[14], X24: d.X[24], Y24: d.Y[24] };
+    }
+    const flee = { mode: 'flee', phase: 0.5, phaseRate: 6 };
+    for (const fx of [0, 2]) {
+      const p = pose(fx, flee);
+      assert.ok(p.Z0 < p.Z14, 'fx ' + fx + ' head nearer: ' + p.Z0 + ' vs ' + p.Z14);
+    }
+    const a = pose(0, { mode: 'path' });
+    const b = pose(1, { mode: 'path' });
+    assert.ok(b.Y0 > a.Y0 + 0.01, 'stoop lowers the head only in vol mode');
+    const c0 = pose(0, { mode: 'path', chat: true });
+    assert.strictEqual(c0.Y6, a.Y6, 'no chat gesture at fx 0');
+    const c2 = pose(1, { mode: 'path', chat: true });
+    const n2 = pose(1, { mode: 'path' });
+    assert.ok(c2.Y6 !== n2.Y6, 'chat gesture moves the hand in vol mode');
+    const grapple = pose(1, { mode: 'cower' });
+    const cower0 = pose(0, { mode: 'cower' });
+    assert.strictEqual(grapple.Y0, cower0.Y0, 'no stoop while cowering');
+  });
+
+  const FL = '#ff8a78';
+  function flushFills(r) { return r.octx.calls.filter((c) => c.fn === 'fill' && c.fill === FL); }
+  function vheart(o) { return Object.assign({ kind: 'vheart', bpm: 65, stateK: 1, periphK: 1, headK: 1 }, o || {}); }
+  function flushRun(fx, o, vesselsOn) {
+    Flags.set('vis.vessels', vesselsOn);
+    try {
+      const f = setup(fx);
+      f.r.quality = 3;
+      const look = lookOf('patron', 2);
+      let best = [];
+      for (const dt of [0.3, 0.4, 0.5, 0.6, 0.7]) {
+        f.r.octx.calls.length = 0;
+        Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60 + dt, { people: { echoes: [echo(1, 60, look, vheart(o))] } });
+        const fl = flushFills(f.r);
+        if (fl.length > best.length) best = fl;
+      }
+      return best;
+    } finally { Flags.set('vis.vessels', false); }
+  }
+
+  test('flush is painted only at fx 2 for vheart echoes with vis.vessels on, never for the vampire, alpha <= 0.18', () => {
+    const on = flushRun(2, {}, true);
+    assert.ok(on.length > 0, 'flush drawn');
+    assert.ok(on.every((c) => c.alpha <= 0.18 + 1e-9), 'alpha cap');
+    assert.strictEqual(flushRun(1, {}, true).length, 0, 'not at Low');
+    assert.strictEqual(flushRun(0, {}, true).length, 0, 'not at Off');
+    assert.strictEqual(flushRun(2, {}, false).length, 0, 'not with vessels off');
+    assert.strictEqual(flushRun(2, { vampire: true }, true).length, 0, 'never the vampire');
+    assert.strictEqual(flushRun(2, { kind: 'ping' }, true).length, 0, 'only vheart echoes');
+    // Reduced motion: static and soft.
+    Flags.set('vis.vessels', true);
+    try {
+      const f = setup(2);
+      f.r.quality = 3;
+      f.r.reduced = true;
+      const look = lookOf('patron', 2);
+      let max = 0;
+      for (const dt of [0.3, 0.4, 0.5, 0.6]) {
+        f.r.octx.calls.length = 0;
+        Render.drawFirstPerson(f.r, f.world, player, f.sonar, 60 + dt, { people: { echoes: [echo(1, 60, look, vheart())] } });
+        for (const c of flushFills(f.r)) max = Math.max(max, c.alpha);
+      }
+      assert.ok(max <= 0.08 + 1e-9, 'reduced flush <= 0.08: ' + max);
+    } finally { Flags.set('vis.vessels', false); }
+  });
+
+  test('periodic terms: chat gesture is 0.6 Hz; flush follows the bpm, capped at 175 (< 3 Hz)', () => {
+    assert.strictEqual(Render.CHAT_HZ, 0.6);
+    let rises = 0;
+    let prev = Render.chatLift(0, 3, 1, true);
+    let dir = 0;
+    for (let i = 1; i <= 1000; i++) {
+      const v = Render.chatLift(i * 0.01, 3, 1, true);
+      const d = v > prev ? 1 : v < prev ? -1 : dir;
+      if (d === 1 && dir === -1) rises++;
+      dir = d;
+      prev = v;
+    }
+    assert.ok(rises >= 5 && rises <= 6, '10 s holds 6 cycles at 0.6 Hz, saw ' + rises + ' troughs');
+    assert.strictEqual(Render.chatLift(0, 1, 1, false), Render.chatLift(7.7, 5, 1, false), 'reduced motion is static');
+    assert.ok(Render.chatLift(1.234, 0, 1, true) >= 0 && Render.chatLift(1.234, 0, 1, true) <= 0.06 + 1e-9);
+
+    assert.ok(VCS.VesselData.BPM_MAX / 60 < 3);
+    const X = new Float32Array(28).fill(100);
+    const Y = new Float32Array(28);
+    [20, 40, 50, 50, 120, 120, 110, 110, 220, 220, 80, 80, 170, 170, 85].forEach((v, i) => { Y[i] = v; });
+    Flags.set('vis.vessels', true);
+    try {
+      function seq(bpm) {
+        const out = [];
+        for (let a = 0; a < 1.6; a += 0.01) {
+          const r = { octx: fakeCtx({}), quality: 2, reduced: false, wscale: 1 };
+          Render.drawVessels(r, vheart({ bpm: bpm }), X, Y, a);
+          out.push(Array.from(Render.flushValues).map((v) => Math.round(v * 1e5)).join(','));
+        }
+        return out;
+      }
+      const hi = seq(999);
+      assert.deepStrictEqual(hi, seq(175), 'bpm above 175 is clamped');
+      assert.notDeepStrictEqual(seq(65), hi, 'flush follows the bpm below the cap');
+      assert.ok(hi.some((s) => s !== '0,0,0,0'), 'flush values are written');
+      // A single beat holds at most a lub and a dub: far fewer than 3 rising edges in any second.
+      let edges = 0;
+      let last = 0;
+      for (const s of hi) { const v = Number(s.split(',')[1]); if (v > last + 1e-4 && last <= 1e-4) edges++; last = v; }
+      assert.ok(edges <= 2, 'rising edges per beat: ' + edges);
+    } finally { Flags.set('vis.vessels', false); }
+  });
+});
 
 

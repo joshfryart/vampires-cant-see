@@ -45,7 +45,8 @@
     devButton: true,
     subtitles: true,
     translation: true,
-    villagerVoices: true
+    villagerVoices: true,
+    effects: 2
   });
 
   const SCHEMA = Object.freeze({
@@ -86,7 +87,8 @@
     devButton: Object.freeze({ type: 'boolean' }),
     subtitles: Object.freeze({ type: 'boolean' }),
     translation: Object.freeze({ type: 'boolean' }),
-    villagerVoices: Object.freeze({ type: 'boolean' })
+    villagerVoices: Object.freeze({ type: 'boolean' }),
+    effects: Object.freeze({ type: 'number', min: 0, max: 2 })
   });
 
   /** Returns the 'config' logger, or a no-op logger when VCS.Log is missing. @returns {object} */

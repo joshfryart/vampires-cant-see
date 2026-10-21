@@ -1,0 +1,979 @@
+'use strict';
+/**
+ * Figure: volumetric villager drawing (v0.15). Pure drawing on a 2D ctx from pose slots, no state of its own.
+ * Redraws the line figure's details (face, hair, hats, scarf, hem, props, cower fingers, dazed stars) on top of
+ * tapered-capsule body parts that are sorted back to front. No per-frame allocation: parts and scratch are
+ * preallocated at load. Public functions never throw.
+ *
+ * P is the pose slot set {X, Y, Z} (typed arrays, also accepted as {x, y, z}); slots 0..23 as in render.js, 24/25 are
+ * the extra grip/tip when present (else a fallback near the hand is used). Z is optional (0 when absent), larger = farther.
+ */
+(function (root) {
+  const VCS = root.VCS = root.VCS || {};
+  const NOOP = { info() {}, warn() {}, error() {}, debug() {} };
+  let logger = null;
+  let logged = 0;
+  function log() {
+    if (logger) return logger;
+    try { logger = VCS.Log && VCS.Log.get ? VCS.Log.get('figure') : NOOP; } catch (e) { logger = NOOP; }
+    return logger || NOOP;
+  }
+  function fail(where, e) {
+    if (logged++ < 3) { try { log().warn('Figure.' + where + ' failed: ' + (e && e.message)); } catch (e2) { /* ignore */ } }
+  }
+
+  const TWO_PI = Math.PI * 2;
+  const MAXP = 16;
+  const COL_RIM = '#ffcf8a';
+  const COL_FLUSH = '#ff8a78';
+  const BLACK = '#000000';
+
+  function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function hasCtx(c) { return !!c && typeof c.moveTo === 'function' && typeof c.stroke === 'function'; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  // ---------------------------------------------------------------- capsule
+
+  /**
+   * Add a tapered-capsule outline subpath (two tangent lines plus two arcs). A circle when the points coincide or one
+   * circle contains the other. Returns true when something was added.
+   */
+  function capsule(c, x0, y0, r0, x1, y1, r1) {
+    try {
+      if (!hasCtx(c) || typeof c.arc !== 'function') return false;
+      if (!(isFinite(x0) && isFinite(y0) && isFinite(x1) && isFinite(y1) && isFinite(r0) && isFinite(r1))) return false;
+      r0 = Math.max(0, r0);
+      r1 = Math.max(0, r1);
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const L = Math.sqrt(dx * dx + dy * dy);
+      if (L < 1e-9 || Math.abs(r0 - r1) >= L) {
+        const big = r1 > r0;
+        const cx = big ? x1 : x0;
+        const cy = big ? y1 : y0;
+        const r = big ? r1 : r0;
+        c.moveTo(cx + r, cy);
+        c.arc(cx, cy, r, 0, TWO_PI);
+        return true;
+      }
+      const a = Math.atan2(dy, dx);
+      const beta = Math.acos(clamp((r0 - r1) / L, -1, 1));
+      const aP = a + beta;
+      const aM = a - beta;
+      c.moveTo(x0 + r0 * Math.cos(aP), y0 + r0 * Math.sin(aP));
+      c.arc(x1, y1, r1, aP, aM, true);
+      c.lineTo(x0 + r0 * Math.cos(aM), y0 + r0 * Math.sin(aM));
+      c.arc(x0, y0, r0, aM, aP, true);
+      c.closePath();
+      return true;
+    } catch (e) { fail('capsule', e); return false; }
+  }
+
+  /** Ellipse subpath that always starts with a moveTo at angle 0 (so it never joins the previous subpath). */
+  function ell(c, x, y, rx, ry, rot) {
+    rx = Math.max(0.01, rx);
+    ry = Math.max(0.01, ry);
+    c.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot));
+    c.ellipse(x, y, rx, ry, rot, 0, TWO_PI);
+  }
+
+  const SQ = new Float64Array(24);
+  function sqPt(i, x, y, cr, sr, px, py) { SQ[i * 2] = x + px * cr - py * sr; SQ[i * 2 + 1] = y + px * sr + py * cr; }
+  /** Rounded-square head outline (same shape as render.js squareHead, allocation free). */
+  function squareHead(c, x, y, rx, ry, rot) {
+    rx = Math.max(0.01, rx);
+    ry = Math.max(0.01, ry);
+    const cr = Math.cos(rot);
+    const sr = Math.sin(rot);
+    const k = 0.55;
+    sqPt(0, x, y, cr, sr, -rx * k, -ry); sqPt(1, x, y, cr, sr, rx * k, -ry); sqPt(2, x, y, cr, sr, rx, -ry * k);
+    sqPt(3, x, y, cr, sr, rx, ry * k); sqPt(4, x, y, cr, sr, rx * k, ry); sqPt(5, x, y, cr, sr, -rx * k, ry);
+    sqPt(6, x, y, cr, sr, -rx, ry * k); sqPt(7, x, y, cr, sr, -rx, -ry * k);
+    sqPt(8, x, y, cr, sr, rx, -ry); sqPt(9, x, y, cr, sr, rx, ry); sqPt(10, x, y, cr, sr, -rx, ry); sqPt(11, x, y, cr, sr, -rx, -ry);
+    c.moveTo(SQ[0], SQ[1]);
+    c.lineTo(SQ[2], SQ[3]);
+    c.quadraticCurveTo(SQ[16], SQ[17], SQ[4], SQ[5]);
+    c.lineTo(SQ[6], SQ[7]);
+    c.quadraticCurveTo(SQ[18], SQ[19], SQ[8], SQ[9]);
+    c.lineTo(SQ[10], SQ[11]);
+    c.quadraticCurveTo(SQ[20], SQ[21], SQ[12], SQ[13]);
+    c.lineTo(SQ[14], SQ[15]);
+    c.quadraticCurveTo(SQ[22], SQ[23], SQ[0], SQ[1]);
+  }
+
+  // ---------------------------------------------------------------- measurements
+
+  function arrX(P) { return P && (P.X || P.x); }
+  function arrY(P) { return P && (P.Y || P.y); }
+  function arrZ(P) { return P && (P.Z || P.z); }
+
+  /** Scratch measurements shared by parts / draw / extras. Filled by measure(); never allocated per call. */
+  const M = {
+    lh: 1, bw: 1, hs: 1, vs: 1, vsy: 1, sr: 0, cr: 1, shoulder: 1,
+    sx: 0, sy: 0, hx: 0, hy: 0, r0: 1, r1: 1,
+    hr: 1, hry: 1, bodyRx: 1, bodyRy: 1
+  };
+
+  function bodyShS(look) {
+    const b = look && look.body;
+    return b === 'round' ? 0.075 : b === 'stick' ? 0.05 : b === 'pear' ? 0.05 : 0.062;
+  }
+
+  function measure(P, pose, look) {
+    const X = arrX(P);
+    const Y = arrY(P);
+    const lh = clamp(num(pose && pose.lh, num(look && look.height, 1)), 0.3, 2);
+    const bw = clamp(num(look && look.build, 1), 0.4, 2);
+    M.lh = lh;
+    M.bw = bw;
+    let hs = num(pose && pose.hs, 0);
+    let vs = num(pose && pose.vs, 0);
+    if (!(vs > 0)) {
+      const fy = (Y[8] + Y[9]) * 0.5;
+      vs = Math.max(1, Math.abs(fy - Y[0]) / (0.9 * lh));
+    }
+    if (!(hs > 0)) hs = vs;
+    M.hs = hs;
+    M.vs = vs;
+    M.vsy = num(pose && pose.vsy, vs);
+    M.shoulder = clamp(num(look && look.shoulder, 1), 0.8, 1.25);
+    M.sx = (X[2] + X[3]) * 0.5;
+    M.sy = (Y[2] + Y[3]) * 0.5;
+    M.hx = (X[4] + X[5]) * 0.5;
+    M.hy = (Y[4] + Y[5]) * 0.5;
+    const swid = Math.abs(X[2] - X[3]) * 0.5;
+    const hwid = Math.abs(X[4] - X[5]) * 0.5;
+    let sr = num(pose && pose.sr, NaN);
+    let cr = num(pose && pose.cr, NaN);
+    if (!isFinite(sr) || !isFinite(cr)) {
+      cr = clamp(swid / (bodyShS(look) * bw * hs + 1e-6), 0, 1);
+      sr = Math.sqrt(1 - cr * cr);
+    }
+    M.sr = Math.abs(sr);
+    M.cr = Math.abs(cr);
+    const bk = look && look.body;
+    const k0 = bk === 'round' ? 1.12 : bk === 'pear' ? 0.92 : bk === 'stick' ? 0.75 : 1;
+    const k1 = bk === 'round' ? 1.2 : bk === 'pear' ? 1.3 : bk === 'stick' ? 0.8 : 1;
+    M.r0 = Math.max(1, (swid * M.shoulder + 0.05 * hs * M.sr) * k0);
+    M.r1 = Math.max(1, (hwid * 1.1 + 0.035 * hs * M.sr) * k1);
+    M.hr = Math.max(0.5, num(pose && pose.hr, 0.088 * lh * Math.sqrt(bw) * hs));
+    M.hry = Math.max(0.5, num(pose && pose.hry, 0.092 * lh * vs));
+    M.bodyRx = Math.max(1, num(pose && pose.bodyRx, M.r0));
+    M.bodyRy = Math.max(1, num(pose && pose.bodyRy, Math.abs(M.hy - M.sy) * 0.5));
+    return M;
+  }
+
+  // ---------------------------------------------------------------- parts
+
+  /** Preallocated part pool (used by draw when the caller gives none). */
+  const POOL = [];
+  for (let i = 0; i < MAXP; i++) POOL.push({ kind: '', a: 0, b: 0, r0: 0, r1: 0, z: 0, ax: 0, ay: 0, bx: 0, by: 0 });
+
+  function setPart(out, i, kind, a, b, ax, ay, bx, by, r0, r1, z) {
+    let p = out[i];
+    if (!p) p = out[i] = { kind: '', a: 0, b: 0, r0: 0, r1: 0, z: 0, ax: 0, ay: 0, bx: 0, by: 0 };
+    p.kind = kind; p.a = a; p.b = b; p.ax = ax; p.ay = ay; p.bx = bx; p.by = by;
+    p.r0 = Math.max(1, r0); p.r1 = Math.max(0.5, r1); p.z = z;
+  }
+
+  /**
+   * Fill out[0..n) with up to 16 parts {kind, a, b, r0, r1, z} (a/b are the slot ids, torso uses 2 and 4) plus the screen
+   * coordinates ax, ay, bx, by. Head and hands/feet put ellipse radii in r0/r1 (rx, ry). Returns n.
+   */
+  function parts(P, pose, look, out) {
+    try {
+      const X = arrX(P);
+      const Y = arrY(P);
+      if (!X || !Y || X.length < 24 || Y.length < 24 || !Array.isArray(out)) return 0;
+      look = look || {};
+      pose = pose || {};
+      const Z = arrZ(P);
+      const m = measure(P, pose, look);
+      const lhs = m.lh * m.hs;
+      let n = 0;
+      const zz = function (a, b) { return Z ? (num(Z[a], 0) + num(Z[b], 0)) * 0.5 : 0; };
+      setPart(out, n++, 'torso', 2, 4, m.sx, m.sy, m.hx, m.hy, m.r0, m.r1, Z ? (num(Z[2], 0) + num(Z[3], 0) + num(Z[4], 0) + num(Z[5], 0)) * 0.25 : 0);
+      setPart(out, n++, 'neck', 1, 0, X[1], Y[1], X[0], Y[0], 0.022 * lhs, 0.02 * lhs, zz(1, 0));
+      for (let s = 0; s < 2; s++) {
+        setPart(out, n++, 'thigh', 4 + s, 12 + s, X[4 + s], Y[4 + s], X[12 + s], Y[12 + s], 0.045 * m.bw * lhs, 0.034 * lhs, zz(4 + s, 12 + s));
+        setPart(out, n++, 'shin', 12 + s, 8 + s, X[12 + s], Y[12 + s], X[8 + s], Y[8 + s], 0.034 * lhs, 0.024 * lhs, zz(12 + s, 8 + s));
+        setPart(out, n++, 'foot', 8 + s, 8 + s, X[8 + s] + m.sr * m.hs * 0.03, Y[8 + s], 0, 0,
+          m.hs * (0.032 + 0.03 * m.sr) + 1, Math.max(1.2, m.vs * 0.02), zz(8 + s, 8 + s));
+        setPart(out, n++, 'uarm', 2 + s, 10 + s, X[2 + s], Y[2 + s], X[10 + s], Y[10 + s], 0.032 * lhs, 0.026 * lhs, zz(2 + s, 10 + s));
+        setPart(out, n++, 'farm', 10 + s, 6 + s, X[10 + s], Y[10 + s], X[6 + s], Y[6 + s], 0.026 * lhs, 0.02 * lhs, zz(10 + s, 6 + s));
+        setPart(out, n++, 'hand', 6 + s, 6 + s, X[6 + s], Y[6 + s], 0, 0, Math.max(1.4, m.hs * 0.022), Math.max(1.4, m.hs * 0.022), zz(6 + s, 6 + s));
+      }
+      setPart(out, n++, 'head', 0, 0, X[0], Y[0], 0, 0, m.hr, m.hry, Z ? num(Z[0], 0) : 0);
+      // n is 15 here; the sixteenth part is the shovel shaft.
+      if (look.extra === 'shovel' && X.length > 25) {
+        setPart(out, n++, 'extra', 24, 25, X[24], Y[24], X[25], Y[25], Math.max(1, m.hs * 0.008), Math.max(1, m.hs * 0.008), zz(24, 25));
+      }
+      return n;
+    } catch (e) { fail('parts', e); return 0; }
+  }
+
+  /** In-place stable insertion sort by z, descending (farthest first). Returns the same array. */
+  function sortBackToFront(arr, n) {
+    try {
+      if (!arr || typeof arr.length !== 'number') return arr;
+      const len = Math.min(arr.length, typeof n === 'number' && n >= 0 ? Math.floor(n) : arr.length);
+      for (let i = 1; i < len; i++) {
+        const item = arr[i];
+        if (!item) continue;
+        const z = num(item.z, 0);
+        let j = i - 1;
+        while (j >= 0 && arr[j] && num(arr[j].z, 0) < z) { arr[j + 1] = arr[j]; j--; }
+        arr[j + 1] = item;
+      }
+      return arr;
+    } catch (e) { fail('sort', e); return arr; }
+  }
+
+  // ---------------------------------------------------------------- draw
+
+  function setHat(P, mode, hat, tilt, m, out) {
+    const X = arrX(P);
+    const Y = arrY(P);
+    const fed = mode === 'fed' && hat !== 'hood';
+    if (fed) {
+      out.x = X[9] + m.hr * 2.6;
+      out.y = Math.max(Y[8], Y[9]) - m.hry * 0.35;
+      out.tilt = 0.9;
+    } else {
+      out.x = X[0];
+      out.y = Y[0];
+      out.tilt = num(tilt, 0);
+    }
+    out.fed = fed;
+  }
+  const HAT = { x: 0, y: 0, tilt: 0, fed: false };
+
+  function wrapArc(c, x0, y0, x1, y1, r0, r1, t, minor) {
+    const cx = lerp(x0, x1, t);
+    const cy = lerp(y0, y1, t);
+    const r = lerp(r0, r1, t);
+    const ang = Math.atan2(y1 - y0, x1 - x0);
+    c.moveTo(cx + r * Math.cos(ang + Math.PI * 0.5), cy + r * Math.sin(ang + Math.PI * 0.5));
+    c.ellipse(cx, cy, Math.max(0.01, r), Math.max(0.01, minor), ang + Math.PI * 0.5, 0, Math.PI, true);
+  }
+
+  function emitPart(c, p, pose) {
+    if (p.kind === 'head') {
+      const hk = pose.headKind || 'round';
+      if (hk === 'square') squareHead(c, p.ax, p.ay, p.r0, p.r1, num(pose.tilt, 0) * 0.6);
+      else ell(c, p.ax, p.ay, p.r0, p.r1, num(pose.tilt, 0) * 0.6);
+    } else if (p.kind === 'foot') {
+      ell(c, p.ax, p.ay, p.r0, p.r1, 0);
+    } else if (p.kind === 'hand') {
+      c.moveTo(p.ax + p.r0, p.ay);
+      c.arc(p.ax, p.ay, p.r0, 0, TWO_PI);
+    } else {
+      capsule(c, p.ax, p.ay, p.r0, p.bx, p.by, p.r1);
+    }
+  }
+
+  function rimPart(c, p, side) {
+    if (p.kind === 'head' || p.kind === 'foot' || p.kind === 'hand') {
+      const a0 = side > 0 ? -Math.PI * 0.5 : Math.PI * 0.5;
+      c.moveTo(p.ax + p.r0 * Math.cos(a0), p.ay + p.r1 * Math.sin(a0));
+      c.ellipse(p.ax, p.ay, Math.max(0.01, p.r0), Math.max(0.01, p.r1), 0, a0, a0 + Math.PI);
+      return;
+    }
+    const dx = p.bx - p.ax;
+    const dy = p.by - p.ay;
+    const L = Math.sqrt(dx * dx + dy * dy);
+    if (L < 1e-6) return;
+    // Perpendicular on the requested screen side (+1 = right).
+    let nx = -dy / L;
+    let ny = dx / L;
+    if (nx * side < 0) { nx = -nx; ny = -ny; }
+    c.moveTo(p.ax + nx * p.r0, p.ay + ny * p.r0);
+    c.lineTo(p.bx + nx * p.r1, p.by + ny * p.r1);
+  }
+
+  /** Hem height on screen for the robe / apron / smock / cloak, from look.hem (0 waist .. 1 ankle). */
+  function hemY(m, look, dflt) {
+    const hem = clamp(num(look.hem, dflt), 0, 1);
+    const hipU = num(m.hipU, 0);
+    const u = lerp(hipU - 0.17 * m.lh, 0.04 * m.lh, hem);
+    return m.hy + (hipU - u) * m.vsy;
+  }
+
+  /**
+   * Draw one figure: contact shadow, sorted body parts (occlusion fill at fx 2, contour, wrap lines, rim), then the
+   * line-figure details on top. o = {fx, lw, alpha, rim:{side,k}, depth, reduced, front}. `front` is accepted but unused.
+   */
+  function draw(c, sa, style, P, pose, look, o) {
+    if (!hasCtx(c)) return false;
+    let saved = false;
+    try {
+      const X = arrX(P);
+      const Y = arrY(P);
+      if (!X || !Y || X.length < 24 || Y.length < 24) return false;
+      pose = pose || {};
+      look = look || {};
+      o = o || {};
+      sa = num(sa, 1);
+      const fx = o.fx >= 2 ? 2 : o.fx >= 1 ? 1 : 0;
+      const lw = Math.max(0.5, num(o.lw, 1));
+      const alpha = clamp(num(o.alpha, 1) * sa, 0, 1);
+      const depth = num(o.depth, num(pose.depth, 0));
+      const near = depth < 6;
+      const rim = o.rim;
+      const rimK = rim ? num(rim.k, 0) : 0;
+      const rimSide = rim && rim.side < 0 ? -1 : 1;
+      const m = measure(P, pose, look);
+      m.hipU = num(pose.hipU, 0);
+      const lod = num(pose.lod, 0);
+      const robe = look.outfit === 'robe';
+      const robeY = robe ? hemY(m, look, 1) : 0;
+      const cut = num(pose.minX, -1e5);
+      const cutW = num(pose.maxX, 1e5) - cut;
+
+      c.save();
+      saved = true;
+      c.lineJoin = 'round';
+      c.lineCap = 'round';
+      c.strokeStyle = style;
+
+      // Contact shadow.
+      {
+        const fxm = (X[8] + X[9]) * 0.5;
+        const fym = Math.max(Y[8], Y[9]) + Math.max(0.5, m.vs * 0.004);
+        const rx = Math.max(1, 0.12 * m.hs * m.bw);
+        const ry = Math.max(0.4, rx * 0.18);
+        if (fx >= 2 && near) {
+          c.globalAlpha = 0.4 * sa;
+          c.fillStyle = BLACK;
+          c.beginPath();
+          ell(c, fxm, fym, rx, ry, 0);
+          c.fill();
+        }
+        c.globalAlpha = clamp(0.2 * sa, 0, 1);
+        c.lineWidth = lw;
+        c.beginPath();
+        c.moveTo(fxm - rx, fym);
+        c.ellipse(fxm, fym, rx, ry, 0, Math.PI, TWO_PI, true);
+        c.stroke();
+      }
+
+      const n = parts(P, pose, look, POOL);
+      sortBackToFront(POOL, n);
+      const sy = num(pose.sinYaw, num(pose.noseX, 0));
+      const minorK = 0.15 + 0.35 * Math.min(1, Math.abs(sy));
+      for (let i = 0; i < n; i++) {
+        const p = POOL[i];
+        const leg = p.kind === 'thigh' || p.kind === 'shin';
+        let clipped = false;
+        if (robe && leg) {
+          // Legs show below the hem only.
+          const topY = Math.min(p.ay, p.by) - p.r0;
+          const botY = Math.max(p.ay, p.by) + p.r0;
+          if (botY <= robeY) continue;
+          if (topY < robeY) {
+            c.save();
+            c.beginPath();
+            c.rect(cut, robeY, cutW, 1e5);
+            c.clip();
+            clipped = true;
+          }
+        }
+        c.beginPath();
+        emitPart(c, p, pose);
+        if (fx >= 2 && near && p.kind !== 'extra') {
+          c.globalAlpha = Math.min(1, 0.55 * sa);
+          c.fillStyle = BLACK;
+          c.fill();
+        }
+        c.globalAlpha = alpha;
+        c.strokeStyle = style;
+        c.lineWidth = lw;
+        if (fx >= 1 && near && (p.kind === 'torso' || leg || p.kind === 'uarm' || p.kind === 'farm')) {
+          const dx = p.bx - p.ax;
+          const dy = p.by - p.ay;
+          if (dx * dx + dy * dy > p.r0 * p.r0 * 2) {
+            if (fx >= 2) {
+              wrapArc(c, p.ax, p.ay, p.bx, p.by, p.r0, p.r1, 0.35, p.r0 * minorK);
+              wrapArc(c, p.ax, p.ay, p.bx, p.by, p.r0, p.r1, 0.7, p.r1 * minorK);
+            } else {
+              wrapArc(c, p.ax, p.ay, p.bx, p.by, p.r0, p.r1, 0.5, lerp(p.r0, p.r1, 0.5) * minorK);
+            }
+          }
+        }
+        c.stroke();
+        if (rimK > 0.02 && near) {
+          c.globalAlpha = clamp(0.5 * rimK * sa, 0, 1);
+          c.strokeStyle = COL_RIM;
+          c.lineWidth = lw * 0.8;
+          c.beginPath();
+          rimPart(c, p, rimSide);
+          c.stroke();
+          c.strokeStyle = style;
+        }
+        if (clipped) c.restore();
+      }
+
+      // Details redrawn in the line figure's style.
+      c.globalAlpha = alpha;
+      c.strokeStyle = style;
+      c.lineWidth = lw;
+      c.beginPath();
+      details(c, P, pose, look, m, lod, lw);
+      c.stroke();
+      if (pose.stars) {
+        c.beginPath();
+        const hr = m.hr;
+        const hry = m.hry;
+        const rr = Math.max(1.2, hr * 0.13);
+        const tN = o.reduced ? 0 : num(pose.t, 0);
+        const pid = num(pose.pid, 0);
+        for (let k = 0; k < 3; k++) {
+          const a = tN * 2.5 + k * 2.094 + pid;
+          const sx = X[23] + Math.cos(a) * hr * 1.7;
+          const sy2 = Y[23] - hry * 0.25 + Math.sin(a) * hry * 0.35;
+          c.moveTo(sx - rr, sy2); c.lineTo(sx + rr, sy2);
+          c.moveTo(sx, sy2 - rr); c.lineTo(sx, sy2 + rr);
+        }
+        c.stroke();
+      }
+      c.restore();
+      saved = false;
+      return true;
+    } catch (e) {
+      fail('draw', e);
+      if (saved) { try { c.restore(); } catch (e2) { /* ignore */ } }
+      return false;
+    }
+  }
+
+  /** Face, hair, hats, hem, seat edge, scarf, props and cower fingers, as subpaths of the current path. */
+  function details(c, P, pose, look, m, lod, lw) {
+    const X = arrX(P);
+    const Y = arrY(P);
+    const hs = m.hs;
+    const vs = m.vs;
+    const lh = m.lh;
+    const hr = m.hr;
+    const hry = m.hry;
+    const hx = X[0];
+    const hy = Y[0];
+    const bx = X[14];
+    const by = Y[14];
+    const bodyRx = m.bodyRx;
+    const bodyRy = m.bodyRy;
+    const mode = pose.mode;
+    const noseX = num(pose.noseX, 0);
+    const faceVis = pose.faceVis !== undefined ? !!pose.faceVis : true;
+    const eyesVis = pose.eyesVis !== undefined ? !!pose.eyesVis : false;
+    const flee = !!pose.flee || mode === 'flee';
+    const moving = !!pose.moving;
+    const jump = num(pose.jump, 0);
+    const roleHat = look.roleHat && look.roleHat !== 'none' ? look.roleHat : '';
+    const acc = look.acc;
+    const hat = roleHat ? 'none' : (pose.hat || look.hat || (acc === 'tophat' || acc === 'nightcap' || acc === 'bonnet' ? acc : 'none'));
+    const prop = pose.prop || look.prop || 'none';
+    const outfit = look.outfit;
+
+    if (lod >= 1 && faceVis) {
+      const nz = typeof look.nose === 'number' ? look.nose : 1;
+      c.moveTo(hx + noseX * hr * 0.55, hy + hry * 0.12);
+      c.lineTo(hx + noseX * hr * (0.75 + 0.25 * nz), hy + hry * (0.2 + 0.14 * nz));
+      if (look.beard && lod >= 2) {
+        c.moveTo(hx - hr * 0.55, hy + hry * 0.55);
+        c.lineTo(hx - hr * 0.3, hy + hry * 1.1);
+        c.lineTo(hx, hy + hry * 0.8);
+        c.lineTo(hx + hr * 0.3, hy + hry * 1.1);
+        c.lineTo(hx + hr * 0.55, hy + hry * 0.55);
+      }
+    }
+    if (lod >= 1 && eyesVis) {
+      for (let side = -1; side <= 1; side += 2) {
+        const ex = hx + side * hr * 0.4 + noseX * hr * 0.2;
+        if (pose.eyesX) {
+          const q = Math.max(1.2, hr * 0.14);
+          c.moveTo(ex - q, hy - hry * 0.2); c.lineTo(ex + q, hy);
+          c.moveTo(ex + q, hy - hry * 0.2); c.lineTo(ex - q, hy);
+        } else {
+          c.moveTo(ex, hy - hry * 0.2);
+          c.lineTo(ex, hy - hry * 0.02);
+        }
+      }
+    }
+    // Hair (only when no hat hides it).
+    const hair = hat === 'none' || hat === 'cap' || hat === 'bonnet' ? look.hair : 'none';
+    if (lod >= 1 && hair && hair !== 'none' && !roleHat) {
+      const ty = hy - hry;
+      if (hair === 'tuft') {
+        for (let k = -1; k <= 1; k++) {
+          c.moveTo(hx + k * hr * 0.3, ty + hry * 0.08);
+          c.lineTo(hx + k * hr * 0.45 + hr * 0.12, ty - hry * 0.28);
+        }
+      } else if (hair === 'bun') {
+        const bxr = hx - noseX * hr * 0.5;
+        const br2 = Math.max(1.5, hr * 0.32);
+        c.moveTo(bxr + br2, ty - hry * 0.05);
+        c.arc(bxr, ty - hry * 0.05, br2, 0, TWO_PI);
+      } else if (hair === 'spiky') {
+        c.moveTo(hx - hr * 0.85, ty + hry * 0.3);
+        for (let k = 0; k < 5; k++) {
+          const u0 = -0.85 + k * 0.42;
+          c.lineTo(hx + (u0 + 0.21) * hr, ty - hry * 0.3);
+          c.lineTo(hx + (u0 + 0.42) * hr, ty + hry * 0.25);
+        }
+      } else if (hair === 'curls') {
+        for (let k = -1; k <= 1; k++) {
+          const cxr = hx + k * hr * 0.55;
+          const rr = Math.max(1.3, hr * 0.26);
+          c.moveTo(cxr + rr, ty + hry * 0.05);
+          c.arc(cxr, ty + hry * 0.05, rr, 0, TWO_PI);
+        }
+      } else if (hair === 'bob') {
+        c.moveTo(hx - hr * 1.05, hy + hry * 0.5);
+        c.quadraticCurveTo(hx - hr * 1.15, ty - hry * 0.1, hx, ty - hry * 0.15);
+        c.quadraticCurveTo(hx + hr * 1.15, ty - hry * 0.1, hx + hr * 1.05, hy + hry * 0.5);
+      }
+    }
+    // Hats (a fed villager's hat lies on the floor beside them).
+    if (hat !== 'none') {
+      setHat(P, mode, hat, pose.tilt, m, HAT);
+      const hhx = HAT.x;
+      const hhy = HAT.y;
+      const hatTilt = HAT.tilt;
+      if (hat === 'tophat') {
+        const hy2 = hhy - hry * 0.78;
+        const bw2 = hr * 1.25;
+        const th = vs * 0.14 * lh;
+        const lean2 = hatTilt * th * 1.2 + (flee ? -hr * 0.6 : 0);
+        const lift = flee ? -th * 0.35 : jump > 0 ? -jump * vs * 0.8 : 0;
+        ell(c, hhx, hy2 + lift, bw2, Math.max(1.2, vs * 0.012), 0);
+        c.moveTo(hhx - hr * 0.78, hy2 + lift);
+        c.lineTo(hhx - hr * 0.7 + lean2, hy2 - th + lift);
+        c.lineTo(hhx + hr * 0.7 + lean2, hy2 - th + lift);
+        c.lineTo(hhx + hr * 0.78, hy2 + lift);
+        c.moveTo(hhx - hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
+        c.lineTo(hhx + hr * 0.77 + lean2 * 0.2, hy2 - th * 0.22 + lift);
+      } else if (hat === 'nightcap') {
+        const hy2 = hhy - hry * 0.7;
+        c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
+        c.quadraticCurveTo(X[18], Y[18] - hry * 0.4, X[17], Y[17] - hry * 0.2);
+        c.quadraticCurveTo(hhx + hr * 0.3, hy2 - hry * 0.2, hhx + hr * 0.95, hy2 + hry * 0.2);
+        const pr = Math.max(1.5, hs * 0.022);
+        c.moveTo(X[17] + pr, Y[17] - hry * 0.2);
+        c.arc(X[17], Y[17] - hry * 0.2, pr, 0, TWO_PI);
+        c.moveTo(hhx - hr * 0.95, hy2 + hry * 0.2);
+        c.lineTo(hhx + hr * 0.95, hy2 + hry * 0.2);
+      } else if (hat === 'bonnet') {
+        c.moveTo(hhx - hr * 1.1, hhy + hry * 0.1);
+        c.ellipse(hhx, hhy, hr * 1.12, hry * 1.1, hatTilt * 0.6, Math.PI * 0.95, Math.PI * 2.1);
+        const ky = hhy + hry * 1.05;
+        c.moveTo(hhx - hr * 0.9, hhy + hry * 0.6);
+        c.quadraticCurveTo(hhx, ky + hry * 0.25, hhx + hr * 0.9, hhy + hry * 0.6);
+        c.moveTo(hhx, ky);
+        c.lineTo(hhx - hr * 0.5, ky + hry * 0.4);
+        c.moveTo(hhx, ky);
+        c.lineTo(hhx + hr * 0.5, ky + hry * 0.4);
+      } else if (hat === 'cap') {
+        const ty = hhy - hry * 0.55;
+        const lift = jump > 0 ? -jump * vs * 0.6 : 0;
+        c.moveTo(hhx - hr * 1.05, ty + lift);
+        c.quadraticCurveTo(hhx, ty - hry * 0.75 + lift, hhx + hr * 1.05, ty + lift);
+        c.moveTo(hhx - hr * 1.05, ty + lift);
+        c.lineTo(hhx + hr * 1.05, ty + lift);
+        const bdir = noseX >= 0 ? 1 : -1;
+        c.moveTo(hhx + bdir * hr * 0.9, ty + lift);
+        c.lineTo(hhx + bdir * hr * 1.45 + noseX * hr * 0.1, ty + hry * 0.12 + lift);
+      } else if (hat === 'hood') {
+        const ty = hhy - hry;
+        c.moveTo(X[2] - hr * 0.2, Y[2]);
+        c.quadraticCurveTo(hhx - hr * 1.35, hhy - hry * 0.2, hhx - hr * 0.2 + (moving ? -hr * 0.3 : 0), ty - hry * 0.45);
+        c.quadraticCurveTo(hhx + hr * 1.35, hhy - hry * 0.2, X[3] + hr * 0.2, Y[3]);
+      }
+    }
+    // Coat hem (the robe and cloak draw their own).
+    if (lod >= 1 && look.coat && mode !== 'fed' && outfit !== 'robe' && outfit !== 'cloak') {
+      const cy0 = by + bodyRy * 0.35;
+      c.moveTo(bx + bodyRx * 0.98, cy0);
+      c.quadraticCurveTo(X[21] + bodyRx * 0.2, (cy0 + Y[21]) * 0.5, X[21] + bodyRx * 0.1, Y[21]);
+      c.quadraticCurveTo((X[21] + X[22]) * 0.5, Y[21] + vs * 0.02, X[22] - bodyRx * 0.1, Y[22]);
+      c.quadraticCurveTo(X[22] - bodyRx * 0.2, (cy0 + Y[22]) * 0.5, bx - bodyRx * 0.98, cy0);
+    }
+    if (pose.seated) {
+      const sw = hs * 0.26 * m.bw;
+      c.moveTo(X[14] - sw, Y[4] + vs * 0.01);
+      c.lineTo(X[14] + sw, Y[5] + vs * 0.01);
+    }
+    if (acc === 'scarf') {
+      const nyy = Y[1] - bodyRy * 0.1;
+      c.moveTo(X[1] - bodyRx * 0.8, nyy);
+      c.quadraticCurveTo(X[1], nyy + hry * 0.5, X[1] + bodyRx * 0.8, nyy);
+      c.moveTo(X[1] + bodyRx * 0.55, nyy + hry * 0.15);
+      c.quadraticCurveTo(X[16], Y[16], X[15], Y[15]);
+    }
+    // Props carried in the right hand.
+    if (prop === 'cane' && mode !== 'fed') {
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(X[20], Y[20]);
+      c.moveTo(X[20], Y[20]);
+      c.lineTo(X[19], Y[19] - vs * 0.03);
+      c.arc(X[19] - hs * 0.015, Y[19] - vs * 0.03, hs * 0.015 + 1, 0, Math.PI, true);
+    } else if (prop === 'lantern') {
+      const lx = X[20];
+      const ly = Y[20];
+      const lw2 = Math.max(1.5, hs * 0.03);
+      const lh2 = Math.max(2, vs * 0.05);
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(lx, ly - lh2 * 0.6);
+      c.moveTo(lx - lw2, ly - lh2 * 0.5);
+      c.lineTo(lx + lw2, ly - lh2 * 0.5);
+      c.lineTo(lx + lw2 * 0.8, ly + lh2 * 0.5);
+      c.lineTo(lx - lw2 * 0.8, ly + lh2 * 0.5);
+      c.closePath();
+    } else if (prop === 'basket') {
+      const kx = X[20];
+      const ky = Y[20];
+      const kw = Math.max(2, hs * 0.045);
+      const kh = Math.max(1.5, vs * 0.035);
+      c.moveTo(kx - kw * 0.8, ky - kh * 0.5);
+      c.quadraticCurveTo(kx, ky - kh * 2.2, kx + kw * 0.8, ky - kh * 0.5);
+      c.moveTo(kx - kw, ky - kh * 0.5);
+      c.lineTo(kx + kw, ky - kh * 0.5);
+      c.lineTo(kx + kw * 0.7, ky + kh * 0.5);
+      c.lineTo(kx - kw * 0.7, ky + kh * 0.5);
+      c.closePath();
+    } else if (prop === 'umbrella' && mode !== 'fed' && mode !== 'cower') {
+      const ux = X[20];
+      const uy = Y[20];
+      const uw = hr * 2.6;
+      c.moveTo(X[19], Y[19]);
+      c.lineTo(ux, uy);
+      c.moveTo(ux - uw, uy + hry * 0.9);
+      c.quadraticCurveTo(ux, uy - hry * 1.2, ux + uw, uy + hry * 0.9);
+      for (let k = 0; k < 3; k++) {
+        const x0 = ux - uw + (k * 2 * uw) / 3;
+        const x1 = x0 + (2 * uw) / 3;
+        c.moveTo(x0, uy + hry * 0.9);
+        c.quadraticCurveTo((x0 + x1) * 0.5, uy + hry * 1.25, x1, uy + hry * 0.9);
+      }
+    }
+    if (pose.handsOverHead && lod >= 2) {
+      for (let side = 0; side < 2; side++) {
+        c.moveTo(X[6 + side], Y[6 + side]);
+        c.lineTo(X[6 + side] + (side ? -1 : 1) * hr * 0.3, Y[6 + side] - hry * 0.25);
+      }
+    }
+    if (lod >= 1 && look.body === 'stick') {
+      c.moveTo(bx - bodyRx * 1.6, by + bodyRy * 0.3);
+      c.quadraticCurveTo(bx, by + bodyRy * 0.55, bx + bodyRx * 1.6, by + bodyRy * 0.3);
+    }
+  }
+
+  // ---------------------------------------------------------------- extras
+
+  /** Extra grip / tip: slots 24/25 when present, otherwise a spot beside the left hand. */
+  const EX = { gx: 0, gy: 0, tx: 0, ty: 0 };
+  function exSlots(P, m) {
+    const X = arrX(P);
+    const Y = arrY(P);
+    if (X.length > 25 && Y.length > 25 && (X[24] !== 0 || Y[24] !== 0 || X[25] !== 0 || Y[25] !== 0)) {
+      EX.gx = X[24]; EX.gy = Y[24]; EX.tx = X[25]; EX.ty = Y[25];
+    } else {
+      EX.gx = X[6]; EX.gy = Y[6];
+      EX.tx = X[6] + m.hs * 0.02; EX.ty = Y[6] - m.vs * 0.28 * m.lh;
+    }
+  }
+
+  /** Mail, robe, apron/smock, cloak, role hats and role items (look.outfit / roleHat / extra). Strokes only. */
+  function drawExtras(c, P, pose, look, o) {
+    if (!hasCtx(c)) return false;
+    let saved = false;
+    try {
+      const X = arrX(P);
+      const Y = arrY(P);
+      if (!X || !Y || X.length < 24 || Y.length < 24) return false;
+      pose = pose || {};
+      look = look || {};
+      o = o || {};
+      const m = measure(P, pose, look);
+      m.hipU = num(pose.hipU, 0);
+      const lod = num(pose.lod, 1);
+      const lw = Math.max(0.5, num(o.lw, 1));
+      const outfit = look.outfit;
+      const roleHat = look.roleHat;
+      const extra = look.extra;
+      if (!(outfit && outfit !== 'plain') && !(roleHat && roleHat !== 'none') && !(extra && extra !== 'none')) return true;
+      c.save();
+      saved = true;
+      c.lineJoin = 'round';
+      c.lineCap = 'round';
+      c.globalAlpha = clamp(num(o.alpha, 1) * num(o.sa, 1), 0, 1);
+      if (typeof o.style === 'string') c.strokeStyle = o.style;
+      c.lineWidth = lw;
+      c.beginPath();
+      const hr = m.hr;
+      const hry = m.hry;
+      const hs = m.hs;
+      const vs = m.vs;
+
+      if (outfit === 'mail' && lod >= 1) {
+        for (let row = 0; row < 3; row++) {
+          const t = 0.25 + 0.25 * row;
+          const cx = lerp(m.sx, m.hx, t);
+          const cy = lerp(m.sy, m.hy, t);
+          const w = lerp(m.r0, m.r1, t) * 0.85;
+          const sr = Math.max(0.8, w / 3);
+          for (let k = 0; k < 3; k++) {
+            const x = cx - w + sr + k * 2 * sr;
+            c.moveTo(x + sr, cy);
+            c.arc(x, cy, sr, 0, Math.PI);
+          }
+        }
+      } else if (outfit === 'robe' || outfit === 'cloak') {
+        const hy = hemY(m, look, outfit === 'robe' ? 1 : 0.8);
+        const lx = X[21];
+        const rx = X[22];
+        const swing = ((lx + rx) * 0.5) - m.hx;
+        const hem = clamp(num(look.hem, 1), 0, 1);
+        const half = Math.max(Math.abs(lx - rx) * 0.5, m.r1 * 1.2) * (outfit === 'cloak' ? 1.45 : 1) * (1 + 0.5 * hem);
+        const cx = m.hx + swing;
+        const shL = X[2] <= X[3] ? 2 : 3;
+        const shR = 5 - shL;
+        if (outfit === 'robe') {
+          c.moveTo(m.hx - m.r1, m.hy);
+          c.quadraticCurveTo(m.hx - m.r1 * 1.2 + (cx - m.hx) * 0.3, (m.hy + hy) * 0.5, cx - half, hy);
+          c.quadraticCurveTo(cx, hy + vs * 0.02, cx + half, hy);
+          c.quadraticCurveTo(m.hx + m.r1 * 1.2 + (cx - m.hx) * 0.3, (m.hy + hy) * 0.5, m.hx + m.r1, m.hy);
+        } else {
+          c.moveTo(X[shL], Y[shL]);
+          c.quadraticCurveTo(X[shL] - half * 0.6, (Y[shL] + hy) * 0.5, cx - half, hy);
+          c.quadraticCurveTo(cx, hy + vs * 0.025, cx + half, hy);
+          c.quadraticCurveTo(X[shR] + half * 0.6, (Y[shR] + hy) * 0.5, X[shR], Y[shR]);
+        }
+      } else if (outfit === 'apron' || outfit === 'smock') {
+        const hy = hemY(m, look, outfit === 'apron' ? 0.35 : 0.2);
+        const wt = lerp(m.r0, m.r1, 0.2) * 0.45;
+        const cy0 = lerp(m.sy, m.hy, 0.15);
+        const cx0 = lerp(m.sx, m.hx, 0.15);
+        const cy1 = lerp(m.sy, m.hy, 0.85);
+        const cx1 = lerp(m.sx, m.hx, 0.85);
+        const wb = lerp(m.r0, m.r1, 0.85) * 0.9;
+        c.moveTo(cx0 - wt, cy0);
+        c.lineTo(cx0 + wt, cy0);
+        c.moveTo(cx0 - wt, cy0);
+        c.lineTo(cx1 - wb, cy1);
+        c.moveTo(cx0 + wt, cy0);
+        c.lineTo(cx1 + wb, cy1);
+        const half = Math.max(wb, m.r1 * 1.05);
+        c.moveTo(m.hx - half, hy);
+        c.quadraticCurveTo(m.hx, hy + vs * 0.02, m.hx + half, hy);
+      }
+
+      // Role hat (replaces the ordinary hat; see draw()).
+      if (roleHat === 'kettle' || roleHat === 'biretta') {
+        setHat(P, pose.mode, roleHat, pose.tilt, m, HAT);
+        const hx = HAT.x;
+        const base = HAT.y - hry * 0.78;
+        if (roleHat === 'kettle') {
+          ell(c, hx, base, hr * 1.5, Math.max(1.2, vs * 0.014), 0);
+          c.moveTo(hx - hr * 0.88, base);
+          c.ellipse(hx, base, hr * 0.88, Math.max(0.01, hry * 0.8), 0, Math.PI, TWO_PI);
+        } else {
+          const top = base - hry * 0.55;
+          c.moveTo(hx - hr * 0.95, base);
+          c.lineTo(hx - hr * 0.78, top);
+          c.lineTo(hx + hr * 0.78, top);
+          c.lineTo(hx + hr * 0.95, base);
+          c.closePath();
+          for (let k = -1; k <= 1; k++) {
+            c.moveTo(hx + k * hr * 0.3, base);
+            c.lineTo(hx + k * hr * 0.26, top);
+          }
+          const tr = Math.max(1.2, hr * 0.15);
+          c.moveTo(hx + tr, top - tr);
+          c.arc(hx, top - tr, tr, 0, TWO_PI);
+        }
+      }
+
+      // Role item in the left hand (side 0).
+      if (extra && extra !== 'none') {
+        exSlots(P, m);
+        const gx = EX.gx;
+        const gy = EX.gy;
+        const tx = EX.tx;
+        const ty = EX.ty;
+        if (extra === 'shovel') {
+          c.moveTo(gx, gy);
+          c.lineTo(tx, ty);
+          const dx = tx - gx;
+          const dy = ty - gy;
+          const L = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+          const ux = dx / L;
+          const uy = dy / L;
+          const bwid = Math.max(2, hs * 0.035);
+          const blen = Math.max(2, vs * 0.045);
+          const nx = -uy * bwid;
+          const ny = ux * bwid;
+          c.moveTo(tx + nx, ty + ny);
+          c.lineTo(tx + ux * blen + nx * 0.8, ty + uy * blen + ny * 0.8);
+          c.lineTo(tx + ux * blen * 1.2, ty + uy * blen * 1.2);
+          c.lineTo(tx + ux * blen - nx * 0.8, ty + uy * blen - ny * 0.8);
+          c.lineTo(tx - nx, ty - ny);
+        } else if (extra === 'bundle') {
+          const rx = Math.max(2, hs * 0.05);
+          const ry = rx * 0.8;
+          ell(c, tx, ty, rx, ry, 0.4);
+          c.moveTo(tx - rx * 0.7, ty - ry * 0.5);
+          c.quadraticCurveTo(tx, ty + ry * 0.2, tx + rx * 0.7, ty + ry * 0.5);
+        } else if (extra === 'ledger') {
+          const w = Math.max(2, hs * 0.04);
+          const h = Math.max(2.5, vs * 0.045);
+          const lx = gx;
+          const ly = gy - h * 0.6;
+          c.moveTo(lx - w, ly - h);
+          c.lineTo(lx + w, ly - h);
+          c.lineTo(lx + w, ly + h);
+          c.lineTo(lx - w, ly + h);
+          c.closePath();
+          c.moveTo(lx - w * 0.6, ly - h);
+          c.lineTo(lx - w * 0.6, ly + h);
+        } else if (extra === 'bow') {
+          const d = num(pose.noseX, 0) >= 0 ? -1 : 1;
+          const tx0 = m.sx + d * m.r0 * 1.1;
+          const ty0 = m.sy - vs * 0.04 * m.lh;
+          const bx0 = m.hx + d * m.r1 * 1.1;
+          const by0 = m.hy + vs * 0.06 * m.lh;
+          const mx = (tx0 + bx0) * 0.5 + d * m.r0 * 1.3;
+          const my = (ty0 + by0) * 0.5;
+          c.moveTo(tx0, ty0);
+          c.quadraticCurveTo(mx, my, bx0, by0);
+          c.moveTo(tx0, ty0);
+          c.quadraticCurveTo((tx0 + bx0) * 0.5 - d * m.r0 * 0.3, my, bx0, by0);
+        }
+      }
+      c.stroke();
+      c.restore();
+      saved = false;
+      return true;
+    } catch (e) {
+      fail('drawExtras', e);
+      if (saved) { try { c.restore(); } catch (e2) { /* ignore */ } }
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------- flush
+
+  /**
+   * Soft coral flush at the face (0), neck (1) and wrists (6/7). flush = [temporal, carotid, radialL, radialR].
+   * a = min(0.18, flush[i] * skin * 0.25 * sa); static and <= 0.08 with reduced motion.
+   */
+  function drawFlush(c, P, pose, flush, o) {
+    if (!hasCtx(c) || !flush || typeof c.fill !== 'function') return false;
+    let saved = false;
+    try {
+      const X = arrX(P);
+      const Y = arrY(P);
+      if (!X || !Y || X.length < 24 || Y.length < 24) return false;
+      pose = pose || {};
+      o = o || {};
+      const look = o.look || {};
+      const skin = clamp(num(look.skin, num(o.skin, 1)), 0, 1);
+      const sa = clamp(num(o.alpha, 1) * num(o.sa, 1), 0, 1);
+      const cap = o.reduced ? 0.08 : 0.18;
+      const m = measure(P, pose, look);
+      c.save();
+      saved = true;
+      c.fillStyle = COL_FLUSH;
+      for (let i = 0; i < 4; i++) {
+        const a = Math.min(cap, Math.max(0, num(flush[i], 0)) * skin * 0.25 * sa);
+        if (!(a > 0.002)) continue;
+        const slot = i === 0 ? 0 : i === 1 ? 1 : i === 2 ? 6 : 7;
+        c.globalAlpha = a;
+        c.beginPath();
+        if (slot === 0) ell(c, X[0], Y[0] + m.hry * 0.1, m.hr * 0.85, m.hry * 0.85, 0);
+        else if (slot === 1) ell(c, X[1], Y[1], Math.max(1.5, m.hs * 0.025), Math.max(1.5, m.vs * 0.02), 0);
+        else ell(c, X[slot], Y[slot], Math.max(1.5, m.hs * 0.02), Math.max(1.5, m.hs * 0.02), 0);
+        c.fill();
+      }
+      c.restore();
+      saved = false;
+      return true;
+    } catch (e) {
+      fail('drawFlush', e);
+      if (saved) { try { c.restore(); } catch (e2) { /* ignore */ } }
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------- grab arms
+
+  /**
+   * Volumetric version of render.js drawGrabArms, same anchors: (r, X, Y, hs, lw, alpha, jolt, tN, pid, style, rs).
+   * The first argument may be the renderer (uses r.octx, r.ow, r.oh, r.wscale) or a bare ctx.
+   */
+  function drawGrabArmsVol(rc, X, Y, hs, lw, alpha, jolt, tN, pid, style, rs) {
+    let c = null;
+    let saved = false;
+    try {
+      const isR = !!rc && !!rc.octx && typeof rc.octx.moveTo === 'function';
+      c = isR ? rc.octx : rc;
+      if (!hasCtx(c) || !X || !Y || X.length < 15 || Y.length < 15) return false;
+      const W = isR ? num(rc.ow, 640) : num(c.canvas && c.canvas.width, 640);
+      const H = isR ? num(rc.oh, 360) : num(c.canvas && c.canvas.height, 360);
+      const ws = isR ? num(rc.wscale, 1) : 1;
+      hs = num(hs, 100); lw = Math.max(0.5, num(lw, 1)); alpha = num(alpha, 1);
+      jolt = num(jolt, 0); tN = num(tN, 0); pid = num(pid, 0); rs = num(rs, 0);
+      const left = X[2] <= X[3] ? 2 : 3;
+      const shake = jolt * hs * 0.05;
+      c.save();
+      saved = true;
+      c.globalAlpha = Math.min(1, alpha * 0.7);
+      c.strokeStyle = style;
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      for (let k = 0; k < 2; k++) {
+        const idx = k === 0 ? left : 5 - left;
+        const sgn = k === 0 ? -1 : 1;
+        const tx = X[idx] + (X[14] - X[idx]) * 0.35 * rs + sgn * hs * 0.03 + Math.sin(tN * 37 + k * 2 + pid) * shake;
+        const ty = Y[idx] + (Y[14] - Y[idx]) * 0.35 * rs + hs * 0.02 + Math.cos(tN * 29 + k * 3 + pid) * shake;
+        const sx = W * 0.5 + sgn * W * 0.3;
+        const sy = H + 12 * ws;
+        const r0 = lw * 4.5;
+        const r1 = lw * 2.6;
+        c.lineWidth = lw;
+        c.beginPath();
+        capsule(c, sx, sy, r0, tx, ty, r1);
+        const dx = tx - sx;
+        const dy = ty - sy;
+        if (dx * dx + dy * dy > 4) {
+          wrapArc(c, sx, sy, tx, ty, r0, r1, 0.4, lerp(r0, r1, 0.4) * 0.35);
+          wrapArc(c, sx, sy, tx, ty, r0, r1, 0.7, lerp(r0, r1, 0.7) * 0.35);
+        }
+        c.stroke();
+        // Knuckles and fingers at the grip.
+        c.beginPath();
+        const gr = Math.max(2, hs * 0.012);
+        c.moveTo(tx + gr, ty);
+        c.arc(tx, ty, gr, 0, TWO_PI);
+        for (let f = -1; f <= 1; f++) {
+          c.moveTo(tx, ty - gr * 0.6);
+          c.lineTo(tx + f * gr * 0.9 - sgn * gr * 0.3, ty - gr * 2);
+          c.moveTo(tx + f * gr * 0.7 - gr * 0.3, ty + gr * 0.2);
+          c.lineTo(tx + f * gr * 0.7 + gr * 0.3, ty + gr * 0.2);
+        }
+        c.stroke();
+      }
+      c.restore();
+      saved = false;
+      return true;
+    } catch (e) {
+      fail('drawGrabArmsVol', e);
+      if (saved) { try { c.restore(); } catch (e2) { /* ignore */ } }
+      return false;
+    }
+  }
+
+  const Figure = { capsule, parts, sortBackToFront, draw, drawExtras, drawFlush, drawGrabArmsVol, MAX_PARTS: MAXP };
+  VCS.Figure = Figure;
+  if (typeof module !== 'undefined' && module.exports) module.exports = Figure;
+})(typeof window !== 'undefined' ? window : globalThis);

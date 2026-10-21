@@ -1,0 +1,3286 @@
+{
+  "fixture": "figure-line",
+  "v": 1,
+  "baseline": "v0.14.0-pre",
+  "hash": "fnv1a-32 over the fake-ctx call log, one line per call: fn(args rounded to 1e-3) s=stroke a=alpha lw=lineWidth, joined by \\n",
+  "source": "render.test.js:231 matrix (reduced x quality x mode x accessory) plus feedLock victim",
+  "count": 546,
+  "entries": [
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=tophat",
+      "hash": "77479181",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=nightcap",
+      "hash": "acd8f1e4",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=bonnet",
+      "hash": "d22d526b",
+      "calls": 24,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=cane",
+      "hash": "1a6bedb5",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=scarf",
+      "hash": "80631f1c",
+      "calls": 41,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=lantern",
+      "hash": "7a2406b1",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=hood",
+      "hash": "50c3af6a",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=umbrella",
+      "hash": "136a7d66",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=cap",
+      "hash": "a10d9784",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=path/acc=basket",
+      "hash": "66e74c70",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=tophat",
+      "hash": "03449c9e",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=nightcap",
+      "hash": "917088f8",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=bonnet",
+      "hash": "45cc0dcb",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=cane",
+      "hash": "38ba06d8",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=scarf",
+      "hash": "911d7817",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=lantern",
+      "hash": "9bd94802",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=hood",
+      "hash": "be79947b",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=umbrella",
+      "hash": "3525505b",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=cap",
+      "hash": "05281fe2",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=startle/acc=basket",
+      "hash": "a7d9a8c2",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=tophat",
+      "hash": "e2266e05",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=nightcap",
+      "hash": "1cc8d9cd",
+      "calls": 31,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=bonnet",
+      "hash": "8d4d98d9",
+      "calls": 40,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=cane",
+      "hash": "8530d2b0",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=scarf",
+      "hash": "fde2d03f",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=lantern",
+      "hash": "b040fb65",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=hood",
+      "hash": "e3fae1d9",
+      "calls": 28,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=umbrella",
+      "hash": "2f5812a0",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=cap",
+      "hash": "61b9cd52",
+      "calls": 40,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=flee/acc=basket",
+      "hash": "5e8ef625",
+      "calls": 25,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=tophat",
+      "hash": "63cec334",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=nightcap",
+      "hash": "6038e653",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=bonnet",
+      "hash": "3c61dd67",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=cane",
+      "hash": "62344f26",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=scarf",
+      "hash": "b6d8e4a3",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=lantern",
+      "hash": "fe43137f",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=hood",
+      "hash": "74e6df59",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=umbrella",
+      "hash": "d6c8e424",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=cap",
+      "hash": "7f5ae5c0",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=cower/acc=basket",
+      "hash": "d5eeb127",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=tophat",
+      "hash": "234154dd",
+      "calls": 44,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=nightcap",
+      "hash": "0594aedd",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=bonnet",
+      "hash": "784c20ed",
+      "calls": 46,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=cane",
+      "hash": "6defa51f",
+      "calls": 45,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=scarf",
+      "hash": "369a8907",
+      "calls": 48,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=lantern",
+      "hash": "342e5719",
+      "calls": 54,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=hood",
+      "hash": "ee24db7a",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=umbrella",
+      "hash": "7578d2b5",
+      "calls": 42,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=cap",
+      "hash": "96f4add9",
+      "calls": 49,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=dazed/acc=basket",
+      "hash": "d85d9106",
+      "calls": 47,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=tophat",
+      "hash": "960e5672",
+      "calls": 31,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=nightcap",
+      "hash": "620ea331",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=bonnet",
+      "hash": "3b4b5b9f",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=cane",
+      "hash": "f3eabe15",
+      "calls": 25,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=scarf",
+      "hash": "3e890b65",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=lantern",
+      "hash": "bf3f6233",
+      "calls": 28,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=hood",
+      "hash": "549b05f4",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=umbrella",
+      "hash": "0e8e00e2",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=cap",
+      "hash": "a51ec150",
+      "calls": 22,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=fed/acc=basket",
+      "hash": "f6847aa5",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=tophat",
+      "hash": "e6858bb2",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=nightcap",
+      "hash": "e5dfa3ab",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=bonnet",
+      "hash": "cd79225a",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=cane",
+      "hash": "b988fa6b",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=scarf",
+      "hash": "980170c7",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=lantern",
+      "hash": "18771d05",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=hood",
+      "hash": "a501defe",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=umbrella",
+      "hash": "94c9d4d1",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=cap",
+      "hash": "84f0821d",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=bogus/acc=basket",
+      "hash": "bcc555f1",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=tophat",
+      "hash": "5292bf9a",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=nightcap",
+      "hash": "3fee5d29",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=bonnet",
+      "hash": "5f4fd5e9",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=cane",
+      "hash": "9b8be5aa",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=scarf",
+      "hash": "e09e2f64",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=lantern",
+      "hash": "40e99e37",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=hood",
+      "hash": "393f554c",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=umbrella",
+      "hash": "f1d53f3d",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=cap",
+      "hash": "87faac8c",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=0/mode=undefined/acc=basket",
+      "hash": "319fa344",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=tophat",
+      "hash": "2a0a4c49",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=nightcap",
+      "hash": "2a3522db",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=bonnet",
+      "hash": "f3778be1",
+      "calls": 198,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=cane",
+      "hash": "253130e2",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=scarf",
+      "hash": "d5e258bb",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=lantern",
+      "hash": "b67f4523",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=hood",
+      "hash": "55c2cd14",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=umbrella",
+      "hash": "1b52ce92",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=cap",
+      "hash": "70ebc5f9",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=path/acc=basket",
+      "hash": "01d32e79",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=tophat",
+      "hash": "2fcaa026",
+      "calls": 222,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=nightcap",
+      "hash": "de6bce00",
+      "calls": 222,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=bonnet",
+      "hash": "ce9a9ad9",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=cane",
+      "hash": "8bc653d3",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=scarf",
+      "hash": "b797a4d4",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=lantern",
+      "hash": "2f136f4a",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=hood",
+      "hash": "ecb4df1e",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=umbrella",
+      "hash": "d6cb68fa",
+      "calls": 258,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=cap",
+      "hash": "702b64fa",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=startle/acc=basket",
+      "hash": "281edcb2",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=tophat",
+      "hash": "b16a8260",
+      "calls": 198,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=nightcap",
+      "hash": "e1f15fa0",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=bonnet",
+      "hash": "bb88e512",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=cane",
+      "hash": "6d7d9112",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=scarf",
+      "hash": "a14db663",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=lantern",
+      "hash": "8268daf5",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=hood",
+      "hash": "4926241c",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=umbrella",
+      "hash": "0d3fca00",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=cap",
+      "hash": "97b443dd",
+      "calls": 274,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=flee/acc=basket",
+      "hash": "2739e1b2",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=tophat",
+      "hash": "96df1d7c",
+      "calls": 254,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=nightcap",
+      "hash": "3abb76d6",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=bonnet",
+      "hash": "391c8642",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=cane",
+      "hash": "f60ec72d",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=scarf",
+      "hash": "25be919c",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=lantern",
+      "hash": "ff30ecdf",
+      "calls": 254,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=hood",
+      "hash": "f525948a",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=umbrella",
+      "hash": "697f6eaa",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=cap",
+      "hash": "42df291f",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=cower/acc=basket",
+      "hash": "344e6a32",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=tophat",
+      "hash": "bd6bc1f5",
+      "calls": 270,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=nightcap",
+      "hash": "52cd39d2",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=bonnet",
+      "hash": "afec64b9",
+      "calls": 274,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=cane",
+      "hash": "57d7e0cf",
+      "calls": 266,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=scarf",
+      "hash": "731e0449",
+      "calls": 270,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=lantern",
+      "hash": "965266a0",
+      "calls": 298,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=hood",
+      "hash": "ff5b92ab",
+      "calls": 262,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=umbrella",
+      "hash": "e0ff26a7",
+      "calls": 238,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=cap",
+      "hash": "a9c0c35c",
+      "calls": 306,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=dazed/acc=basket",
+      "hash": "5dac4087",
+      "calls": 258,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=tophat",
+      "hash": "c61ffa57",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=nightcap",
+      "hash": "a5548493",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=bonnet",
+      "hash": "38ee0f86",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=cane",
+      "hash": "4db7d6ae",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=scarf",
+      "hash": "428274c5",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=lantern",
+      "hash": "6a04d2c3",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=hood",
+      "hash": "7b8a9f3f",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=umbrella",
+      "hash": "5fc7d2f5",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=cap",
+      "hash": "9011ee41",
+      "calls": 150,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=fed/acc=basket",
+      "hash": "103c77f8",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=tophat",
+      "hash": "0bdfe629",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=nightcap",
+      "hash": "bc0782ac",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=bonnet",
+      "hash": "4d5e3cf7",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=cane",
+      "hash": "de63d7aa",
+      "calls": 234,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=scarf",
+      "hash": "8a0e3a75",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=lantern",
+      "hash": "82bbf26a",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=hood",
+      "hash": "bc7b29a3",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=umbrella",
+      "hash": "af717ae2",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=cap",
+      "hash": "8bf5102d",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=bogus/acc=basket",
+      "hash": "65f0aa0e",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=tophat",
+      "hash": "506bd987",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=nightcap",
+      "hash": "266d20e2",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=bonnet",
+      "hash": "0a4e7f07",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=cane",
+      "hash": "11ea0435",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=scarf",
+      "hash": "a5baffae",
+      "calls": 250,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=lantern",
+      "hash": "84c2214b",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=hood",
+      "hash": "6227d20c",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=umbrella",
+      "hash": "99f685b2",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=cap",
+      "hash": "70faf549",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=1/mode=undefined/acc=basket",
+      "hash": "0711fa9c",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=tophat",
+      "hash": "74bdf261",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=nightcap",
+      "hash": "53b7138c",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=bonnet",
+      "hash": "163f5086",
+      "calls": 207,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=cane",
+      "hash": "f20c7a1a",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=scarf",
+      "hash": "b46afbf4",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=lantern",
+      "hash": "b50710dc",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=hood",
+      "hash": "89fd5309",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=umbrella",
+      "hash": "0136c10f",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=cap",
+      "hash": "92c67027",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=path/acc=basket",
+      "hash": "06918429",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=tophat",
+      "hash": "7b64ef63",
+      "calls": 231,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=nightcap",
+      "hash": "66d67712",
+      "calls": 231,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=bonnet",
+      "hash": "2cc53df2",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=cane",
+      "hash": "2347ba2e",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=scarf",
+      "hash": "28a9a163",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=lantern",
+      "hash": "73f75283",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=hood",
+      "hash": "aa103291",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=umbrella",
+      "hash": "0d855914",
+      "calls": 267,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=cap",
+      "hash": "fa0ae006",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=startle/acc=basket",
+      "hash": "50793705",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=tophat",
+      "hash": "314e6c4f",
+      "calls": 207,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=nightcap",
+      "hash": "80e7eb54",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=bonnet",
+      "hash": "35b76abd",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=cane",
+      "hash": "703e339e",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=scarf",
+      "hash": "88baaf29",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=lantern",
+      "hash": "1c433b33",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=hood",
+      "hash": "d34d1e7f",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=umbrella",
+      "hash": "cc266077",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=cap",
+      "hash": "594c3a06",
+      "calls": 283,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=flee/acc=basket",
+      "hash": "564e2042",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=tophat",
+      "hash": "aef5d1b4",
+      "calls": 263,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=nightcap",
+      "hash": "706fde6c",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=bonnet",
+      "hash": "9f7ab04b",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=cane",
+      "hash": "140f7782",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=scarf",
+      "hash": "da8e197a",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=lantern",
+      "hash": "37c34a86",
+      "calls": 263,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=hood",
+      "hash": "e45fcb63",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=umbrella",
+      "hash": "52b444b7",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=cap",
+      "hash": "d3063b68",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=cower/acc=basket",
+      "hash": "bd93ed01",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=tophat",
+      "hash": "909bfac2",
+      "calls": 279,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=nightcap",
+      "hash": "ceae71a1",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=bonnet",
+      "hash": "83269e14",
+      "calls": 283,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=cane",
+      "hash": "b7b5183c",
+      "calls": 275,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=scarf",
+      "hash": "efb1cacf",
+      "calls": 279,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=lantern",
+      "hash": "2860c46b",
+      "calls": 307,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=hood",
+      "hash": "ee748a5d",
+      "calls": 271,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=umbrella",
+      "hash": "033f8c46",
+      "calls": 247,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=cap",
+      "hash": "f8cca8c1",
+      "calls": 315,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=dazed/acc=basket",
+      "hash": "09c95e55",
+      "calls": 267,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=tophat",
+      "hash": "82a6f269",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=nightcap",
+      "hash": "561eae4a",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=bonnet",
+      "hash": "ac0b2e78",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=cane",
+      "hash": "868e900e",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=scarf",
+      "hash": "55bb2875",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=lantern",
+      "hash": "b736f117",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=hood",
+      "hash": "166d3992",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=umbrella",
+      "hash": "a2012031",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=cap",
+      "hash": "9295a6e2",
+      "calls": 159,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=fed/acc=basket",
+      "hash": "dfcf9b1a",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=tophat",
+      "hash": "5cc94c80",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=nightcap",
+      "hash": "55ad902d",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=bonnet",
+      "hash": "d73b5649",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=cane",
+      "hash": "3e21195f",
+      "calls": 243,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=scarf",
+      "hash": "4df320b7",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=lantern",
+      "hash": "f6f0696c",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=hood",
+      "hash": "1e20b8a5",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=umbrella",
+      "hash": "cc01d38b",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=cap",
+      "hash": "aceb5fc2",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=bogus/acc=basket",
+      "hash": "065dea69",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=tophat",
+      "hash": "7299c125",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=nightcap",
+      "hash": "3d043d4d",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=bonnet",
+      "hash": "67c1dedc",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=cane",
+      "hash": "c80e78eb",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=scarf",
+      "hash": "41f2acdf",
+      "calls": 259,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=lantern",
+      "hash": "fd418a63",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=hood",
+      "hash": "8af925e9",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=umbrella",
+      "hash": "9f3522fd",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=cap",
+      "hash": "a38b19e7",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=false/q=3/mode=undefined/acc=basket",
+      "hash": "6a1083d6",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=tophat",
+      "hash": "656eee9a",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=nightcap",
+      "hash": "ced530e2",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=bonnet",
+      "hash": "52c77500",
+      "calls": 24,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=cane",
+      "hash": "3c5fb0b0",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=scarf",
+      "hash": "bb7595a7",
+      "calls": 41,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=lantern",
+      "hash": "7314790a",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=hood",
+      "hash": "a5f4b778",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=umbrella",
+      "hash": "b9a92aec",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=cap",
+      "hash": "cb6539b6",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=path/acc=basket",
+      "hash": "d7ed9fa8",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=tophat",
+      "hash": "bf3139e0",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=nightcap",
+      "hash": "a87c281a",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=bonnet",
+      "hash": "cfbf4d5b",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=cane",
+      "hash": "91c8214a",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=scarf",
+      "hash": "11c2946f",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=lantern",
+      "hash": "71591472",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=hood",
+      "hash": "971092fc",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=umbrella",
+      "hash": "911349a5",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=cap",
+      "hash": "34fa81b8",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=startle/acc=basket",
+      "hash": "6ea63c2e",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=tophat",
+      "hash": "37565a9f",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=nightcap",
+      "hash": "0b2146c5",
+      "calls": 31,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=bonnet",
+      "hash": "79819bb8",
+      "calls": 40,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=cane",
+      "hash": "fe04295a",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=scarf",
+      "hash": "d116eb47",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=lantern",
+      "hash": "01641516",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=hood",
+      "hash": "64c01ee1",
+      "calls": 28,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=umbrella",
+      "hash": "bb3e9abc",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=cap",
+      "hash": "3ababd39",
+      "calls": 40,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=flee/acc=basket",
+      "hash": "9e9d9e10",
+      "calls": 25,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=tophat",
+      "hash": "b0e5082a",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=nightcap",
+      "hash": "4d33668d",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=bonnet",
+      "hash": "5bae8840",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=cane",
+      "hash": "604aa60c",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=scarf",
+      "hash": "b9a7b34f",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=lantern",
+      "hash": "63139183",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=hood",
+      "hash": "4b4ef4db",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=umbrella",
+      "hash": "dc8c51ef",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=cap",
+      "hash": "e3ff1dfc",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=cower/acc=basket",
+      "hash": "dc3d1e4a",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=tophat",
+      "hash": "2c4951be",
+      "calls": 44,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=nightcap",
+      "hash": "89e7f764",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=bonnet",
+      "hash": "d5b9c093",
+      "calls": 46,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=cane",
+      "hash": "ea965a8e",
+      "calls": 45,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=scarf",
+      "hash": "0f1e907a",
+      "calls": 48,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=lantern",
+      "hash": "7062643e",
+      "calls": 54,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=hood",
+      "hash": "66f8a213",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=umbrella",
+      "hash": "0fdd1f6e",
+      "calls": 42,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=cap",
+      "hash": "1e2623b3",
+      "calls": 49,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=dazed/acc=basket",
+      "hash": "4723515b",
+      "calls": 47,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=tophat",
+      "hash": "c0615fd6",
+      "calls": 31,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=nightcap",
+      "hash": "65307860",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=bonnet",
+      "hash": "6b919238",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=cane",
+      "hash": "bfed40b4",
+      "calls": 25,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=scarf",
+      "hash": "c7e4fabe",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=lantern",
+      "hash": "b65e4156",
+      "calls": 28,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=hood",
+      "hash": "496b2c97",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=umbrella",
+      "hash": "64e56c73",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=cap",
+      "hash": "facd4e72",
+      "calls": 22,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=fed/acc=basket",
+      "hash": "60735070",
+      "calls": 35,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=tophat",
+      "hash": "26c11097",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=nightcap",
+      "hash": "50ef992f",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=bonnet",
+      "hash": "cfe3c8ab",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=cane",
+      "hash": "2019caa2",
+      "calls": 39,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=scarf",
+      "hash": "2bed779c",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=lantern",
+      "hash": "94f9d16d",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=hood",
+      "hash": "c7655cf2",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=umbrella",
+      "hash": "9e362194",
+      "calls": 29,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=cap",
+      "hash": "c4ea31e8",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=bogus/acc=basket",
+      "hash": "4e978955",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=tophat",
+      "hash": "f3ed5922",
+      "calls": 27,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=nightcap",
+      "hash": "7e0cd6c3",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=bonnet",
+      "hash": "72ee1d13",
+      "calls": 33,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=cane",
+      "hash": "4cad4fa9",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=scarf",
+      "hash": "1fb41d41",
+      "calls": 36,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=lantern",
+      "hash": "96c8cb82",
+      "calls": 34,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=hood",
+      "hash": "4fe7c363",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=umbrella",
+      "hash": "85ad08c1",
+      "calls": 37,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=cap",
+      "hash": "b505aa06",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=0/mode=undefined/acc=basket",
+      "hash": "4477523b",
+      "calls": 32,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=tophat",
+      "hash": "2d6325d7",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=nightcap",
+      "hash": "cd6fedac",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=bonnet",
+      "hash": "622d6581",
+      "calls": 198,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=cane",
+      "hash": "86dc85d7",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=scarf",
+      "hash": "31ad4b1c",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=lantern",
+      "hash": "d70fc039",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=hood",
+      "hash": "eca27f32",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=umbrella",
+      "hash": "80cd1994",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=cap",
+      "hash": "1654b532",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=path/acc=basket",
+      "hash": "d3bc9c84",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=tophat",
+      "hash": "58d59b02",
+      "calls": 222,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=nightcap",
+      "hash": "18452bc2",
+      "calls": 222,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=bonnet",
+      "hash": "d141d56c",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=cane",
+      "hash": "a7b86c41",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=scarf",
+      "hash": "6b4dd9f8",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=lantern",
+      "hash": "98f8e5ee",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=hood",
+      "hash": "022de0f5",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=umbrella",
+      "hash": "328dc917",
+      "calls": 258,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=cap",
+      "hash": "9ea2be12",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=startle/acc=basket",
+      "hash": "f06cbbb2",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=tophat",
+      "hash": "a8f13a5c",
+      "calls": 198,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=nightcap",
+      "hash": "529797d0",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=bonnet",
+      "hash": "6cab58cd",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=cane",
+      "hash": "1dcacc50",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=scarf",
+      "hash": "ce9b630e",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=lantern",
+      "hash": "b5c63928",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=hood",
+      "hash": "738762ba",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=umbrella",
+      "hash": "efa28627",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=cap",
+      "hash": "b0add605",
+      "calls": 274,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=flee/acc=basket",
+      "hash": "a838a818",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=tophat",
+      "hash": "d89876dd",
+      "calls": 254,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=nightcap",
+      "hash": "d4d22606",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=bonnet",
+      "hash": "d9f2f3de",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=cane",
+      "hash": "f4efae30",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=scarf",
+      "hash": "07fd9ac8",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=lantern",
+      "hash": "77126a4c",
+      "calls": 254,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=hood",
+      "hash": "7be4ff72",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=umbrella",
+      "hash": "29a70cc6",
+      "calls": 214,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=cap",
+      "hash": "34ea3bdc",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=cower/acc=basket",
+      "hash": "179036f4",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=tophat",
+      "hash": "34840b28",
+      "calls": 270,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=nightcap",
+      "hash": "c9ddadcd",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=bonnet",
+      "hash": "63021655",
+      "calls": 274,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=cane",
+      "hash": "8c029173",
+      "calls": 266,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=scarf",
+      "hash": "c1a84774",
+      "calls": 270,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=lantern",
+      "hash": "d7b817ed",
+      "calls": 298,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=hood",
+      "hash": "52820777",
+      "calls": 262,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=umbrella",
+      "hash": "51ecb9fa",
+      "calls": 238,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=cap",
+      "hash": "54ad44b4",
+      "calls": 306,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=dazed/acc=basket",
+      "hash": "b886cc46",
+      "calls": 258,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=tophat",
+      "hash": "61565e52",
+      "calls": 186,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=nightcap",
+      "hash": "acdc2d1b",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=bonnet",
+      "hash": "06d9ac23",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=cane",
+      "hash": "bbf6268c",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=scarf",
+      "hash": "8544e994",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=lantern",
+      "hash": "4c9cd044",
+      "calls": 178,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=hood",
+      "hash": "66be3cdd",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=umbrella",
+      "hash": "a9ce6d80",
+      "calls": 206,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=cap",
+      "hash": "8eaf04ef",
+      "calls": 150,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=fed/acc=basket",
+      "hash": "8d9f46c4",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=tophat",
+      "hash": "98fd741a",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=nightcap",
+      "hash": "c79b1703",
+      "calls": 210,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=bonnet",
+      "hash": "cacf766d",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=cane",
+      "hash": "1b642ace",
+      "calls": 234,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=scarf",
+      "hash": "200a2280",
+      "calls": 242,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=lantern",
+      "hash": "b8e9d892",
+      "calls": 170,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=hood",
+      "hash": "63b6fbd7",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=umbrella",
+      "hash": "a05de866",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=cap",
+      "hash": "7cf303af",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=bogus/acc=basket",
+      "hash": "35270cca",
+      "calls": 226,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=tophat",
+      "hash": "a8452341",
+      "calls": 202,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=nightcap",
+      "hash": "aabae59e",
+      "calls": 174,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=bonnet",
+      "hash": "503c6102",
+      "calls": 230,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=cane",
+      "hash": "e3a59342",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=scarf",
+      "hash": "352bfa95",
+      "calls": 250,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=lantern",
+      "hash": "a690cc77",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=hood",
+      "hash": "3f95c7ed",
+      "calls": 194,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=umbrella",
+      "hash": "fa8982a8",
+      "calls": 218,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=cap",
+      "hash": "5816fde5",
+      "calls": 182,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=1/mode=undefined/acc=basket",
+      "hash": "c7d4ce55",
+      "calls": 190,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=tophat",
+      "hash": "b78eb100",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=nightcap",
+      "hash": "edecf5f3",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=bonnet",
+      "hash": "61268681",
+      "calls": 207,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=cane",
+      "hash": "8f778430",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=scarf",
+      "hash": "5ba08f05",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=lantern",
+      "hash": "a43d3f5f",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=hood",
+      "hash": "514c6560",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=umbrella",
+      "hash": "4d91e281",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=cap",
+      "hash": "cee9415e",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=path/acc=basket",
+      "hash": "12801c8a",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=tophat",
+      "hash": "c01e6b76",
+      "calls": 231,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=nightcap",
+      "hash": "aecde8bf",
+      "calls": 231,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=bonnet",
+      "hash": "ca42e827",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=cane",
+      "hash": "460fcff5",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=scarf",
+      "hash": "895de70c",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=lantern",
+      "hash": "dd515b03",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=hood",
+      "hash": "a4de1180",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=umbrella",
+      "hash": "c663ea95",
+      "calls": 267,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=cap",
+      "hash": "ab528783",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=startle/acc=basket",
+      "hash": "4c29671f",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=tophat",
+      "hash": "85e43c37",
+      "calls": 207,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=nightcap",
+      "hash": "dc4b567e",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=bonnet",
+      "hash": "c05c18db",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=cane",
+      "hash": "8174b91e",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=scarf",
+      "hash": "cb85563d",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=lantern",
+      "hash": "2dfa6f89",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=hood",
+      "hash": "3ab6e678",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=umbrella",
+      "hash": "5bd897b3",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=cap",
+      "hash": "6f11298a",
+      "calls": 283,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=flee/acc=basket",
+      "hash": "bdd443f9",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=tophat",
+      "hash": "e1d4c882",
+      "calls": 263,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=nightcap",
+      "hash": "ed6775ca",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=bonnet",
+      "hash": "f2ec1f5a",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=cane",
+      "hash": "594d273d",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=scarf",
+      "hash": "6f2110e5",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=lantern",
+      "hash": "183689ae",
+      "calls": 263,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=hood",
+      "hash": "7119e64f",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=umbrella",
+      "hash": "aa22fdfc",
+      "calls": 223,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=cap",
+      "hash": "e63e1f52",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=cower/acc=basket",
+      "hash": "336073f4",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=tophat",
+      "hash": "85b5309f",
+      "calls": 279,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=nightcap",
+      "hash": "b211105c",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=bonnet",
+      "hash": "c6841ac8",
+      "calls": 283,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=cane",
+      "hash": "b320686f",
+      "calls": 275,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=scarf",
+      "hash": "697ac9b3",
+      "calls": 279,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=lantern",
+      "hash": "6e1a9604",
+      "calls": 307,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=hood",
+      "hash": "e455abe9",
+      "calls": 271,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=umbrella",
+      "hash": "f96c0fec",
+      "calls": 247,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=cap",
+      "hash": "a1f538ac",
+      "calls": 315,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=dazed/acc=basket",
+      "hash": "a85b4c13",
+      "calls": 267,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=tophat",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=nightcap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=bonnet",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=cane",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=scarf",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=lantern",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=hood",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=umbrella",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=cap",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=grapple/acc=basket",
+      "hash": "8aa6bb61",
+      "calls": 2,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=tophat",
+      "hash": "013ef2aa",
+      "calls": 195,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=nightcap",
+      "hash": "e5464529",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=bonnet",
+      "hash": "8d039ccc",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=cane",
+      "hash": "9b7625fd",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=scarf",
+      "hash": "c2e259aa",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=lantern",
+      "hash": "f902ca3e",
+      "calls": 187,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=hood",
+      "hash": "c129ec24",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=umbrella",
+      "hash": "5f1ed1a1",
+      "calls": 215,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=cap",
+      "hash": "72f4339c",
+      "calls": 159,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=fed/acc=basket",
+      "hash": "1d629cea",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=tophat",
+      "hash": "82b00198",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=nightcap",
+      "hash": "744647c9",
+      "calls": 219,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=bonnet",
+      "hash": "854e8912",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=cane",
+      "hash": "49908b68",
+      "calls": 243,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=scarf",
+      "hash": "1c042b03",
+      "calls": 251,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=lantern",
+      "hash": "21ba30a9",
+      "calls": 179,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=hood",
+      "hash": "7158438f",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=umbrella",
+      "hash": "b3be252f",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=cap",
+      "hash": "a6af7bbb",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=bogus/acc=basket",
+      "hash": "43ce2a22",
+      "calls": 235,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=tophat",
+      "hash": "afd5faac",
+      "calls": 211,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=nightcap",
+      "hash": "9e27a8a3",
+      "calls": 183,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=bonnet",
+      "hash": "d421e6fc",
+      "calls": 239,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=cane",
+      "hash": "10593932",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=scarf",
+      "hash": "fdbc6437",
+      "calls": 259,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=lantern",
+      "hash": "d58b90d7",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=hood",
+      "hash": "fa76fb18",
+      "calls": 203,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=umbrella",
+      "hash": "c30d0882",
+      "calls": 227,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=cap",
+      "hash": "3c7a06e0",
+      "calls": 191,
+      "threw": null
+    },
+    {
+      "key": "matrix/reduced=true/q=3/mode=undefined/acc=basket",
+      "hash": "b7c90d1a",
+      "calls": 199,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=false/q=0",
+      "hash": "3bfeaa72",
+      "calls": 65,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=false/q=1",
+      "hash": "dd571d3d",
+      "calls": 75,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=false/q=3",
+      "hash": "4f314e21",
+      "calls": 75,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=true/q=0",
+      "hash": "2c5c3441",
+      "calls": 65,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=true/q=1",
+      "hash": "0d56e0e6",
+      "calls": 75,
+      "threw": null
+    },
+    {
+      "key": "feedLock/reduced=true/q=3",
+      "hash": "0d56e0e6",
+      "calls": 75,
+      "threw": null
+    }
+  ]
+}

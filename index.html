@@ -99,6 +99,14 @@
         </select>
       </div>
       <div class="row">
+        <label for="set-effects">Effects</label>
+        <select id="set-effects">
+          <option value="0">Off (classic lines)</option>
+          <option value="1">Low</option>
+          <option value="2">High</option>
+        </select>
+      </div>
+      <div class="row">
         <label for="set-fov">Field of view</label>
         <input id="set-fov" type="range" min="50" max="100" step="1">
         <output id="out-fov" for="set-fov"></output>
@@ -218,6 +226,7 @@
   <script src="js/hunger.js" defer></script>
   <script src="js/save.js" defer></script>
   <script src="js/struggle.js" defer></script>
+  <script src="js/figure.js" defer></script>
   <script src="js/render.js" defer></script>
   <script src="js/hud.js" defer></script>
   <script src="js/icons.js" defer></script>

@@ -90,8 +90,20 @@ test('DEFAULTS is frozen and has the contract values', () => {
     devButton: true,
     subtitles: true,
     translation: true,
-    villagerVoices: true
+    villagerVoices: true,
+    effects: 2
   });
+});
+
+test('effects setting: default 2, 0..2 accepted, 3 and "2" rejected', () => {
+  assert.strictEqual(DEFAULTS.effects, 2);
+  for (const v of [0, 1, 2]) assert.strictEqual(sanitize({ effects: v }).config.effects, v);
+  const hi = sanitize({ effects: 3 });
+  assert.strictEqual(hi.config.effects, 2);
+  assert.strictEqual(hi.warnings.length, 1);
+  const str = sanitize({ effects: '2' });
+  assert.strictEqual(str.config.effects, 2);
+  assert.strictEqual(str.warnings.length, 1);
 });
 
 test('sanitize range-checks fovDeg (50 to 100 degrees)', () => {
@@ -199,7 +211,8 @@ test('sanitize keeps valid values, including range bounds', () => {
     devButton: false,
     subtitles: false,
     translation: false,
-    villagerVoices: false
+    villagerVoices: false,
+    effects: 0
   };
   const r = sanitize(input);
   assert.deepStrictEqual(r.warnings, []);

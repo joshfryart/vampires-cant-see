@@ -2316,6 +2316,7 @@
     set('set-invert', 'checked', !!c.invertMouse);
     set('set-volume', 'value', String(c.volume));
     set('set-scale', 'value', String(c.renderScale));
+    set('set-effects', 'value', String(c.effects));
     set('set-fov', 'value', String(c.fovDeg));
     set('set-night', 'value', String(c.nightLengthMin));
     set('set-bob', 'checked', c.headBob !== false);
@@ -2398,6 +2399,7 @@
     num('set-fov', 'fovDeg');
     num('set-night', 'nightLengthMin');
     num('set-scale', 'renderScale');
+    num('set-effects', 'effects');
     num('set-keyturn', 'keyTurnSpeed');
     const flag = function (id, key) {
       bind(id, 'change', function () {
@@ -3823,6 +3825,7 @@
           VCS.Flags.registerTun('vessels', 'windowRange', { value: 2.5, min: 0.5, max: 5, step: 0.25, desc: 'Cells within which vessels show through glass' });
           VCS.Flags.registerTun('vessels', 'lowGamma', { value: 0.5, min: 0.2, max: 1, step: 0.05, desc: 'Ease weak hearts (stateK < 1) so the core still shows when nearly drained' });
           VCS.Flags.registerTun('vessels', 'highlight', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Travelling highlight alpha along the edges' });
+          VCS.Flags.registerTun('figure', 'budgetMs', { value: 2.5, min: 0.5, max: 8, step: 0.25, desc: 'Volumetric figure draw budget per frame (ms); the rest draw as lines' });
           VCS.Flags.load(root.location.search, debug);
           if (VCS.Flags.get('dev.showFps')) S.debugOn = true;
           VCS.Flags.onChange(function (ev) {

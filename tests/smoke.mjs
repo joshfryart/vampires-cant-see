@@ -133,10 +133,16 @@ if (process.argv.includes('--shots')) {
   let code = 0;
   try {
     const url = INDEX_URL + '?seed=7&debug=1';
-    const open = async (start) => {
+    // fx (0..2) seeds vcs.settings before the game loads; query adds URL params (e.g. '&map=test').
+    const open = async (start, fx, query) => {
       const pg = await newPg(br, { viewport: { width: 1280, height: 720 } });
+      if (fx !== undefined) {
+        await pg.context().addInitScript((v) => {
+          try { localStorage.setItem('vcs.settings', JSON.stringify({ cfgV: 2, effects: v })); } catch (e) { /* ignore */ }
+        }, fx);
+      }
       pg.on('pageerror', (e) => console.log('pageerror: ' + (e && e.message ? e.message : e)));
-      await pg.goto(url);
+      await pg.goto(url + (query || ''));
       await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
       if (start) { await clickNew(pg); await sleep(300); }
       return pg;
@@ -155,7 +161,7 @@ if (process.argv.includes('--shots')) {
     await snap(pm, 'menu', false);
     await pm.close();
 
-    const pg = await open(true);
+    const pg = await open(true, 2);
     await snap(pg, 'crypt', true);
 
     const doors = await pg.evaluate(() => {
@@ -206,8 +212,54 @@ if (process.argv.includes('--shots')) {
     await snap(pg, 'hud-weak', false);
     await pg.close();
 
+
+    // Archetype lineup at effects 0, 1 and 2: one villager of each archetype in a row 1.6 cells apart, 2.5 cells ahead of
+    // the player and facing them. people[i].mode is set directly (cycling the list below), then one pulse.
+    const LINEUP_MODES = ['path', 'sit', 'chat', 'flee', 'cower', 'dazed', 'grapple', 'fed'];
+    for (const fx of [0, 1, 2]) {
+      const pl = await open(true, fx, '&map=test');
+      const lineup = await pl.evaluate((modes) => {
+        const G = window.VCS.Game;
+        const list = window.VCS.ArchetypeData.list.map((a) => a.id);
+        const n = list.length;
+        const w = G.debugPeopleState().world;
+        const m = window.VCS.MapData.maps.test;
+        const at = (x, y, a, i) => {
+          const lat = (i - (n - 1) / 2) * 1.6;
+          return { x: x + Math.cos(a) * 2.5 - Math.sin(a) * lat, y: y + Math.sin(a) * 2.5 + Math.cos(a) * lat };
+        };
+        let spot = null;
+        for (let y = 1; y < m.rows.length - 1 && !spot; y++) {
+          for (let x = 1; x < m.rows[y].length - 1 && !spot; x++) {
+            for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+              const px = x + 0.5;
+              const py = y + 0.5;
+              if (w.blocks(px, py, 0.25)) continue;
+              let clear = true;
+              for (let i = 0; i < n && clear; i++) { const q = at(px, py, a, i); if (w.blocks(q.x, q.y, 0.25)) clear = false; }
+              if (clear) { spot = { x: px, y: py, a: a }; break; }
+            }
+          }
+        }
+        if (!spot) return { ok: false, why: 'no open spot on the test map' };
+        G.debugTeleport(spot.x, spot.y, spot.a);
+        const ids = [];
+        for (let i = 0; i < n; i++) {
+          const q = at(spot.x, spot.y, spot.a, i);
+          const res = G.debugForgeSpawn(list[i], q.x, q.y, spot.a + Math.PI);
+          ids.push(res && res.ok ? res.id : null);
+        }
+        const people = G.debugPeopleState().people;
+        ids.forEach((id, i) => { const p = people.find((q) => q.id === id); if (p) p.mode = modes[i % modes.length]; });
+        return { ok: true, spawned: ids.filter((v) => v !== null).length, of: n };
+      }, LINEUP_MODES);
+      console.log('lineup fx' + fx + ': ' + JSON.stringify(lineup));
+      await snap(pl, 'lineup-fx' + fx, true);
+      await pl.close();
+    }
+
     // 5 feeding (test map has reliable victims), 6 gift panel.
-    const pf = await open(true);
+    const pf = await open(true, 2);
     await pf.evaluate(() => {
       const G = window.VCS.Game;
       G.debugMap('test', null);
@@ -657,6 +709,28 @@ try {
     console.log('FPS median (' + label + ', lit): ' + med.toFixed(1));
     if (med < 50 && med >= 35) console.log('WARN fps below 50 (' + label + '): ' + med.toFixed(1));
     check(label + ' fps >= 35', med >= 35, 'median=' + med.toFixed(1));
+  }
+
+  // B5: street fps at effects 2 with 3 pulses. No saved value means the default, which is 2.
+  {
+    await p6.evaluate(() => window.VCS.Game.debugMap('town', null));
+    await tp(outsidePt(doorInfo.tavern, 3));
+    const fxSaved = await p6.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('vcs.settings')); return s && typeof s === 'object' ? s.effects : null; } catch (e) { return null; } });
+    const fx2 = fxSaved === null || fxSaved === undefined ? 2 : fxSaved;
+    const fpsAt2 = [];
+    for (let k = 0; k < 3; k++) {
+      await p6.evaluate(() => window.VCS.Game.debugPulse());
+      const t1 = Date.now();
+      while (Date.now() - t1 < 1000) {
+        fpsAt2.push(await p6.evaluate(() => window.VCS.Game.debugState().fps));
+        await sleep(100);
+      }
+    }
+    const v2 = fpsAt2.filter((v) => typeof v === 'number' && v > 0).sort((a, b) => a - b);
+    const med2 = v2.length ? v2[Math.floor(v2.length / 2)] : 0;
+    // C4: no page errors so far and street fps >= 35 at effects 2 (3 pulses).
+    check('street at effects 2: no page errors and fps >= 35', fx2 === 2 && errs6.length === 0 && med2 >= 35,
+      'effects=' + fx2 + ' median=' + med2.toFixed(1) + ' pageErrors=' + errs6.length);
   }
 
   // Forced crash shows error screen.
