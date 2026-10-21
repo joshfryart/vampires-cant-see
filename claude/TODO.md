@@ -6,20 +6,18 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 1. [ ] Playtest v0.11.1 in browser (user played a v0.11.0 session OK, no errors in log; echo visuals/audio unchecked). Older list: v0.10.14 in browser (new: drink drag, town lights -35%; v0.10.13 items still apply; last playthrough ran 60 fps): step rings differ for sneak/run and grass/wood/stone; windows only under ripple (brief), villager footsteps sound like steps; echo timing (one sonar speed 12 cells/s, echo = round trip), far echoes from distant walls, torch glow/holders under ripple, edge glow direction + smoothness, fire hiss range, devtool ring alignment (`?debug=1`), night 4 min pace, town darkness at 3× radius.
 2. [x] Smoke test runs on a real machine (2026-10-20, Windows): 249 pass. Fixed stale night-length check (360 → 240 s). Needs Playwright installed outside the repo, `NODE_PATH` set to its node_modules, then `node tests/smoke.mjs`. First run had one extra failure that did not repeat; watch for flakiness. Still run before each release.
 3. [x] Perf: measured 2026-10-20, street/tavern hold 59–60 fps headless (earlier 44–52 was machine-load noise). CSS-overlay vignette tried and dropped (it dimmed the HUD; gain was noise). Update 2026-10-20: a later agent branch re-added it and it is merged on main (Render.setVignette); not re-measured, check HUD dimming.
-4. [x] Drink grab (v0.10.14; v0.10.17: click/Space pings while holding, no longer lets go; light -35% playtested OK; v0.10.16: start blood 10%; v0.10.15: pools 30–50, rate 7→2.5/s ≈ 9 s per villager; smoke retuned and passing 249 on 2026-10-20; Playwright lives at %TEMP%audepw-tools
-ode_modules (NODE_PATH)): hold drink → victim pulled to 0.6 cells ahead, you move at 25% speed (full victim) → 55% (drained), look halved. Tune DRAG_* in game.js. Smoke needs a drag check.
+4. [x] Drink grab (v0.10.14; v0.10.17: click/Space pings while holding, no longer lets go; light -35% playtested OK; v0.10.16: start blood 10%; v0.10.15: pools 30–50, rate 7→2.5/s ≈ 9 s per villager; smoke retuned and passing 249 on 2026-10-20; Playwright now at %TEMP%\vcs-pw\node_modules (NODE_PATH)): hold drink → victim pulled to 0.6 cells ahead, you move at 25% speed (full victim) → 55% (drained), look halved. Tune DRAG_* in game.js. Smoke needs a drag check.
 5. [x] Hidden "veil" meter (requested 2026-10-18 b): eye + 5 ticks beside the vial, smoothed `playerLit`; vignette tone-down/setting, fear tie-in and `tut:light` still open below. Same pass: gulp sound, victim struggle/break-free, drag scuffle sounds (untested in browser).
 6. [x] v0.10.18 (2026-10-20): villager struggle animations (`js/struggle.js`: panic flail -> push-away -> limp by blood, startle spike per break-free attempt, perspective/yaw cheat in `put`), vampire arms drawn in the held victim's echo, hold E to restrain (no break-free, muffled, half drink speed), G throws a rock (3 per run, saved in snapshot, clatter sound + sonar pulse + startles), rocks HUD pebbles right of skills, veil meter beside vial with skills shifted right, drinking 25% faster (DRINK_BOOST 1.25, ~7 s per villager). Opus brainstormed the move set; GIFs in docs/struggle-*.gif. Untested by hand in browser beyond headless screenshots: playtest restrain/rock feel, pebble placement with 3 powers unlocked, large-text HUD.
 7. [x] v0.10.19 (2026-10-20) V1 night schedules: `js/schedule.js` (roles = [places, until, act] over the night fraction; 20:00 = 0, 01:00 = 0.5), town `places` + `role`/`home` per path in maps.js, people.js routes trips with a lit-street-preferring Dijkstra (`routeTo`); sitters and the test map keep their loops. Curfew: all but the watch and night owls are indoors by 01:00 (tested), then abed (seated pose via `seated`). 2 guards patrol the 8 outdoor posts all night in opposite directions (speed 1.3); insomniac + gravedigger stay out until ~0.7; drunk leaves the tavern ~0.26 and is home by ~0.45. Homes: house1 (farmer), house2 (elder, regular, mother; separate cells), barn (drunk, insomniac), shed (gravedigger), tavern (innkeeper), church (priest). Home acts: cook, eat, spin/mend/whittle, sleep (benches as beds). `People.snapshot` has `sched` {role, stop, act, next, walking, eta}. 543 unit pass. Still open: on-screen `?debug=1` readout, go-home-early on high fear, flee along a trip path can wrap through a wall and cower, hearth fires/light inside homes (V6), real beds/lying pose, guard lantern.
 7b. [x] Decided: villagers first (V1 done above); v0.11 Echoes after. (was: Decide v0.11 Echoes (sonar speed decided; next = stages S1–S10) vs. v0.11 Villagers.)
 7c. [x] v0.11.1 (2026-10-20) Echoes shipped to main: visuals (air rings, wall vibe, ceiling ring indoors only, shared beam curve) + audio (acoustics block, materials/normals, TL occlusion + Maekawa, Sabine T60, comb, grain, click ping, per-material voices). Opus review fixes applied (min lowpass behind+occ, render reads pu.facing, one beam curve, breath honors occ, real 96-voice cap). 574 unit tests pass.
-7d. [ ] v0.11.1 NOT verified: smoke (253 pass was on the audio branch only, not re-run on merged main), air-ring look/tuning in a real browser, wetter reverb mix by ear, perf with new passes (street >=50 fps headless).
+7d. [ ] v0.11.1 NOT verified: smoke (253 pass was on the audio branch only, not re-run on merged main), air-ring look/tuning in a real browser, wetter reverb mix by ear, perf with new passes (street >=50 fps headless), CSS vignette HUD dimming (item 3).
 7e. [ ] v0.11 echo leftovers: corridor flutter; high-band beam narrowing + rear body shadow; air-band shelf; floor-bounce echo (below); struck-lit objects/people + warm tint (walls only today); roughness speckles; TL computed from formula (tl500 is a hand table, stone/brick 60/50 vs spec caps 65/55); person echoes still use old 0.7*strength (object sonar equation unused); repetition-pitch limit 2 m vs spec 1.3 cells; comb/delay nodes per echo not voice-tracked; air rings vanish when matDetail/fps auto-off; tests missing for game.js occlusionTo/firstSolid/blockMaterial and strongestEcho->gameAmp end to end; breath() occ test only checks return value.
 8. [x] Fix `docs/SPEC-echoes.md` lines ~333 and ~386 (still mention `delayMul`).
 
 - [x] (fixed 2026-10-20, 4 runs x 249 pass: pinned random, state waits, closed pages, per-section try/catch; rAF-freeze hook skipped) Smoke flakiness diagnosed 2026-10-20 (Fable agent; no game regressions, suite is racy). Fix list, in order: (1) pin Math.random on the lit-walker page `lp` (tests/smoke.mjs ~899-901): struggle() at 0.7 s can break free (40%) and end the drink before the witness flees, so 'lit walker facing away' is a coin flip; also reword the check (struggle noise startles it now, not a heartbeat). (2) optional `?debug=1` hook to stop the rAF loop so time moves only via debugAdvance (real time drifts the 20:00 / blood / pulse-pixel checks). (3) replace fixed sleeps with unswallowed state waits (53 `.catch(() => {})` hide slow boots, cascading into null-state TypeErrors: getContext, .blood, nightLengthMin, essenceBonus). (4) close all 9 leaked pages per section (31 opened, 21 closed; fps drops 60 -> 30-39). (5) per-section try/catch so one error does not skip ~100 checks. (6) pin Math.random in newPg; write screenshots outside OneDrive. Logs were in the scratchpad (run1.log, run2.log).
-- [ ] Smoke is flaky run to run (2026-10-20: meta-backup notice, tab-lock, occasional drink checks); pinned Math.random in the drink SETUP so break-free no longer fails drain checks. Playwright installed at %TEMP%cs-pw (NODE_PATH=...cs-pw
-ode_modules).
+- [ ] Smoke is flaky run to run (2026-10-20: meta-backup notice, tab-lock, occasional drink checks); pinned Math.random in the drink SETUP so break-free no longer fails drain checks. Playwright installed at %TEMP%\vcs-pw (NODE_PATH=%TEMP%\vcs-pw\node_modules).
 - [ ] Ideas: visible flying rock arc; rock pickups instead of a fixed 3; struggle moves could drive sounds (kick = thud); restrain stamina/noise tradeoff tuning.
 - [x] Town light radius scale 0.6 → 0.39 (-35%) (v0.10.14); world tests use light 20
 
@@ -149,12 +147,12 @@ Already done, NOT in v0.11: door texture, window glow shader, glass lets light, 
 - [x] Lights: player can't see light sources themselves — only glow under ripple; holders shown under ripple (v0.10.5–0.10.6)
   - [ ] Later: some villagers carry lanterns (moving glow + held lantern shown by ping).
 - [x] Fire sound: steady quiet hiss, no periodic pulse (v0.10.6)
-- [ ] Drink grab: animation pulls the victim close. Player can move slowly while drinking to drag them into shadow. Victim resists (slows/pulls back), resistance falls as their blood drains.
+- [x] (v0.10.14 drag, v0.10.18 struggle/break-free) Drink grab: animation pulls the victim close. Player can move slowly while drinking to drag them into shadow. Victim resists (slows/pulls back), resistance falls as their blood drains.
 
 ## Requested 2026-10-18 (b) — design pass, todo only
 ### Hidden meter (light readout)
 Now: lit ≥ 0.3 → warm edge vignette. Binary-feeling, easy to miss, reads as "warmth" not "seen".
-- [ ] Add small "veil" meter, bottom-left by blood bar, same doodle line style.
+- [x] (v0.10.14/v0.10.18, beside the vial) Add small "veil" meter, bottom-left by blood bar, same doodle line style.
   - Icon: closed eye (hidden) → half-lid → open eye with lashes (exposed). 3 states + smooth fill.
   - Bar: 5 ticks, value = world.lightAt at player (already computed for vignette), smoothed ~0.3 s.
   - Colours: cold blue-grey hidden → candle gold exposed (match window/door tints). No flashing; gentle 0.5 Hz breathe at full exposure only (≤3 Hz rule).
@@ -172,7 +170,7 @@ Now: lit ≥ 0.3 → warm edge vignette. Binary-feeling, easy to miss, reads as 
 
 ### Footstep rings (villagers)
 Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big full rings.
-- [ ] Shrink: range ~0.35, strength ~0.2, shorter fade.
+- [x] (v0.10.13: range 0.4, strength 0.25) Shrink: range ~0.35, strength ~0.2, shorter fade.
 - [ ] Restyle: small floor-only ellipse "scuff" (flattened, ground-hugging), not a full ring; alternate left/right offset per step so it reads as feet; no bounce pass.
 - [ ] Keep it lighting floor only (no walls) so player pulses stay the main reveal.
 
@@ -197,10 +195,10 @@ Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big 
 
 ## Requested 2026-10-18 (d) — living village, todo only
 ### V1 Night schedules (pathing)
-- [ ] Each villager gets a role + a night schedule (seeded per night): list of stops with times, built at dusk, covering the whole night length.
+- [x] (v0.10.19, not seeded per night; roles differ from this list) Each villager gets a role + a night schedule (seeded per night): list of stops with times, built at dusk, covering the whole night length.
   - Roles: baker, innkeeper, drunk, watchman/lamplighter, priest, mother/father/child (family home), courting pair, elder, maid, dog-walker, insomniac.
   - Stops: home, tavern, church, well, a friend's house, bed. Times scale with nightLengthMin.
-- [ ] Paths prefer torch-lit streets (existing lightPref) and use a precomputed street graph (nodes at junctions/doors) instead of loose patrol loops; replaces the 9 hand loops.
+- [x] (v0.10.19 `routeTo` lit-preferring Dijkstra) Paths prefer torch-lit streets (existing lightPref) and use a precomputed street graph (nodes at junctions/doors) instead of loose patrol loops; replaces the 9 hand loops.
 - [ ] Schedule visible in debug overlay (`?debug=1`): who, current stop, next stop, ETA.
 - [ ] Interruptions (fear, bumped, heard you) pause the schedule; they resume or go home early if fear is high.
 ### V2 Villager-to-villager interactions
