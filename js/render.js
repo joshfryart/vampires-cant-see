@@ -2567,8 +2567,7 @@
     if (hi < 0.02) {
       // Outline gone, but the circulatory wave may still be travelling to the hands and feet (flag on only).
       if (e.kind === 'vheart' && !locked && vesselsOn() && age >= 0 && age < vesselLife(e, !!r.reduced)) {
-        let nv = 0;
-        clippedDraw(r, minX - lw, maxX + lw, depth, function () { nv = drawVessels(r, e, X, Y, age); });
+        const nv = drawVesselsSeen(r, e, X, Y, age, minX - lw, maxX + lw, depth, player);
         ctx.globalAlpha = 1;
         return nv > 0;
       }
@@ -2613,7 +2612,7 @@
     };
     clippedDraw(r, minX - lw, maxX + lw, depth, wrapped);
     // Circulatory overlay: after the outline, not limited to the chest strip (the outline stays chest-only).
-    if (e.kind === 'vheart' && !locked && vesselsOn()) clippedDraw(r, minX - lw, maxX + lw, depth, function () { drawVessels(r, e, X, Y, age); });
+    if (e.kind === 'vheart' && !locked && vesselsOn()) drawVesselsSeen(r, e, X, Y, age, minX - lw, maxX + lw, depth, player);
     if (locked) drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
     ctx.globalAlpha = 1;
     return true;
@@ -2621,7 +2620,7 @@
 
   // ---- Circulatory pulse overlay (behind the `vis.vessels` flag): P3 nodes, P4 travelling lub-dub wave ----
   /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
-  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75, edges: 0.45, highlight: 1 };
+  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75, edges: 0.45, highlight: 1, window: 0.35, windowRange: 2.5 };
   const VESSEL_REDUCED_CAP = 0.5;
   /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
   const VESSEL_LEVELS = 6;
@@ -2665,6 +2664,61 @@
     else if (!o.reduced) a *= 1 + (n.hot || 0) * (typeof o.hotK === 'number' ? o.hotK : VESSEL_TUN.hot);
     if (o.reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
     return a > 1 ? 1 : a < 0 ? 0 : a;
+  }
+
+  /** Ray-cast tile code of a window ('w') column, and how far behind the glass a body may stand and still show. */
+  const TILE_WINDOW = 119;
+  const VESSEL_GLASS_REACH = 2.5;
+
+  /**
+   * P2b mute (0..1) for vessels seen through a window: `vessels.window` (0.35) x (1 - d / `vessels.windowRange` (2.5)),
+   * d = player -> body distance; 0 beyond the range or when a solid (non-glass) tile lies on the line (world.lineBlocked).
+   */
+  function vesselWindowMute(r, e, player) {
+    const k = vesselTun('window');
+    const range = vesselTun('windowRange');
+    if (!(k > 0) || !(range > 0) || !player || !e) return 0;
+    const d = Math.hypot(e.x - player.x, e.y - player.y);
+    if (!(d < range)) return 0;
+    const w = r.visWorld;
+    if (w && typeof w.lineBlocked === 'function' && w.lineBlocked(player.x, player.y, e.x, e.y)) return 0;
+    return k * (1 - d / range);
+  }
+
+  /** Like clippedDraw, but only over window columns in front of the body (glass within VESSEL_GLASS_REACH of it). */
+  function windowDraw(r, x0, x1, depth, fn) {
+    if (!r.tch || !r.zbuf) return;
+    const a = Math.max(0, Math.floor(x0 / r.colW));
+    const b = Math.min(r.cols - 1, Math.floor(x1 / r.colW));
+    const ctx = r.octx;
+    let runStart = -1;
+    for (let c = a; c <= b + 1; c++) {
+      const z = c <= b ? r.zbuf[c] : 0;
+      const vis = c <= b && z <= depth && r.tch[c] === TILE_WINDOW && depth - z <= VESSEL_GLASS_REACH;
+      if (vis && runStart < 0) runStart = c;
+      if (!vis && runStart >= 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(runStart * r.colW, 0, (c - runStart) * r.colW, r.oh);
+        ctx.clip();
+        fn(ctx);
+        ctx.restore();
+        runStart = -1;
+      }
+    }
+  }
+
+  /**
+   * Vessels where the body is seen: open columns at full strength (walls hide them, like the outline), window columns
+   * muted by vesselWindowMute (P2b). The overlay rides only on vheart echoes, which exist only where the beat's own
+   * pulse passed Sonar.visibleFrom. Returns the nodes drawn (> 0 when anything showed).
+   */
+  function drawVesselsSeen(r, e, X, Y, age, x0, x1, depth, player) {
+    let n = 0;
+    clippedDraw(r, x0, x1, depth, function () { n += drawVessels(r, e, X, Y, age); });
+    const m = vesselWindowMute(r, e, player);
+    if (m > 0.01) windowDraw(r, x0, x1, depth, function () { n += drawVessels(r, e, X, Y, age, m); });
+    return n;
   }
 
   /** Per-node screen points and alphas for one drawVessels call (reused, no per-frame allocation). */
@@ -3548,6 +3602,8 @@
     const tanHalf = Math.tan(fov / 2);
     const bob = opts && typeof opts.bob === 'number' && isFinite(opts.bob) ? opts.bob : 0;
     r.horizon = r.oh / 2 + bob * (r.oh / BASE_H);
+    // Vessel overlay through windows (P2b) needs a glass-aware line of sight; read only while vis.vessels is on.
+    r.visWorld = world;
     const hits = VCS.Raycast.cast(world, player.x, player.y, player.angle, fov, r.cols, MAX_DIST);
 
     const octx = r.octx;
@@ -3865,6 +3921,8 @@
     speckle: speckle,
     pulseRough: pulseRough,
     drawVessels: drawVessels,
+    drawVesselsSeen: drawVesselsSeen,
+    vesselWindowMute: vesselWindowMute,
     vesselAlpha: vesselAlpha,
     vesselLife: vesselLife,
     VESSEL_TUN: VESSEL_TUN

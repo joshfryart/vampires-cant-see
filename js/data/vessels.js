@@ -135,6 +135,9 @@
 
   function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
+  /** Pulse state of a body that never pulses (vampire, P2c). */
+  const STILL = Object.freeze({ pulse: false, bpm: 0, stateK: 0, periphK: 0, headK: 0 });
+
   /**
    * Pulse state for a body. kind 'vampire' never pulses (undead: anatomy only, no heartbeat, no blood).
    * mode is a villager mode name (unknown = calm); blood is left/pool 0..1 (default 1).
@@ -143,7 +146,7 @@
    * Returns { pulse, bpm, stateK, periphK, headK }.
    */
   function state(kind, mode, blood) {
-    if (kind === 'vampire') return { pulse: false, bpm: 0, stateK: 0, periphK: 0, headK: 0 };
+    if (kind === 'vampire') return STILL;
     const m = MODES[mode] || MODES.calm;
     const f = blood === undefined ? 1 : clamp01(blood);
     if (m.bpm === 0 || f <= 0) return { pulse: false, bpm: 0, stateK: 0, periphK: 0, headK: 0 };
@@ -169,10 +172,15 @@
     return k * st.stateK * per * (n.head ? st.headK : 1);
   }
 
-  /** Vessel model per body kind. Vampire: same anatomy, pulse and blood false. */
+  /**
+   * Vessel model per body kind. Vampire (the player, P2c): the same anatomy (nodes, anchors, edges) but undead:
+   * pulse and blood false and a frozen still state, so nothing on it ever pulses or carries blood. The player body
+   * is only ever drawn as the grab arms (first person); drawVessels refuses vampire bodies, so the model is anatomy
+   * data for any future drawing of the player's body, never a heartbeat.
+   */
   function forBody(kind) {
     const vamp = kind === 'vampire';
-    return { kind: vamp ? 'vampire' : 'villager', nodes: all(), pulse: !vamp, blood: !vamp };
+    return { kind: vamp ? 'vampire' : 'villager', nodes: all(), pulse: !vamp, blood: !vamp, state: vamp ? STILL : null };
   }
 
   // ---- P4 travelling pulse: pure timing helpers ----

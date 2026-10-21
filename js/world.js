@@ -647,6 +647,7 @@
       materialAt: materialAt,
       roughnessAt: roughnessAt,
       isSolid: isSolid,
+      lineBlocked: lineBlocked,
       isDoorOpen: isDoorOpen,
       setDoor: setDoor,
       doorsById: doorsById,

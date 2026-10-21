@@ -716,6 +716,8 @@ describe('render-vessels (circulatory P3)', () => {
       assert.strictEqual(Render.drawVessels(r, e, X, Y, -1), 0);
       assert.strictEqual(r.octx.calls.filter((c) => c.fn === 'fill').length, 0);
     }
+    // P2c: a vampire body never pulses, at any point of the wave either.
+    for (const a of [0, 0.1, 0.3]) assert.strictEqual(Render.drawVessels(rig(2), vh({ body: 'vampire' }), X, Y, a), 0);
     // Past the echo's life: nothing.
     assert.strictEqual(Render.drawVessels(rig(2), vh(), X, Y, 5), 0);
     Flags.set('vis.vessels', false);
@@ -855,5 +857,39 @@ describe('render-vessels (circulatory P3)', () => {
     assert.strictEqual(Render.drawVessels(rig(2), vh(), X, Y, 0.1, 0), 0);
     Flags.set('vis.vessels', false);
   });
+  // ---- P2b: window / wall muting ----
+  test('P2b window mute: distance-scaled, 0 past the range or behind a solid wall', () => {
+    const pl = { x: 0, y: 0 };
+    const r = rig(2);
+    const at = (d) => Render.vesselWindowMute(r, { x: d, y: 0 }, pl);
+    assert.ok(Math.abs(at(1) - 0.35 * (1 - 1 / 2.5)) < 1e-9);
+    assert.ok(at(0.5) > at(1.5) && at(1.5) > 0);
+    assert.strictEqual(at(2.6), 0);
+    r.visWorld = { lineBlocked: () => true };
+    assert.strictEqual(at(1), 0);
+    r.visWorld = { lineBlocked: () => false };
+    assert.ok(at(1) > 0);
+  });
+
+  test('P2b drawVesselsSeen: full in the open, muted through glass, nothing through a wall', () => {
+    Flags.set('vis.vessels', true);
+    const cols = 32;
+    const mk = (z, code) => Object.assign(rig(2), { cols, colW: 10, oh: 360, zbuf: new Float32Array(cols).fill(z), tch: new Uint8Array(cols).fill(code) });
+    const e = vh({ x: 1.2, y: 0 });
+    const pl = { x: 0, y: 0 };
+    const mx = (r) => Math.max(0, ...r.octx.calls.filter((c) => c.fn === 'fill' || c.fn === 'stroke').map((c) => c.alpha));
+    const open = mk(10, 46);
+    assert.ok(Render.drawVesselsSeen(open, e, X, Y, 0.1, 0, 300, 1.2, pl) > 0);
+    const glass = mk(0.6, 119);
+    assert.ok(Render.drawVesselsSeen(glass, e, X, Y, 0.1, 0, 300, 1.2, pl) > 0);
+    assert.ok(mx(glass) > 0 && mx(glass) < mx(open) * 0.5, mx(glass) + ' vs ' + mx(open));
+    const wall = mk(0.6, 35);
+    assert.strictEqual(Render.drawVesselsSeen(wall, e, X, Y, 0.1, 0, 300, 1.2, pl), 0);
+    assert.strictEqual(mx(wall), 0);
+    // Glass but too far away: nothing.
+    assert.strictEqual(Render.drawVesselsSeen(mk(0.6, 119), vh({ x: 3, y: 0 }), X, Y, 0.1, 0, 300, 3, pl), 0);
+    Flags.set('vis.vessels', false);
+  });
 });
+
 

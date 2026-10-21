@@ -181,6 +181,11 @@ test('vampire: anatomy only, no pulse, no blood', () => {
   const pb = V.forBody('villager');
   assert.strictEqual(pb.pulse, true);
   assert.strictEqual(pb.blood, true);
+  // P2c: the vampire model carries a frozen still state at any blood level; same anatomy and edges as a villager.
+  assert.ok(Object.isFrozen(vb.state) && vb.state.pulse === false && vb.state.bpm === 0);
+  for (const b of [0, 0.5, 1]) assert.strictEqual(V.state('vampire', 'calm', b).pulse, false);
+  assert.deepStrictEqual(vb.nodes.map((n) => n.id), pb.nodes.map((n) => n.id));
+  assert.strictEqual(pb.state, null);
 });
 
 // ---- P4: travelling pulse wave, lub-dub ----
