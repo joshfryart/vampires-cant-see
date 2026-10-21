@@ -655,7 +655,7 @@ describe('render-vessels (circulatory P3)', () => {
     });
   }
   function rig(q, reduced) { return { octx: ctx(), quality: q, reduced: !!reduced, wscale: 1 }; }
-  // Pose: head at top, feet 200 px below.
+  // Pose: head at top, feet 200 px below. age -1 = static nodes (no beat clock); P4 travel is tested below.
   const X = new Float32Array(24).fill(100);
   const Y = new Float32Array(24);
   [20, 40, 50, 50, 120, 120, 110, 110, 220, 220, 80, 80, 170, 170, 85].forEach((v, i) => { Y[i] = v; });
@@ -665,25 +665,25 @@ describe('render-vessels (circulatory P3)', () => {
   test('no-op when the flag is off (default)', () => {
     Flags.set('vis.vessels', false);
     const r = rig(2);
-    assert.strictEqual(Render.drawVessels(r, vh(), X, Y, 0), 0);
+    assert.strictEqual(Render.drawVessels(r, vh(), X, Y, -1), 0);
     assert.strictEqual(r.octx.calls.length, 0);
   });
 
   test('draws every node at quality >= 1, nothing extra at quality 0 or for other echo kinds', () => {
     Flags.set('vis.vessels', true);
-    for (const q of [1, 2, 3]) assert.strictEqual(Render.drawVessels(rig(q), vh(), X, Y, 0), total);
+    for (const q of [1, 2, 3]) assert.strictEqual(Render.drawVessels(rig(q), vh(), X, Y, -1), total);
     const r0 = rig(0);
-    assert.strictEqual(Render.drawVessels(r0, vh(), X, Y, 0), 0);
+    assert.strictEqual(Render.drawVessels(r0, vh(), X, Y, -1), 0);
     assert.strictEqual(r0.octx.calls.length, 0);
-    assert.strictEqual(Render.drawVessels(rig(2), vh({ kind: 'ping' }), X, Y, 0), 0);
+    assert.strictEqual(Render.drawVessels(rig(2), vh({ kind: 'ping' }), X, Y, -1), 0);
     // Batched: a handful of fills per figure, not one per node.
     const r = rig(2);
-    Render.drawVessels(r, vh(), X, Y, 0);
+    Render.drawVessels(r, vh(), X, Y, -1);
     const fills = r.octx.calls.filter((c) => c.fn === 'fill').length;
     assert.ok(fills > 0 && fills <= 4 * 6, 'fills ' + fills);
     // Halo only at quality 2+.
     const r1 = rig(1);
-    Render.drawVessels(r1, vh(), X, Y, 0);
+    Render.drawVessels(r1, vh(), X, Y, -1);
     assert.ok(r1.octx.calls.filter((c) => c.fn === 'fill').length < fills);
     Flags.set('vis.vessels', false);
   });
@@ -705,7 +705,7 @@ describe('render-vessels (circulatory P3)', () => {
     // periphK 0 drops the hands/feet (periph 1) from the drawn set.
     Flags.set('vis.vessels', true);
     const periph = D.arteries.concat(D.veins).filter((n) => n.periph >= 1).length;
-    assert.strictEqual(Render.drawVessels(rig(2), vh({ periphK: 0 }), X, Y, 0), total - periph);
+    assert.strictEqual(Render.drawVessels(rig(2), vh({ periphK: 0 }), X, Y, -1), total - periph);
     Flags.set('vis.vessels', false);
   });
 
@@ -713,7 +713,7 @@ describe('render-vessels (circulatory P3)', () => {
     Flags.set('vis.vessels', true);
     for (const e of [vh({ vampire: true }), vh({ body: 'vampire' }), vh({ stateK: 0 }), vh({ strength: 0 })]) {
       const r = rig(2);
-      assert.strictEqual(Render.drawVessels(r, e, X, Y, 0), 0);
+      assert.strictEqual(Render.drawVessels(r, e, X, Y, -1), 0);
       assert.strictEqual(r.octx.calls.filter((c) => c.fn === 'fill').length, 0);
     }
     // Past the echo's life: nothing.
@@ -724,12 +724,57 @@ describe('render-vessels (circulatory P3)', () => {
   test('reduced motion: no halo, every fill alpha <= 0.5', () => {
     Flags.set('vis.vessels', true);
     const r = rig(3, true);
-    const n = Render.drawVessels(r, vh({ stateK: 1.6, headK: 1.25 }), X, Y, 0);
+    const n = Render.drawVessels(r, vh({ stateK: 1.6, headK: 1.25 }), X, Y, -1);
     assert.ok(n > 0);
     const fills = r.octx.calls.filter((c) => c.fn === 'fill');
     assert.ok(fills.length > 0);
     for (const f of fills) assert.ok(f.alpha <= 0.5 + 1e-9, 'alpha ' + f.alpha);
     for (const n2 of D.arteries) assert.ok(Render.vesselAlpha(n2, vh({ stateK: 2 }), { base: 1, reduced: true }) <= 0.5);
+    Flags.set('vis.vessels', false);
+  });
+
+  // ---- P4: travelling wave ----
+  // Node positions drawn (arc centres) with their fill alpha, solid pass only.
+  function lit(r) {
+    const out = [];
+    for (const c of r.octx.calls) if (c.fn === 'arc' && c.alpha > 0) out.push({ x: c.args[0], y: c.args[1], r: c.args[2], a: c.alpha, fill: c.fill });
+    return out;
+  }
+  const V = VCS.Vessels;
+  const art = (id) => D.arteries.find((n) => n.id === id);
+  const yOf = (n) => V.anchor(n, X, Y).y;
+
+  test('P4 wave travels outward: chest first, feet later, nothing before a node\'s delay', () => {
+    Flags.set('vis.vessels', true);
+    const tr = V.travel(1.75);
+    const early = lit((() => { const r = rig(1); Render.drawVessels(r, vh(), X, Y, 0.03); return r; })());
+    const footY = yOf(art('pedalL'));
+    const handY = yOf(art('radialL'));
+    assert.ok(early.length > 0, 'heart lit at 0.03 s');
+    assert.ok(early.every((p) => p.y < handY - 1), 'only the chest at 0.03 s');
+    const ages = [0.03, 0.15, 0.3, tr.art[D.arteries.indexOf(art('pedalL'))] + 0.06];
+    const reach = ages.map((a) => { const r = rig(1); Render.drawVessels(r, vh(), X, Y, a); return Math.max(...lit(r).map((p) => p.y)); });
+    for (let k = 1; k < reach.length; k++) assert.ok(reach[k] >= reach[k - 1], 'front moves down ' + reach);
+    assert.ok(Math.abs(reach[reach.length - 1] - footY) < 1e-6, 'feet lit at the end');
+    Flags.set('vis.vessels', false);
+  });
+
+  test('P4 vessel life: drawVessels stops at life, vesselLife ~1 s and reduced shorter', () => {
+    Flags.set('vis.vessels', true);
+    const life = Render.vesselLife(vh(), false);
+    assert.ok(life > 0.9 && life < 1.3, 'life ' + life);
+    assert.ok(Render.vesselLife(vh(), true) < life);
+    assert.ok(Render.drawVessels(rig(2), vh(), X, Y, life * 0.6) > 0);
+    assert.strictEqual(Render.drawVessels(rig(2), vh(), X, Y, life + 0.01), 0);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('P4 reduced motion: every node lit together, alpha <= 0.5', () => {
+    Flags.set('vis.vessels', true);
+    const r = rig(3, true);
+    const n = Render.drawVessels(r, vh({ stateK: 1.6 }), X, Y, 0.1);
+    assert.strictEqual(n, total);
+    for (const f of r.octx.calls.filter((c) => c.fn === 'fill')) assert.ok(f.alpha <= 0.5 + 1e-9);
     Flags.set('vis.vessels', false);
   });
 });

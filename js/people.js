@@ -1170,7 +1170,15 @@
     }
     const fade = sonar && typeof sonar.fade === 'number' ? sonar.fade : 3;
     let w = 0;
-    for (let i = 0; i < es.length; i++) if (t - es[i].t < (es[i].fade || fade)) es[w++] = es[i];
+    const VF = root.VCS.Flags;
+    const V = root.VCS.Vessels;
+    const vessels = !!(V && V.timing && VF && VF.get && VF.get('vis.vessels'));
+    for (let i = 0; i < es.length; i++) {
+      let life = es[i].fade || fade;
+      // Flag on: keep a heartbeat until its vessel wave (feet, dub, venous swell) has faded.
+      if (vessels && es[i].kind === 'vheart') { const vl = V.timing(es[i].bpm).life; if (vl > life) life = vl; }
+      if (t - es[i].t < life) es[w++] = es[i];
+    }
     es.length = w;
     // Cap the echo list; heartbeat snapshots have their own small budget so a crowd of footsteps cannot push them out.
     let hearts = 0;

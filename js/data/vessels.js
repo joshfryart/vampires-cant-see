@@ -75,6 +75,17 @@
     ATTACK: 0.06,         // s envelope rise
     DECAY: 0.25,          // s envelope tau
     VEIN_DRIFT: 0.2,      // m/s venous tint drift
+    REST_BPM: 65,         // bpm the dub delay is quoted at
+    DUB_K_FAST: 0.15,     // dub strength at the bpm cap (fades from DUB_K above DUB_FADE_BPM, keeps flashes soft)
+    DUB_FADE_BPM: 120,
+    VEIN_LAG: 0.08,       // s veins start after the arterial launch
+    VEIN_SLOW: 1.25,       // venous swell travels this much slower than the arterial wave
+    VEIN_ATTACK: 0.1,     // s venous swell rise
+    VEIN_DECAY: 0.3,      // s venous swell tau
+    SOFT_ATTACK: 0.1,     // reduced motion: one soft pulse, no travel
+    SOFT_DECAY: 0.3,
+    TAIL: 0.2,            // s smooth fade-out at the end of the vessel life
+    LIFE_TAUS: 1.2,       // life ends this many decay taus after the last arrival (rest ~1 s)
     ARTERY_RGB: [200, 32, 36],
     VEIN_RGB: [104, 34, 92],
     HEART: { slot: 14, to: 1, t: 0.45 },
@@ -164,8 +175,72 @@
     return { kind: vamp ? 'vampire' : 'villager', nodes: all(), pulse: !vamp, blood: !vamp };
   }
 
+  // ---- P4 travelling pulse: pure timing helpers ----
+  const DELAY_CACHE = {};
+
+  /** Arrival delays (s) for arteries and veins at pwvScale (cached). Veins: VEIN_LAG + arterial delay x VEIN_SLOW. */
+  function travel(pwvScale) {
+    const m = pwvScale > 0 ? pwvScale : VesselData.PWV_SCALE;
+    const key = String(m);
+    let c = DELAY_CACHE[key];
+    if (c) return c;
+    const art = delays(VesselData.PWV, m, ARTERIES);
+    const vein = delays(VesselData.PWV, m, VEINS).map(function (d) { return VesselData.VEIN_LAG + d * VesselData.VEIN_SLOW; });
+    c = { art: art, vein: vein, artMax: Math.max.apply(null, art), veinMax: Math.max.apply(null, vein) };
+    DELAY_CACHE[key] = c;
+    return c;
+  }
+
+  /** Envelope 0..1 at t s after arrival: smoothstep rise over attack, then exp decay with tau. 0 before arrival. */
+  function envelope(t, attack, tau) {
+    if (!(t >= 0)) return 0;
+    if (t < attack) { const k = t / attack; return k * k * (3 - 2 * k); }
+    return Math.exp(-(t - attack) / tau);
+  }
+
+  /**
+   * Beat timing for a bpm (<= BPM_MAX). dub: delay of the dicrotic ripple after the lub (DUB_DELAY at REST_BPM, shrinks
+   * ~1/sqrt(bpm), never past 45% of the beat period); dubK: its strength (DUB_K, fading to DUB_K_FAST at the cap so a fast
+   * heart stays one strong flash per beat). life: seconds until the last node (dub at the feet, or the venous swell)
+   * has decayed; reduced: no travel, one soft pulse.
+   */
+  function timing(bpm, reduced, pwvScale) {
+    const D = VesselData;
+    const b = bpm > 0 ? capBpm(bpm) : D.REST_BPM;
+    if (reduced) return { dub: 0, dubK: 0, life: D.SOFT_ATTACK + 2 * D.SOFT_DECAY, reduced: true };
+    let dub = D.DUB_DELAY * Math.min(1.1, Math.sqrt(D.REST_BPM / b));
+    dub = Math.min(dub, 0.45 * 60 / b);
+    const f = clamp01((b - D.DUB_FADE_BPM) / (D.BPM_MAX - D.DUB_FADE_BPM));
+    const dubK = D.DUB_K + (D.DUB_K_FAST - D.DUB_K) * f;
+    const tr = travel(pwvScale);
+    const art = tr.artMax + dub + D.ATTACK + D.LIFE_TAUS * D.DECAY;
+    const vein = tr.veinMax + D.VEIN_ATTACK + D.LIFE_TAUS * D.VEIN_DECAY;
+    return { dub: dub, dubK: dubK, life: Math.max(art, vein), reduced: false };
+  }
+
+  /**
+   * Pulse 0..~1 of node index i (in arteries or veins, by vein) at age s after the beat, for timing tm (from timing()).
+   * Arteries: lub env(age - d) + dubK env(age - d - dub). Veins: one slower, later swell. Reduced: env(age), no delay.
+   * Includes the smooth tail fade so nothing pops off at tm.life.
+   */
+  function pulse(vein, i, age, tm, pwvScale) {
+    const D = VesselData;
+    if (!(age >= 0) || !tm || age >= tm.life) return 0;
+    const left = tm.life - age;
+    const tail = left < D.TAIL ? (left / D.TAIL) * (left / D.TAIL) * (3 - 2 * left / D.TAIL) : 1;
+    if (tm.reduced) return envelope(age, D.SOFT_ATTACK, D.SOFT_DECAY) * tail;
+    const tr = travel(pwvScale);
+    if (vein) return envelope(age - tr.vein[i], D.VEIN_ATTACK, D.VEIN_DECAY) * tail;
+    const t = age - tr.art[i];
+    return (envelope(t, D.ATTACK, D.DECAY) + tm.dubK * envelope(t - tm.dub, D.ATTACK, D.DECAY)) * tail;
+  }
+
   const Vessels = {
     data: VesselData,
+    travel: travel,
+    envelope: envelope,
+    timing: timing,
+    pulse: pulse,
     all: all,
     byId: byId,
     anchor: anchor,

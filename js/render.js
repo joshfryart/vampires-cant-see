@@ -2564,7 +2564,16 @@
       if (a < lo) lo = a;
       if (a > hi) hi = a;
     }
-    if (hi < 0.02) return false;
+    if (hi < 0.02) {
+      // Outline gone, but the circulatory wave may still be travelling to the hands and feet (flag on only).
+      if (e.kind === 'vheart' && !locked && vesselsOn() && age >= 0 && age < vesselLife(e, !!r.reduced)) {
+        let nv = 0;
+        clippedDraw(r, minX - lw, maxX + lw, depth, function () { nv = drawVessels(r, e, X, Y, age); });
+        ctx.globalAlpha = 1;
+        return nv > 0;
+      }
+      return false;
+    }
     const uniform = hi - lo < 0.03 && frontStrip < 0;
     const uToY = function (z) { return fig.floorY - z * FIG_H * lh * fig.sy * vs; };
     const wrapped = function (c) {
@@ -2610,9 +2619,9 @@
     return true;
   }
 
-  // ---- Circulatory pulse overlay (P3: static vessel nodes, behind the `vis.vessels` flag) ----
+  // ---- Circulatory pulse overlay (behind the `vis.vessels` flag): P3 nodes, P4 travelling lub-dub wave ----
   /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
-  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3 };
+  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75 };
   const VESSEL_REDUCED_CAP = 0.5;
   /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
   const VESSEL_LEVELS = 6;
@@ -2626,6 +2635,16 @@
   }
   function vesselsOn() {
     return !!(VCS.Flags && VCS.Flags.get && VCS.Flags.get('vis.vessels'));
+  }
+
+  /**
+   * Seconds a vheart echo stays drawable for the vessel wave (last node's dub / venous swell decayed), from
+   * VCS.Vessels.timing at the echo's bpm. 0 without the Vessels module. Only consulted while `vis.vessels` is on.
+   */
+  function vesselLife(e, reduced) {
+    const V = VCS.Vessels;
+    if (!V || !V.timing || !e) return 0;
+    return V.timing(e.bpm, !!reduced, vesselTun('pwvScale')).life;
   }
 
   /**
@@ -2650,8 +2669,10 @@
 
   /**
    * Vessel nodes for one vheart echo e at pose slots X, Y (drawPerson's PX/PY), age s since the beat reached them.
-   * Static nodes only: a dot per node (arteries red, veins deeper red-blue, a bit larger and behind), plus a soft
-   * halo at quality >= 2. Not masked to the chest strip. Returns the number of nodes drawn (0 when off).
+   * A dot per node (arteries red, veins deeper red-blue, a bit larger and behind), plus a soft halo at quality >= 2.
+   * Alpha = vesselAlpha x strength x Vessels.pulse: the lub launches at the heart and reaches each node after its
+   * travel delay, a ~30% dub ripple follows, veins swell later and slower; reduced motion: one soft pulse, no travel.
+   * age < 0 draws the static nodes. Not masked to the chest strip. Returns the number of nodes drawn (0 when off).
    */
   function drawVessels(r, e, X, Y, age) {
     const V = VCS.Vessels;
@@ -2662,10 +2683,11 @@
     if (e.vampire || e.body === 'vampire' || e.bodyKind === 'vampire') return 0;
     const b = typeof e.strength === 'number' ? Math.min(1, e.strength) : 1;
     if (!(b > 0.01) || !(typeof e.stateK === 'number' ? e.stateK > 0 : true)) return 0;
-    const fade = typeof e.fade === 'number' && e.fade > 0 ? e.fade : 3;
-    const env = age >= 0 ? glow(age, SWEEP + glowDur(fade)) : 1;
-    if (env <= 0.01) return 0;
     const reduced = !!r.reduced;
+    // P4: the beat launches at the heart (age 0) and travels out; age < 0 (no beat clock) draws the static P3 nodes.
+    const pws = vesselTun('pwvScale');
+    const tm = age >= 0 ? V.timing(e.bpm, reduced, pws) : null;
+    if (tm && age >= tm.life) return 0;
     const opts = { base: vesselTun('alpha'), hotK: vesselTun('hot'), veinK: vesselTun('veins'), reduced: reduced };
     // Dot size from the figure's on-screen height (head to lower foot).
     const figPx = Math.max(Math.abs(Y[8] - Y[0]), Math.abs(Y[9] - Y[0]), 1);
@@ -2682,7 +2704,9 @@
       const rr = vein ? rad * 1.6 : rad;
       for (let k = 0; k <= VESSEL_LEVELS; k++) VESSEL_BUCKET[k] = null;
       for (let i = 0; i < nodes.length; i++) {
-        let a = vesselAlpha(nodes[i], e, opts) * b * env;
+        const env = tm ? V.pulse(vein, i, age, tm, pws) : 1;
+        if (env <= 0.005) continue;
+        let a = vesselAlpha(nodes[i], e, opts) * b * (env > 1 ? 1 : env);
         if (reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
         if (a < 0.02) continue;
         const lv = Math.max(1, Math.min(VESSEL_LEVELS, Math.round(a * VESSEL_LEVELS)));
@@ -3116,7 +3140,10 @@
       // Ripple-only: the snapshot shows while the band sweeps it and for one afterglow after.
       if (!(age >= 0)) continue;
       const ef = typeof e.fade === 'number' && e.fade > 0 ? e.fade : fade;
-      if (age >= SWEEP + glowDur(ef)) continue;
+      let life = SWEEP + glowDur(ef);
+      // Flag on: a heartbeat lives until the vessel wave has reached the feet and its dub has faded.
+      if (e.kind === 'vheart' && vesselsOn()) { const vl = vesselLife(e, !!r.reduced); if (vl > life) life = vl; }
+      if (age >= life) continue;
       let b = typeof e.strength === 'number' ? e.strength : 1;
       if (b <= 0.01) continue;
       if (b > 1) b = 1;
@@ -3722,6 +3749,7 @@
     pulseRough: pulseRough,
     drawVessels: drawVessels,
     vesselAlpha: vesselAlpha,
+    vesselLife: vesselLife,
     VESSEL_TUN: VESSEL_TUN
   };
   VCS.Render = Render;

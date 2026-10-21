@@ -125,6 +125,27 @@ describe('people.test.js', () => {
     assert.strictEqual(st.echoes.length, 0);
   });
 
+  test('vheart echo life: unchanged with vis.vessels off, extended to the vessel wave when on', () => {
+    require('../js/flags.js');
+    require('../js/data/vessels.js');
+    const Flags = globalThis.VCS.Flags;
+    Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+    const mk = () => [
+      { personId: 1, kind: 'vheart', t: 0, fade: 0.4, bpm: 65, strength: 1 },
+      { personId: 2, kind: 'ping', t: 0, fade: 0.4, strength: 1 }
+    ];
+    const run = (t) => { const st = { people: [], echoes: mk(), maxEchoes: 10 }; People.updateEchoes(st, { pulses: [], fade: 3 }, t - 0.01, t); return st.echoes.map((e) => e.kind); };
+    Flags.set('vis.vessels', false);
+    assert.deepStrictEqual(run(0.39), ['vheart', 'ping']);
+    assert.deepStrictEqual(run(0.41), []);
+    Flags.set('vis.vessels', true);
+    const life = globalThis.VCS.Vessels.timing(65).life;
+    assert.deepStrictEqual(run(0.41), ['vheart']);
+    assert.deepStrictEqual(run(life - 0.01), ['vheart']);
+    assert.deepStrictEqual(run(life + 0.01), []);
+    Flags.set('vis.vessels', false);
+  });
+
   test('echo cap holds', () => {
     const world = World.load(def);
     const st = People.create(world, def, { seed: 1, maxEchoes: 4 });
