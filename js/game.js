@@ -1351,10 +1351,12 @@
     VCS.Ripple.prune(S.ripple, S.clock);
   }
 
+  const PERSON_ECHO_GAIN = 0.5; // villager echoes sit well under the wall echoes
+
   /** Audible echo of a person snapshot: object sonar equation (-40 log r + TS + class gain), not the old 0.7 * strength. */
   function personEcho(e) {
     const A = VCS.SoundData && VCS.SoundData.acoustics;
-    const amp = A ? clamp(A.personAmp(e.dist, e.theta), 0.1, 0.7) : clamp(0.7 * e.strength, 0.1, 0.7);
+    const amp = (A ? clamp(A.personAmp(e.dist, e.theta), 0.1, 0.7) : clamp(0.7 * e.strength, 0.1, 0.7)) * PERSON_ECHO_GAIN;
     VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), amp, e.pan, { voice: 'person' });
   }
 
