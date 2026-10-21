@@ -1362,7 +1362,7 @@
         e.x = p.x; e.y = p.y; e.id = p.id;
         e.angle = p.angle;
         e.foot = (p.steps - todo + k) & 1; // alternate left/right foot
-        // v0.14: a guard in armour walks with the heavy 'mail' gait (clink + thud) unless running
+        // v0.14: a guard in armour walks with the heavy 'mail' gait (heavy thud) unless running
         e.gait = p.mode === 'flee' ? 'run' : p.gait === 'mail' ? 'mail' : p.wary > 0 ? 'sneak' : 'walk';
         e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;

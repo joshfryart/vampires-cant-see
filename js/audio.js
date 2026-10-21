@@ -608,14 +608,12 @@
       }
       tone(ctx, out, 'sine', 110 * k, 60 * k, t, 0.004, 0.07, peak);
     },
-    // guard footstep (v0.14): mail clink (two metallic rings) over a heavy boot thud, a little scuff on stone
+    // guard footstep: heavy boot thud with a dull scuff (the v0.14 metallic mail clink was removed in v0.20.1: it read as a stray echo)
     guardStep: function (ctx, out, t, peak, v) {
       const k = v.pitch * (v.foot ? 1.06 : 1);
       tone(ctx, out, 'sine', 70 * k, 40 * k, t, 0.005, 0.12, peak * 1.2);
       tone(ctx, out, 'triangle', 140 * k, 80 * k, t, 0.004, 0.06, peak * 0.6);
-      tone(ctx, out, 'sine', 2300 * k, 2150 * k, t + 0.012, 0.002, 0.09, peak * 0.3);
-      tone(ctx, out, 'sine', 3350 * k, 3200 * k, t + 0.03, 0.002, 0.07, peak * 0.22);
-      noise(ctx, out, t, 0.04, peak * 0.5, 'bandpass', 3800, 0.002);
+      noise(ctx, out, t, 0.05, peak * 0.4, 'lowpass', 900 * k, 0.004);
       if (v.material !== 'grass') noise(ctx, out, t + 0.03, 0.05, peak * 0.3, 'highpass', 3000, 0.01);
     },
     // cartoon creak: pitch bends up and wobbles back down through a band-pass

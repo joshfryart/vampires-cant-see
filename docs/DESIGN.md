@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.20.0)
+# Vampires Can't See - Design (v0.20.1)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.20.0'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.20.1'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map

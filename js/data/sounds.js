@@ -200,7 +200,7 @@
     levels: {
       step: { range: 1.1, strength: 0.3, z: 0, fade: 0.8, bounces: 0, gain: 0.08, interval: 0.48, footOffset: 0.15, footSide: 0.12 },
       personStep: { range: 0.2, strength: 0.2, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
-      // v0.14 guard footstep: mail clink + heavy thud, heard farther than a villager's step
+      // v0.14 guard footstep: heavy thud (no clink since v0.20.1), heard farther than a villager's step
       guardStep: { range: 0.3, strength: 0.28, z: 0, fade: 0.7, bounces: 0, gain: 0.2, hearDist: 12 },
       // v0.14 villager speech: +4 dB over the old 0.06 fallback (0.06 x 1.585 ~ 0.095 -> 0.10); hearDist = barks RANGE
       voice: { range: 0, strength: 0, z: 0.6, fade: 1, bounces: 0, gain: 0.1, hearDist: 16 },

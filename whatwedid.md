@@ -119,3 +119,7 @@ A standalone page to play with villagers: `tools/character-creator.html` (+ `.cs
 - **Safety:** `Creator.sanitize` clamps everything to `LOOK_RANGES` / `LOOK_ENUMS`; `tests/creator.test.js` (12 tests) covers fields, clamping, presets vs Forge, randomize and locks, pose echoes, view clamping, JSON round trips and malformed input, storage failures, Forge spec validity, and renders 26 random or extreme looks x 11 poses x Effects 0/1/2 x 3 turns through `Render.drawSolo` with no logged errors.
 - **Verified** in a browser at 1440 px (two columns) and 375 px (one column, no horizontal scroll): idle, held with circulation and overlays, walk at Effects 0, wild random, save, import of bad and clamped JSON, draft restore. No console errors.
 - **Ideas not done:** spawn a saved character straight into a running game (the dev panel could list `vcs.creator`), an onion-skin compare against a second character, a URL-hash share link.
+
+## v0.20.1: guard footstep
+
+Removed the metallic mail clink (two high rings) from the `guardStep` sound in `js/audio.js`; it read as a stray echo while guards walked (heard to 12 cells). It is now a boot thud with a dull scuff. Checked in the live town map: villagers produce no person echoes without a ping (the 5c5e2d7 fix holds).
