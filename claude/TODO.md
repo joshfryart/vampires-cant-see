@@ -175,7 +175,7 @@ Done (0.11.3 + 2026-10-21 commits 8fc8568..079d97f): heartbeat audio (`Audio.hea
 
 #### Whole-body circulatory pulse (proposed 2026-10-21, Opus code read + Sonnet physiology; awaiting user answers to open questions)
 Goal: the whole vessel network pulses on each beat, strongest at the heart, travelling out and fading toward hands/feet. Render-side overlay on the existing `vheart` echo; no extra sonar pulses. Flag `vis.vessels` (default off), tunables `vessels.*`.
-- [ ] P1 Data + pure helpers: `js/data/vessels.js`, ~15-node tree rooted at heart, each node anchored to a `drawPerson` pose slot (0 head, 1 neck, 2/3 shoulders, 4/5 hips, 6/7 hands, 8/9 feet, 10/11 elbows, 12/13 knees, 14 torso) so it follows every pose. Per node: `pathLen`, delay `pathLen*m/PWV`, weight `w`, hotspot boost. Unit tests (tree, monotonic delay/weight).
+- [x] P1 Data + pure helpers: `js/data/vessels.js`, ~15-node tree rooted at heart, each node anchored to a `drawPerson` pose slot (0 head, 1 neck, 2/3 shoulders, 4/5 hips, 6/7 hands, 8/9 feet, 10/11 elbows, 12/13 knees, 14 torso) so it follows every pose. Per node: `pathLen`, delay `pathLen*m/PWV`, weight `w`, hotspot boost. Unit tests (tree, monotonic delay/weight).
 - [ ] P2 Snapshot fields `bpm`, `periphK` on the echo (people.js ~1151) from `stepHeartbeats`; cap bpm at 175 (<3 Hz); unify drink bpm formula with `drinkBeat` (game.js 770-780).
 - [ ] P3 `drawVessels(r,e,X,Y,age)` in render.js behind flag, static nodes, drawn after the body outline and ignoring the chest-only strip mask (body outline stays chest-only).
 - [ ] P4 Travel: per-node delay + envelope (attack ~0.06 s, decay tau ~0.25 s), extend vheart echo life to ~0.5 s so far nodes are not cut off.

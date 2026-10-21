@@ -33,6 +33,7 @@ Script order in `index.html`: log, config, checks, data (maps, sounds, upgrades,
 | `js/data/sounds.js` | `VCS.SoundData` | Sound levels, room kinds, `react` constants |
 | `js/data/upgrades.js` | `VCS.UpgradeData` | Effect defaults/limits, 9 upgrades, 9 boons |
 | `js/data/hunger.js` | `VCS.HungerData` | Powers, gifts, fear, drain ramp |
+| `js/data/vessels.js` | `VCS.VesselData`, `VCS.Vessels` | Arterial/venous node graph on pose slots, PWV delays, pulse state per mode (not wired in yet) |
 | `js/raycast.js` | `VCS.Raycast` | DDA grid raycasting |
 | `js/world.js` | `VCS.World` | Tile grid, doors, torches, light, glass, `kindAt`, `materialAt` |
 | `js/player.js` | `VCS.Player` | Movement, turning, collision |

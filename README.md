@@ -266,6 +266,7 @@ Playwright installed and writes a screenshot to `tests/out/smoke.png`.
       game.js           main loop, states, menus and overlays
       hunger.js         overflow gifts, powers and fear (pure state)
       data/hunger.js    gift, power and fear data
+      data/vessels.js   vessel graph for the body pulse (not wired in yet)
     tests/              node:test unit tests and the smoke test
     tools/sim.mjs       economy simulation (node tools/sim.mjs)
     docs/DESIGN.md      rules, numbers and design for all modules
