@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.19.0)
+# Vampires Can't See - Design (v0.20.0)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.19.0'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.20.0'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map
@@ -53,6 +53,8 @@ Script order in `index.html`: log, config, checks, data (maps, sounds, upgrades,
 | `js/icons.js` | `VCS.Icons` | 13 doodle icons, tombstone, crypt menu |
 | `js/game.js` | `VCS.Game` | Loop, states, menus, overlays, tutorial hints, ambience, debug hooks |
 | `tools/sim.mjs` | none | Economy simulation (Section 13) |
+| `tools/character-creator-core.js` | `VCS.Creator` | Character creator data: look fields, clamping, presets, poses, storage, JSON (Section 5.7) |
+| `tools/character-creator.js` | none | Character creator page (`tools/character-creator.html`, Section 5.7) |
 
 Game states: `title`, `playing`, `paused`, `transition`, `feeding`, `sleeping`, `boon`, `gift`, `runend`, `error`.
 
@@ -212,7 +214,7 @@ Source: `js/data/archetypes.js`, `js/forge.js`, `js/schedule.js` (`loadRoles`), 
 
 **Custom archetypes and the library.** `Forge.register` adds a custom archetype (id matches `^[a-z][a-z0-9_]{1,23}$`; built-in ids are refused; at most 16 custom). The library is stored under `vcs.forge` as `{v:1, list}` (at most 16384 bytes). It loads at boot. The dev panel's "Save as custom archetype" button is the only writer. `Forge.importLibrary` and `exportLibrary` back the dev panel's import and copy buttons.
 
-**Dev panel.** F9 opens the NPC Forge editor: pick an archetype and seed, edit look fields (`Forge.LOOK_FIELDS`), then spawn in front, alter the nearest person or despawn the nearest person. The buttons need a running run.
+**Dev panel.** F9 opens the NPC Forge editor: pick an archetype and seed, edit look fields (`Forge.LOOK_FIELDS`), then spawn in front, alter the nearest person or despawn the nearest person. The buttons need a running run. "Open character creator" opens `tools/character-creator.html` in a new tab (Section 5.7).
 
 ### 5.6 Figures
 
@@ -253,6 +255,20 @@ Source: `js/figure.js` (`VCS.Figure`, a script before `render.js`), `js/render.j
   - body shake `sin(9.4 t)` 1.5 Hz, 0.006 lh (one mode)
   - every other sway in `posePerson` is at or below 1.5 Hz
   - grab-arm jitter `sin(37 t)` and `cos(29 t)` at 5.9 Hz and 4.6 Hz, amplitude `jolt x hs x 0.05` px, zero at rest. This is shake, not light, and it exists in the line grab arms too.
+
+### 5.7 Character creator (dev tool)
+
+Source: `tools/character-creator.html` + `.css` + `.js` (page), `tools/character-creator-core.js` (`VCS.Creator`, pure logic, Node-testable), `tests/creator.test.js`. Open the HTML file from the repo (it loads the real `js/` scripts next to it), or press "Open character creator" in the F9 dev panel's NPC Forge section. Nothing in the game loads it.
+
+- **Rendering.** Every view goes through `Render.drawSolo` (the real `drawPerson` path: `posePerson`, `Figure.draw` or the line figure, rim light, vessels, flush, grab arms), so changes to `js/figure.js` and `js/render.js` show up with no copy of drawing code. One renderer per render scale draws into its offscreen canvas; the page copies a crop around the figure (as the figure sheet does).
+- **Preview.** Large live view with the idle clock running. Pose: idle, wary, chat, walk, flee, startle, cower, dazed, seated, fed, held (struggle k slider and restrained toggle; drawn at depth 1.25 with the vampire grab arms). Turn slider, Front / 3/4 / Side / Back, auto-turn and drag-to-turn (yaw 0 faces the camera; echo angle = pi + yaw). Effects 0/1/2, quality 1..3, zoom (render scale 1..4), camera distance 1.2..5 (depth drives level of detail), play/pause and speed, rim light, circulation (`vis.vessels` plus the heart echo, beat mode from the pose), skeleton slots, vessel graph and part outlines overlays, reduced motion, Save PNG.
+- **Game scale.** Four small views (front, 3/4, side, back) at render scale 2; a lineup at depth 2.5 between four Forge villagers and a full 640 x 360 frame with the character at depths 7, 4, 2.6 and 1.6, both rendered at render scale 1 (the game's internal size) and shown at 1x/2x/3x with pixelated scaling.
+- **Fields.** `Creator.fields()` builds the table from `ArchetypeData.LOOK_ENUMS` and `LOOK_RANGES`: body, height, build, shoulder, stoop, stride, head, nose, hair, beard, skin (flush strength), outfit, hem, coat, scarf, hat, roleHat, prop, extra. `acc` is not edited directly: the renderer draws `look.hat` and `look.prop` itself and a scarf from `acc === 'scarf'`, so the scarf toggle writes `acc = 'scarf'` and otherwise `acc` follows the hat, then the prop (`deriveAcc`). The hair row is dimmed with a note when the game's Forge would hide it (tophat, nightcap, hood). Each field has a lock used by randomize.
+- **Validation.** `Creator.sanitize` returns a complete look for any input: unknown and prototype keys dropped, numbers clamped to `LOOK_RANGES` (numeric strings accepted) and rounded to 3 decimals, bad enums and booleans fall back to the previous look, `v` is 1, the archetype id must match the Forge id pattern. Every edit, preset, randomize, import and draft passes through it, and the result passes `Forge.validate('look', l, {partial: true})` with no errors. `sanitizeView` clamps the view state (pose, fx 0..2, quality 1..3, zoom 1..4, distance 1.2..5, speed 0..2, yaw wrapped to -pi..pi).
+- **Presets and random.** "Apply preset" is `Forge.generate({archetype, seed}, {stateSeed: 0, index: 0, accOffset: 0})` (the dev panel's Forge editor context); seed 0..65535. "Random in archetype" picks a random seed; "Wild random" draws every unlocked field over its full range (height mostly adult, role hat 20%, scarf 20%, robes get a long hem).
+- **Saving.** Named characters `{name, archetype, seed, look, saved}` live in localStorage under `vcs.creator` as `{format: 'vcs-characters', v: 1, list}` (at most 64, newest first, same name replaces, case-insensitive; at most 256 KB). Names: control characters and `<>` removed, spaces collapsed, at most 32 characters. The work in progress (look, archetype, seed, name, view) is kept under `vcs.creator.draft` and restored on reload.
+- **JSON.** "Export this" downloads `{format: 'vcs-character', v: 1, ...character}`; "Export all" downloads the bundle; both also fill the JSON box. Import (pasted text or a file) accepts one character, a bundle, a plain array or a bare look object; entries that are not objects are skipped and counted. Codes: `E_CC_PARSE`, `E_CC_TYPE`, `E_CC_EMPTY`, `E_CC_LIMIT`, storage failures `E_CC_STORAGE`. "Forge spec" shows `{archetype, seed, overrides}`, the spec `host.spawnAhead` takes; on spawn the game re-applies its Forge rules (hair hidden under a tophat, nightcap or hood).
+- **Test hook.** `window.__creator` (`state()`, `frames()`, `errors`, `edit(key, value)`, `setView(patch)`, `setTime(t)`).
 
 ## 6. Light, sound and hearing
 

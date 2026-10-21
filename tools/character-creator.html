@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character Creator</title>
+<link rel="stylesheet" href="character-creator.css">
+</head>
+<body>
+<header class="cc-top">
+  <h1>Character creator <small id="ver"></small></h1>
+  <nav class="cc-links">
+    <a href="../index.html">Back to game</a>
+    <a href="figure-sheet.html">Figure sheet</a>
+  </nav>
+</header>
+<main class="cc-main">
+  <section class="cc-stage-col" aria-label="Preview">
+    <div class="cc-stage" id="stage">
+      <canvas id="preview" width="10" height="10" role="img" aria-label="Live preview of the villager"></canvas>
+      <div class="cc-stage-hint" id="stage-hint">Drag to turn</div>
+    </div>
+    <div class="cc-bar" id="viewbar">
+      <label>Pose <select id="v-pose"></select></label>
+      <button id="v-play" type="button">Pause</button>
+      <label>Speed <select id="v-speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select></label>
+      <label class="cc-held" hidden>Struggle <input id="v-struggle" type="range" min="0" max="1" step="0.05"></label>
+      <label class="cc-held cc-check" hidden><input id="v-restrain" type="checkbox"> restrained</label>
+    </div>
+    <div class="cc-bar">
+      <label>Turn <input id="v-yaw" type="range" min="-180" max="180" step="1"><output id="o-yaw" class="cc-val"></output></label>
+      <span class="cc-btns">
+        <button type="button" data-yaw="0">Front</button><button type="button" data-yaw="-50">3/4</button><button type="button" data-yaw="-90">Side</button><button type="button" data-yaw="180">Back</button>
+      </span>
+      <label class="cc-check"><input id="v-spin" type="checkbox"> auto-turn</label>
+    </div>
+    <div class="cc-bar">
+      <label>Effects <select id="v-fx"><option value="0">0 Off (lines)</option><option value="1">1 Low</option><option value="2">2 High</option></select></label>
+      <label>Quality <select id="v-quality"><option>1</option><option>2</option><option>3</option></select></label>
+      <label>Zoom <select id="v-zoom"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="4">4x</option></select></label>
+      <label>Distance <input id="v-dist" type="range" min="1.2" max="5" step="0.05"><output id="o-dist" class="cc-val"></output></label>
+    </div>
+    <div class="cc-bar">
+      <label class="cc-check"><input id="v-rim" type="checkbox"> rim light</label>
+      <label class="cc-check"><input id="v-vessels" type="checkbox"> circulation</label>
+      <label class="cc-check"><input id="v-skel" type="checkbox"> skeleton</label>
+      <label class="cc-check"><input id="v-graph" type="checkbox"> vessel graph</label>
+      <label class="cc-check"><input id="v-parts" type="checkbox"> part outlines</label>
+      <label class="cc-check"><input id="v-reduced" type="checkbox"> reduced motion</label>
+      <button id="v-png" type="button">Save PNG</button>
+    </div>
+
+    <h2>Four views</h2>
+    <div class="cc-views" id="views"></div>
+
+    <h2>At game scale</h2>
+    <p class="cc-note">Rendered at the game's 640 x 360 internal size, then shown at <select id="v-gscale" aria-label="Display scale"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option></select> like the game canvas stretched to a window. You stand in the middle of a few villagers.</p>
+    <div class="cc-game"><canvas id="lineup" width="10" height="10" role="img" aria-label="Game-scale lineup"></canvas></div>
+    <div class="cc-game"><canvas id="frame" width="10" height="10" role="img" aria-label="Full game frame with the character at four depths"></canvas></div>
+  </section>
+
+  <section class="cc-side" aria-label="Character">
+    <div class="cc-group">
+      <h2>Start from</h2>
+      <div class="cc-row"><label for="c-arch">Archetype</label><select id="c-arch"></select></div>
+      <div class="cc-row"><label for="c-seed">Seed</label><span class="cc-ctl"><input id="c-seed" type="number" min="0" max="65535" step="1"><button id="c-seed-rand" type="button" class="cc-small">Dice</button></span></div>
+      <div class="cc-btnrow">
+        <button id="c-preset" type="button">Apply preset</button>
+        <button id="c-rand-arch" type="button">Random in archetype</button>
+        <button id="c-rand-wild" type="button">Wild random</button>
+      </div>
+      <p class="cc-note">Presets come from the game's NPC Forge. Tick a lock to keep a field when randomizing.</p>
+    </div>
+    <div id="fields"></div>
+    <div class="cc-group">
+      <h2>Saved characters</h2>
+      <div class="cc-row"><label for="c-name">Name</label><input id="c-name" type="text" maxlength="32" autocomplete="off" spellcheck="false"></div>
+      <div class="cc-btnrow">
+        <button id="c-save" type="button">Save</button>
+        <button id="c-export" type="button">Export this</button>
+        <button id="c-export-all" type="button">Export all</button>
+      </div>
+      <ul class="cc-saved" id="saved"></ul>
+    </div>
+    <div class="cc-group">
+      <h2>Import / JSON</h2>
+      <textarea id="c-json" rows="5" spellcheck="false" aria-label="Character JSON" placeholder="Paste character JSON (or a look object) here"></textarea>
+      <div class="cc-btnrow">
+        <button id="c-import" type="button">Import pasted</button>
+        <button id="c-import-file" type="button">Import file</button>
+        <button id="c-show" type="button">Show current</button>
+        <button id="c-spec" type="button">Forge spec</button>
+      </div>
+      <input id="c-file" type="file" accept=".json,application/json" hidden>
+    </div>
+    <div class="cc-status" id="status" role="status" aria-live="polite"></div>
+  </section>
+</main>
+<script src="../js/log.js"></script>
+<script src="../js/flags.js"></script>
+<script src="../js/ripple.js"></script>
+<script src="../js/data/vessels.js"></script>
+<script src="../js/data/archetypes.js"></script>
+<script src="../js/data/voices.js"></script>
+<script src="../js/struggle.js"></script>
+<script src="../js/forge.js"></script>
+<script src="../js/figure.js"></script>
+<script src="../js/render.js"></script>
+<script src="character-creator-core.js"></script>
+<script src="character-creator.js"></script>
+</body>
+</html>

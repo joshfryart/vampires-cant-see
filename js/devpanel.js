@@ -155,6 +155,8 @@
 
   // ---- NPC Forge editor (v0.14). Host is set by game.js: {spawnAhead(spec), alterNearest(patch), despawnNearest(), people()} or null.
   let forgeHost = null;
+  // v0.20: the standalone character creator (tools/character-creator.html) draws the same figures with every look field.
+  const CREATOR_URL = 'tools/character-creator.html';
   const forgeUi = { sel: null, seed: null, pre: null, ctl: Object.create(null), hostBtns: [], hint: null, edits: Object.create(null), look: null, lib: null };
 
   function forgeApi() { return VCS.Forge && typeof VCS.Forge.generate === 'function' ? VCS.Forge : null; }
@@ -339,6 +341,9 @@
     const lb = el('div', 'dp-bar');
     lb.appendChild(button('Save as custom archetype', forgeSaveCustom));
     lb.appendChild(button('Copy library JSON', forgeCopyLibrary));
+    lb.appendChild(button('Open character creator', function () {
+      try { root.open(CREATOR_URL, '_blank', 'noopener'); say('Character creator opened in a new tab'); } catch (e) { say('Open ' + CREATOR_URL + ' from the game folder'); }
+    }));
     sec.appendChild(lb);
     forgeUi.lib = el('textarea', 'dp-paste dp-forge-lib');
     forgeUi.lib.rows = 3;
