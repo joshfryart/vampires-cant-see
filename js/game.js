@@ -3800,11 +3800,11 @@
     return bpm * (0.5 + 0.5 * k);
   }
 
-  /** Heartbeat of the nearest two villagers within hearDist (5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse. */
+  /** Heartbeat of the nearest two villagers within hearDist (2.5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse. */
   function stepHeartbeats(dt, list) {
     const a = S.audio;
     const p = S.player;
-    const hear = level('vheart').hearDist || 5;
+    const hear = level('vheart').hearDist || 2.5;
     let n1 = null;
     let d1 = hear * hear;
     let n2 = null;
