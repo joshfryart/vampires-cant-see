@@ -193,6 +193,7 @@
     if (S.state === next) return;
     L().info('State ' + S.state + ' -> ' + next);
     S.state = next;
+    if (next !== 'playing') endListen();
     if (next !== 'paused') S.guideOpen = false;
     show(S.els.pause, next === 'paused' && !S.guideOpen);
     if (next === 'paused') showSettings(false);
@@ -452,7 +453,8 @@
         updateBob(dt, 0);
         S.stepTimer = 0;
       } else {
-        VCS.Player.update(S.player, S.world, inp, dt, S.config);
+        const lis = S.listen && S.listen.active;
+        VCS.Player.update(S.player, S.world, inp, dt, lis ? Object.assign({}, S.config, { moveSpeed: cfgNum('moveSpeed', 3) * VCS.Listen.MOVE_K }) : S.config); // W2: listening is slow
         const moved = Math.hypot(S.player.x - px, S.player.y - py);
         updateBob(dt, moved);
         playerSteps(dt, moved);
@@ -465,6 +467,7 @@
     S.playerLit = safeLight(S.world, S.player.x, S.player.y);
     S.veilK += (clamp(S.playerLit, 0, 1) - S.veilK) * (1 - Math.exp(-dt / 0.3)); // veil meter: same light value villagers spot with
     if (S.grace > 0) S.grace -= dt;
+    stepListen(dt);
     if (!wasDrinking) {
       if (checkLinkDoor()) return;
       followRoom();
@@ -494,6 +497,96 @@
     const cd = VCS.Sonar.cooldownLeft(S.sonar, S.clock);
     if (cd > 0) S.hudFrac = Math.min(1, cd / (S.sonar.cooldown || 0.8));
     S.hudA = clamp(S.hudA + (cd > 0 ? dt : -dt) / 0.15, 0, 1);
+  }
+
+  /** W2: hold E facing a window from outside to hear the room behind it (muffled by the glass). Never throws. */
+  function stepListen(dt) {
+    try {
+      const p = S.player;
+      if (!VCS.Listen || !p || S.state !== 'playing' || !S.world) return;
+      if (!S.listen) S.listen = VCS.Listen.create();
+      const px = S.lisPx === undefined ? p.x : S.lisPx;
+      const py = S.lisPy === undefined ? p.y : S.lisPy;
+      S.lisPx = p.x;
+      S.lisPy = p.y;
+      const inst = dt > 0 ? Math.hypot(p.x - px, p.y - py) / dt : 0;
+      S.lisSpeed = (S.lisSpeed || 0) + (inst - (S.lisSpeed || 0)) * (1 - Math.exp(-dt / 0.15));
+      const canSpeak = !!S.audio && typeof VCS.Audio.speak === 'function';
+      VCS.Listen.step(S.listen, {
+        now: S.clock,
+        held: !!(S.input && S.input.keys && S.input.keys.has('KeyE')),
+        holding: !!S.drink || !!S.mist,
+        speed: S.lisSpeed,
+        world: S.world,
+        player: p,
+        people: S.people ? S.people.people : [],
+        fear: S.hunger ? S.hunger.fear : 0,
+        pan: panTo,
+        speak: canSpeak ? function (o) { return VCS.Audio.speak(S.audio, o); } : null,
+        speakLength: typeof VCS.Audio.speakLength === 'function' ? VCS.Audio.speakLength : null,
+        voiceFor: VCS.VoiceData && typeof VCS.VoiceData.forPerson === 'function' ? function (who, seed) { return VCS.VoiceData.forPerson(typeof who.id === 'number' ? who.id : seed, who.role); } : null,
+        onChange: function (on, info) {
+          if (on) S.lisCount = info.count;
+          if (on) L().info('Listening at window ' + (info.zone || '?') + ': ' + info.count + ' inside, lit ' + info.lit.toFixed(2));
+          else L().info('Listening ended');
+          listenSr(on ? 'Listening at a window. Voices inside: ' + info.count : 'Stopped listening');
+        }
+      });
+      if (S.listen.active && S.listen.count !== S.lisCount) {
+        S.lisCount = S.listen.count;
+        listenSr('Voices inside: ' + S.listen.count);
+      } else if (!S.listen.active) S.lisCount = -1;
+    } catch (e) { if (!S.lisWarned) { S.lisWarned = true; L().warn('stepListen failed', e); } }
+  }
+
+  /** W2: drop any listening state (speech stopped, timers and speed tracking reset). Never throws. */
+  function endListen() {
+    try { if (S.listen && VCS.Listen) VCS.Listen.stop(S.listen); } catch (e) { /* ignore */ }
+    S.listen = null;
+    S.lisPx = undefined;
+    S.lisPy = undefined;
+    S.lisSpeed = 0;
+    S.lisCount = -1;
+  }
+
+  /** Screen-reader announcement through a visually hidden live region. */
+  function listenSr(text) {
+    try {
+      if (!root.document) return;
+      let el = S.srEl;
+      if (!el) {
+        el = root.document.createElement('div');
+        el.setAttribute('aria-live', 'polite');
+        el.setAttribute('role', 'status');
+        const st = el.style;
+        st.position = 'absolute';
+        st.width = '1px';
+        st.height = '1px';
+        st.overflow = 'hidden';
+        st.clip = 'rect(0 0 0 0)';
+        root.document.body.appendChild(el);
+        S.srEl = el;
+      }
+      el.textContent = text;
+    } catch (e) { /* ignore */ }
+  }
+
+  /** HUD line while listening, just above the tutorial hint. */
+  function drawListen(c) {
+    try {
+      const l = S.listen;
+      if (!l || !l.active) return;
+      const k = cfgOn('largeText') ? 1.3 : 1;
+      const txt = 'Voices inside: ' + l.count + (l.silent && l.count ? ' (hushed)' : '');
+      c.save();
+      c.globalAlpha = 0.85;
+      c.fillStyle = '#cfe3ff';
+      c.font = Math.round(11 * k) + 'px ui-monospace, Menlo, Consolas, monospace';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(txt, 320, 262 - (k - 1) * 20);
+      c.restore();
+    } catch (e) { /* ignore */ }
   }
 
   /** Advance the night clock; handles its events. True if the run ended or a fatal error occurred. */
@@ -1005,6 +1098,7 @@
     S.mist = null;
     S.mistVis = 0;
     S.overAcc = 0;
+    endListen();
   }
 
   /** Begin a brand new run (from the menu or the run-end panel). True if it started. */
@@ -1832,6 +1926,7 @@
       HOPTS.dur = S.tutCur.dur;
       Hud.drawHint(S.hud, c, S.tutCur.text, S.tutAge, S.clock, HOPTS);
     }
+    drawListen(c);
     drawSaveDot(c);
   }
 
@@ -3950,7 +4045,8 @@
     vial: 'Vial = blood. Drink past full for gifts',
     fear: 'Eyes by the clock = fear',
     sleep: 'E at the crypt or a dark spot to sleep',
-    light: 'Eye = light on you. Stay dark to stay unseen'
+    light: 'Eye = light on you. Stay dark to stay unseen',
+    listen: 'Hold E facing a lit window to listen'
   };
 
   /** Which tutorial hints were already seen in this browser (vcs.seen entries "tut:<id>"). */
@@ -4015,6 +4111,7 @@
       if (n.blood < 50) tutQueue('vial');
       if (S.hunger && S.hunger.fear > 0) tutQueue('fear');
       if (S.veilK > 0.5) tutQueue('light');
+      if (S.world && S.player && VCS.Listen && VCS.Listen.nearLitWindow(S.world, S.player, 2.5)) tutQueue('listen');
       if (n.night === 1 && n.min >= 510) tutQueue('sleep');
     }
     if (S.cardText !== null || S.hintT > 0) return;
@@ -4214,6 +4311,7 @@
   /** Swap to map `name` placing the player at (x,y,angle); resets sonar, echoes, rings, audio. doorId opens the arrival door. */
   function enterMap(name, x, y, angle, doorId) {
     endDrink('map');
+    endListen();
     S.landings.length = 0;
     const old = S.people;
     if (old) VCS.People.clearEchoes(old);

@@ -1308,7 +1308,172 @@
     if (a) a.pingBip = bip === true;
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setWet, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, heartbeat, fireBed };
+  const MAX_SPEAKERS = 4;
+
+  /** VCS.VoiceData or null. */
+  function voiceData() {
+    return (root.VCS && root.VCS.VoiceData) || null;
+  }
+
+  /** Resolves opts.voice (preset name or forPerson result) to a voice object. */
+  function resolveVoice(VD, voice) {
+    if (voice && typeof voice === 'object' && typeof voice.pitch === 'number') return voice;
+    return VD.PRESETS[typeof voice === 'string' && VD.PRESETS[voice] ? voice : 'man'];
+  }
+
+  /** Total duration in seconds of a line, scaled by mood and voice speed. */
+  function scaledLength(VD, syls, moodRow, voice) {
+    const sp = Math.max(0.3, moodRow.speed * (voice && voice.speed > 0 ? voice.speed : 1));
+    return VD.lineLength(syls) / sp;
+  }
+
+  /**
+   * Duration in seconds speak() would take, without playing (pure, for scheduling). 0 when voice data is missing.
+   * @param {number|string} seed
+   * @param {string} kind chat|question|argue|laugh|murmur|greet|startle
+   * @param {string} [mood] calm|whisper|worried|argue
+   * @param {object|string} [voice] preset name or forPerson result (speed scales the length; default speed 1)
+   * @returns {number}
+   */
+  function speakLength(seed, kind, mood, voice) {
+    try {
+      const VD = voiceData();
+      if (!VD) return 0;
+      const mr = VD.MOODS[mood] || VD.MOODS.calm;
+      const v = voice === undefined ? { speed: 1 } : resolveVoice(VD, voice);
+      return scaledLength(VD, VD.line(seed, kind, mood), mr, v);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /** Silences one speaker handle. Never throws. */
+  function killSpeaker(ctx, sp) {
+    try {
+      sp.dead = true;
+      const now = ctx.currentTime || 0;
+      const g = (sp.bus || sp.env).gain;
+      if (typeof g.cancelScheduledValues === 'function') g.cancelScheduledValues(now);
+      g.setValueAtTime(0, now);
+      sp.osc.stop(now + 0.02);
+    } catch (e) {
+      // already ended
+    }
+  }
+
+  /**
+   * Plays synthesized villager speech: a sawtooth source through three formant band-pass filters (muffled horn), noise for
+   * consonants and whisper. At most 4 speakers at once: a 5th call drops the OLDEST speaker (it is silenced) and plays.
+   * Level comes from SoundData.levels.voice (fallback 0.06) times master volume and opts.gain. Reverb via the shared send.
+   * @param {object} a Audio state.
+   * @param {{voice?: (string|object), seed?: (number|string), kind?: string, mood?: string, pan?: number, lpHz?: number, gain?: number}} [opts]
+   * @returns {{end: number, stop: function(): void}|null} end = seconds the line lasts; null when not ready, muted or unsupported.
+   */
+  function speak(a, opts) {
+    try {
+      if (!ready(a)) return null;
+      const VD = voiceData();
+      if (!VD) return null;
+      const o = opts || {};
+      const ctx = a.ctx;
+      if (typeof ctx.createOscillator !== 'function' || typeof ctx.createBiquadFilter !== 'function') return null;
+      const mr = VD.MOODS[o.mood] || VD.MOODS.calm;
+      const voice = resolveVoice(VD, o.voice);
+      const og = typeof o.gain === 'number' && Number.isFinite(o.gain) ? clamp01(o.gain) : 1;
+      const peak = a.volume * levelOf('voice', 0.06).gain * mr.gain * og;
+      if (!(peak > 0)) return null;
+      const syls = VD.line(o.seed === undefined ? 0 : o.seed, o.kind, o.mood);
+      if (!syls.length) return null;
+      const sp = Math.max(0.3, mr.speed * (voice.speed > 0 ? voice.speed : 1));
+      const total = VD.lineLength(syls) / sp;
+
+      // concurrency cap: drop the oldest live speaker
+      const now = ctx.currentTime || 0;
+      const list = (ctx.__vcsSpeakers = (ctx.__vcsSpeakers || []).filter((s) => !s.dead && s.end > now));
+      while (list.length >= MAX_SPEAKERS) killSpeaker(ctx, list.shift());
+
+      const t0 = now + 0.02;
+      const breath = Math.min(1, voice.breath + mr.breath);
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, t0);
+      const sum = ctx.createGain();
+      sum.gain.value = 1;
+      const fils = [];
+      const fgain = [1, 0.6, 0.3];
+      for (let i = 0; i < 3; i++) {
+        const f = ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        if (f.Q) f.Q.value = i === 0 ? 5 : 8;
+        const fg = ctx.createGain();
+        fg.gain.value = fgain[i];
+        osc.connect(f);
+        f.connect(fg);
+        fg.connect(sum);
+        fils.push(f);
+      }
+      sum.connect(env);
+      // bus: voiced env + consonant noise share one pan/lowpass path and one kill switch
+      const bus = ctx.createGain();
+      bus.gain.value = 1;
+      env.connect(bus);
+      routeOut(ctx, bus, o.pan, typeof o.lpHz === 'number' && o.lpHz > 0 ? o.lpHz : 1800);
+
+      const base = voice.pitch * mr.pitch;
+      let t = t0;
+      const voiced = mr.voiced;
+      for (let i = 0; i < syls.length; i++) {
+        const s = syls[i];
+        const d = s.dur / sp;
+        const fm = VD.VOWELS[s.vowel] || VD.VOWELS.a;
+        const f0 = Math.max(40, base * s.pitchMul * (1 + (i % 2 ? 1 : -1) * voice.wobble * 0.04));
+        osc.frequency.setValueAtTime(f0, t);
+        osc.frequency.linearRampToValueAtTime(f0 * (1 + voice.wobble * 0.03), t + d);
+        for (let j = 0; j < 3; j++) {
+          const hz = fm[j] * (voice.formantMul || 1);
+          fils[j].frequency.setValueAtTime(hz, t);
+        }
+        const c = VD.CONSONANTS[s.consonant] || VD.CONSONANTS[''];
+        const pk = peak * (0.7 + 0.3 * Math.min(1.5, s.pitchMul)) * voiced;
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.linearRampToValueAtTime(Math.max(pk, 0.0001), t + Math.min(0.03, d * 0.25));
+        if (c.rolled) {
+          // rolled r: fast amplitude flutter
+          const step = Math.max(0.02, d / 5);
+          for (let k = 1; k < 5; k++) {
+            env.gain.linearRampToValueAtTime(Math.max(pk * (k % 2 ? 0.3 : 1), 0.0001), t + k * step);
+          }
+        }
+        env.gain.linearRampToValueAtTime(0.0001, t + d);
+        // consonant / breath noise (best effort; needs createBuffer)
+        const nz = Math.max(c.noise, breath * 0.5);
+        if (nz > 0.02) {
+          const nHz = c.hz > 0 ? c.hz : fm[1] * (voice.formantMul || 1);
+          noise(ctx, bus, t, Math.max(0.03, d * (c.noise > 0.2 ? 0.45 : 1)), peak * nz * (mr.voiced < 0.5 ? 1.6 : 0.8), 'bandpass', nHz, 0.01);
+        }
+        t += d + s.gap / sp;
+      }
+      const endAt = t0 + total + 0.05;
+      osc.start(t0);
+      osc.stop(endAt);
+      track(ctx, osc, bus, endAt);
+      const handle = { osc: osc, env: env, bus: bus, end: endAt, dead: false };
+      list.push(handle);
+      log().debug('speak ' + String(o.kind || 'chat'));
+      return {
+        end: total,
+        stop() {
+          if (!handle.dead) killSpeaker(ctx, handle);
+        }
+      };
+    } catch (e) {
+      reportFailure(a, 'Sound failed to speak', e);
+      return null;
+    }
+  }
+
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setWet, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, heartbeat, fireBed, speak, speakLength, MAX_SPEAKERS };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;
