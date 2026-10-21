@@ -1448,6 +1448,15 @@
    * rules as the floor front (walls and light-of-sight), gated on airOn; at most TEX_MAX_CELLS cells a frame.
    */
   function drawFloorTexture(r, world, sonar, t, player, tanHalf) {
+    drawSurfaceTexture(r, world, sonar, t, player, tanHalf, false);
+    if (world) drawSurfaceTexture(r, world, sonar, t, player, tanHalf, true);
+  }
+
+  /** Ceiling marks for a floor texture kind: grass has no ceiling analogue (timber), cobble becomes stone. */
+  function ceilTexKind(kind) { return kind === 'grass' ? 'plank' : kind === 'cobble' ? 'brick' : kind; }
+
+  /** One surface of drawFloorTexture; up=true draws the ceiling (mirrored about the horizon) over indoor cells only. */
+  function drawSurfaceTexture(r, world, sonar, t, player, tanHalf, up) {
     const pulses = sonar.pulses;
     if (!pulses || !pulses.length || !airOn(r) || !world || typeof world.materialAt !== 'function') return;
     const ctx = r.octx;
@@ -1463,12 +1472,13 @@
       const fwd = dx * ca + dy * sa;
       if (fwd < 0.3) return false;
       pr.x = halfW + ((-dx * sa + dy * ca) / fwd) * focal;
-      pr.y = horizon + half / fwd;
+      pr.y = up ? horizon - half / fwd : horizon + half / fwd;
       pr.f = fwd;
       pr.f2 = focal / fwd;
-      return pr.x > -40 && pr.x < r.ow + 40 && pr.y < r.oh * 3;
+      return pr.x > -40 && pr.x < r.ow + 40 && (up ? pr.y > -r.oh * 2 : pr.y < r.oh * 3);
     };
     const P = { pt: pr };
+    const hasKind = typeof world.kindAt === 'function';
     ctx.lineWidth = 1;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#d8ecff';
@@ -1508,8 +1518,12 @@
           const col = Math.max(0, Math.min(r.cols - 1, Math.floor(sx / r.colW)));
           if (fwd > r.zbuf[col] + 0.05 || !visibleFrom(pu, mx, my)) continue;
           if (world.isSolid(mx, my)) continue;
-          const kind = floorTexKind(world.materialAt(mx, my));
+          let kind = floorTexKind(world.materialAt(mx, my));
           if (!kind) continue;
+          if (up) {
+            if (hasKind && world.kindAt(mx, my) === 'outdoor') continue;
+            kind = ceilTexKind(kind);
+          }
           const bk = Math.min(TEX_BUCKETS - 1, Math.floor(g * TEX_BUCKETS * 1.2));
           sets[bk].push(cx, cy, kind, fwd);
           if (--budget <= 0) break;
