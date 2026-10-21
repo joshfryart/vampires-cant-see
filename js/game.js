@@ -551,6 +551,15 @@
     if (S.audio) VCS.Audio.play(S.audio, 'miss', { gain: level('miss').gain, pan: 0 });
   }
 
+  /** Pulse snapshot of a held victim for the vessel overlay (drawn on the locked figure, which has no vheart echo). */
+  function victimVessel(p) {
+    const V = VCS.Vessels;
+    if (!V || typeof V.state !== 'function') return null;
+    const blood = p.pool > 0 ? clamp(p.left / p.pool, 0, 1) : 1;
+    const st = V.state('villager', 'drinking', blood);
+    return st.pulse ? { bpm: st.bpm, stateK: st.stateK, periphK: st.periphK, headK: st.headK } : null;
+  }
+
   /** Push (or refresh) a snapshot echo of a person so the feed lock has a figure to draw. */
   function pushVictimEcho(p) {
     const st = S.people;
@@ -560,7 +569,7 @@
     es.push({
       personId: p.id, x: p.x, y: p.y, angle: p.angle, lookAngle: p.lookAngle, phase: p.phase, moving: false,
       t: S.clock, dist: Math.hypot(p.x - S.player.x, p.y - S.player.y), strength: 0.9, pan: panTo(p.x, p.y), look: p.look,
-      zMin: 0, zMax: 1.2, fade: 2.2
+      zMin: 0, zMax: 1.2, fade: 2.2, vessel: victimVessel(p)
     });
     while (es.length > st.maxEchoes) es.shift();
   }

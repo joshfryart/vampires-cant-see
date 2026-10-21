@@ -2613,6 +2613,11 @@
     clippedDraw(r, minX - lw, maxX + lw, depth, wrapped);
     // Circulatory overlay: after the outline, not limited to the chest strip (the outline stays chest-only).
     if (e.kind === 'vheart' && !locked && vesselsOn()) drawVesselsSeen(r, e, X, Y, age, minX - lw, maxX + lw, depth, player);
+    // Held victim: the vessels beat with the drink pulse (the echo is rebuilt each beat, so its age is the beat age).
+    if (locked && e.vessel && vesselsOn()) {
+      const ve = Object.assign({}, e.vessel, { kind: 'vheart', x: e.x, y: e.y, strength: 1 });
+      drawVesselsSeen(r, ve, X, Y, Math.max(0, now - e.t), minX - lw, maxX + lw, depth, player);
+    }
     if (locked) drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
     ctx.globalAlpha = 1;
     return true;
