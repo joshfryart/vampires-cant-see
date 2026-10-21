@@ -1388,13 +1388,22 @@ describe('game-echo helpers (v0.11.2)', () => {
     const a2 = at(2);
     const a4 = at(4);
     assert.strictEqual(a2.opts.voice, 'person');
-    near(a2.strength, 0.03 * Math.min(0.7, Math.max(0.1, A.personAmp(2, 0))));
+    near(a2.strength, Math.min(0.7, Math.max(0.1, A.personAmp(2, 0))));
     assert.ok(a2.strength > a4.strength, 'doubling distance costs level');
     near(A.echoLevel('person', 2, 0) - A.echoLevel('person', 4, 0), 40 * Math.log10(2) + 2 * 2 * A.airDbPerM);
     assert.ok(at(3, Math.PI).strength < at(3, 0).strength, 'behind the mouth is quieter');
     near(a2.delay, 2 / VCS.Sonar.SONAR_SPEED);
-    assert.ok(at(30).strength >= 0.003 - 1e-9, 'never below the old floor (x0.03)');
-    assert.ok(at(0.2).strength <= 0.021 + 1e-9, 'never above the old ceiling (x0.03)');
+    assert.ok(at(30).strength >= 0.1 - 1e-9, 'never below the old floor');
+    assert.ok(at(0.2).strength <= 0.7 + 1e-9, 'never above the old ceiling');
+  });
+
+  test('person echoes of world sounds (villager steps) are silent; only the player ping is heard', () => {
+    G.bind({ audio: { room: 'indoor' }, sonar: { speed: VCS.Sonar.SONAR_SPEED } });
+    const go = (kind) => spyEcho(() => G.personEcho({ dist: 0.1, theta: 0, strength: 1, pan: 0, kind: kind }));
+    assert.strictEqual(go('personStep').length, 0);
+    assert.strictEqual(go('step').length, 0);
+    assert.strictEqual(go('door').length, 0);
+    assert.strictEqual(go('ping').length, 1);
   });
 
   test('person echo record carries theta (off the mouth axis) from the ping facing', () => {

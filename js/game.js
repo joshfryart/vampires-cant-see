@@ -1351,10 +1351,13 @@
     VCS.Ripple.prune(S.ripple, S.clock);
   }
 
-  const PERSON_ECHO_GAIN = 0.03; // villager echoes: very faint (3% of the object-sonar level; was 8%, still too loud); distance falloff kept
+  const PERSON_ECHO_GAIN = 1; // level of a villager's ping echo (was turned down to 0.5/0.08/0.03 while chasing the footstep bug)
 
   /** Audible echo of a person snapshot: object sonar equation (-40 log r + TS + class gain), not the old 0.7 * strength. */
   function personEcho(e) {
+    // Only the player's own ping comes back to the player as an echo. World sounds (villager footsteps, doors) light the
+    // person visually but are not echoes you hear; playing them made every step of every villager thump in the ear.
+    if (e.kind && e.kind !== 'ping') return;
     const A = VCS.SoundData && VCS.SoundData.acoustics;
     const amp = (A ? clamp(A.personAmp(e.dist, e.theta), 0.1, 0.7) : clamp(0.7 * e.strength, 0.1, 0.7)) * PERSON_ECHO_GAIN;
     VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), amp, e.pan, { voice: 'person' });
