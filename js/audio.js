@@ -81,7 +81,8 @@
     tick: { f0: 5200, f1: 4800, sec: 0.004, tail: 0.02, lp: 9000, gain: 0.8, type: 'sine' },
     ring: { f0: 2400, f1: 2400, sec: 0.02, tail: 0.45, lp: 5500, gain: 0.8, type: 'sine', partials: [2.76] },
     soft: { f0: 900, f1: 600, sec: 0.04, tail: 0.09, lp: 700, gain: 0.12, type: 'sine' },
-    person: { f0: 600, f1: 420, sec: 0.06, tail: 0.16, lp: 900, gain: 0.85, type: 'triangle' }
+    // dull body thud (a chirp here read as a cartoon "bew" on every villager echo)
+    person: { f0: 170, f1: 120, sec: 0.03, tail: 0.09, lp: 380, gain: 1, type: 'sine' }
   };
   const MAX_VOICES = 96;
 
