@@ -9,7 +9,7 @@ stood. Ping again to see where they went.
 Find a villager, drink in the dark, and get back to your crypt (or a safe, dark
 spot) before dawn. Survive five nights to win the run.
 
-Current build (v0.17.0)
+Current build (v0.18.0)
 
 No install, no server, no build step, no network. Plain HTML and JavaScript.
 

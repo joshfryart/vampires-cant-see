@@ -417,6 +417,13 @@
       pushRing(p, u * u * Ax + 2 * u * t * Cx + t * t * Ex, u * u * Ay + 2 * u * t * Cy + t * t * Ey, prof(T, R, t) * k, Math.atan2(TAN.y, TAN.x));
     }
     {
+      // Third ring: sleeve / trouser cuff near the wrist or ankle.
+      const t = t0 + (t1 - t0) * 0.84;
+      const u = 1 - t;
+      tangent(Ax, Ay, Cx, Cy, Ex, Ey, t);
+      pushRing(p, u * u * Ax + 2 * u * t * Cx + t * t * Ex, u * u * Ay + 2 * u * t * Cy + t * t * Ey, prof(T, R, t) * k * 1.04, Math.atan2(TAN.y, TAN.x));
+    }
+    {
       const t = (t0 + t1) * 0.5;
       const u = 1 - t;
       tangent(Ax, Ay, Cx, Cy, Ex, Ey, t);
@@ -759,6 +766,38 @@
     c.ellipse(cx, cy, Math.max(0.01, r), Math.max(0.01, r * minorK), ang + Math.PI * 0.5, 0, Math.PI, true);
   }
 
+  /** Cloth creases fanning up from the belt line. */
+  function torsoFolds(c, p, m, lw, alpha) {
+    const ax = p.bx - p.ax;
+    const ay = p.by - p.ay;
+    const L = Math.sqrt(ax * ax + ay * ay);
+    if (L < 8) return;
+    const ux = ax / L;
+    const uy = ay / L;
+    const dx = m.beltX1 - m.beltX0;
+    const dy = m.beltY1 - m.beltY0;
+    const bw = Math.sqrt(dx * dx + dy * dy);
+    if (bw < 4) return;
+    c.globalAlpha = alpha * 0.45;
+    c.lineWidth = lw * 0.7;
+    c.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const f = 0.28 + i * 0.22;
+      const sx = m.beltX0 + dx * f;
+      const sy = m.beltY0 + dy * f;
+      const sgn = i === 0 ? -1 : i === 2 ? 1 : 0;
+      const len = L * (0.2 + 0.05 * (i % 2));
+      const ex = sx - ux * len + dx * sgn * 0.08;
+      const ey = sy - uy * len + dy * sgn * 0.08;
+      const bow = bw * 0.06 * (i === 1 ? 1 : -sgn);
+      c.moveTo(sx, sy);
+      c.quadraticCurveTo((sx + ex) * 0.5 - uy * bow, (sy + ey) * 0.5 + ux * bow, ex, ey);
+    }
+    c.stroke();
+    c.lineWidth = lw;
+    c.globalAlpha = alpha;
+  }
+
   /** Hem height on screen for the robe / apron / smock / cloak, from look.hem (0 waist .. 1 ankle). */
   function hemY(m, look, dflt) {
     const hem = clamp(num(look.hem, dflt), 0, 1);
@@ -865,6 +904,29 @@
           }
         }
         c.stroke();
+        if (fx >= 1 && near && p.kind !== 'extra' && p.kind !== 'head') {
+          // Shade side: a heavier contour on the side away from the light gives the flat outline some roundness.
+          c.globalAlpha = clamp(0.55 * alpha, 0, 1);
+          c.lineWidth = lw * 1.9;
+          c.beginPath();
+          rimPart(c, p, -rimSide);
+          c.stroke();
+          c.lineWidth = lw;
+          c.globalAlpha = alpha;
+        }
+        if (lod >= 1 && fx >= 1 && near) {
+          if ((leg || p.kind === 'arm') && p.nw > 2 && !robe && look.outfit !== 'cloak' && !(p.kind === 'arm' && look.outfit === 'mail')) {
+            c.globalAlpha = alpha * 0.8;
+            c.lineWidth = lw * 0.9;
+            c.beginPath();
+            wrapRing(c, p, 2, minorK);
+            c.stroke();
+            c.lineWidth = lw;
+            c.globalAlpha = alpha;
+          } else if (p.kind === 'torso' && lod >= 2 && m.belt && look.outfit !== 'robe' && look.outfit !== 'cloak') {
+            torsoFolds(c, p, m, lw, alpha);
+          }
+        }
         if (rimK > 0.02 && near) {
           c.globalAlpha = clamp(0.5 * rimK * sa, 0, 1);
           c.strokeStyle = COL_RIM;

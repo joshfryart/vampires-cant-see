@@ -84,3 +84,11 @@ Result: the volumetric figure (`js/figure.js`) now draws anatomical outlines ins
 - Before/after uses the new pose slots on both sides, so the v0.17 child-width tweak shows on the old figure too.
 - The old line-figure coat crosses itself into an X when facing the camera. This is fixed only in the volumetric path, because the line path has to stay identical.
 - Ideas not done: facial asymmetry per archetype, finger poses for props and the held-victim grip, cloth folds on robes and cloaks, and a shared silhouette cache for the pulse-strip clipping.
+
+## v0.18.0 follow-up (second pass)
+
+All inside `draw()` in `js/figure.js`, Effects >= 1 and near figures only (the Effects 0 line figure is untouched):
+- Shade-side contour: a heavier (1.9x) partial stroke on the side away from the rim light, via `rimPart(c, p, -rimSide)`. Gives limbs and torso roundness.
+- Cuffs: a third wrap ring per arm and leg (`sweep`, t 0.84) drawn at lod >= 1 as sleeve/trouser cuffs (skipped for robe, cloak, mail sleeves).
+- Torso creases (`torsoFolds`): three fine curves fanning up from the belt line at lod 2 (skipped for robe and cloak).
+Tests in `tests/` all pass unchanged. Still open: hood/arm overlap on the idle head-scratch, per-archetype faces, finger poses, robe folds.
