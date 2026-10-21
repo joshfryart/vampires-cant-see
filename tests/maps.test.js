@@ -4,6 +4,8 @@ const assert = require('node:assert');
 const Log = require('../js/log.js');
 const MapData = require('../js/data/maps.js');
 const World = require('../js/world.js');
+require('../js/data/archetypes.js');
+require('../js/forge.js');
 const People = require('../js/people.js');
 
 Log.setConsole(false);

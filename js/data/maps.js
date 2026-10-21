@@ -31,9 +31,9 @@
         // centres), seconds to wait at each point, walking speed in cells/s.
         // Paths loop back to the first point. Segments must not cross walls.
         paths: [
-          { points: [[16, 1], [21, 1], [21, 5], [16, 5]], waits: [2.0, 1.0, 2.5, 1.0], speed: 1.2 },
-          { points: [[13, 4], [11, 4], [11, 1], [13, 1]], waits: [1.5, 1.0, 2.0, 1.0], speed: 1.0 },
-          { points: [[14, 8], [3, 8], [3, 7], [20, 7], [20, 8]], waits: [2.0, 1.5, 1.0, 1.5, 1.0], speed: 1.4 }
+          { points: [[16, 1], [21, 1], [21, 5], [16, 5]], waits: [2.0, 1.0, 2.5, 1.0], speed: 1.2, archetype: 'patron', seed: 0 },
+          { points: [[13, 4], [11, 4], [11, 1], [13, 1]], waits: [1.5, 1.0, 2.0, 1.0], speed: 1.0, archetype: 'patron', seed: 1 },
+          { points: [[14, 8], [3, 8], [3, 7], [20, 7], [20, 8]], waits: [2.0, 1.5, 1.0, 1.5, 1.0], speed: 1.4, archetype: 'patron', seed: 2 }
         ]
       },
       crypt: {
@@ -274,23 +274,25 @@
           { type: 'cross', col: 52, row: 44 }
         ],
         paths: [
-          { points: [[16, 3], [16, 17], [28, 16], [16, 17]], waits: [3, 1, 7, 1], speed: 1.3, role: 'guard' },
-          { points: [[28, 3], [23, 3], [23, 8], [28, 8]], waits: [2, 1, 4, 1], speed: 1, role: 'innkeeper', home: 'tavern' },
-          { points: [[32, 3], [36, 3], [36, 12], [32, 12]], waits: [1, 1, 3, 6], speed: 1, role: 'drunk', home: 'barn' },
-          { points: [[61, 3], [61, 18], [50, 18], [61, 18]], waits: [2, 1, 8, 1], speed: 1.1, role: 'priest', home: 'church' },
-          { points: [[50, 4], [57, 4], [57, 13], [50, 13]], waits: [2, 1, 2, 5], speed: 1, role: 'elder', home: 'house2' },
-          { points: [[20, 8], [26, 8], [26, 12], [20, 10]], waits: [1.5, 1, 5, 1], speed: 1, role: 'regular', home: 'house2' },
-          { points: [[20, 12], [20, 11]], waits: [1, 1], speed: 1, sit: true },
-          { points: [[44, 13], [44, 14]], waits: [1, 1], speed: 1, sit: true },
-          { points: [[2, 19], [20, 19], [35, 19], [58, 19], [58, 20]], waits: [3, 1, 6, 1, 2], speed: 1.3, role: 'guard' },
-          { points: [[34, 21], [34, 38]], waits: [2, 6], speed: 1.1, role: 'insomniac', home: 'barn' },
-          { points: [[52, 21], [52, 36], [45, 36], [52, 36]], waits: [1.5, 1, 6, 1], speed: 1.2, role: 'farmer', home: 'house1' },
-          { points: [[5, 28], [5, 27]], waits: [1, 1], speed: 1, sit: true },
-          { points: [[20, 29], [26, 29], [23, 26], [20, 26]], waits: [3, 2, 6, 1], speed: 1, role: 'mother', home: 'house2' },
-          { points: [[3, 42], [28, 42], [28, 40], [14, 40]], waits: [2, 4, 1, 2], speed: 1.3, role: 'gravedigger', home: 'shed' }
+          { points: [[16, 3], [16, 17], [28, 16], [16, 17]], waits: [3, 1, 7, 1], speed: 1.3, archetype: 'guard', seed: 0 },
+          { points: [[28, 3], [23, 3], [23, 8], [28, 8]], waits: [2, 1, 4, 1], speed: 1, archetype: 'innkeeper', seed: 1, home: 'tavern' },
+          { points: [[32, 3], [36, 3], [36, 12], [32, 12]], waits: [1, 1, 3, 6], speed: 1, archetype: 'drunk', seed: 2, home: 'barn' },
+          { points: [[61, 3], [61, 18], [50, 18], [61, 18]], waits: [2, 1, 8, 1], speed: 1.1, archetype: 'priest', seed: 3, home: 'church' },
+          { points: [[50, 4], [57, 4], [57, 13], [50, 13]], waits: [2, 1, 2, 5], speed: 1, archetype: 'elder', seed: 4, home: 'house2' },
+          { points: [[20, 8], [26, 8], [26, 12], [20, 10]], waits: [1.5, 1, 5, 1], speed: 1, archetype: 'regular', seed: 5, home: 'house2' },
+          { points: [[20, 12], [20, 11]], waits: [1, 1], speed: 1, sit: true, archetype: 'patron', seed: 6 },
+          { points: [[44, 13], [44, 14]], waits: [1, 1], speed: 1, sit: true, archetype: 'patron', seed: 7 },
+          { points: [[2, 19], [20, 19], [35, 19], [58, 19], [58, 20]], waits: [3, 1, 6, 1, 2], speed: 1.3, archetype: 'guard', seed: 8 },
+          { points: [[34, 21], [34, 38]], waits: [2, 6], speed: 1.1, archetype: 'insomniac', seed: 9, home: 'barn' },
+          { points: [[52, 21], [52, 36], [45, 36], [52, 36]], waits: [1.5, 1, 6, 1], speed: 1.2, archetype: 'farmer', seed: 10, home: 'house1' },
+          { points: [[5, 28], [5, 27]], waits: [1, 1], speed: 1, sit: true, archetype: 'patron', seed: 11 },
+          { points: [[20, 29], [26, 29], [23, 26], [20, 26]], waits: [3, 2, 6, 1], speed: 1, archetype: 'mother', seed: 12, home: 'house2' },
+          { points: [[3, 42], [28, 42], [28, 40], [14, 40]], waits: [2, 4, 1, 2], speed: 1.3, archetype: 'gravedigger', seed: 13, home: 'shed' }
         ],
         // Dark doorway/alcove floor cells people can flee to.
         hides: [[6, 4], [9, 4], [10, 24], [13, 24], [29, 24], [40, 25], [43, 27], [19, 14]],
+        // v0.14: where mid-night reinforcements (guard, hunter) walk in, [col,row] (the street_far cell).
+        reinforce: { at: [2, 19] },
         // Named stops for night schedules (js/schedule.js), [col,row]; every one is a cell people already walk.
         places: {
           // Streets and yards (watch posts and errands).

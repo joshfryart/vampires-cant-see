@@ -759,6 +759,8 @@
         if (S.audio) VCS.Audio.play(S.audio, 'chime', { gain: level('chime').gain, pan: 0 });
         showCard('Dawn');
         L().info('Night chime');
+      } else if (ev[i] === 'washout') {
+        forgeWashout();
       } else if (ev[i] === 'dawn') {
         L().info('Dawn: the sun is up');
       } else if (ev[i] === 'lost') {
@@ -1592,6 +1594,7 @@
     const tPrev = S.clock - dt;
     const pc = peopleCtx();
     VCS.People.update(S.people, S.world, dt, pc);
+    stepForge(dt);
     drainPeopleEvents();
     peopleSounds(tPrev);
     const made = VCS.People.updateEchoes(S.people, S.sonar, tPrev, S.clock);
@@ -1608,6 +1611,70 @@
     }
     markerRipples(tPrev, S.clock);
     VCS.Ripple.prune(S.ripple, S.clock);
+  }
+
+  /**
+   * v0.14 mid-night hooks, at most once per second, only while playing or feeding on a map with `reinforce`.
+   * Fear walks in reinforcements (Forge.reinforcement); at fear 8 the watch lifts lanterns (look only, no light).
+   */
+  function stepForge(dt) {
+    const F = VCS.Forge;
+    const st = S.people;
+    if (!F || !st || !S.night || !S.hunger || !S.player || (S.state !== 'playing' && S.state !== 'feeding')) return;
+    const md = VCS.MapData && VCS.MapData.maps ? VCS.MapData.maps[S.mapName] : null;
+    const rf = md && md.reinforce;
+    if (!rf || !Array.isArray(rf.at)) return;
+    S.forgeIn = (S.forgeIn || 0) - dt;
+    if (S.forgeIn > 0) return;
+    S.forgeIn = 1;
+    try {
+      const fear = S.hunger.fear;
+      if (typeof st.forgeFired !== 'number') st.forgeFired = 0;
+      if (!st.forgeReinf) st.forgeReinf = [];
+      const hit = F.reinforcement({ fear: fear, night: S.night.night, runSeed: S.run ? S.run.seed : 1, fired: st.forgeFired });
+      if (hit) {
+        const x = rf.at[0] + 0.5;
+        const y = rf.at[1] + 0.5;
+        const p = S.player;
+        const far = Math.hypot(p.x - x, p.y - y) >= 10 || S.world.lineBlocked(p.x, p.y, x, y);
+        if (far) {
+          const r = VCS.People.spawn(st, S.world, { archetype: hit.archetype, seed: hit.seed }, { x: x, y: y });
+          st.forgeFired++; // a refused spawn (full town, solid cell) is not retried every second
+          if (r.ok) {
+            st.forgeReinf.push(r.id);
+            showCard(hit.card);
+            emitSound('bell', x, y);
+            L().info('Reinforcement: ' + hit.archetype + ' at fear ' + fear);
+          } else {
+            L().warn('reinforcement spawn refused: ' + r.code);
+          }
+        }
+      }
+      if (fear >= 8 && !st.forgeLantern) {
+        st.forgeLantern = true;
+        for (let i = 0; i < st.people.length; i++) {
+          if (st.people[i].watch) VCS.People.alter(st, st.people[i].id, { acc: 'lantern' });
+        }
+      }
+    } catch (err) {
+      L().warn('stepForge failed', err);
+    }
+  }
+
+  /** At washout, reinforcements that are out of sight (walled off or over 10 cells away) and not busy leave. */
+  function forgeWashout() {
+    const st = S.people;
+    if (!st || !st.forgeReinf || !S.player) return;
+    const keep = [];
+    for (let i = 0; i < st.forgeReinf.length; i++) {
+      const id = st.forgeReinf[i];
+      let q = null;
+      for (let k = 0; k < st.people.length; k++) if (st.people[k].id === id) q = st.people[k];
+      if (!q) continue;
+      const gone = S.world.lineBlocked(S.player.x, S.player.y, q.x, q.y) || Math.hypot(S.player.x - q.x, S.player.y - q.y) > 10;
+      if (!gone || !VCS.People.despawn(st, id).ok) keep.push(id);
+    }
+    st.forgeReinf = keep;
   }
 
   const PERSON_ECHO_GAIN = 1; // level of a villager's ping echo (was turned down to 0.5/0.08/0.03 while chasing the footstep bug)
@@ -2734,6 +2801,11 @@
       ls = null;
     }
     S.store = VCS.Save.create(ls);
+    try {
+      if (VCS.Forge && ls) VCS.Forge.loadLibrary(ls);
+    } catch (e) {
+      L().warn('forge library load failed', e);
+    }
     S.meta = VCS.Meta.create();
     if (!S.store.persistent) {
       S.storeWarned = true;
@@ -3599,9 +3671,50 @@
     return { ok: true, code: '' };
   }
 
+  /** Dev-panel host for the Forge editor. */
+  function forgeHost() {
+    return {
+      spawnAhead: function (spec) {
+        const p = S.player;
+        if (!p || !S.people) return { ok: false, code: 'E_PEOPLE_ARGS' };
+        const sp = spec && typeof spec === 'object' ? Object.assign({}, spec) : {};
+        if (!(typeof sp.seed === 'number' && isFinite(sp.seed))) sp.seed = Math.floor(Math.random() * 4294967296);
+        return VCS.People.spawn(S.people, S.world, sp, { x: p.x + Math.cos(p.angle) * 1.5, y: p.y + Math.sin(p.angle) * 1.5 });
+      },
+      alterNearest: function (patch) {
+        const q = nearestPerson();
+        return q ? VCS.People.alter(S.people, q.id, patch) : { ok: false, code: 'E_PEOPLE_NONE' };
+      },
+      despawnNearest: function () {
+        const q = nearestPerson();
+        return q ? VCS.People.despawn(S.people, q.id) : { ok: false, code: 'E_PEOPLE_NONE' };
+      },
+      people: function () {
+        return S.people ? S.people.people.map(function (q) { return { id: q.id, archetype: q.archetype, role: q.role, x: q.x, y: q.y }; }) : [];
+      }
+    };
+  }
+
+  function nearestPerson() {
+    if (!S.people || !S.player) return null;
+    let best = null;
+    let bd = Infinity;
+    for (let i = 0; i < S.people.people.length; i++) {
+      const q = S.people.people[i];
+      const d = Math.hypot(q.x - S.player.x, q.y - S.player.y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+  }
+
   /** ?debug=1 hooks for runs and saves. */
   function installDebugHooks() {
     const G = Game;
+    G.debugForgeSpawn = function (archetype, x, y, angle) {
+      if (!S.people) return { ok: false, code: 'E_PEOPLE_ARGS' };
+      return VCS.People.spawn(S.people, S.world, { archetype: archetype, seed: Math.floor(Math.random() * 4294967296), ang: angle }, { x: x, y: y });
+    };
+    G.debugForgeAlter = function (id, patch) { return S.people ? VCS.People.alter(S.people, id, patch) : { ok: false, code: 'E_PEOPLE_NONE' }; };
     G.debugSave = function () {
       const m = S.store.write('meta', VCS.Meta.SCHEMA, S.meta);
       const r = runIsActive() ? S.store.write('run', VCS.Save.RUN_SCHEMA, getSnapshot()) : null;
@@ -3717,6 +3830,7 @@
           });
         }
         if (VCS.DevPanel) VCS.DevPanel.init({ f9: debug });
+        if (VCS.DevPanel && typeof VCS.DevPanel.setForgeHost === 'function') VCS.DevPanel.setForgeHost(forgeHost());
       } catch (err) { L().warn('dev flags init failed', err); }
       try {
         S.osReduced = !!(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -4546,6 +4660,7 @@
   function getSnapshot() {
     const doors = {};
     const people = {};
+    const forge = {};
     for (let n = 0; n < S.worldNames.length; n++) {
       const name = S.worldNames[n];
       const w = S.worlds[name];
@@ -4557,7 +4672,11 @@
         }
       }
       if (open.length) doors[name] = open;
-      if (S.peopleByMap[name]) people[name] = S.peopleByMap[name].seed;
+      if (S.peopleByMap[name]) {
+        people[name] = S.peopleByMap[name].seed;
+        const fs = VCS.People.forgeState(S.peopleByMap[name]);
+        if (fs.spawned.length || fs.altered.length) forge[name] = fs;
+      }
     }
     const p = S.player || { x: 0, y: 0, angle: 0 };
     const snap = { v: 4, map: S.mapName, player: { x: p.x, y: p.y, angle: p.angle }, doors: doors, people: people };
@@ -4565,7 +4684,38 @@
     snap.rocks = S.rocksLeft;
     snap.run = cloneRun(S.run);
     snap.run.hunger = S.hunger ? VCS.Hunger.serialize(S.hunger) : null;
+    if (Object.keys(forge).length) snap.forge = { v: 1, maps: forge };
     return snap;
+  }
+
+  /** Replay saved mid-night spawns, then alters, onto a freshly built people state. Unknown archetypes are dropped. */
+  function replayForge(st, name, forge) {
+    try {
+      if (!st || !forge || typeof forge !== 'object' || forge.v !== 1 || !forge.maps || !Object.prototype.hasOwnProperty.call(forge.maps, name)) return;
+      if (st.forgeLog && (st.forgeLog.spawned.length || st.forgeLog.altered.length)) return; // already replayed
+      const f = forge.maps[name];
+      const F = VCS.Forge;
+      const world = S.worlds[name];
+      const reinf = VCS.ArchetypeData && VCS.ArchetypeData.REINFORCE ? VCS.ArchetypeData.REINFORCE.map(function (e) { return e.archetype; }) : [];
+      if (!f || !F || !Array.isArray(f.spawned)) return;
+      if (!st.forgeReinf) st.forgeReinf = [];
+      for (let i = 0; i < f.spawned.length; i++) {
+        const e = f.spawned[i];
+        if (!e || typeof e.a !== 'string' || !F.archetype(e.a)) {
+          L().warn('applySnapshot: dropping unknown archetype ' + String(e && e.a));
+          continue;
+        }
+        const r = VCS.People.spawn(st, world, { archetype: e.a, seed: e.s, ang: e.ang }, { x: e.x, y: e.y });
+        if (!r.ok) { L().warn('applySnapshot: forge spawn refused: ' + r.code); continue; }
+        if (reinf.indexOf(e.a) >= 0) { st.forgeFired = (st.forgeFired || 0) + 1; st.forgeReinf.push(r.id); }
+      }
+      const al = Array.isArray(f.altered) ? f.altered : [];
+      for (let i = 0; i < al.length; i++) {
+        if (al[i] && Number.isInteger(al[i].id) && al[i].look && typeof al[i].look === 'object') VCS.People.alter(st, al[i].id, al[i].look);
+      }
+    } catch (err) {
+      L().warn('applySnapshot: forge replay failed', err);
+    }
   }
 
   /** Restore a snapshot; validates everything, ignores bad fields, never throws. Returns true if the map was applied. */
@@ -4607,7 +4757,8 @@
             L().warn('applySnapshot: ignoring people for ' + name);
             continue;
           }
-          peopleFor(name, snap.people[name]);
+          const pst = peopleFor(name, snap.people[name]);
+          replayForge(pst, name, snap.forge);
         }
       }
       if (snap.doors && typeof snap.doors === 'object') {

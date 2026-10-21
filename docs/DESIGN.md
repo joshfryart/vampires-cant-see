@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.10.4)
+# Vampires Can't See - Design (v0.14.0)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.10.13'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.14.0'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map
@@ -34,13 +34,15 @@ Script order in `index.html`: log, config, checks, data (maps, sounds, upgrades,
 | `js/data/upgrades.js` | `VCS.UpgradeData` | Effect defaults/limits, 9 upgrades, 9 boons |
 | `js/data/hunger.js` | `VCS.HungerData` | Powers, gifts, fear, drain ramp |
 | `js/data/vessels.js` | `VCS.VesselData`, `VCS.Vessels` | Arterial/venous node graph on pose slots, PWV delays, pulse state per mode (drawn by `render.js` `drawVessels` behind `vis.vessels`) |
+| `js/data/archetypes.js` | `VCS.ArchetypeData` | NPC archetypes (14 rows), look schema ranges and enums, legacy recipe, REINFORCE table (Section 5.5) |
 | `js/raycast.js` | `VCS.Raycast` | DDA grid raycasting |
 | `js/world.js` | `VCS.World` | Tile grid, doors, torches, light, glass, `kindAt`, `materialAt` |
 | `js/player.js` | `VCS.Player` | Movement, turning, collision |
 | `js/input.js` | `VCS.Input` | Keyboard, mouse, drag-to-look, pointer lock, `feedHeld()` |
 | `js/sonar.js` | `VCS.Sonar` | Pulse emission, range/fade/cooldown, echoes |
 | `js/ripple.js` | `VCS.Ripple` | Secondary rings, line wobble, `inward` rings, jitter |
-| `js/people.js` | `VCS.People` | Walkers, reactions, lit and hide refuges, grab/drink/release, pools |
+| `js/forge.js` | `VCS.Forge` | NPC Forge: seeded look generation from archetypes, look validation and alter, custom library (`vcs.forge`), reinforcement rule (Section 5.5) |
+| `js/people.js` | `VCS.People` | Walkers, reactions, lit and hide refuges, grab/drink/release, pools, mid-night spawn/despawn/alter |
 | `js/night.js` | `VCS.Night` | Clock, blood, weakness, dawn, sleep (pure state) |
 | `js/meta.js` | `VCS.Meta` | Essence, upgrades, stats, boons, effects |
 | `js/hunger.js` | `VCS.Hunger` | Overflow gifts, powers, fear (pure state) |
@@ -153,6 +155,65 @@ Source: `SoundData.react`, `people.js`, `game.js` (`reactCfgNow`).
 
 `People.create(world, mapDef, {seed, poolMin, poolMax, shuffle})`. With `shuffle`, each walker starts at a random path index and 50% travel in reverse (seeded). Paths must not cross walls (legs may pass through doors). People are never drawn live: a passing wavefront reveals each figure strip by strip (feet→hat over SWEEP 0.22 s); everything (people, walls, props) uses a short afterglow AFTERGLOW_K 0.18 × pulse fade (≈0.54 s, clamped 0.2–1.0 s), so the screen is black once rings stop. Exceptions: feed lock, Warm Sense, people's own sound rings. Torch/brazier flames and their holders (wall sconce or free-standing post) follow the same ripple + afterglow rule; the warm screen-border vignette (lit >= 0.3) is the always-on light cue. Looks: 10 accessories × body/head/hair/beard/nose/coat; poses per mode (walk, idle, wary, sit, startle hop, flee lean, cower, dazed stars, grapple limp, fed slump). Seed per map: `(seed ^ (mapIndex x 2654435761) ^ (night x 40503)) >>> 0`. Events kept: `scream`, `startle`, `flee`, `whimper` (max 64).
 
+### 5.5 Archetypes and Forge
+
+Source: `js/data/archetypes.js`, `js/forge.js`, `js/schedule.js` (`loadRoles`), `people.js` (`create`, `spawn`, `despawn`, `alter`, `forgeState`), `game.js` (`stepForge`, `forgeWashout`, `replayForge`), `save.js` (`sanitizeForge`).
+
+- **Look.** A look is a plain object. The 12 legacy keys (`height, build, stride, acc, body, head, hat, hair, beard, nose, coat, prop`) are the v0.13 shape. v0.14 adds `v, archetype, outfit, roleHat, extra, stoop, shoulder, hem, skin`. The renderer reads the v0.14 keys from v0.15 on (`outfit`, `roleHat`, `extra` in `figure.js`; `stoop`, `hem`, `shoulder`, `skin` in `render.js`).
+- **Ranges and enums** (`ArchetypeData.LOOK_RANGES` / `LOOK_ENUMS`): height 0.5..1.2, build and stride 0.7..1.4, nose 0.5..1.6, stoop 0..0.4, shoulder 0.8..1.25, hem 0..1, skin 0..1. `validate` clamps numbers, falls back to defaults on bad enums and non-boolean values, and rejects unknown or `__proto__`/`constructor`/`prototype` keys.
+- **Derived rules.** `hat` and `prop` follow `acc` (hat-type and prop-type accessories). `hair` is `none` under tophat, nightcap or hood.
+- **Generation.** `Forge.generate(spec, ctx)` with `spec = {archetype, seed?, home?, overrides?}` and `ctx = {stateSeed, index, accOffset}`. The entry seed is `spec.seed` when it is an integer 0..65535, otherwise `index`. The look seed is the v0.13 `makeLook` formula with the entry seed in place of the person id. Shipped walkers use `seed = index`, so their looks match v0.13.2. `acc` is `ACCESSORIES[(accOffset + 3 * entrySeed) mod 10]` for recipes marked `cycle`. The extras (shoulder, skin, stoop, hem) come from a second stream seeded by `lookSeed ^ 0x9E3779B9`. `overrides` are validated as a partial look and applied last. An unknown archetype returns `E_FORGE_UNKNOWN` with a patron person.
+- **Alter.** `Forge.alter(look, patch)` returns a new look object and the list of changed keys. It never mutates the old one, so echoes keep their snapshot.
+
+**Archetype rows** (`ArchetypeData.list`, 14 rows; the first 11 are the shipped roles):
+
+| id | role | voice | talk | schedule | watch | feedable | gait | speed | outfit / roleHat / extra / stoop / hem |
+|---|---|---|---|---|---|---|---|---|---|
+| patron | '' | man | villager | none | no | yes | walk | 1.0 | plain / none / none / 0 / 0 |
+| innkeeper | innkeeper | woman | innkeeper | 5 stops | no | yes | walk | 1.0 | apron / none / none / 0 / 0.6 |
+| drunk | drunk | man | drunk | 3 stops | no | yes | walk | 1.0 | plain / none / none / 0 / 0 |
+| regular | regular | man | innkeeper | 4 stops | no | yes | walk | 1.0 | plain / none / none / 0 / 0 |
+| priest | priest | elder | priest | 4 stops | no | yes | walk | 1.0 | robe / biretta / none / 0 / 1 |
+| elder | elder | elder | elder | 4 stops | no | yes | walk | 1.0 | plain / none / none / 0.25 / 0.5 |
+| farmer | farmer | man | farmer | 7 stops | no | yes | walk | 1.0 | smock / none / none / 0 / 0.3 |
+| mother | mother | woman | mother | 5 stops | no | yes | walk | 1.0 | apron / none / bundle / 0 / 0.8 |
+| insomniac | insomniac | man | villager | 5 stops | no | yes | walk | 1.0 | plain / none / none / 0 / 0 |
+| gravedigger | gravedigger | man | gravedigger | 5 stops | no | yes | walk | 1.0 | smock / none / shovel / 0.05 / 0.2 |
+| guard | guard | man | guard | watch | yes | yes | mail | 1.3 | mail / kettle / none / 0 / 0.3 |
+| child | child | child | child | 3 stops | no | **no** | walk | 1.0 | plain / none / none / 0 / 0 (height 0.58+0.08r, build 0.85+0.15r, no beard) |
+| merchant | merchant | man | villager | 3 stops | no | yes | walk | 1.0 | cloak / none / ledger / 0 / 0.7 |
+| hunter | hunter | man | guard | watch | yes | yes | walk | 1.3 | cloak / none / bow / 0 / 0.4 |
+
+- Every row has skin `[0.35, 0.3]`. Shoulder is `[0.95, 0.1]`, except priest and guard at `[1.05, 0.1]`.
+- `schedule` tuples are the same format as before (`[[places], until, act]`). `schedule.js` builds its `ROLES` table from this data at load: `'watch'` becomes the watch-post walk, and an array becomes a routine. Child, merchant and hunter have routines too, but no shipped map spawns the child or merchant.
+- Children are not feedable and are not reinforcements. Children are not placed on any shipped map.
+- `legacy` marks the 11 shipped roles. It is data only.
+
+**Walkers.** `People.create` picks each walker's archetype from `def.archetype`, else `Forge.byRole(def.role)` for old map data, else `patron`. `maps.js` gives all 17 walkers an `archetype` and a `seed` (the entry index). `person.watch` replaces the old `role === 'guard'` checks, and `person.gait === 'mail'` replaces the old guard gait check. `isFeedable` returns false when `person.feedable === false`.
+
+**Mid-night spawn, despawn, alter** (`People.spawn/despawn/alter`, used by the reinforcement rule and the dev panel):
+
+- `spawn(state, world, spec, at)`: `spec.seed` is a uint32 saved for replay. The look seed is `((s >>> 16) ^ s) & 0xFFFF`. The pool and schedule draw from `mulberry32(s)`, never from `state.rng`. Refused codes: `E_PEOPLE_SOLID` (solid cell), `E_FORGE_LIMIT` (24 walkers at most), `E_PEOPLE_ARGS`, `E_FORGE_UNKNOWN`.
+- `despawn(state, id)`: refused with `E_FORGE_BUSY` while the person is grappled, dazed or fed. Echoes stay.
+- `alter(state, id, patch)`: replaces `person.look` with `Forge.alter` output.
+- Each spawn and alter is logged in `state.forgeLog` (`spawned` and `altered`, at most 16 altered). `forgeState` returns the compact record for the run snapshot, with altered ids renumbered to the ids a replay assigns.
+
+**Reinforcements** (`ArchetypeData.REINFORCE`, `Forge.reinforcement`):
+
+| Fear | Archetype | Card |
+|---|---|---|
+| 6 | guard | The watch is doubled |
+| 10 | hunter | A hunter walks the lanes |
+
+- `stepForge` runs at most once per second. It runs only while `playing` or `feeding`, and only on maps with `reinforce` (the town, at the `[2, 19]` cell).
+- Each entry fires once per run, in order (`st.forgeFired`), when fear reaches its threshold and the player is at least 10 cells away or out of line of sight. The seed is `(runSeed * 31 + night * 977 + fired * 7919) >>> 0`. A success shows the card and plays the bell at the entry cell. A refused spawn still counts as fired.
+- At fear 8, once per run, every watch person gets `acc: 'lantern'` (look only).
+- `forgeWashout` (on washout) despawns reinforcements that are out of sight (line blocked, or over 10 cells away) and not busy. The rest stay.
+
+**Custom archetypes and the library.** `Forge.register` adds a custom archetype (id matches `^[a-z][a-z0-9_]{1,23}$`; built-in ids are refused; at most 16 custom). The library is stored under `vcs.forge` as `{v:1, list}` (at most 16384 bytes). It loads at boot. The dev panel's "Save as custom archetype" button is the only writer. `Forge.importLibrary` and `exportLibrary` back the dev panel's import and copy buttons.
+
+**Dev panel.** F9 opens the NPC Forge editor: pick an archetype and seed, edit look fields (`Forge.LOOK_FIELDS`), then spawn in front, alter the nearest person or despawn the nearest person. The buttons need a running run.
+
 ## 6. Light, sound and hearing
 
 Source: `js/data/sounds.js`, `js/audio.js`, `js/game.js` (`spatial`, `occludedTo`, `stepAmbient`, `updateAmbience`), `js/world.js`.
@@ -216,15 +277,16 @@ Source: `js/save.js`, `js/game.js`.
 
 | Item | Value |
 |---|---|
-| Keys | `vcs.settings` (config), `vcs.run`, `vcs.meta`; each also `.bak` and `.tmp`. `vcs.tab` (two-tab lock), `vcs.seen` (hints seen) |
+| Keys | `vcs.settings` (config), `vcs.run`, `vcs.meta`; each also `.bak` and `.tmp`. `vcs.tab` (two-tab lock), `vcs.seen` (hints seen). `vcs.forge` (custom archetype library, raw `{v:1, list}` JSON, not in the envelope, <= 16384 bytes; Section 5.5) |
 | Limits | `MAX_BYTES` 65536 per save, `MAX_IMPORT` 131072, nesting depth <= 12 |
 | Schemas | `RUN_SCHEMA = 4`, `Meta.SCHEMA = 1`, `Hunger.SCHEMA = 1`, night serialize `v:1`, export `v:1` |
 | Envelope | Exactly keys `app:'vcs', kind, v, game, sum, data`. `sum` = FNV-1a 32 (8 hex chars) of `JSON.stringify(data)` |
 | Safe write | stringify -> too big? `E_SAVE_TOO_BIG` -> write `.tmp` -> read back must equal (`E_SAVE_VERIFY`) -> if current main valid copy to `.bak` -> write main -> remove `.tmp`. setItem throws -> `E_SAVE_QUOTA` |
 | Safe read | Main bad (size, parse, bad key, schema, checksum): try `.bak`; if ok copy into main, `source:'bak'`, `code` = main's error. Both bad: `source:'none'` |
 | Run validation | `validateRun` (save.js) runs on each autosave snapshot: failure logs `Run snapshot invalid (code)` and skips that autosave |
-| Run snapshot | `{v:4, map, player:{x,y,angle}, doors, people, night, run, hunger?}`; `run = {seed, boons[], closedSafe{}, pendingBoons, pendingGifts}`; `run.hunger` null or Hunger.serialize |
-| sanitizeRun | Allowed top keys `v, map, player, doors, people, night, run`; `v===4`; map string <= 32; doors <= 512 cells per map; boons <= 20 strings <= 24; pendingBoons/pendingGifts null or <= 3 strings; hunger exact keys `v,fear,over,giftsTonight,gifts,essenceBonus,nextBlood`, gifts <= 20 |
+| Run snapshot | `{v:4, map, player:{x,y,angle}, doors, people, night, run, hunger?, forge?}`; `run = {seed, boons[], closedSafe{}, pendingBoons, pendingGifts}`; `run.hunger` null or Hunger.serialize |
+| Forge block | Optional top-level `forge`, written only when a map has mid-night spawns or alters: `{v:1, maps:{<mapName>: {spawned:[{a, s, x, y, ang}], altered:[{id, look}]}}}`. Schema stays 4. Replayed after the map's people are built (`replayForge`): unknown archetypes are dropped with a warning |
+| sanitizeRun | Allowed top keys `v, map, player, doors, people, night, run, rocks, forge`; `v===4`; map string <= 32; doors <= 512 cells per map; boons <= 20 strings <= 24; pendingBoons/pendingGifts null or <= 3 strings; hunger exact keys `v,fear,over,giftsTonight,gifts,essenceBonus,nextBlood`, gifts <= 20. `forge` (`sanitizeForge`): exactly keys `v, maps`, `v===1`, <= 4 maps, each map has only `spawned` (<= 4, `a` matches the archetype id pattern, `s` uint32, x/y clamped 0..64, ang clamped -7..7) and `altered` (<= 16, `id` 0..255, look validated as a partial look). A bad forge block is dropped, the rest of the run is kept |
 | Migration | v1/v2 -> v3 (adds `run:{seed:1, boons:[], closedSafe:{}, pendingBoons:null}`) -> v4 (adds `run.hunger = null`); newer than 4 -> `E_SAVE_VERSION`. Meta v0 `{essence, bought[]}` -> v1 with tier 1 each |
 | Autosave | Every `autosaveSec` (20; range 5..300) of play clock in `playing`; also after map change, on pause, `visibilitychange` hidden, `pagehide` (any active run state) |
 | Two-tab guard | `tabLock` writes a heartbeat `{id, t}` to `vcs.tab`; `tabCheck` treats another tab as alive if its heartbeat is < 12 s old. Checked at boot and every 5 s. While another tab is alive: saving is paused here and the notice "Game is open in another tab — saving is paused here." appears once. Resumes when the other tab is gone |
@@ -450,6 +512,7 @@ Only with `?debug=1` on `VCS.Game`. URL params: `?debug=1` (verbose log, F3 over
 | Feeding | `debugFeed`, `debugFeedHold(seconds)` |
 | Meta / saves | `debugSave`, `debugMeta`, `debugEssence(n)`, `debugEndRun(kind)`, `debugPickBoon(i)`, `debugRun`, `debugFx`, `debugMenu(action: continue, newrun, shop, stats, menu)`, `debugExport`, `debugImport`, `debugPending` |
 | Hunger | `debugHunger`, `debugHungerSet`, `debugFear(n)`, `debugOverflow(n)`, `debugPower(id)`, `debugPickGift(i)` |
+| Forge | `debugForgeSpawn(archetype, x, y, angle)` (random seed), `debugForgeAlter(id, patch)` |
 
 ## 13. Testing and simulation
 

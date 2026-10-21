@@ -11,6 +11,8 @@ describe('people.test.js', () => {
   const World = require('../js/world.js');
   const Raycast = require('../js/raycast.js');
   const Sonar = require('../js/sonar.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   Log.setConsole(false);
@@ -411,6 +413,8 @@ describe('people-react.test.js', () => {
   const MapData = require('../js/data/maps.js');
   const SoundData = require('../js/data/sounds.js');
   const World = require('../js/world.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   Log.setConsole(false);
@@ -756,6 +760,8 @@ describe('people-feed.test.js', () => {
   const World = require('../js/world.js');
   require('../js/raycast.js');
   require('../js/sonar.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   function setup() {
@@ -888,6 +894,8 @@ describe('people-drink.test.js', () => {
   const World = require('../js/world.js');
   require('../js/raycast.js');
   require('../js/sonar.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   function setup(seed) {
@@ -1057,6 +1065,8 @@ describe('people-shuffle.test.js', () => {
   const Log = require('../js/log.js');
   const MapData = require('../js/data/maps.js');
   const World = require('../js/world.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   Log.setConsole(false);
@@ -1118,6 +1128,8 @@ describe('people-a3.test.js', () => {
   const assert = require('node:assert');
   const Log = require('../js/log.js');
   const World = require('../js/world.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   Log.setConsole(false);
@@ -1270,5 +1282,101 @@ describe('people-a3.test.js', () => {
       for (let k = 0; k < 4; k++) if (p.state === 'idle' && Math.hypot(p.x - [4.5, 8.5, 8.5, 4.5][k], p.y - [4.5, 4.5, 6.5, 6.5][k]) < 0.05) seen.add(k);
     }
     assert.strictEqual(seen.size, 4);
+  });
+
+  // ---- v0.14 forge hooks: spawn, despawn, alter, forgeState
+  const MapData = require('../js/data/maps.js');
+  const townDef = MapData.maps.town;
+  const AT = { x: 2.5, y: 19.5 };
+  function town(seed) {
+    require('../js/schedule.js'); // lazy: earlier suites in this file assume no schedules
+    const world = World.load(townDef, { requireStart: false });
+    return { world: world, st: People.create(world, townDef, { seed: seed || 5 }) };
+  }
+
+  test('spawn: unique ids, deterministic look from the saved seed, E_FORGE_LIMIT and solid refusal', () => {
+    const { world, st } = town();
+    const n0 = st.people.length;
+    const a = People.spawn(st, world, { archetype: 'guard', seed: 123456789 }, AT);
+    const b = People.spawn(st, world, { archetype: 'hunter', seed: 42 }, { x: 3.5, y: 19.5 });
+    assert.ok(a.ok && b.ok);
+    assert.notStrictEqual(a.id, b.id);
+    assert.strictEqual(a.id, n0);
+    assert.strictEqual(new Set(st.people.map((p) => p.id)).size, st.people.length);
+    const t2 = town();
+    const a2 = People.spawn(t2.st, t2.world, { archetype: 'guard', seed: 123456789 }, AT);
+    assert.deepStrictEqual(t2.st.people[a2.id].look, st.people[a.id].look);
+    assert.strictEqual(People.spawn(st, world, { archetype: 'guard', seed: 1 }, { x: 0.5, y: 0.5 }).code, 'E_PEOPLE_SOLID');
+    assert.strictEqual(People.spawn(st, world, { archetype: 'nope', seed: 1 }, AT).ok, false);
+    while (st.people.length < 24) assert.ok(People.spawn(st, world, { archetype: 'patron', seed: st.people.length }, AT).ok);
+    assert.strictEqual(People.spawn(st, world, { archetype: 'patron', seed: 9 }, AT).code, 'E_FORGE_LIMIT');
+  });
+
+  test('spawn leaves the state.rng stream unchanged', () => {
+    const t1 = town(9);
+    const t2 = town(9);
+    People.spawn(t1.st, t1.world, { archetype: 'guard', seed: 77 }, AT);
+    for (let i = 0; i < 5; i++) assert.strictEqual(t1.st.rng(), t2.st.rng());
+  });
+
+  test('spawned guard is on the watch and does not go home at fear 8', () => {
+    const { world, st } = town();
+    const r = People.spawn(st, world, { archetype: 'guard', seed: 5 }, AT);
+    const g = st.people[r.id];
+    assert.ok(g.watch);
+    assert.ok(g.sched);
+    for (let i = 0; i < 120; i++) People.update(st, world, DT, { fear: 9, nightFrac: 0.3, nightSec: 240 });
+    assert.ok(!g.sched.homeEarly);
+    const other = st.people.find((p) => p.sched && !p.watch);
+    assert.ok(other && other.sched.homeEarly);
+  });
+
+  test('despawn removes a person, refuses grappled people, keeps chat partner lookups id-based', () => {
+    const { world, st } = town();
+    const a = People.spawn(st, world, { archetype: 'patron', seed: 3 }, AT);
+    const b = People.spawn(st, world, { archetype: 'patron', seed: 4 }, { x: 3.5, y: 19.5 });
+    st.people[a.id].mode = 'grapple';
+    assert.strictEqual(People.despawn(st, a.id).code, 'E_FORGE_BUSY');
+    st.people[a.id].mode = 'path';
+    assert.ok(People.despawn(st, a.id).ok);
+    assert.strictEqual(st.people.find((p) => p.id === a.id), undefined);
+    assert.ok(st.people.find((p) => p.id === b.id));
+    assert.strictEqual(People.despawn(st, 9999).ok, false);
+    assert.deepStrictEqual(People.forgeState(st).spawned.length, 1);
+  });
+
+  test('alter gives a new look object; the old echo keeps the old look', () => {
+    const { world, st } = town();
+    const r = People.spawn(st, world, { archetype: 'guard', seed: 8 }, AT);
+    const p = st.people.find((q) => q.id === r.id);
+    const old = p.look;
+    const echo = { look: p.look };
+    assert.ok(People.alter(st, r.id, { acc: 'lantern' }).ok);
+    assert.notStrictEqual(p.look, old);
+    assert.strictEqual(p.look.acc, 'lantern');
+    assert.strictEqual(echo.look, old);
+    assert.notStrictEqual(old.acc, 'lantern');
+    assert.strictEqual(People.alter(st, 9999, { acc: 'cane' }).ok, false);
+    const fs = People.forgeState(st);
+    assert.strictEqual(fs.altered.length, 1);
+    assert.strictEqual(fs.altered[0].id, r.id);
+    assert.strictEqual(fs.altered[0].look.acc, 'lantern');
+  });
+
+  test('forgeState replays: same spawns and alters rebuild the same people', () => {
+    const t1 = town(11);
+    const a = People.spawn(t1.st, t1.world, { archetype: 'hunter', seed: 4000000000 }, AT);
+    const b = People.spawn(t1.st, t1.world, { archetype: 'guard', seed: 17 }, { x: 3.5, y: 19.5 });
+    People.despawn(t1.st, a.id);
+    People.alter(t1.st, b.id, { acc: 'lantern' });
+    const fs = JSON.parse(JSON.stringify(People.forgeState(t1.st)));
+    assert.strictEqual(fs.spawned.length, 1);
+    const t2 = town(11);
+    fs.spawned.forEach((e) => People.spawn(t2.st, t2.world, { archetype: e.a, seed: e.s, ang: e.ang }, { x: e.x, y: e.y }));
+    fs.altered.forEach((e) => People.alter(t2.st, e.id, e.look));
+    const p1 = t1.st.people.find((p) => p.id === b.id);
+    const p2 = t2.st.people[t2.st.people.length - 1];
+    assert.deepStrictEqual(p2.look, p1.look);
+    assert.strictEqual(p2.archetype, 'guard');
   });
 });

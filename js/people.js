@@ -66,6 +66,13 @@
    * (distinct across ids) plus body/head shapes, hair, beard, nose and a coat flag for the renderer.
    */
   function makeLook(seed, id, accOffset) {
+    const F = forge();
+    if (F && typeof F.legacyLook === 'function') return F.legacyLook(seed, id, accOffset);
+    return makeLookLocal(seed, id, accOffset);
+  }
+
+  /** Fallback copy of the legacy look (used only when VCS.Forge is missing). */
+  function makeLookLocal(seed, id, accOffset) {
     const sd = typeof seed === 'number' && isFinite(seed) ? seed : 0;
     const pid = typeof id === 'number' && isFinite(id) ? Math.floor(id) : 0;
     const off = typeof accOffset === 'number' && isFinite(accOffset) ? Math.floor(accOffset) : 0;
@@ -231,6 +238,7 @@
   }
 
   function sched() { return VCS.Schedule || null; }
+  function forge() { return VCS.Forge || null; }
 
   /** Lit-street cost: cells whose own light is >= LIT_MIN are cheap, dark cells cost more. Cached per state. */
   function stepCost(state, world, cx, cy, pref) {
@@ -372,7 +380,7 @@
     const c = p.chat;
     if (!c) return;
     p.chat = null;
-    const q = state && state.people ? state.people[c.partner] : null;
+    const q = state && state.people ? findPerson(state, c.partner) : null;
     if (q && q.chat && q.chat.partner === p.id) q.chat = null;
     if (state) p.chatCool = state.time + CHAT_COOL[0] + (CHAT_COOL[1] - CHAT_COOL[0]) * state.chatRng();
   }
@@ -400,6 +408,7 @@
     const spawns = (world && world.spots && world.spots.people) || [];
     const defs = mapDef && Array.isArray(mapDef.paths) ? mapDef.paths : [];
     const Sched = sched();
+    const Forge = forge();
     const places = {};
     if (Sched && mapDef && mapDef.places && typeof mapDef.places === 'object') {
       Object.keys(mapDef.places).forEach(function (k) {
@@ -415,19 +424,30 @@
       if (path.length > 1) angle = Math.atan2(path[1].y - path[0].y, path[1].x - path[0].x);
       const sit = !!(def && def.sit === true);
       const pool = poolMin + (poolMax - poolMin) * state.rng();
+      // v0.14: each walker comes from an archetype (def.archetype, else the old def.role, else patron) plus a seed.
+      let archId = def && typeof def.archetype === 'string' ? def.archetype : '';
+      if (!archId && Forge && def && typeof def.role === 'string') {
+        const ba = Forge.byRole(def.role);
+        archId = ba && ba.id ? ba.id : '';
+      }
+      const gen = Forge ? Forge.generate({ archetype: archId || 'patron', seed: def ? def.seed : undefined, home: def ? def.home : undefined }, { stateSeed: seed, index: i, accOffset: accOffset }) : null;
+      const gp = gen && gen.person ? gen.person : null;
       state.people.push({
-        pool: pool, left: pool, dazedLeft: 0, role: def && typeof def.role === 'string' ? def.role : '',
+        pool: pool, left: pool, dazedLeft: 0, role: (gp && gp.role) || (def && typeof def.role === 'string' ? def.role : ''),
+        archetype: gp ? gp.archetype : 'patron', watch: gp ? gp.watch : !!(def && def.role === 'guard'),
+        feedable: gp ? gp.feedable : true, gait: gp ? gp.gait : (def && def.role === 'guard' ? 'mail' : 'walk'),
         id: i, x: path[0].x, y: path[0].y, angle: angle, speed: speed, path: path,
         idx: path.length > 1 && !sit ? 1 : 0, state: 'idle', idleLeft: path[0].wait,
         lookAngle: 0, lookTarget: 0, lookIn: 0.5 + state.rng() * 0.6, phase: 0, walked: 0,
-        look: makeLook(seed, i, accOffset), steps: 0, stepsReported: 0,
+        look: gp ? gp.look : makeLook(seed, i, accOffset), steps: 0, stepsReported: 0,
         mode: 'path', modeLeft: 0, fleeFrom: { x: 0, y: 0 }, calmLeft: 0, fdir: 1, blockCount: 0, preState: 'idle',
         sit: sit, route: null, ri: 0, ret: null, ri2: 0, bumping: false, wary: 0, whimperIn: WHIMPER_GAP
       });
       // V1: a role with a night schedule walks routed trips between named places instead of its hand-made loop.
       const person = state.people[state.people.length - 1];
-      if (Sched && !sit && def && Sched.hasRole(def.role)) {
-        person.sched = Sched.make(def.role, places, { x: path[0].x, y: path[0].y }, mulberry32((seed * 31 + i * 977 + 5) >>> 0), { home: def.home, slot: i });
+      const schedRole = gp ? gp.schedRole : (def && def.role);
+      if (Sched && !sit && def && schedRole && Sched.hasRole(schedRole)) {
+        person.sched = Sched.make(schedRole, places, { x: path[0].x, y: path[0].y }, mulberry32((seed * 31 + i * 977 + 5) >>> 0), { home: def.home, slot: i });
         if (person.sched) { person.idleLeft = 0; faceTables(person.sched, mapDef); }
       }
     }
@@ -445,6 +465,14 @@
         p.angle = Math.atan2(p.path[p.idx].y - p.y, p.path[p.idx].x - p.x);
       }
     }
+    state.places = places;
+    state.mapDef = mapDef || null;
+    state.accOffset = accOffset;
+    state.poolMin = poolMin;
+    state.poolMax = poolMax;
+    state.nextId = state.people.length;
+    state.baseCount = state.people.length;
+    state.forgeLog = { spawned: [], altered: [] };
     lastState = state;
     const log = logger();
     if (log) log.info('people: ' + state.people.length + ' walkers, seed ' + seed);
@@ -661,7 +689,7 @@
     const s = p.sched;
     if (s.en) { p.state = 'walk'; return; }
     // High village fear sends everyone but the watch home for the rest of the night (the last stop is bed).
-    if (!s.homeEarly && state.fear >= FEAR_HOME && s.role !== 'guard') s.homeEarly = true;
+    if (!s.homeEarly && state.fear >= FEAR_HOME && !p.watch) s.homeEarly = true;
     const want = s.homeEarly ? s.stops.length - 1 : Sched.stopAt(s.stops, state.nightFrac);
     if (want === s.si && !s.retarget) return;
     const stop = s.stops[want];
@@ -683,7 +711,7 @@
   /** Standing meeting: face the partner, stop walking, end on time. Tablemates (c.table) are not held here. */
   function chatHold(state, p, dt) {
     const c = p.chat;
-    const q = state.people[c.partner];
+    const q = findPerson(state, c.partner);
     if (!q || state.time >= c.until) { endChat(state, p); return false; }
     p.angle = Math.atan2(q.y - p.y, q.x - p.x);
     p.lookAngle += (0 - p.lookAngle) * Math.min(1, 4 * dt);
@@ -1102,7 +1130,7 @@
 
   /** True when a person can currently be fed on (v0.7). */
   function isFeedable(person) {
-    return !!person && (person.mode === 'path' || person.mode === 'startle' || person.mode === 'flee' ||
+    return !!person && person.feedable !== false && (person.mode === 'path' || person.mode === 'startle' || person.mode === 'flee' ||
       person.mode === 'cower' || person.mode === 'dazed');
   }
 
@@ -1335,7 +1363,7 @@
         e.angle = p.angle;
         e.foot = (p.steps - todo + k) & 1; // alternate left/right foot
         // v0.14: a guard in armour walks with the heavy 'mail' gait (clink + thud) unless running
-        e.gait = p.mode === 'flee' ? 'run' : p.role === 'guard' || (p.sched && p.sched.role === 'guard') ? 'mail' : p.wary > 0 ? 'sneak' : 'walk';
+        e.gait = p.mode === 'flee' ? 'run' : p.gait === 'mail' ? 'mail' : p.wary > 0 ? 'sneak' : 'walk';
         e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;
         n++;
@@ -1391,7 +1419,126 @@
     return { partner: c.partner, kind: c.kind, mood: state.fear >= 1.5 ? 'hushed' : c.mood };
   }
 
+  const MAX_PEOPLE = 24;
+
+  /**
+   * v0.14 mid-night spawn. spec = {archetype, seed?, home?}; at = {x, y} in world units.
+   * spec.seed is a uint32 (saved for replay). The look seed is derived from it as ((s >>> 16) ^ s) & 0xFFFF, so the same
+   * saved 32-bit seed always rebuilds the same look (Forge.generate only takes 0..65535 as an entry seed).
+   * The pool and schedule draw from mulberry32(spec.seed), never state.rng, so other streams are untouched.
+   */
+  function spawn(state, world, spec, at) {
+    try {
+      const Forge = forge();
+      if (!state || !Array.isArray(state.people) || !Forge || !at || typeof at !== 'object') return { ok: false, code: 'E_PEOPLE_ARGS', id: -1 };
+      if (!spec || typeof spec !== 'object' || typeof spec.archetype !== 'string') return { ok: false, code: 'E_PEOPLE_ARGS', id: -1 };
+      const ax = Number(at.x);
+      const ay = Number(at.y);
+      if (!isFinite(ax) || !isFinite(ay)) return { ok: false, code: 'E_PEOPLE_ARGS', id: -1 };
+      const w = world || state.world;
+      if (state.people.length >= MAX_PEOPLE) return { ok: false, code: 'E_FORGE_LIMIT', id: -1 };
+      if (!w || w.isSolid(ax, ay)) return { ok: false, code: 'E_PEOPLE_SOLID', id: -1 };
+      const raw = Number(spec.seed);
+      const sd = isFinite(raw) ? Math.floor(Math.abs(raw)) % 4294967296 : 0;
+      const entry = ((sd >>> 16) ^ sd) & 0xFFFF;
+      const gen = Forge.generate({ archetype: spec.archetype, seed: entry, home: spec.home }, { stateSeed: state.seed, index: state.nextId, accOffset: state.accOffset || 0 });
+      if (!gen || !gen.ok || !gen.person) return { ok: false, code: (gen && gen.code) || 'E_FORGE_UNKNOWN', id: -1 };
+      const gp = gen.person;
+      const rng = mulberry32(sd >>> 0);
+      const pMin = state.poolMin || 30;
+      const pMax = state.poolMax || Math.max(pMin, 50);
+      const pool = pMin + (pMax - pMin) * rng();
+      const id = state.nextId++;
+      const arch = Forge.archetype ? Forge.archetype(gp.archetype) : null;
+      const speed = arch && typeof arch.speed === 'number' && arch.speed > 0 ? arch.speed : DEFAULT_SPEED;
+      const ang = typeof spec.ang === 'number' && isFinite(spec.ang) ? spec.ang : 0;
+      const person = {
+        pool: pool, left: pool, dazedLeft: 0, role: gp.role || '', archetype: gp.archetype, watch: !!gp.watch,
+        feedable: gp.feedable !== false, gait: gp.gait || 'walk',
+        id: id, x: ax, y: ay, angle: ang, speed: speed, path: [{ x: ax, y: ay, wait: DEFAULT_WAIT }],
+        idx: 0, state: 'idle', idleLeft: DEFAULT_WAIT,
+        lookAngle: 0, lookTarget: 0, lookIn: 0.5 + rng() * 0.6, phase: 0, walked: 0,
+        look: gp.look, steps: 0, stepsReported: 0,
+        mode: 'path', modeLeft: 0, fleeFrom: { x: 0, y: 0 }, calmLeft: 0, fdir: 1, blockCount: 0, preState: 'idle',
+        sit: false, route: null, ri: 0, ret: null, ri2: 0, bumping: false, wary: 0, whimperIn: WHIMPER_GAP
+      };
+      const Sched = sched();
+      if (Sched && gp.schedRole && Sched.hasRole(gp.schedRole)) {
+        person.sched = Sched.make(gp.schedRole, state.places || {}, { x: ax, y: ay }, rng, { home: gp.home, slot: id });
+        if (person.sched) { person.idleLeft = 0; faceTables(person.sched, state.mapDef); }
+      }
+      state.people.push(person);
+      if (state.forgeLog) state.forgeLog.spawned.push({ a: gp.archetype, s: sd, x: ax, y: ay, ang: ang, id: id });
+      return { ok: true, code: 'OK', id: id };
+    } catch (e) {
+      const log = logger();
+      if (log) log.warn('spawn failed: ' + (e && e.message));
+      return { ok: false, code: 'E_PEOPLE_ARGS', id: -1 };
+    }
+  }
+
+  /** Remove a person (not while grappled, dazed or fed). Their echoes stay. */
+  function despawn(state, id) {
+    try {
+      const p = findPerson(state, id);
+      if (!p) return { ok: false, code: 'E_PEOPLE_NONE' };
+      if (p.mode === 'grapple' || p.mode === 'dazed' || p.mode === 'fed') return { ok: false, code: 'E_FORGE_BUSY' };
+      if (p.chat) endChat(state, p);
+      state.people.splice(state.people.indexOf(p), 1);
+      const fl = state.forgeLog;
+      if (fl) {
+        fl.spawned = fl.spawned.filter(function (e) { return e.id !== id; });
+        fl.altered = fl.altered.filter(function (e) { return e.id !== id; });
+      }
+      return { ok: true, code: 'OK' };
+    } catch (e) {
+      return { ok: false, code: 'E_PEOPLE_ARGS' };
+    }
+  }
+
+  /** Patch a person's look through Forge.alter. The look is replaced by a new object; old echoes keep the old one. */
+  function alter(state, id, patch) {
+    try {
+      const Forge = forge();
+      const p = findPerson(state, id);
+      if (!p || !Forge) return { ok: false, code: 'E_PEOPLE_NONE' };
+      const r = Forge.alter(p.look, patch);
+      if (!r || !r.ok || !r.look) return { ok: false, code: (r && r.code) || 'E_FORGE_TYPE' };
+      p.look = r.look;
+      const fl = state.forgeLog;
+      if (fl) {
+        const ch = {};
+        const keys = r.changed || [];
+        for (let i = 0; i < keys.length; i++) ch[keys[i]] = r.look[keys[i]];
+        let e = null;
+        for (let i = 0; i < fl.altered.length; i++) if (fl.altered[i].id === id) e = fl.altered[i];
+        if (e) Object.assign(e.look, ch);
+        else if (fl.altered.length < 16) fl.altered.push({ id: id, look: ch });
+      }
+      return { ok: true, code: 'OK' };
+    } catch (e) {
+      return { ok: false, code: 'E_PEOPLE_ARGS' };
+    }
+  }
+
+  /**
+   * Compact record of mid-night spawns and look alters, for the run snapshot. Altered ids are renumbered to the ids a
+   * replay assigns (baseCount + spawn index), so despawned spawns do not break the mapping.
+   */
+  function forgeState(state) {
+    const fl = state && state.forgeLog;
+    if (!fl) return { spawned: [], altered: [] };
+    const base = state.baseCount || 0;
+    const remap = {};
+    fl.spawned.forEach(function (e, i) { remap[e.id] = base + i; });
+    return {
+      spawned: fl.spawned.map(function (e) { return { a: e.a, s: e.s, x: e.x, y: e.y, ang: e.ang }; }),
+      altered: fl.altered.map(function (e) { return { id: Object.prototype.hasOwnProperty.call(remap, e.id) ? remap[e.id] : e.id, look: Object.assign({}, e.look) }; })
+    };
+  }
+
   const People = {
+    spawn: spawn, despawn: despawn, alter: alter, forgeState: forgeState,
     conversationFor: conversationFor,
     create: create, update: update, updateEchoes: updateEchoes, stepEvents: stepEvents, makeLook: makeLook,
     echoBrightness: echoBrightness, ACCESSORIES: ACCESSORIES, heightBandOf: heightBandOf, echoAge: echoAge, snapshot: snapshot,

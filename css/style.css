@@ -570,10 +570,17 @@ body.large-text .panel output { font-size: 13px; }
 #devpanel .dp-errs { margin: 4px 0; padding-left: 16px; font-size: 11px; max-height: 120px; overflow: auto; }
 #devpanel .dp-err { color: #f99; }
 #devpanel .dp-warn { color: #ec9; }
+#devpanel .dp-forge-top select, #devpanel .dp-forge-top input { min-width: 0; }
+#devpanel .dp-forge-seed { width: 9em; }
+#devpanel .dp-forge-row .dp-ctl { flex: 0 1 60%; }
+#devpanel .dp-forge-row select { max-width: 100%; }
+#devpanel .dp-forge-preview { max-height: 160px; overflow: auto; font-size: 11px; margin: 6px 0; padding: 4px; border: 1px solid currentColor; border-radius: 3px; opacity: 0.85; white-space: pre-wrap; }
+#devpanel .dp-forge button:disabled { opacity: 0.5; }
 #devpanel .dp-status { min-height: 1.2em; margin-top: 6px; opacity: 0.85; }
 body.large-text #devpanel { font-size: 16px; }
 body.large-text #devpanel .dp-hint,
 body.large-text #devpanel .dp-errs,
 body.large-text #devpanel .dp-small,
 body.large-text #devpanel .dp-paste,
+body.large-text #devpanel .dp-forge-preview,
 body.large-text #devpanel .dp-fps { font-size: 14px; }

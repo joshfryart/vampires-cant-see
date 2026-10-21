@@ -254,7 +254,7 @@ test('guards: call out ("Wer da? Alles ruhig", the hour) from farther away and s
 
 test('people.stepEvents: guards walk with the heavy mail gait, runners still run', () => {
   const People = require(path.join(ROOT, 'js', 'people.js'));
-  const mkp = (role, mode) => ({ id: 1, x: 1, y: 1, angle: 0, steps: 2, stepsReported: 0, mode: mode || 'path', wary: 0, speed: 1.3, role: role });
+  const mkp = (role, mode) => ({ id: 1, x: 1, y: 1, angle: 0, steps: 2, stepsReported: 0, mode: mode || 'path', wary: 0, speed: 1.3, role: role, gait: role === 'guard' ? 'mail' : 'walk' });
   const out = [];
   People.stepEvents({ people: [mkp('guard'), mkp('')] }, 0, 1, out);
   assert.deepStrictEqual(out.map((e) => e.gait), ['mail', 'mail', 'walk', 'walk']);

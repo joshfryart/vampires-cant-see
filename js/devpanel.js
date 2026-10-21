@@ -153,6 +153,212 @@
     bar.appendChild(ask);
   }
 
+  // ---- NPC Forge editor (v0.14). Host is set by game.js: {spawnAhead(spec), alterNearest(patch), despawnNearest(), people()} or null.
+  let forgeHost = null;
+  const forgeUi = { sel: null, seed: null, pre: null, ctl: Object.create(null), hostBtns: [], hint: null, edits: Object.create(null), look: null, lib: null };
+
+  function forgeApi() { return VCS.Forge && typeof VCS.Forge.generate === 'function' ? VCS.Forge : null; }
+  function storageRef() { try { return root.localStorage || null; } catch (e) { return null; } }
+  function forgeSeedValue() {
+    const n = Math.floor(Number(forgeUi.seed && forgeUi.seed.value));
+    return isFinite(n) ? Math.max(0, Math.min(4294967295, n)) : 0;
+  }
+  function forgeSpec() {
+    const spec = { archetype: forgeUi.sel ? forgeUi.sel.value : 'patron', seed: forgeSeedValue() };
+    if (Object.keys(forgeUi.edits).length) spec.overrides = Object.assign({}, forgeUi.edits);
+    return spec;
+  }
+  function forgeRefresh(fromControls) {
+    const F = forgeApi();
+    if (!F || !forgeUi.pre) return;
+    let look = null;
+    try {
+      const r = F.generate(forgeSpec(), { stateSeed: 0, index: 0, accOffset: 0 });
+      look = r && r.person ? r.person.look : null;
+    } catch (e) { look = null; }
+    forgeUi.look = look;
+    forgeUi.pre.textContent = look ? JSON.stringify(look, null, 1) : '(no look)';
+    if (fromControls || !look) return;
+    Object.keys(forgeUi.ctl).forEach(function (k) {
+      const c = forgeUi.ctl[k];
+      const v = look[k];
+      if (c.kind === 'num') { c.input.value = String(v); c.out.textContent = String(v); }
+      else if (c.kind === 'bool') c.input.checked = !!v;
+      else c.input.value = String(v);
+    });
+  }
+  function forgeFillSelect(keep) {
+    const F = forgeApi();
+    if (!F || !forgeUi.sel) return;
+    forgeUi.sel.textContent = '';
+    let ids = [];
+    try { ids = F.list(); } catch (e) { ids = []; }
+    ids.forEach(function (id) {
+      const o = el('option', null, id);
+      o.value = id;
+      forgeUi.sel.appendChild(o);
+    });
+    if (keep && ids.indexOf(keep) >= 0) forgeUi.sel.value = keep;
+  }
+  function forgeSetHostState() {
+    forgeUi.hostBtns.forEach(function (b) { b.disabled = !forgeHost; });
+    if (forgeUi.hint) forgeUi.hint.textContent = forgeHost ? '' : 'Start a run to use these';
+  }
+  function forgeCall(name, arg, what) {
+    if (!forgeHost || typeof forgeHost[name] !== 'function') { say('Start a run to use these'); return; }
+    try {
+      const r = forgeHost[name](arg);
+      say(what + (r && r.code ? ': ' + r.code : ' done'));
+    } catch (e) { say(what + ' failed'); log().error('devpanel forge ' + what, e); }
+  }
+  function forgeCopyLibrary() {
+    const F = forgeApi();
+    if (!F) { say('Forge unavailable'); return; }
+    const text = F.exportLibrary();
+    const fallback = function () {
+      const box = root.document.getElementById('report-box');
+      if (!box) { say('Copy unavailable'); return; }
+      box.value = text; box.hidden = false;
+      try { box.focus(); box.select(); } catch (e) { /* ignore */ }
+      say('Selected in the box below; press Ctrl+C');
+    };
+    try {
+      const nav = root.navigator;
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        nav.clipboard.writeText(text).then(function () { say('Copied library'); }, fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
+  }
+  function forgeSaveCustom() {
+    const F = forgeApi();
+    if (!F) { say('Forge unavailable'); return; }
+    const base = F.archetype(forgeUi.sel.value);
+    const look = forgeUi.look;
+    if (!base || !look) { say('Nothing to save'); return; }
+    let id = '';
+    for (let i = 1; i < 100 && !id; i++) if (!F.archetype('custom_' + i)) id = 'custom_' + i;
+    if (!id) { say('Save archetype: E_FORGE_LIMIT'); return; }
+    const arch = {
+      id: id, role: '', label: id, voice: base.voice, talk: base.talk, schedule: null, watch: false, feedable: base.feedable,
+      gait: base.gait, speed: base.speed,
+      recipe: {
+        height: [look.height, 0], build: [look.build, 0], stride: [look.stride, 0], nose: [look.nose, 0],
+        bodies: [look.body], heads: [look.head], hairs: [look.hair], beardP: look.beard ? 1 : 0, coatP: look.coat ? 1 : 0, acc: look.acc
+      },
+      extras: { outfit: look.outfit, roleHat: look.roleHat, extra: look.extra, stoop: look.stoop, shoulder: look.shoulder, hem: look.hem, skin: look.skin }
+    };
+    const r = F.register(arch);
+    let code = r.code;
+    if (r.ok) {
+      const st = storageRef();
+      const sv = st ? F.saveLibrary(st) : { ok: false, code: 'E_FORGE_TYPE' };
+      code = sv.ok ? 'OK' : 'registered, not stored (' + sv.code + ')';
+      forgeFillSelect(id);
+      forgeUi.edits = Object.create(null);
+      forgeRefresh(false);
+    }
+    say('Save archetype ' + id + ': ' + code);
+  }
+  function forgeAddField(sec, f) {
+    const row = el('div', 'dp-row dp-forge-row');
+    row.appendChild(el('span', 'dp-name', nice(f.key)));
+    const ctl = el('div', 'dp-ctl');
+    const note = function (v) { forgeUi.edits[f.key] = v; forgeRefresh(true); };
+    if (f.type === 'num') {
+      const rng = el('input');
+      rng.type = 'range';
+      rng.min = String(f.min); rng.max = String(f.max); rng.step = String(f.step);
+      const out = el('output', 'dp-val', '');
+      rng.addEventListener('input', function () { out.textContent = rng.value; note(Number(rng.value)); });
+      ctl.appendChild(rng); ctl.appendChild(out);
+      forgeUi.ctl[f.key] = { kind: 'num', input: rng, out: out };
+    } else if (f.type === 'enum') {
+      const sel = el('select');
+      (f.values || []).forEach(function (v) {
+        const o = el('option', null, v);
+        o.value = v;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () { note(sel.value); });
+      ctl.appendChild(sel);
+      forgeUi.ctl[f.key] = { kind: 'enum', input: sel };
+    } else {
+      const cb = el('input', 'dp-switch');
+      cb.type = 'checkbox';
+      cb.addEventListener('change', function () { note(cb.checked); });
+      ctl.appendChild(cb);
+      forgeUi.ctl[f.key] = { kind: 'bool', input: cb };
+    }
+    row.appendChild(ctl);
+    sec.appendChild(row);
+  }
+  function buildForge(parent) {
+    const F = forgeApi();
+    const sec = el('section', 'dp-group dp-forge');
+    sec.appendChild(el('h3', null, 'NPC Forge'));
+    if (!F) {
+      sec.appendChild(el('p', 'dp-hint', 'Forge is not loaded.'));
+      parent.appendChild(sec);
+      return;
+    }
+    const top = el('div', 'dp-bar dp-forge-top');
+    forgeUi.sel = el('select', 'dp-forge-select');
+    forgeUi.sel.setAttribute('aria-label', 'Archetype');
+    forgeFillSelect();
+    forgeUi.sel.addEventListener('change', function () { forgeUi.edits = Object.create(null); forgeRefresh(false); });
+    forgeUi.seed = el('input', 'dp-forge-seed');
+    forgeUi.seed.type = 'number';
+    forgeUi.seed.min = '0'; forgeUi.seed.max = '4294967295'; forgeUi.seed.step = '1'; forgeUi.seed.value = '1';
+    forgeUi.seed.setAttribute('aria-label', 'Seed');
+    forgeUi.seed.addEventListener('change', function () { forgeUi.edits = Object.create(null); forgeRefresh(false); });
+    top.appendChild(forgeUi.sel);
+    top.appendChild(forgeUi.seed);
+    top.appendChild(button('Random seed', function () {
+      forgeUi.seed.value = String(Math.floor(Math.random() * 4294967296));
+      forgeUi.edits = Object.create(null);
+      forgeRefresh(false);
+    }, 'dp-small'));
+    sec.appendChild(top);
+    let fields = [];
+    try { fields = F.LOOK_FIELDS || []; } catch (e) { fields = []; }
+    fields.forEach(function (f) { forgeAddField(sec, f); });
+    forgeUi.pre = el('pre', 'dp-forge-preview');
+    sec.appendChild(forgeUi.pre);
+    const hb = el('div', 'dp-bar');
+    forgeUi.hostBtns = [
+      button('Spawn in front', function () { forgeCall('spawnAhead', forgeSpec(), 'Spawn'); }),
+      button('Alter nearest', function () {
+        forgeCall('alterNearest', Object.keys(forgeUi.edits).length ? Object.assign({}, forgeUi.edits) : Object.assign({}, forgeUi.look || {}), 'Alter');
+      }),
+      button('Despawn nearest', function () { forgeCall('despawnNearest', undefined, 'Despawn'); })
+    ];
+    forgeUi.hostBtns.forEach(function (b) { hb.appendChild(b); });
+    sec.appendChild(hb);
+    forgeUi.hint = el('div', 'dp-hint dp-forge-hint');
+    sec.appendChild(forgeUi.hint);
+    const lb = el('div', 'dp-bar');
+    lb.appendChild(button('Save as custom archetype', forgeSaveCustom));
+    lb.appendChild(button('Copy library JSON', forgeCopyLibrary));
+    sec.appendChild(lb);
+    forgeUi.lib = el('textarea', 'dp-paste dp-forge-lib');
+    forgeUi.lib.rows = 3;
+    forgeUi.lib.spellcheck = false;
+    forgeUi.lib.setAttribute('aria-label', 'Library JSON to import');
+    forgeUi.lib.placeholder = 'Paste library JSON here, then press Import';
+    sec.appendChild(forgeUi.lib);
+    const ib = el('div', 'dp-bar');
+    ib.appendChild(button('Import library JSON', function () {
+      const r = F.importLibrary(forgeUi.lib.value);
+      forgeFillSelect(forgeUi.sel.value);
+      forgeRefresh(false);
+      say('Import library: ' + r.code + (r.ok ? ' (' + r.n + ')' : ''));
+    }));
+    sec.appendChild(ib);
+    parent.appendChild(sec);
+    forgeSetHostState();
+    forgeRefresh(false);
+  }
+
   function init(opts) {
     if (panel || !root.document || !VCS.Flags) return false;
     f9 = !!(opts && opts.f9);
@@ -189,6 +395,8 @@
       errBox = el('ul', 'dp-errs');
       tools.appendChild(errBox);
       panel.appendChild(tools);
+
+      buildForge(panel);
 
       const io = el('section', 'dp-group');
       io.appendChild(el('h3', null, 'Share settings'));
@@ -254,7 +462,12 @@
       try { if (b && b.offsetParent !== null) b.focus(); } catch (e) { /* ignore */ }
       return false;
     },
-    toggle: function () { return this.isOpen() ? this.close() : this.open(); }
+    toggle: function () { return this.isOpen() ? this.close() : this.open(); },
+    setForgeHost: function (h) {
+      forgeHost = h && typeof h === 'object' ? h : null;
+      try { forgeSetHostState(); } catch (e) { log().error('setForgeHost', e); }
+      return !!forgeHost;
+    }
   };
   VCS.DevPanel = Dev;
   if (typeof module !== 'undefined' && module.exports) module.exports = Dev;

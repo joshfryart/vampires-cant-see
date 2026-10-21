@@ -10,23 +10,13 @@
 
   const SEATED = { sleep: true, eat: true, sit: true, mend: true, spin: true, drink: true, pray: true, whittle: true };
 
-  const ROLES = {
-    innkeeper: [[['tavern_a'], 0.30, 'work'], [['tavern_b'], 0.45, 'work'], [['tavern_c'], 0.52, 'work'], [['@hearth'], 0.60, 'cook'], [['@bed'], 1, 'sleep']],
-    drunk: [[['tavern_c', 'tavern_b'], 0.26, 'drink'], [['square'], 0.32, 'sing'], [['@bed'], 1, 'sleep']],
-    regular: [[['tavern_t'], 0.16, 'drink'], [['@table'], 0.50, 'eat'], [['@work'], 0.66, 'mend'], [['@bed'], 1, 'sleep']],
-    priest: [[['church_a'], 0.25, 'pray'], [['church_c'], 0.45, 'read'], [['church_b'], 0.58, 'pray'], [['@bed'], 1, 'sleep']],
-    elder: [[['church_c'], 0.20, 'pray'], [['square'], 0.30, 'rest'], [['@hearth'], 0.54, 'sit'], [['@bed'], 1, 'sleep']],
-    farmer: [[['barn_b'], 0.08, 'work'], [['barn'], 0.13, 'work'], [['well'], 0.20, 'draw water'], [['@hearth'], 0.30, 'cook'], [['@table'], 0.48, 'eat'], [['@work'], 0.62, 'mend'], [['@bed'], 1, 'sleep']],
-    mother: [[['well'], 0.06, 'draw water'], [['@hearth'], 0.26, 'cook'], [['@table'], 0.48, 'eat'], [['@work'], 0.64, 'spin'], [['@bed'], 1, 'sleep']],
-    // Night owls: still about after 01:00.
-    insomniac: [[['lane_s'], 0.22, 'pace'], [['street_mid'], 0.40, 'pace'], [['well'], 0.56, 'sit'], [['@work'], 0.68, 'whittle'], [['@bed'], 1, 'sleep']],
-    gravedigger: [[['grave'], 0.30, 'dig'], [['road_s'], 0.45, 'rest'], [['grave'], 0.66, 'dig'], [['@hearth'], 0.76, 'cook'], [['@bed'], 1, 'sleep']]
-  };
+  // Role templates come from the archetype data (js/data/archetypes.js): array schedules are used as-is, 'watch' maps to the post walker below.
+  const ROLES = {};
 
   // The watch walks the posts all night, never going indoors. Slot picks the direction and starting post.
   const POSTS = ['square', 'street_w', 'well', 'street_mid', 'street_e', 'lane_s', 'road_s', 'street_far'];
   const WATCH_STOPS = 12;
-  ROLES.guard = function (slot) {
+  function watchRole(slot) {
     const n = POSTS.length;
     const out = [];
     for (let i = 0; i < WATCH_STOPS; i++) {
@@ -34,7 +24,21 @@
       out.push([[POSTS[k]], (i + 1) / WATCH_STOPS, 'watch']);
     }
     return out;
-  };
+  }
+
+  (function loadRoles() {
+    let AD = root.VCS && root.VCS.ArchetypeData ? root.VCS.ArchetypeData : null;
+    try {
+      if (!AD && typeof require === 'function' && typeof module !== 'undefined') AD = require('./data/archetypes.js');
+    } catch (e) { /* ignore */ }
+    const list = AD && Array.isArray(AD.list) ? AD.list : [];
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (!a || typeof a.role !== 'string' || a.role === '' || !a.schedule) continue;
+      if (a.schedule === 'watch') ROLES[a.role] = watchRole;
+      else if (Array.isArray(a.schedule)) ROLES[a.role] = a.schedule;
+    }
+  })();
 
   function isNum(x) { return typeof x === 'number' && isFinite(x); }
   function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }

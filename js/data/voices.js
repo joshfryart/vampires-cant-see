@@ -586,9 +586,21 @@
   };
   const DAYTALK_GROUPS = Object.keys(DAYTALK);
 
+  /** Archetype for a role string (v0.14), looked up at call time; null when the data module is missing or the role is unknown. */
+  function archByRole(r) {
+    try {
+      const AD = root.VCS && root.VCS.ArchetypeData;
+      return AD && typeof AD.byRole === 'function' ? AD.byRole(r) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /** Daytalk group for a role: farmer|innkeeper|priest|drunk|guard|gravedigger|elder|mother|child, else 'villager'. */
   function groupOf(role) {
     const r = String(role || '').toLowerCase();
+    const arch = archByRole(r);
+    if (arch && typeof arch.talk === 'string') return arch.talk;
     if (DAYTALK[r]) return r;
     if (/inn|regular|barkeep|tavern|baker/.test(r)) return 'innkeeper';
     if (/priest|monk|nun|sexton/.test(r)) return 'priest';
@@ -805,6 +817,8 @@
   /** Resolves a role or age group into a preset name. @returns {string} */
   function presetFor(role) {
     const r = String(role || '').toLowerCase();
+    const arch = archByRole(r);
+    if (arch && typeof arch.voice === 'string' && PRESETS[arch.voice]) return arch.voice;
     if (PRESETS[r]) return r;
     if (/child|kid|boy|girl/.test(r)) return 'child';
     if (/elder|old|priest|grand/.test(r)) return 'elder';

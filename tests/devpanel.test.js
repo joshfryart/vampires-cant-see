@@ -29,3 +29,19 @@ test('the panel data source (Flags) lists what the panel renders', () => {
   assert.strictEqual(Flags.tun('demo', 'amount'), 5);
   Flags._clear();
 });
+
+test('setForgeHost exists, accepts null and a host object without a DOM', () => {
+  assert.strictEqual(typeof Dev.setForgeHost, 'function');
+  assert.doesNotThrow(() => Dev.setForgeHost(null));
+  assert.doesNotThrow(() => Dev.setForgeHost({ spawnAhead() {}, alterNearest() {}, despawnNearest() {}, people() { return []; } }));
+  assert.doesNotThrow(() => Dev.setForgeHost(undefined));
+  assert.doesNotThrow(() => Dev.setForgeHost('nope'));
+  Dev.setForgeHost(null);
+});
+
+test('devpanel.js uses no forbidden APIs', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', 'devpanel.js'), 'utf8');
+  [/innerHTML/, /outerHTML/, /insertAdjacentHTML/, /document\.write/, /eval\(/, /new Function/, /\balert\(/, /\bconfirm\(/].forEach((re) => {
+    assert.ok(!re.test(src), String(re));
+  });
+});

@@ -8,7 +8,10 @@ describe('schedule.test.js', () => {
   const MapData = require('../js/data/maps.js');
   const World = require('../js/world.js');
   const Schedule = require('../js/schedule.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
+  const Forge = require('../js/forge.js');
 
   Log.setConsole(false);
 
@@ -89,8 +92,9 @@ describe('schedule.test.js', () => {
       assert.ok(!world.isSolid(x, y) && !world.blocks(x, y, 0), k);
     });
     town.paths.forEach((p, i) => {
-      if (!p.role) return;
-      assert.ok(Schedule.hasRole(p.role), 'path ' + i + ' role ' + p.role);
+      const role = Forge.archetype(p.archetype).role;
+      if (!role) return;
+      assert.ok(Schedule.hasRole(role), 'path ' + i + ' role ' + role);
       if (p.home) assert.ok(town.zones.some((z) => z.name === p.home), 'path ' + i + ' home zone ' + p.home);
     });
   });

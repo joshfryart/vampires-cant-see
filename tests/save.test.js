@@ -397,6 +397,80 @@ describe('save.test.js', () => {
     assert.strictEqual(Save.tabCheck({ getItem() { throw new Error('x'); } }, 'A', 1).other, false);
   });
 
+  // ---- v0.14 forge key ----
+  require('../js/forge.js');
+  function forgeRun(f) { const r = validRun(); if (f !== undefined) r.forge = f; return r; }
+  const GOOD_FORGE = { v: 1, maps: { town: {
+    spawned: [{ a: 'guard', s: 77, x: 10.5, y: 20.25, ang: 1.5 }],
+    altered: [{ id: 3, look: { height: 0.9, beard: true } }]
+  } } };
+
+  test('forge: v0.13.2-shaped run (no forge) sanitizes to the literal snapshot', () => {
+    const snap = {
+      v: 4, map: 'town', player: { x: 1.5, y: 2.5, angle: 0.3 },
+      doors: { town: [[1, 2], [3, 4]] }, people: { town: 12345 },
+      night: Night.serialize(Night.create()),
+      run: { seed: 99, boons: ['hush'], closedSafe: { town: [[5, 6]] }, pendingBoons: null, hunger: null, pendingGifts: null }
+    };
+    const out = Save.sanitizeRun(JSON.parse(JSON.stringify(snap)));
+    assert.ok(out);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(out, 'forge'), false);
+    assert.deepStrictEqual(out, snap);
+  });
+
+  test('forge: valid block is kept, other keys unchanged', () => {
+    const out = Save.sanitizeRun(forgeRun(JSON.parse(JSON.stringify(GOOD_FORGE))));
+    assert.ok(out);
+    assert.strictEqual(out.forge.v, 1);
+    assert.deepStrictEqual(out.forge.maps.town.spawned, GOOD_FORGE.maps.town.spawned);
+    assert.strictEqual(out.forge.maps.town.altered[0].id, 3);
+    assert.strictEqual(out.forge.maps.town.altered[0].look.height, 0.9);
+  });
+
+  test('forge: garbage drops only forge, run still loads', () => {
+    const cases = [
+      JSON.parse('{"v":1,"maps":{"__proto__":{"spawned":[]}}}'),
+      JSON.parse('{"v":1,"maps":{"town":{"spawned":[],"__proto__":{}}}}'),
+      { v: 1, maps: { town: { spawned: [{ a: 'guard', s: 1, x: NaN, y: 1, ang: 0 }] } } },
+      { v: 1, maps: { town: { spawned: new Array(50).fill({ a: 'guard', s: 1, x: 1, y: 1, ang: 0 }) } } },
+      { v: 2, maps: {} },
+      { v: 1, maps: { a: {}, b: {}, c: {}, d: {}, e: {} } },
+      { v: 1, maps: { town: { altered: [{ id: 999, look: {} }] } } },
+      { v: 1, maps: { town: { altered: [{ id: 1, look: JSON.parse('{"__proto__":{"x":1}}') }] } } },
+      { v: 1, maps: {}, extra: 1 },
+      'junk', 5, null, []
+    ];
+    for (const c of cases) {
+      const out = Save.sanitizeRun(forgeRun(c));
+      assert.ok(out, JSON.stringify(c));
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(out, 'forge'), false, JSON.stringify(c));
+      assert.strictEqual(out.map, 'town');
+    }
+  });
+
+  test('forge: coordinates clamp, huge values do not break the run', () => {
+    const f = { v: 1, maps: { town: { spawned: [{ a: 'guard', s: 4294967295, x: 1e9, y: -1e9, ang: 99 }] } } };
+    const out = Save.sanitizeRun(forgeRun(f));
+    assert.ok(out && out.forge);
+    const e = out.forge.maps.town.spawned[0];
+    assert.deepStrictEqual([e.x, e.y, e.ang], [64, 0, 7]);
+    assert.strictEqual(Save.sanitizeRun(forgeRun({ v: 1, maps: { town: { spawned: [{ a: 'guard', s: 4294967296, x: 1, y: 1, ang: 0 }] } } })).forge, undefined);
+    assert.strictEqual(Save.sanitizeRun(forgeRun({ v: 1, maps: { town: { spawned: [{ a: 'Bad Id', s: 1, x: 1, y: 1, ang: 0 }] } } })).forge, undefined);
+  });
+
+  test('forge: round-trips through Save.create(memoryStorage) write/read', () => {
+    const st = Save.create(fake());
+    const run = forgeRun(JSON.parse(JSON.stringify(GOOD_FORGE)));
+    assert.strictEqual(st.write('run', 4, run).ok, true);
+    const r = st.read('run');
+    assert.strictEqual(r.ok, true);
+    const out = Save.sanitizeRun(r.data);
+    assert.ok(out && out.forge);
+    assert.deepStrictEqual(out.forge, Save.sanitizeRun(forgeRun(JSON.parse(JSON.stringify(GOOD_FORGE)))).forge);
+    assert.strictEqual(out.forge.maps.town.spawned[0].a, 'guard');
+  });
+
+
 });
 
 describe('save-v4.test.js', () => {

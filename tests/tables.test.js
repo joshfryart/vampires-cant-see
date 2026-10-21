@@ -10,6 +10,8 @@ describe('tables.test.js (V4 dinner tables, V2 conversations)', () => {
   const MapData = require('../js/data/maps.js');
   const World = require('../js/world.js');
   const Schedule = require('../js/schedule.js');
+  require('../js/data/archetypes.js');
+  require('../js/forge.js');
   const People = require('../js/people.js');
 
   Log.setConsole(false);

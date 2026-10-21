@@ -1,0 +1,3410 @@
+{
+ "fixture": "forge-golden",
+ "v": 1,
+ "baseline": "v0.13.2",
+ "maps": [
+  "test",
+  "town"
+ ],
+ "seeds": [
+  1,
+  7,
+  123456
+ ],
+ "people": [
+  {
+   "map": "test",
+   "seed": 1,
+   "id": 0,
+   "role": "",
+   "look": {
+    "height": 0.9176643039216288,
+    "build": 1.10604572200682,
+    "stride": 1.033243887219578,
+    "acc": "lantern",
+    "body": "round",
+    "head": "square",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": true,
+    "nose": 1.1430300892097875,
+    "coat": false,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 16.5,
+   "y": 1.5
+  },
+  {
+   "map": "test",
+   "seed": 1,
+   "id": 1,
+   "role": "",
+   "look": {
+    "height": 0.9138630580971949,
+    "build": 1.0277661295607685,
+    "stride": 1.0654358848463743,
+    "acc": "cap",
+    "body": "bean",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.1547357636503874,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 104.976,
+    "speed": 0.959,
+    "wobble": 0.114,
+    "breath": 0.095,
+    "formantMul": 1.021
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 13.5,
+   "y": 4.5
+  },
+  {
+   "map": "test",
+   "seed": 1,
+   "id": 2,
+   "role": "",
+   "look": {
+    "height": 0.9441162750008516,
+    "build": 1.0361019074684008,
+    "stride": 0.9772853887174279,
+    "acc": "nightcap",
+    "body": "box",
+    "head": "egg",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9557224364252761,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 14.5,
+   "y": 8.5
+  },
+  {
+   "map": "test",
+   "seed": 7,
+   "id": 0,
+   "role": "",
+   "look": {
+    "height": 0.9966144058853388,
+    "build": 1.0398738124989904,
+    "stride": 1.1439712936175055,
+    "acc": "tophat",
+    "body": "round",
+    "head": "square",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9823950943304225,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 16.5,
+   "y": 1.5
+  },
+  {
+   "map": "test",
+   "seed": 7,
+   "id": 1,
+   "role": "",
+   "look": {
+    "height": 0.9628578246803955,
+    "build": 1.1409468713449313,
+    "stride": 1.0697974243434145,
+    "acc": "cane",
+    "body": "box",
+    "head": "long",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 0.7542332317447289,
+    "coat": false,
+    "prop": "cane"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 104.976,
+    "speed": 0.959,
+    "wobble": 0.114,
+    "breath": 0.095,
+    "formantMul": 1.021
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 13.5,
+   "y": 4.5
+  },
+  {
+   "map": "test",
+   "seed": 7,
+   "id": 2,
+   "role": "",
+   "look": {
+    "height": 0.9581884039915167,
+    "build": 0.9975999952061102,
+    "stride": 0.9344169066520408,
+    "acc": "hood",
+    "body": "pear",
+    "head": "round",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.7798079893924296,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 14.5,
+   "y": 8.5
+  },
+  {
+   "map": "test",
+   "seed": 123456,
+   "id": 0,
+   "role": "",
+   "look": {
+    "height": 0.9593006538343616,
+    "build": 1.0925269995699636,
+    "stride": 0.9553065535495989,
+    "acc": "lantern",
+    "body": "bean",
+    "head": "square",
+    "hat": "none",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.3890071707312017,
+    "coat": false,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 16.5,
+   "y": 1.5
+  },
+  {
+   "map": "test",
+   "seed": 123456,
+   "id": 1,
+   "role": "",
+   "look": {
+    "height": 0.9065520133939572,
+    "build": 0.9651944304117933,
+    "stride": 1.1226143984589725,
+    "acc": "cap",
+    "body": "bean",
+    "head": "long",
+    "hat": "cap",
+    "hair": "bob",
+    "beard": true,
+    "nose": 0.9914257640019059,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 104.976,
+    "speed": 0.959,
+    "wobble": 0.114,
+    "breath": 0.095,
+    "formantMul": 1.021
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 13.5,
+   "y": 4.5
+  },
+  {
+   "map": "test",
+   "seed": 123456,
+   "id": 2,
+   "role": "",
+   "look": {
+    "height": 1.0222918533836491,
+    "build": 1.0551075659226625,
+    "stride": 0.9309587766532786,
+    "acc": "nightcap",
+    "body": "pear",
+    "head": "square",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.0322582030668854,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 14.5,
+   "y": 8.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 0,
+   "role": "guard",
+   "look": {
+    "height": 0.9176643039216288,
+    "build": 1.10604572200682,
+    "stride": 1.033243887219578,
+    "acc": "lantern",
+    "body": "round",
+    "head": "square",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": true,
+    "nose": 1.1430300892097875,
+    "coat": false,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.097018087
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.179946967
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.242644355
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.323222514
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.42612057
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.510569277
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.585885723
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.680564761
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.757962035
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.824342077
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.917275438
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 16.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 1,
+   "role": "innkeeper",
+   "look": {
+    "height": 0.9138630580971949,
+    "build": 1.0277661295607685,
+    "stride": 1.0654358848463743,
+    "acc": "cap",
+    "body": "bean",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.1547357636503874,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 204.953,
+    "speed": 1.007,
+    "wobble": 0.136,
+    "breath": 0.133,
+    "formantMul": 1.194
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_a",
+     "act": "work",
+     "until": 0.285646046
+    },
+    {
+     "place": "tavern_b",
+     "act": "work",
+     "until": 0.440911817
+    },
+    {
+     "place": "tavern_c",
+     "act": "work",
+     "until": 0.525796251
+    },
+    {
+     "place": "tavern_hearth",
+     "act": "cook",
+     "until": 0.607649205
+    },
+    {
+     "place": "tavern_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 28.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 2,
+   "role": "drunk",
+   "look": {
+    "height": 0.9441162750008516,
+    "build": 1.0361019074684008,
+    "stride": 0.9772853887174279,
+    "acc": "nightcap",
+    "body": "box",
+    "head": "egg",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9557224364252761,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "drunk",
+   "stops": [
+    {
+     "place": "tavern_c",
+     "act": "drink",
+     "until": 0.267134119
+    },
+    {
+     "place": "square",
+     "act": "sing",
+     "until": 0.32465443
+    },
+    {
+     "place": "barn_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 32.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 3,
+   "role": "priest",
+   "look": {
+    "height": 0.9169045006041415,
+    "build": 0.9856996657676064,
+    "stride": 1.0639812479843385,
+    "acc": "scarf",
+    "body": "stick",
+    "head": "square",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.0655313914874567,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 131.369,
+    "speed": 0.851,
+    "wobble": 0.254,
+    "breath": 0.248,
+    "formantMul": 0.951
+   },
+   "talk": "priest",
+   "stops": [
+    {
+     "place": "church_a",
+     "act": "pray",
+     "until": 0.235799301
+    },
+    {
+     "place": "church_c",
+     "act": "read",
+     "until": 0.441578344
+    },
+    {
+     "place": "church_b",
+     "act": "pray",
+     "until": 0.593146342
+    },
+    {
+     "place": "church_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 61.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 4,
+   "role": "elder",
+   "look": {
+    "height": 1.036741769767832,
+    "build": 0.909307712665759,
+    "stride": 1.0560118593624792,
+    "acc": "umbrella",
+    "body": "bean",
+    "head": "square",
+    "hat": "none",
+    "hair": "bob",
+    "beard": true,
+    "nose": 0.944039837224409,
+    "coat": false,
+    "prop": "umbrella"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 118.011,
+    "speed": 0.815,
+    "wobble": 0.252,
+    "breath": 0.353,
+    "formantMul": 0.981
+   },
+   "talk": "elder",
+   "stops": [
+    {
+     "place": "church_c",
+     "act": "pray",
+     "until": 0.212123936
+    },
+    {
+     "place": "square",
+     "act": "rest",
+     "until": 0.285568516
+    },
+    {
+     "place": "house2_hearth2",
+     "act": "sit",
+     "until": 0.54659246
+    },
+    {
+     "place": "house2_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 50.5,
+   "y": 4.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 5,
+   "role": "regular",
+   "look": {
+    "height": 1.0328984927851708,
+    "build": 1.11996642841259,
+    "stride": 1.0759560596547089,
+    "acc": "tophat",
+    "body": "bean",
+    "head": "round",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.964851801469922,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 111.338,
+    "speed": 1.049,
+    "wobble": 0.1,
+    "breath": 0.095,
+    "formantMul": 0.989
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_t2",
+     "act": "drink",
+     "until": 0.150085242
+    },
+    {
+     "place": "house2_table3",
+     "act": "eat",
+     "until": 0.497364566
+    },
+    {
+     "place": "house2_work3",
+     "act": "mend",
+     "until": 0.672074301
+    },
+    {
+     "place": "house2_bed3",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 8.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 6,
+   "role": "",
+   "look": {
+    "height": 0.9881971232243814,
+    "build": 1.0259928199579007,
+    "stride": 1.0446111848345025,
+    "acc": "cane",
+    "body": "pear",
+    "head": "round",
+    "hat": "none",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.1087057592580094,
+    "coat": false,
+    "prop": "cane"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 109.551,
+    "speed": 0.906,
+    "wobble": 0.091,
+    "breath": 0.1,
+    "formantMul": 1.028
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 20.5,
+   "y": 12.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 7,
+   "role": "",
+   "look": {
+    "height": 0.927652631700039,
+    "build": 0.9696968876291067,
+    "stride": 1.0977004923392086,
+    "acc": "hood",
+    "body": "pear",
+    "head": "long",
+    "hat": "hood",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.2740050236228853,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.684,
+    "speed": 0.97,
+    "wobble": 0.088,
+    "breath": 0.121,
+    "formantMul": 0.997
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 44.5,
+   "y": 13.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 8,
+   "role": "guard",
+   "look": {
+    "height": 0.9226409937255085,
+    "build": 1.0048642004607244,
+    "stride": 1.11788609737996,
+    "acc": "basket",
+    "body": "box",
+    "head": "long",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.0315156434429809,
+    "coat": false,
+    "prop": "basket"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 101.919,
+    "speed": 1.005,
+    "wobble": 0.071,
+    "breath": 0.122,
+    "formantMul": 1
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.069434591
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.162072418
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.240923902
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.323656419
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.407533743
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.496871576
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.5802547
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.656538749
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.749037478
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.834183898
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.928337534
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 2.5,
+   "y": 19.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 9,
+   "role": "insomniac",
+   "look": {
+    "height": 1.0095040421001613,
+    "build": 1.106615321629215,
+    "stride": 0.9196038967114873,
+    "acc": "bonnet",
+    "body": "bean",
+    "head": "square",
+    "hat": "bonnet",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.3392375166993586,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 93.212,
+    "speed": 1.066,
+    "wobble": 0.089,
+    "breath": 0.11,
+    "formantMul": 1.011
+   },
+   "talk": "villager",
+   "stops": [
+    {
+     "place": "lane_s",
+     "act": "pace",
+     "until": 0.230430208
+    },
+    {
+     "place": "street_mid",
+     "act": "pace",
+     "until": 0.393902381
+    },
+    {
+     "place": "well",
+     "act": "sit",
+     "until": 0.571822234
+    },
+    {
+     "place": "barn_work2",
+     "act": "whittle",
+     "until": 0.688972995
+    },
+    {
+     "place": "barn_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 34.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 10,
+   "role": "farmer",
+   "look": {
+    "height": 1.0053175443783402,
+    "build": 0.9085890851332806,
+    "stride": 1.10170694461558,
+    "acc": "lantern",
+    "body": "box",
+    "head": "round",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.309908235236071,
+    "coat": true,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 113.839,
+    "speed": 0.922,
+    "wobble": 0.116,
+    "breath": 0.077,
+    "formantMul": 0.982
+   },
+   "talk": "farmer",
+   "stops": [
+    {
+     "place": "barn_b",
+     "act": "work",
+     "until": 0.081812738
+    },
+    {
+     "place": "barn",
+     "act": "work",
+     "until": 0.133752545
+    },
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.206515704
+    },
+    {
+     "place": "house1_hearth",
+     "act": "cook",
+     "until": 0.285460399
+    },
+    {
+     "place": "house1_table2",
+     "act": "eat",
+     "until": 0.469110684
+    },
+    {
+     "place": "house1_work",
+     "act": "mend",
+     "until": 0.615242629
+    },
+    {
+     "place": "house1_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 52.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 11,
+   "role": "",
+   "look": {
+    "height": 1.006649087893311,
+    "build": 1.0282907330314628,
+    "stride": 1.1389095175894908,
+    "acc": "cap",
+    "body": "round",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.0433120633475481,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 94.721,
+    "speed": 1.075,
+    "wobble": 0.121,
+    "breath": 0.098,
+    "formantMul": 1.009
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 5.5,
+   "y": 28.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 12,
+   "role": "mother",
+   "look": {
+    "height": 1.0398591779870912,
+    "build": 0.9205002406728454,
+    "stride": 1.1447871995391323,
+    "acc": "nightcap",
+    "body": "bean",
+    "head": "egg",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.188557653245516,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 196.073,
+    "speed": 0.978,
+    "wobble": 0.13,
+    "breath": 0.178,
+    "formantMul": 1.14
+   },
+   "talk": "mother",
+   "stops": [
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.063202844
+    },
+    {
+     "place": "house2_hearth",
+     "act": "cook",
+     "until": 0.249552159
+    },
+    {
+     "place": "house2_table",
+     "act": "eat",
+     "until": 0.466029685
+    },
+    {
+     "place": "house2_work",
+     "act": "spin",
+     "until": 0.626019563
+    },
+    {
+     "place": "house2_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 29.5
+  },
+  {
+   "map": "town",
+   "seed": 1,
+   "id": 13,
+   "role": "gravedigger",
+   "look": {
+    "height": 1.0136575981392526,
+    "build": 1.0343070104485377,
+    "stride": 1.0380789827671832,
+    "acc": "scarf",
+    "body": "stick",
+    "head": "square",
+    "hat": "none",
+    "hair": "spiky",
+    "beard": false,
+    "nose": 1.1335622514598072,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 102.806,
+    "speed": 0.907,
+    "wobble": 0.099,
+    "breath": 0.079,
+    "formantMul": 1.007
+   },
+   "talk": "gravedigger",
+   "stops": [
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.297996727
+    },
+    {
+     "place": "road_s",
+     "act": "rest",
+     "until": 0.448827472
+    },
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.654228103
+    },
+    {
+     "place": "shed_hearth",
+     "act": "cook",
+     "until": 0.757160505
+    },
+    {
+     "place": "shed_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 3.5,
+   "y": 42.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 0,
+   "role": "guard",
+   "look": {
+    "height": 0.9966144058853388,
+    "build": 1.0398738124989904,
+    "stride": 1.1439712936175055,
+    "acc": "tophat",
+    "body": "round",
+    "head": "square",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9823950943304225,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.074868465
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.17006039
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.26164918
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.322823583
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.418060762
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.513642574
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.579590625
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.651954313
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.735639767
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.821271757
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.914409817
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 16.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 1,
+   "role": "innkeeper",
+   "look": {
+    "height": 0.9628578246803955,
+    "build": 1.1409468713449313,
+    "stride": 1.0697974243434145,
+    "acc": "cane",
+    "body": "box",
+    "head": "long",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 0.7542332317447289,
+    "coat": false,
+    "prop": "cane"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 204.953,
+    "speed": 1.007,
+    "wobble": 0.136,
+    "breath": 0.133,
+    "formantMul": 1.194
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_a",
+     "act": "work",
+     "until": 0.293631902
+    },
+    {
+     "place": "tavern_b",
+     "act": "work",
+     "until": 0.437714615
+    },
+    {
+     "place": "tavern_c",
+     "act": "work",
+     "until": 0.529621958
+    },
+    {
+     "place": "tavern_hearth",
+     "act": "cook",
+     "until": 0.591844794
+    },
+    {
+     "place": "tavern_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 28.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 2,
+   "role": "drunk",
+   "look": {
+    "height": 0.9581884039915167,
+    "build": 0.9975999952061102,
+    "stride": 0.9344169066520408,
+    "acc": "hood",
+    "body": "pear",
+    "head": "round",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.7798079893924296,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "drunk",
+   "stops": [
+    {
+     "place": "tavern_c",
+     "act": "drink",
+     "until": 0.269491018
+    },
+    {
+     "place": "square",
+     "act": "sing",
+     "until": 0.305669662
+    },
+    {
+     "place": "barn_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 32.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 3,
+   "role": "priest",
+   "look": {
+    "height": 0.910995919292327,
+    "build": 1.0801598964375443,
+    "stride": 1.0642271255841478,
+    "acc": "basket",
+    "body": "stick",
+    "head": "round",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.1736111518228425,
+    "coat": false,
+    "prop": "basket"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 131.369,
+    "speed": 0.851,
+    "wobble": 0.254,
+    "breath": 0.248,
+    "formantMul": 0.951
+   },
+   "talk": "priest",
+   "stops": [
+    {
+     "place": "church_a",
+     "act": "pray",
+     "until": 0.251112917
+    },
+    {
+     "place": "church_c",
+     "act": "read",
+     "until": 0.438634801
+    },
+    {
+     "place": "church_b",
+     "act": "pray",
+     "until": 0.581866947
+    },
+    {
+     "place": "church_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 61.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 4,
+   "role": "elder",
+   "look": {
+    "height": 0.9174538435880095,
+    "build": 0.9579321328550577,
+    "stride": 0.9654062997200527,
+    "acc": "bonnet",
+    "body": "stick",
+    "head": "round",
+    "hat": "bonnet",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.2109840147662907,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 118.011,
+    "speed": 0.815,
+    "wobble": 0.252,
+    "breath": 0.353,
+    "formantMul": 0.981
+   },
+   "talk": "elder",
+   "stops": [
+    {
+     "place": "church_c",
+     "act": "pray",
+     "until": 0.19086012
+    },
+    {
+     "place": "square",
+     "act": "rest",
+     "until": 0.299575278
+    },
+    {
+     "place": "house2_hearth2",
+     "act": "sit",
+     "until": 0.549677067
+    },
+    {
+     "place": "house2_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 50.5,
+   "y": 4.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 5,
+   "role": "regular",
+   "look": {
+    "height": 0.9145628732861951,
+    "build": 1.0397065568598918,
+    "stride": 1.0709582747425883,
+    "acc": "lantern",
+    "body": "pear",
+    "head": "long",
+    "hat": "none",
+    "hair": "spiky",
+    "beard": false,
+    "nose": 1.0620044362265615,
+    "coat": true,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 111.338,
+    "speed": 1.049,
+    "wobble": 0.1,
+    "breath": 0.095,
+    "formantMul": 0.989
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_t2",
+     "act": "drink",
+     "until": 0.145959915
+    },
+    {
+     "place": "house2_table3",
+     "act": "eat",
+     "until": 0.498545024
+    },
+    {
+     "place": "house2_work3",
+     "act": "mend",
+     "until": 0.666660866
+    },
+    {
+     "place": "house2_bed3",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 8.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 6,
+   "role": "",
+   "look": {
+    "height": 1.0024937722831964,
+    "build": 0.9819555239286274,
+    "stride": 1.1436888410593382,
+    "acc": "cap",
+    "body": "box",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "bob",
+    "beard": false,
+    "nose": 1.1260618803091347,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 109.551,
+    "speed": 0.906,
+    "wobble": 0.091,
+    "breath": 0.1,
+    "formantMul": 1.028
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 20.5,
+   "y": 12.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 7,
+   "role": "",
+   "look": {
+    "height": 1.02565850650426,
+    "build": 0.9481126422528178,
+    "stride": 0.9521880176966079,
+    "acc": "nightcap",
+    "body": "box",
+    "head": "egg",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.2567766702501102,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.684,
+    "speed": 0.97,
+    "wobble": 0.088,
+    "breath": 0.121,
+    "formantMul": 0.997
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 44.5,
+   "y": 13.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 8,
+   "role": "guard",
+   "look": {
+    "height": 1.0331523576867767,
+    "build": 1.0529890027013606,
+    "stride": 0.9514890925842338,
+    "acc": "scarf",
+    "body": "stick",
+    "head": "square",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": true,
+    "nose": 0.8358614762080833,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 101.919,
+    "speed": 1.005,
+    "wobble": 0.071,
+    "breath": 0.122,
+    "formantMul": 1
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.097954731
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.161079604
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.250139201
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.340104876
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.403547528
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.488842213
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.587910627
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.674627784
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.749420647
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.840695969
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.908088615
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 2.5,
+   "y": 19.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 9,
+   "role": "insomniac",
+   "look": {
+    "height": 0.9534871478914283,
+    "build": 1.0876109536970033,
+    "stride": 0.9419854795909487,
+    "acc": "umbrella",
+    "body": "stick",
+    "head": "square",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 0.8376088399440049,
+    "coat": false,
+    "prop": "umbrella"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 93.212,
+    "speed": 1.066,
+    "wobble": 0.089,
+    "breath": 0.11,
+    "formantMul": 1.011
+   },
+   "talk": "villager",
+   "stops": [
+    {
+     "place": "lane_s",
+     "act": "pace",
+     "until": 0.22978341
+    },
+    {
+     "place": "street_mid",
+     "act": "pace",
+     "until": 0.389845155
+    },
+    {
+     "place": "well",
+     "act": "sit",
+     "until": 0.560387991
+    },
+    {
+     "place": "barn_work2",
+     "act": "whittle",
+     "until": 0.670638565
+    },
+    {
+     "place": "barn_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 34.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 10,
+   "role": "farmer",
+   "look": {
+    "height": 0.9894581111264416,
+    "build": 0.9030451153870672,
+    "stride": 0.9648765828809701,
+    "acc": "tophat",
+    "body": "box",
+    "head": "round",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.383234988548793,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 113.839,
+    "speed": 0.922,
+    "wobble": 0.116,
+    "breath": 0.077,
+    "formantMul": 0.982
+   },
+   "talk": "farmer",
+   "stops": [
+    {
+     "place": "barn_b",
+     "act": "work",
+     "until": 0.092504974
+    },
+    {
+     "place": "barn",
+     "act": "work",
+     "until": 0.131684498
+    },
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.204003753
+    },
+    {
+     "place": "house1_hearth",
+     "act": "cook",
+     "until": 0.301512585
+    },
+    {
+     "place": "house1_table2",
+     "act": "eat",
+     "until": 0.474461738
+    },
+    {
+     "place": "house1_work",
+     "act": "mend",
+     "until": 0.620333218
+    },
+    {
+     "place": "house1_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 52.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 11,
+   "role": "",
+   "look": {
+    "height": 0.9982168893213385,
+    "build": 1.099798806454055,
+    "stride": 1.0991864420706405,
+    "acc": "cane",
+    "body": "round",
+    "head": "round",
+    "hat": "none",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.2420641472795977,
+    "coat": false,
+    "prop": "cane"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 94.721,
+    "speed": 1.075,
+    "wobble": 0.121,
+    "breath": 0.098,
+    "formantMul": 1.009
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 5.5,
+   "y": 28.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 12,
+   "role": "mother",
+   "look": {
+    "height": 0.9643735548248514,
+    "build": 0.9609099677531049,
+    "stride": 1.125612824782729,
+    "acc": "hood",
+    "body": "stick",
+    "head": "long",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.3084316997323184,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 196.073,
+    "speed": 0.978,
+    "wobble": 0.13,
+    "breath": 0.178,
+    "formantMul": 1.14
+   },
+   "talk": "mother",
+   "stops": [
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.064060702
+    },
+    {
+     "place": "house2_hearth",
+     "act": "cook",
+     "until": 0.250091284
+    },
+    {
+     "place": "house2_table",
+     "act": "eat",
+     "until": 0.469073285
+    },
+    {
+     "place": "house2_work",
+     "act": "spin",
+     "until": 0.630395493
+    },
+    {
+     "place": "house2_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 29.5
+  },
+  {
+   "map": "town",
+   "seed": 7,
+   "id": 13,
+   "role": "gravedigger",
+   "look": {
+    "height": 0.9314837834914215,
+    "build": 1.1369228103780187,
+    "stride": 0.9253864084370435,
+    "acc": "basket",
+    "body": "stick",
+    "head": "long",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 1.0414835770614443,
+    "coat": false,
+    "prop": "basket"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 102.806,
+    "speed": 0.907,
+    "wobble": 0.099,
+    "breath": 0.079,
+    "formantMul": 1.007
+   },
+   "talk": "gravedigger",
+   "stops": [
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.286691345
+    },
+    {
+     "place": "road_s",
+     "act": "rest",
+     "until": 0.457151888
+    },
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.674765246
+    },
+    {
+     "place": "shed_hearth",
+     "act": "cook",
+     "until": 0.7694258
+    },
+    {
+     "place": "shed_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 3.5,
+   "y": 42.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 0,
+   "role": "guard",
+   "look": {
+    "height": 0.9593006538343616,
+    "build": 1.0925269995699636,
+    "stride": 0.9553065535495989,
+    "acc": "lantern",
+    "body": "bean",
+    "head": "square",
+    "hat": "none",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.3890071707312017,
+    "coat": false,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.188,
+    "speed": 0.956,
+    "wobble": 0.115,
+    "breath": 0.123,
+    "formantMul": 0.998
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.088127783
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.156502941
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.253314563
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.34246378
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.420707596
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.512800207
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.593025464
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.677795647
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.754624828
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.828476209
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.903441263
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 16.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 1,
+   "role": "innkeeper",
+   "look": {
+    "height": 0.9065520133939572,
+    "build": 0.9651944304117933,
+    "stride": 1.1226143984589725,
+    "acc": "cap",
+    "body": "bean",
+    "head": "long",
+    "hat": "cap",
+    "hair": "bob",
+    "beard": true,
+    "nose": 0.9914257640019059,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 204.953,
+    "speed": 1.007,
+    "wobble": 0.136,
+    "breath": 0.133,
+    "formantMul": 1.194
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_a",
+     "act": "work",
+     "until": 0.286740523
+    },
+    {
+     "place": "tavern_b",
+     "act": "work",
+     "until": 0.440064099
+    },
+    {
+     "place": "tavern_c",
+     "act": "work",
+     "until": 0.506282193
+    },
+    {
+     "place": "tavern_hearth",
+     "act": "cook",
+     "until": 0.613149629
+    },
+    {
+     "place": "tavern_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 28.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 2,
+   "role": "drunk",
+   "look": {
+    "height": 1.0222918533836491,
+    "build": 1.0551075659226625,
+    "stride": 0.9309587766532786,
+    "acc": "nightcap",
+    "body": "pear",
+    "head": "square",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.0322582030668854,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 110.101,
+    "speed": 0.99,
+    "wobble": 0.12,
+    "breath": 0.13,
+    "formantMul": 1.008
+   },
+   "talk": "drunk",
+   "stops": [
+    {
+     "place": "tavern_c",
+     "act": "drink",
+     "until": 0.255709928
+    },
+    {
+     "place": "square",
+     "act": "sing",
+     "until": 0.32472092
+    },
+    {
+     "place": "barn_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 32.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 3,
+   "role": "priest",
+   "look": {
+    "height": 0.9319475064519793,
+    "build": 0.9663140240940266,
+    "stride": 1.0310800901264883,
+    "acc": "scarf",
+    "body": "bean",
+    "head": "square",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.2497399712214246,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 131.369,
+    "speed": 0.851,
+    "wobble": 0.254,
+    "breath": 0.248,
+    "formantMul": 0.951
+   },
+   "talk": "priest",
+   "stops": [
+    {
+     "place": "church_a",
+     "act": "pray",
+     "until": 0.26186854
+    },
+    {
+     "place": "church_c",
+     "act": "read",
+     "until": 0.455670771
+    },
+    {
+     "place": "church_b",
+     "act": "pray",
+     "until": 0.594169648
+    },
+    {
+     "place": "church_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 61.5,
+   "y": 3.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 4,
+   "role": "elder",
+   "look": {
+    "height": 1.0030958706513047,
+    "build": 1.1117681271629407,
+    "stride": 0.9786746591329575,
+    "acc": "umbrella",
+    "body": "bean",
+    "head": "long",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 0.8081505576847121,
+    "coat": true,
+    "prop": "umbrella"
+   },
+   "voice": {
+    "name": "elder",
+    "pitch": 118.011,
+    "speed": 0.815,
+    "wobble": 0.252,
+    "breath": 0.353,
+    "formantMul": 0.981
+   },
+   "talk": "elder",
+   "stops": [
+    {
+     "place": "church_c",
+     "act": "pray",
+     "until": 0.208792049
+    },
+    {
+     "place": "square",
+     "act": "rest",
+     "until": 0.312784253
+    },
+    {
+     "place": "house2_hearth2",
+     "act": "sit",
+     "until": 0.530296105
+    },
+    {
+     "place": "house2_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 50.5,
+   "y": 4.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 5,
+   "role": "regular",
+   "look": {
+    "height": 0.9388724987162277,
+    "build": 1.0076913889846764,
+    "stride": 0.9147450452204794,
+    "acc": "tophat",
+    "body": "box",
+    "head": "egg",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.1354193543549627,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 111.338,
+    "speed": 1.049,
+    "wobble": 0.1,
+    "breath": 0.095,
+    "formantMul": 0.989
+   },
+   "talk": "innkeeper",
+   "stops": [
+    {
+     "place": "tavern_t2",
+     "act": "drink",
+     "until": 0.165008776
+    },
+    {
+     "place": "house2_table3",
+     "act": "eat",
+     "until": 0.502275191
+    },
+    {
+     "place": "house2_work3",
+     "act": "mend",
+     "until": 0.664522514
+    },
+    {
+     "place": "house2_bed3",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 8.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 6,
+   "role": "",
+   "look": {
+    "height": 0.9885823779855855,
+    "build": 0.9251333208288998,
+    "stride": 1.0425933978753164,
+    "acc": "cane",
+    "body": "bean",
+    "head": "long",
+    "hat": "none",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9032998803537339,
+    "coat": true,
+    "prop": "cane"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 109.551,
+    "speed": 0.906,
+    "wobble": 0.091,
+    "breath": 0.1,
+    "formantMul": 1.028
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 20.5,
+   "y": 12.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 7,
+   "role": "",
+   "look": {
+    "height": 0.9158944520750083,
+    "build": 0.9079298385535367,
+    "stride": 0.903427874238696,
+    "acc": "hood",
+    "body": "bean",
+    "head": "egg",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.2903694721404462,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 100.684,
+    "speed": 0.97,
+    "wobble": 0.088,
+    "breath": 0.121,
+    "formantMul": 0.997
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 44.5,
+   "y": 13.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 8,
+   "role": "guard",
+   "look": {
+    "height": 1.0300945999799296,
+    "build": 0.9257695203181356,
+    "stride": 0.962981286610011,
+    "acc": "basket",
+    "body": "pear",
+    "head": "square",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.3479266277747228,
+    "coat": true,
+    "prop": "basket"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 101.919,
+    "speed": 1.005,
+    "wobble": 0.071,
+    "breath": 0.122,
+    "formantMul": 1
+   },
+   "talk": "guard",
+   "stops": [
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.075666595
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.15435016
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.251222447
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 0.323721241
+    },
+    {
+     "place": "street_e",
+     "act": "watch",
+     "until": 0.428438201
+    },
+    {
+     "place": "lane_s",
+     "act": "watch",
+     "until": 0.503745352
+    },
+    {
+     "place": "road_s",
+     "act": "watch",
+     "until": 0.568639688
+    },
+    {
+     "place": "street_far",
+     "act": "watch",
+     "until": 0.663087473
+    },
+    {
+     "place": "square",
+     "act": "watch",
+     "until": 0.752593899
+    },
+    {
+     "place": "street_w",
+     "act": "watch",
+     "until": 0.846917667
+    },
+    {
+     "place": "well",
+     "act": "watch",
+     "until": 0.921798634
+    },
+    {
+     "place": "street_mid",
+     "act": "watch",
+     "until": 1
+    }
+   ],
+   "x": 2.5,
+   "y": 19.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 9,
+   "role": "insomniac",
+   "look": {
+    "height": 1.0236662694602274,
+    "build": 1.1407827767310663,
+    "stride": 1.1272991948993876,
+    "acc": "bonnet",
+    "body": "bean",
+    "head": "long",
+    "hat": "bonnet",
+    "hair": "spiky",
+    "beard": false,
+    "nose": 0.7227478626416995,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 93.212,
+    "speed": 1.066,
+    "wobble": 0.089,
+    "breath": 0.11,
+    "formantMul": 1.011
+   },
+   "talk": "villager",
+   "stops": [
+    {
+     "place": "lane_s",
+     "act": "pace",
+     "until": 0.218899443
+    },
+    {
+     "place": "street_mid",
+     "act": "pace",
+     "until": 0.40191308
+    },
+    {
+     "place": "well",
+     "act": "sit",
+     "until": 0.56767795
+    },
+    {
+     "place": "barn_work2",
+     "act": "whittle",
+     "until": 0.682667884
+    },
+    {
+     "place": "barn_bed2",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 34.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 10,
+   "role": "farmer",
+   "look": {
+    "height": 1.047646357503254,
+    "build": 0.9487642830121331,
+    "stride": 0.9861439763684757,
+    "acc": "lantern",
+    "body": "box",
+    "head": "square",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": true,
+    "nose": 1.3820267384406177,
+    "coat": false,
+    "prop": "lantern"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 113.839,
+    "speed": 0.922,
+    "wobble": 0.116,
+    "breath": 0.077,
+    "formantMul": 0.982
+   },
+   "talk": "farmer",
+   "stops": [
+    {
+     "place": "barn_b",
+     "act": "work",
+     "until": 0.075983148
+    },
+    {
+     "place": "barn",
+     "act": "work",
+     "until": 0.132490699
+    },
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.207414602
+    },
+    {
+     "place": "house1_hearth",
+     "act": "cook",
+     "until": 0.293237233
+    },
+    {
+     "place": "house1_table2",
+     "act": "eat",
+     "until": 0.487546059
+    },
+    {
+     "place": "house1_work",
+     "act": "mend",
+     "until": 0.618074097
+    },
+    {
+     "place": "house1_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 52.5,
+   "y": 21.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 11,
+   "role": "",
+   "look": {
+    "height": 0.9322041623177938,
+    "build": 0.9962484891642817,
+    "stride": 0.9671271370956674,
+    "acc": "cap",
+    "body": "round",
+    "head": "round",
+    "hat": "cap",
+    "hair": "spiky",
+    "beard": false,
+    "nose": 0.9994598536053672,
+    "coat": false,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 94.721,
+    "speed": 1.075,
+    "wobble": 0.121,
+    "breath": 0.098,
+    "formantMul": 1.009
+   },
+   "talk": "villager",
+   "stops": null,
+   "x": 5.5,
+   "y": 28.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 12,
+   "role": "mother",
+   "look": {
+    "height": 1.0490788114489988,
+    "build": 0.9438646027469076,
+    "stride": 1.083984166709706,
+    "acc": "nightcap",
+    "body": "stick",
+    "head": "long",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.7170376293826848,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "woman",
+    "pitch": 196.073,
+    "speed": 0.978,
+    "wobble": 0.13,
+    "breath": 0.178,
+    "formantMul": 1.14
+   },
+   "talk": "mother",
+   "stops": [
+    {
+     "place": "well",
+     "act": "draw water",
+     "until": 0.049584871
+    },
+    {
+     "place": "house2_hearth",
+     "act": "cook",
+     "until": 0.264608441
+    },
+    {
+     "place": "house2_table",
+     "act": "eat",
+     "until": 0.494738033
+    },
+    {
+     "place": "house2_work",
+     "act": "spin",
+     "until": 0.626702534
+    },
+    {
+     "place": "house2_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 20.5,
+   "y": 29.5
+  },
+  {
+   "map": "town",
+   "seed": 123456,
+   "id": 13,
+   "role": "gravedigger",
+   "look": {
+    "height": 1.0066290304530412,
+    "build": 1.0104573268676176,
+    "stride": 0.9548162249615416,
+    "acc": "scarf",
+    "body": "round",
+    "head": "round",
+    "hat": "none",
+    "hair": "none",
+    "beard": true,
+    "nose": 0.8557529323035851,
+    "coat": true,
+    "prop": "none"
+   },
+   "voice": {
+    "name": "man",
+    "pitch": 102.806,
+    "speed": 0.907,
+    "wobble": 0.099,
+    "breath": 0.079,
+    "formantMul": 1.007
+   },
+   "talk": "gravedigger",
+   "stops": [
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.287954927
+    },
+    {
+     "place": "road_s",
+     "act": "rest",
+     "until": 0.457527805
+    },
+    {
+     "place": "grave",
+     "act": "dig",
+     "until": 0.646684688
+    },
+    {
+     "place": "shed_hearth",
+     "act": "cook",
+     "until": 0.757822134
+    },
+    {
+     "place": "shed_bed",
+     "act": "sleep",
+     "until": 1
+    }
+   ],
+   "x": 3.5,
+   "y": 42.5
+  }
+ ],
+ "looks": [
+  {
+   "id": 0,
+   "look": {
+    "height": 0.9663474414730445,
+    "build": 1.1061260504415258,
+    "stride": 1.035061251814477,
+    "acc": "cane",
+    "body": "round",
+    "head": "round",
+    "hat": "none",
+    "hair": "curls",
+    "beard": true,
+    "nose": 1.3971785572124644,
+    "coat": false,
+    "prop": "cane"
+   }
+  },
+  {
+   "id": 1,
+   "look": {
+    "height": 0.9210966499289498,
+    "build": 1.0406466841581277,
+    "stride": 0.9282344010192901,
+    "acc": "hood",
+    "body": "stick",
+    "head": "egg",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.1498922523809596,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 2,
+   "look": {
+    "height": 1.002035963977687,
+    "build": 1.0276086136931553,
+    "stride": 1.0979651326546445,
+    "acc": "basket",
+    "body": "box",
+    "head": "long",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 0.9374300035648048,
+    "coat": true,
+    "prop": "basket"
+   }
+  },
+  {
+   "id": 3,
+   "look": {
+    "height": 0.9288021227577702,
+    "build": 1.074156472145114,
+    "stride": 1.080250399163924,
+    "acc": "bonnet",
+    "body": "stick",
+    "head": "round",
+    "hat": "bonnet",
+    "hair": "curls",
+    "beard": true,
+    "nose": 1.0790334636112675,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 4,
+   "look": {
+    "height": 0.9405487071024254,
+    "build": 0.9025919319014065,
+    "stride": 0.9781380579574034,
+    "acc": "lantern",
+    "body": "pear",
+    "head": "egg",
+    "hat": "none",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.0304549965076149,
+    "coat": false,
+    "prop": "lantern"
+   }
+  },
+  {
+   "id": 5,
+   "look": {
+    "height": 0.9663705523707904,
+    "build": 0.9073861955315806,
+    "stride": 1.0579338597366585,
+    "acc": "cap",
+    "body": "stick",
+    "head": "round",
+    "hat": "cap",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.1627308276714756,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 6,
+   "look": {
+    "height": 0.9961152170319111,
+    "build": 0.9301526293624193,
+    "stride": 1.0725437257555313,
+    "acc": "nightcap",
+    "body": "bean",
+    "head": "square",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.3546858024783432,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 7,
+   "look": {
+    "height": 0.952105477033183,
+    "build": 1.0837523529538884,
+    "stride": 1.0828587756026535,
+    "acc": "scarf",
+    "body": "round",
+    "head": "long",
+    "hat": "none",
+    "hair": "curls",
+    "beard": true,
+    "nose": 0.9592884422047063,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 8,
+   "look": {
+    "height": 0.9692912608617917,
+    "build": 1.024536498566158,
+    "stride": 1.0071477099903858,
+    "acc": "umbrella",
+    "body": "box",
+    "head": "egg",
+    "hat": "none",
+    "hair": "bun",
+    "beard": false,
+    "nose": 1.3567288012010976,
+    "coat": false,
+    "prop": "umbrella"
+   }
+  },
+  {
+   "id": 9,
+   "look": {
+    "height": 0.9863295963965356,
+    "build": 0.9692399304825813,
+    "stride": 1.0744226856390013,
+    "acc": "tophat",
+    "body": "pear",
+    "head": "egg",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": true,
+    "nose": 0.9622741526924072,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 10,
+   "look": {
+    "height": 1.0180916920071468,
+    "build": 0.9818511685938575,
+    "stride": 0.9897301020449959,
+    "acc": "cane",
+    "body": "round",
+    "head": "square",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 0.9150483765406534,
+    "coat": false,
+    "prop": "cane"
+   }
+  },
+  {
+   "id": 11,
+   "look": {
+    "height": 1.0365561787504702,
+    "build": 1.0076017158920876,
+    "stride": 0.9772855704417452,
+    "acc": "hood",
+    "body": "box",
+    "head": "long",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.8331239134538918,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 12,
+   "look": {
+    "height": 0.9326618323568255,
+    "build": 0.9284730145940557,
+    "stride": 0.9578816067427397,
+    "acc": "basket",
+    "body": "stick",
+    "head": "long",
+    "hat": "none",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.1912214228883384,
+    "coat": false,
+    "prop": "basket"
+   }
+  },
+  {
+   "id": 13,
+   "look": {
+    "height": 0.9620293216779828,
+    "build": 1.0815120456158183,
+    "stride": 1.1380308672436512,
+    "acc": "bonnet",
+    "body": "bean",
+    "head": "long",
+    "hat": "bonnet",
+    "hair": "spiky",
+    "beard": false,
+    "nose": 0.7312087793136015,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 14,
+   "look": {
+    "height": 1.0072711980552413,
+    "build": 1.053131773113273,
+    "stride": 0.9824812593054958,
+    "acc": "lantern",
+    "body": "pear",
+    "head": "long",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.1820690653985366,
+    "coat": true,
+    "prop": "lantern"
+   }
+  },
+  {
+   "id": 15,
+   "look": {
+    "height": 0.9159217887092382,
+    "build": 1.1265060309437103,
+    "stride": 1.09430151686538,
+    "acc": "cap",
+    "body": "round",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "bob",
+    "beard": false,
+    "nose": 1.212059717439115,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 16,
+   "look": {
+    "height": 0.910204981151037,
+    "build": 0.9349432895309292,
+    "stride": 0.9246192464255728,
+    "acc": "nightcap",
+    "body": "stick",
+    "head": "long",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.3922920007491484,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 17,
+   "look": {
+    "height": 0.9675959660089575,
+    "build": 0.9034388242056594,
+    "stride": 1.106182379857637,
+    "acc": "scarf",
+    "body": "box",
+    "head": "egg",
+    "hat": "none",
+    "hair": "bun",
+    "beard": true,
+    "nose": 1.063139074621722,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 18,
+   "look": {
+    "height": 1.001507664914243,
+    "build": 0.927874129882548,
+    "stride": 1.1045645922771654,
+    "acc": "umbrella",
+    "body": "round",
+    "head": "egg",
+    "hat": "none",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.2486906508449465,
+    "coat": false,
+    "prop": "umbrella"
+   }
+  },
+  {
+   "id": 19,
+   "look": {
+    "height": 0.9021186621277594,
+    "build": 1.024854284862522,
+    "stride": 1.0553269665455445,
+    "acc": "tophat",
+    "body": "bean",
+    "head": "round",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.8361809886293485,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 20,
+   "look": {
+    "height": 0.9927933876053431,
+    "build": 0.9511480368440971,
+    "stride": 0.9801388860563748,
+    "acc": "cane",
+    "body": "round",
+    "head": "egg",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.2152423263061791,
+    "coat": false,
+    "prop": "cane"
+   }
+  },
+  {
+   "id": 21,
+   "look": {
+    "height": 0.9219705277355388,
+    "build": 0.9191521613160148,
+    "stride": 1.1471793892327695,
+    "acc": "hood",
+    "body": "pear",
+    "head": "square",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.9717782031279056,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 22,
+   "look": {
+    "height": 0.9726852085324936,
+    "build": 0.9877427844679915,
+    "stride": 1.0596134600695222,
+    "acc": "basket",
+    "body": "stick",
+    "head": "egg",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.3461826579645275,
+    "coat": false,
+    "prop": "basket"
+   }
+  },
+  {
+   "id": 23,
+   "look": {
+    "height": 1.0293831837829202,
+    "build": 0.9483934644726105,
+    "stride": 0.9509457091684453,
+    "acc": "bonnet",
+    "body": "stick",
+    "head": "long",
+    "hat": "bonnet",
+    "hair": "bob",
+    "beard": false,
+    "nose": 1.3542781708762048,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 24,
+   "look": {
+    "height": 1.027096821111627,
+    "build": 0.9567294051870704,
+    "stride": 1.07919562041061,
+    "acc": "lantern",
+    "body": "box",
+    "head": "round",
+    "hat": "none",
+    "hair": "tuft",
+    "beard": false,
+    "nose": 1.3566299405647442,
+    "coat": true,
+    "prop": "lantern"
+   }
+  },
+  {
+   "id": 25,
+   "look": {
+    "height": 0.9634094929439015,
+    "build": 1.1117666709818876,
+    "stride": 1.0861876420443877,
+    "acc": "cap",
+    "body": "pear",
+    "head": "round",
+    "hat": "cap",
+    "hair": "bun",
+    "beard": false,
+    "nose": 0.9353613235289231,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 26,
+   "look": {
+    "height": 1.043674912035931,
+    "build": 0.9786597900441848,
+    "stride": 1.0954630226828157,
+    "acc": "nightcap",
+    "body": "bean",
+    "head": "long",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.0783650861354543,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 27,
+   "look": {
+    "height": 0.9823179040336981,
+    "build": 0.973241101927124,
+    "stride": 0.9450956737040542,
+    "acc": "scarf",
+    "body": "pear",
+    "head": "round",
+    "hat": "none",
+    "hair": "curls",
+    "beard": false,
+    "nose": 1.1260899020358919,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 28,
+   "look": {
+    "height": 0.9873861832427793,
+    "build": 1.1387203651596791,
+    "stride": 1.033864614763297,
+    "acc": "umbrella",
+    "body": "bean",
+    "head": "egg",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 0.9700581562239676,
+    "coat": true,
+    "prop": "umbrella"
+   }
+  },
+  {
+   "id": 29,
+   "look": {
+    "height": 0.9616715965443291,
+    "build": 0.9625529565731995,
+    "stride": 1.068472598597873,
+    "acc": "tophat",
+    "body": "round",
+    "head": "round",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.3053385795792565,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 30,
+   "look": {
+    "height": 1.024375235766638,
+    "build": 1.1108515101717784,
+    "stride": 1.025251802499406,
+    "acc": "cane",
+    "body": "box",
+    "head": "long",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 0.7753475880250335,
+    "coat": false,
+    "prop": "cane"
+   }
+  },
+  {
+   "id": 31,
+   "look": {
+    "height": 0.9130105901509523,
+    "build": 1.0145618055597878,
+    "stride": 1.1304492298862896,
+    "acc": "hood",
+    "body": "box",
+    "head": "long",
+    "hat": "hood",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.7936425415566191,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 32,
+   "look": {
+    "height": 1.0308237872784958,
+    "build": 1.0769315286073833,
+    "stride": 1.1017139458912424,
+    "acc": "basket",
+    "body": "round",
+    "head": "round",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 0.8642385641345753,
+    "coat": false,
+    "prop": "basket"
+   }
+  },
+  {
+   "id": 33,
+   "look": {
+    "height": 1.0142090692534111,
+    "build": 1.075705435394775,
+    "stride": 0.9999071131227538,
+    "acc": "bonnet",
+    "body": "round",
+    "head": "square",
+    "hat": "bonnet",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.1071415138198062,
+    "coat": true,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 34,
+   "look": {
+    "height": 0.9749489909852855,
+    "build": 1.1444746292894705,
+    "stride": 1.1435399786918423,
+    "acc": "lantern",
+    "body": "pear",
+    "head": "square",
+    "hat": "none",
+    "hair": "curls",
+    "beard": true,
+    "nose": 0.9022310308879241,
+    "coat": false,
+    "prop": "lantern"
+   }
+  },
+  {
+   "id": 35,
+   "look": {
+    "height": 1.0371055547730066,
+    "build": 1.0063404235756024,
+    "stride": 0.9073833943461068,
+    "acc": "cap",
+    "body": "bean",
+    "head": "egg",
+    "hat": "cap",
+    "hair": "none",
+    "beard": true,
+    "nose": 1.3947972551221026,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 36,
+   "look": {
+    "height": 0.9521329734823667,
+    "build": 1.0904489880544133,
+    "stride": 1.0194473298382944,
+    "acc": "nightcap",
+    "body": "bean",
+    "head": "egg",
+    "hat": "nightcap",
+    "hair": "none",
+    "beard": false,
+    "nose": 0.8788718196097761,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 37,
+   "look": {
+    "height": 0.9469499364146031,
+    "build": 0.9046664964756929,
+    "stride": 0.9933419081848115,
+    "acc": "scarf",
+    "body": "stick",
+    "head": "square",
+    "hat": "none",
+    "hair": "bob",
+    "beard": false,
+    "nose": 1.0603959838626906,
+    "coat": false,
+    "prop": "none"
+   }
+  },
+  {
+   "id": 38,
+   "look": {
+    "height": 0.9495146155706607,
+    "build": 1.0450517116463742,
+    "stride": 1.0627258282969705,
+    "acc": "umbrella",
+    "body": "round",
+    "head": "round",
+    "hat": "none",
+    "hair": "none",
+    "beard": false,
+    "nose": 1.175863558729179,
+    "coat": false,
+    "prop": "umbrella"
+   }
+  },
+  {
+   "id": 39,
+   "look": {
+    "height": 1.0057090432732365,
+    "build": 0.9757338971598074,
+    "stride": 0.9843472767155618,
+    "acc": "tophat",
+    "body": "round",
+    "head": "square",
+    "hat": "tophat",
+    "hair": "none",
+    "beard": true,
+    "nose": 0.8378185074310749,
+    "coat": true,
+    "prop": "none"
+   }
+  }
+ ],
+ "roles": [
+  {
+   "role": "",
+   "preset": "man",
+   "talk": "villager"
+  },
+  {
+   "role": "guard",
+   "preset": "man",
+   "talk": "guard"
+  },
+  {
+   "role": "innkeeper",
+   "preset": "woman",
+   "talk": "innkeeper"
+  },
+  {
+   "role": "drunk",
+   "preset": "man",
+   "talk": "drunk"
+  },
+  {
+   "role": "priest",
+   "preset": "elder",
+   "talk": "priest"
+  },
+  {
+   "role": "elder",
+   "preset": "elder",
+   "talk": "elder"
+  },
+  {
+   "role": "regular",
+   "preset": "man",
+   "talk": "innkeeper"
+  },
+  {
+   "role": "insomniac",
+   "preset": "man",
+   "talk": "villager"
+  },
+  {
+   "role": "farmer",
+   "preset": "man",
+   "talk": "farmer"
+  },
+  {
+   "role": "mother",
+   "preset": "woman",
+   "talk": "mother"
+  },
+  {
+   "role": "gravedigger",
+   "preset": "man",
+   "talk": "gravedigger"
+  }
+ ]
+}

@@ -12,7 +12,7 @@
   const BAD_KEYS = ['__proto__', 'constructor', 'prototype'];
   const ENV_KEYS = ['app', 'kind', 'v', 'game', 'sum', 'data'];
   const IMPORT_KEYS = ['app', 'kind', 'v', 'game', 'meta', 'run'];
-  const RUN_KEYS = ['v', 'map', 'player', 'doors', 'people', 'night', 'run', 'rocks'];
+  const RUN_KEYS = ['v', 'map', 'player', 'doors', 'people', 'night', 'run', 'rocks', 'forge'];
   const RUN_RUN_KEYS = ['seed', 'boons', 'closedSafe', 'pendingBoons'];
 
   function logger() {
@@ -444,6 +444,58 @@
     return null;
   }
 
+  const FORGE_ID_RE = /^[a-z][a-z0-9_]{1,23}$/;
+  function clampNum(n, lo, hi) { return n < lo ? lo : (n > hi ? hi : n); }
+
+  /** Validate the optional run.forge block. @returns {object|undefined} clean copy, or undefined when invalid */
+  function sanitizeForge(f) {
+    try {
+      if (!isPlain(f)) return undefined;
+      const fk = Object.keys(f);
+      if (fk.length !== 2 || !hasOwn(f, 'v') || !hasOwn(f, 'maps')) return undefined;
+      if (f.v !== 1 || !isPlain(f.maps)) return undefined;
+      const names = Object.keys(f.maps);
+      if (names.length > 4) return undefined;
+      const F = mod('Forge', './forge.js');
+      const maps = {};
+      for (let i = 0; i < names.length; i++) {
+        const name = names[i];
+        if (isBadKey(name) || name.length < 1 || name.length > 32) return undefined;
+        const m = f.maps[name];
+        if (!isPlain(m)) return undefined;
+        const mk = Object.keys(m);
+        for (let j = 0; j < mk.length; j++) if (mk[j] !== 'spawned' && mk[j] !== 'altered') return undefined;
+        const spawned = [];
+        const altered = [];
+        if (hasOwn(m, 'spawned')) {
+          if (!Array.isArray(m.spawned) || m.spawned.length > 4) return undefined;
+          for (let j = 0; j < m.spawned.length; j++) {
+            const e = m.spawned[j];
+            if (!isPlain(e) || typeof e.a !== 'string' || !FORGE_ID_RE.test(e.a)) return undefined;
+            if (!isInt(e.s) || e.s < 0 || e.s > 4294967295) return undefined;
+            if (!isNum(e.x) || !isNum(e.y) || !isNum(e.ang)) return undefined;
+            spawned.push({ a: e.a, s: e.s, x: clampNum(e.x, 0, 64), y: clampNum(e.y, 0, 64), ang: clampNum(e.ang, -7, 7) });
+          }
+        }
+        if (hasOwn(m, 'altered')) {
+          if (!Array.isArray(m.altered) || m.altered.length > 16) return undefined;
+          for (let j = 0; j < m.altered.length; j++) {
+            const e = m.altered[j];
+            if (!isPlain(e) || !isInt(e.id) || e.id < 0 || e.id > 255) return undefined;
+            if (!F || typeof F.validate !== 'function') return undefined;
+            const r = F.validate('look', e.look, { partial: true });
+            if (!r || !r.ok || !isPlain(r.value)) return undefined;
+            altered.push({ id: e.id, look: Object.assign({}, r.value) });
+          }
+        }
+        maps[name] = { spawned: spawned, altered: altered };
+      }
+      return { v: 1, maps: maps };
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   function sanitizeRun(data) {
     try {
       if (!isPlain(data)) return null;
@@ -516,6 +568,11 @@
         }
         out.night = n;
       }
+      if (hasOwn(data, 'forge') && data.forge !== undefined) {
+        const fg = sanitizeForge(data.forge);
+        if (fg) out.forge = fg;
+        else warn('dropping invalid forge block');
+      }
       out.run = { seed: r.seed, boons: boons, closedSafe: closedSafe, pendingBoons: pending, hunger: hunger, pendingGifts: pendingGifts };
       return out;
     } catch (e) {
@@ -583,7 +640,8 @@
     exportText: exportText,
     parseImport: parseImport,
     migrateRun: migrateRun,
-    sanitizeRun: sanitizeRun
+    sanitizeRun: sanitizeRun,
+    sanitizeForge: sanitizeForge
   };
   VCS.Save = Save;
   if (typeof module !== 'undefined' && module.exports) module.exports = Save;
