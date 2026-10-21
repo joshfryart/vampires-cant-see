@@ -1393,8 +1393,8 @@ describe('game-echo helpers (v0.11.2)', () => {
     near(A.echoLevel('person', 2, 0) - A.echoLevel('person', 4, 0), 40 * Math.log10(2) + 2 * 2 * A.airDbPerM);
     assert.ok(at(3, Math.PI).strength < at(3, 0).strength, 'behind the mouth is quieter');
     near(a2.delay, 2 / VCS.Sonar.SONAR_SPEED);
-    assert.ok(at(30).strength >= 0.1, 'never below the old floor');
-    assert.ok(at(0.2).strength <= 0.7, 'never above the old ceiling');
+    assert.ok(at(30).strength >= 0.05 - 1e-9, 'never below the old floor (halved)');
+    assert.ok(at(0.2).strength <= 0.35 + 1e-9, 'never above the old ceiling (halved)');
   });
 
   test('person echo record carries theta (off the mouth axis) from the ping facing', () => {
