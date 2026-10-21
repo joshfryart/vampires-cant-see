@@ -9,7 +9,7 @@ stood. Ping again to see where they went.
 Find a villager, drink in the dark, and get back to your crypt (or a safe, dark
 spot) before dawn. Survive five nights to win the run.
 
-Current build (v0.18.0)
+Current build (v0.20.0)
 
 No install, no server, no build step, no network. Plain HTML and JavaScript.
 
@@ -76,7 +76,9 @@ node tools/sim.mjs
 
 `tests/smoke.mjs` drives the game in Chromium through Playwright (install it
 outside the repo and set `NODE_PATH`). `tools/sound-lab.html` lets you audition
-every sound.
+every sound. `tools/character-creator.html` lets you build villagers with every
+look option and see them live through the game's own renderer (also linked from
+the F9 dev panel).
 
 Add `?debug=1` to the page address for logs, the F3 overlay, a top-down map
 (M) and test hooks. F9 opens the dev panel, which has a "Copy error report"

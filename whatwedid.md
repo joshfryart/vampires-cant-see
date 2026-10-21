@@ -92,3 +92,18 @@ All inside `draw()` in `js/figure.js`, Effects >= 1 and near figures only (the E
 - Cuffs: a third wrap ring per arm and leg (`sweep`, t 0.84) drawn at lod >= 1 as sleeve/trouser cuffs (skipped for robe, cloak, mail sleeves).
 - Torso creases (`torsoFolds`): three fine curves fanning up from the belt line at lod 2 (skipped for robe and cloak).
 Tests in `tests/` all pass unchanged. Still open: hood/arm overlap on the idle head-scratch, per-archetype faces, finger poses, robe folds.
+
+## v0.20.0: character creator
+
+(Version 0.19.0 was left to a parallel figure-art pass; this branch jumps to 0.20.0 to avoid a collision.)
+
+A standalone page to play with villagers: `tools/character-creator.html` (+ `.css`, `.js`) and the pure data layer `tools/character-creator-core.js` (`VCS.Creator`). It loads the real game scripts like the figure sheet and draws only through `Render.drawSolo`, so it picks up any change to `js/figure.js` / `js/render.js` with no edits. Neither file was touched. Details: `docs/DESIGN.md` 5.7.
+
+- **Open it:** the HTML file from the repo root folder (file:// works), or F9 dev panel > NPC Forge > "Open character creator" (the only game-side hook, in `js/devpanel.js`).
+- **Preview:** big live figure with the idle clock running; pose picker (idle, wary, chat, walk, flee, startle, cower, dazed, seated, fed, held with a struggle slider); turn slider, preset views, auto-turn, drag to turn; Effects 0/1/2, quality, zoom (render scale), camera distance; rim light, circulation, skeleton, vessel graph and part-outline overlays; reduced motion; Save PNG.
+- **Game scale:** four small views, a lineup between Forge villagers at depth 2.5 and a full 640 x 360 frame at four depths, rendered at the game's internal size and shown at 1x/2x/3x.
+- **Editing:** every Forge look field (dropdowns, sliders, toggles) with per-field locks; `acc` is replaced by independent hat, prop and scarf controls (the renderer draws `look.hat` / `look.prop` directly). Archetype presets and seeds come from `Forge.generate`; "Random in archetype" and "Wild random".
+- **Saving:** named characters in localStorage (`vcs.creator`, max 64), the draft auto-restores (`vcs.creator.draft`), export one or all as JSON, import from a file or pasted text (also a bare look object), and a Forge spawn spec view.
+- **Safety:** `Creator.sanitize` clamps everything to `LOOK_RANGES` / `LOOK_ENUMS`; `tests/creator.test.js` (12 tests) covers fields, clamping, presets vs Forge, randomize and locks, pose echoes, view clamping, JSON round trips and malformed input, storage failures, Forge spec validity, and renders 26 random or extreme looks x 11 poses x Effects 0/1/2 x 3 turns through `Render.drawSolo` with no logged errors.
+- **Verified** in a browser at 1440 px (two columns) and 375 px (one column, no horizontal scroll): idle, held with circulation and overlays, walk at Effects 0, wild random, save, import of bad and clamped JSON, draft restore. No console errors.
+- **Ideas not done:** spawn a saved character straight into a running game (the dev panel could list `vcs.creator`), an onion-skin compare against a second character, a URL-hash share link.
