@@ -467,6 +467,69 @@ describe('render-feed.test.js', () => {
     }
   });
 
+  test('speckle scale: roughness thickens and lengthens the stipple, clamped 0..1', () => {
+    const lo = Render.speckle(0.1);
+    const hi = Render.speckle(0.8);
+    assert.ok(hi.n > lo.n && hi.back > lo.back);
+    assert.deepStrictEqual(Render.speckle(-5), Render.speckle(0));
+    assert.deepStrictEqual(Render.speckle(9), Render.speckle(1));
+    assert.ok(Render.speckle(0).n >= 0.5 && Render.speckle(1).n <= 2.01);
+    const room = (floor, wall) => VCS.World.load({ name: 'sp', rows: ['#############', '#' + floor.repeat(11) + '#', '#' + floor.repeat(11) + '#', '#' + floor.repeat(11) + '#', '#############'], materials: { '#': wall } }, { requireStart: false });
+    const pulse = (w) => { const s = VCS.Sonar.create({ bounces: 0, visRays: 360 }); VCS.Sonar.emit(s, w, 3.5, 2.5, 0, { range: 10 }); return s.lastPulse; };
+    const smooth = Render.pulseRough(room('.', 'stone'), pulse(room('.', 'stone')));
+    const rough = Render.pulseRough(room('g', 'cobble'), pulse(room('g', 'cobble')));
+    assert.ok(rough > smooth + 0.3, 'grass + cobble ' + rough + ' vs stone ' + smooth);
+    const pu = pulse(room('.', 'stone'));
+    const first = Render.pulseRough(room('g', 'cobble'), pu);
+    assert.strictEqual(Render.pulseRough(room('.', 'stone'), pu), first, 'cached on the pulse');
+  });
+
+  test('speckles: rough surfaces draw more dots; matDetail auto-off and quality 1 fall back to the plain stipple', () => withPath2D(() => {
+    const rows = ['#################', '#' + '.'.repeat(15) + '#', '#' + '.'.repeat(15) + '#', '#' + '.'.repeat(15) + '#', '#' + '.'.repeat(15) + '#', '#################'];
+    const dotsFor = (floorCh, wall, mut) => {
+      const w = VCS.World.load({ name: 'sp', rows: rows.map((r) => r.replace(/[.]/g, floorCh)), materials: { '#': wall } }, { requireStart: false });
+      const f = setup();
+      f.r.quality = 3;
+      if (mut) mut(f.r);
+      const p = { x: 3.5, y: 2.5, angle: 0 };
+      VCS.Sonar.emit(f.sonar, w, p.x, p.y, 100, { range: 12, facing: 0 });
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, w, p, f.sonar, 100.45, {});
+      return f.r.octx.calls.filter((c) => c.fn === 'rect' && c.args[2] <= 2 && c.args[3] <= 2 && c.args[2] * c.args[3] <= 2);
+    };
+    const smooth = dotsFor('.', 'stone');
+    const rough = dotsFor('g', 'cobble');
+    assert.ok(rough.length > smooth.length, 'rough ' + rough.length + ' > smooth ' + smooth.length);
+    assert.ok(rough.length <= 80 + 40, 'dot count stays bounded');
+    const off = dotsFor('g', 'cobble', (r) => { r.matDetail = false; });
+    assert.ok(off.length <= 40, 'matDetail off: base stipple only (' + off.length + ')');
+    const cfgOff = dotsFor('g', 'cobble', (r) => { r.config = { materialDetail: false }; });
+    assert.ok(cfgOff.length <= 40, 'materialDetail setting off: base stipple only');
+    const q1 = dotsFor('g', 'cobble', (r) => { r.quality = 1; });
+    assert.strictEqual(q1.length, 0, 'quality < 2 draws no floor front');
+  }));
+
+  test('floor texture: grass dots are 1x2 ticks, wood 2x1 grain, stone 1x1 specks (one fill, no extra pass)', () => withPath2D(() => {
+    const rows = ['#################', '#' + '.'.repeat(15) + '#', '#' + '.'.repeat(15) + '#', '#' + '.'.repeat(15) + '#', '#################'];
+    const sizes = (ch) => {
+      const w = VCS.World.load({ name: 'ft', rows: rows.map((r) => r.replace(/[.]/g, ch)) }, { requireStart: false });
+      const f = setup();
+      f.r.quality = 3;
+      const p = { x: 3.5, y: 2.5, angle: 0 };
+      VCS.Sonar.emit(f.sonar, w, p.x, p.y, 100, { range: 12, facing: 0 });
+      f.r.octx.calls.length = 0;
+      Render.drawFirstPerson(f.r, w, p, f.sonar, 100.45, {});
+      const dots = f.r.octx.calls.filter((c) => c.fn === 'rect' && c.args[2] * c.args[3] <= 2);
+      return { w: new Set(dots.map((c) => c.args[2])), h: new Set(dots.map((c) => c.args[3])), n: dots.length };
+    };
+    const grass = sizes('g');
+    const wood = sizes(',');
+    const stone = sizes('.');
+    assert.ok(grass.n > 0 && wood.n > 0 && stone.n > 0);
+    assert.ok(grass.h.has(2) && grass.w.has(1) && !grass.w.has(2));
+    assert.ok(wood.w.has(2) && wood.h.has(1) && !wood.h.has(2));
+    assert.ok(stone.w.has(1) && stone.h.has(1) && stone.w.size === 1 && stone.h.size === 1);
+  }));
 });
 
 describe('render-warm.test.js', () => {

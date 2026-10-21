@@ -1129,6 +1129,7 @@
         const echo = {
           personId: p.id, x: p.x, y: p.y, angle: p.angle, lookAngle: p.lookAngle, phase: p.phase,
           moving: p.state === 'walk', t: la, dist: dist, strength: strength, pan: 0, look: p.look,
+          theta: typeof pu.facing === 'number' ? Math.atan2(ey, ex) - pu.facing : 0, // off the mouth axis, for the audio level
           zMin: band[0], zMax: band[1], fade: efade,
           // Pose state for the renderer (snapshot of the moment the wavefront passed).
           mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0

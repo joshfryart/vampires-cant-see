@@ -14,6 +14,7 @@
     airDbPerM: 0.0245, // 3.4 kHz, 10 C, 70 % RH
     spread: { wall: 20, object: 40 }, // wall = image source at 2r, object = sonar equation
     ts: { prop: -16.5, person: -15 },
+    personGainDb: 12, // class calibration G for people (spec T21), so a person at 3 cells is still audible
     // Mouth beam B(theta), dB at 0/30/60/90/120/150/180 degrees (TODO v0.11; symmetric, linear between nodes).
     beamDb: [0, -1, -3, -8, -14, -18, -20],
     beamStepDeg: 30,
@@ -45,7 +46,9 @@
     // Repetition pitch: feed-forward comb at tau = 2r/c for r <= maxM.
     rp: { maxM: 2 },
     // Click ping: ~8 ms, 3.2 kHz (the old bip stays as the pingBip setting).
-    ping: { clickMs: 8, clickHz: 3200 }
+    ping: { clickMs: 8, clickHz: 3200 },
+    // Floor bounce: every ping returns a short floor echo (eye height eyeM), shaped by the floor material; absDb = extra dB per unit alpha.
+    floor: { eyeM: 1.6, delay: 0.035, db: -12, absDb: 20, minAmp: 0.06 }
   };
   const EPS = 1e-9;
   function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
@@ -83,6 +86,16 @@
   };
   /** Game amplitude 0..1 for a level in dB (compressed by gameKappa, never below gameMin). */
   A.gameAmp = function (db) { return clampN(Math.pow(10, (A.gameKappa * (num(db, A.gameRefDb) - A.gameRefDb)) / 20), A.gameMin, 1); };
+  /** Person echo amplitude 0..1 (object sonar equation -40 log r + TS + class gain, compressed like walls) at rCells, theta off the facing direction. */
+  A.personAmp = function (rCells, theta) { return A.gameAmp(A.echoLevel('person', rCells, theta) + A.personGainDb); };
+  /** Floor-bounce level (dB): image source at the eye height, floor material loss, softer by floor.db and floor.absDb x alpha (grass ~silent). */
+  A.floorLevel = function (mat) {
+    const f = A.floor;
+    return A.echoLevel('wall', f.eyeM / A.cellM, 0, mat) + f.db - f.absDb * A.matOf(mat).alpha;
+  };
+  /** Floor-bounce amplitude 0..1 for a floor material; 0 when it is below floor.minAmp (nothing worth playing). */
+  A.floorAmp = function (mat) { const a = A.gameAmp(A.floorLevel(mat)); return a < A.floor.minAmp ? 0 : a; };
+
   /** Sabine RT60 = 0.161 V / A for a box w x d cells (cellM) of height h m and mean absorption alpha, clamped to t60Min..t60Max. */
   A.sabine = function (w, d, h, alpha) {
     const W = w * A.cellM;

@@ -77,8 +77,9 @@ body {
   aspect-ratio: 640 / 360;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) calc(var(--vw) * 0.1575), rgba(0, 0, 0, 0.75) calc(var(--vw) * 0.5967));
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) calc(var(--vw) * 0.1575), rgba(0, 0, 0, 0.6) calc(var(--vw) * 0.5967));
 }
+body.no-vignette #vignette { display: none; }
 
 @keyframes grain-shift {
   from { background-position: 0 0; }

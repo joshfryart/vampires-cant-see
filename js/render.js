@@ -1344,10 +1344,37 @@
   }
 
   /**
+   * Speckle scale for a surface roughness 0..1 (SoundData.acoustics.rough): n = dot-count multiplier (0.5..2), back = how far behind the
+   * front the dots linger as a fraction of the radius. Stone ~0.12 is sparse and tight, grass/cobble thick and trailing.
+   */
+  function speckle(rough) {
+    const k = rough > 1 ? 1 : rough > 0 ? rough : 0;
+    return { n: 0.5 + 1.5 * k, back: 0.25 + 0.5 * k };
+  }
+  /** Mean roughness of the walls a pulse hit (every 8th ray) mixed 50/50 with the floor under its origin; cached on the pulse (pu.rough). */
+  function pulseRough(world, pu) {
+    if (typeof pu.rough === 'number') return pu.rough;
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    let floor = 0.2;
+    if (A && world && typeof world.materialAt === 'function') floor = A.roughOf(world.materialAt(pu.x, pu.y));
+    let sum = 0;
+    let n = 0;
+    if (A && pu.vmat && pu.vnorm) {
+      for (let i = 0; i < pu.vis.length; i += 8) {
+        if (pu.vnorm[i] === 255 || !(pu.vis[i] > 0)) continue;
+        sum += A.roughOf(VCS.Sonar.MATS[pu.vmat[i]]);
+        n++;
+      }
+    }
+    pu.rough = n ? 0.5 * floor + 0.5 * (sum / n) : floor;
+    return pu.rough;
+  }
+
+  /**
    * Floor depth cue: each primary pulse's wavefront over open floor as a thin perspective-projected ellipse
    * arc, with a few seeded stipple dots trailing behind it. Cheap (one stroke + one fill per pulse).
    */
-  function drawFloorFront(r, sonar, t, player, tanHalf) {
+  function drawFloorFront(r, world, sonar, t, player, tanHalf) {
     const pulses = sonar.pulses;
     if (!pulses || !pulses.length || r.quality < 2) return;
     const Sonar = VCS.Sonar;
@@ -1403,13 +1430,25 @@
       ctx.stroke();
       // Stipple behind the front: seeded per pulse so the dots hold still as the ring expands.
       const seed = Math.round(pu.t0 * 1000) + k * 7919;
-      const nd = r.quality >= 3 ? FRONT_DOTS : FRONT_DOTS >> 1;
+      let nd = r.quality >= 3 ? FRONT_DOTS : FRONT_DOTS >> 1;
+      // v0.11: with material detail on, roughness thickens and lengthens the stipple, and the floor shapes the dots (grass ticks, wood grain, stone specks).
+      let span = 0.5;
+      let dw = 1;
+      let dh = 1;
+      if (airOn(r)) {
+        const sp = speckle(pulseRough(world, pu));
+        nd = Math.min(FRONT_DOTS * 2, Math.round(nd * sp.n));
+        span = sp.back;
+        const fm = world && typeof world.materialAt === 'function' ? world.materialAt(pu.x, pu.y) : 'stone';
+        if (fm === 'grass') dh = 2;
+        else if (fm === 'wood') dw = 2;
+      }
       ctx.globalAlpha = a * 0.7;
       ctx.beginPath();
       let any = false;
       for (let d = 0; d < nd; d++) {
         const th = hash01(seed, d * 2) * TWO_PI;
-        const back = 0.06 + 0.5 * hash01(seed, d * 2 + 1);
+        const back = 0.06 + span * hash01(seed, d * 2 + 1);
         const Rd = R * (1 - back);
         const wx = pu.x + Math.cos(th) * Rd;
         const wy = pu.y + Math.sin(th) * Rd;
@@ -1422,7 +1461,7 @@
         if (sx < 0 || sx >= r.ow || y >= r.oh) continue;
         const col = Math.min(r.cols - 1, Math.floor(sx / r.colW));
         if (fwd > r.zbuf[col] + 0.05 || !visibleFrom(pu, wx, wy)) continue;
-        ctx.rect(sx - 0.5, y - 0.5, 1, 1);
+        ctx.rect(sx - 0.5, y - 0.5, dw, dh);
         any = true;
       }
       if (any) ctx.fill();
@@ -3265,7 +3304,7 @@
     drawRipple(r, world, sonar, t, player, tanHalf);
     drawAirRings(r, world, sonar, t, player, tanHalf);
     drawWallVibe(r, hits, sonar, t, player, tanHalf);
-    drawFloorFront(r, sonar, t, player, tanHalf);
+    drawFloorFront(r, world, sonar, t, player, tanHalf);
     drawFootRings(r, sonar, t, player, tanHalf);
     const ripple = opts && opts.ripple;
     const people = opts && opts.people;
@@ -3565,7 +3604,9 @@
     edgeGlowAlpha: edgeGlowAlpha,
     edgeZoneAlpha: edgeZoneAlpha,
     beamGain: beamGain,
-    beamReach: beamReach
+    beamReach: beamReach,
+    speckle: speckle,
+    pulseRough: pulseRough
   };
   VCS.Render = Render;
   if (typeof module !== 'undefined' && module.exports) module.exports = Render;

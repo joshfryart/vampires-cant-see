@@ -1163,6 +1163,16 @@
     return o;
   }
 
+  /** v0.11 floor bounce: each ping also returns a short echo off the floor underfoot, voiced by the floor material (grass ~silent, stone crisp, wood hollow). */
+  function floorBounce() {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const p = S.player;
+    if (!A || !A.floor || !S.audio || S.audio.pingBip === true || !p) return;
+    const m = stepMaterial(p.x, p.y);
+    const amp = A.floorAmp(m);
+    if (amp > 0) VCS.Audio.echo(S.audio, A.floor.delay, amp, 0, { voice: A.matOf(m).voice });
+  }
+
   /** Floor material under (x,y) for footsteps: grass, stone or wood (anything else is stone). */
   function stepMaterial(x, y) {
     let m = 'stone';
@@ -1330,12 +1340,17 @@
       VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.6, life: 0.9, strength: e.strength });
       VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
       e.pan = clamp(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), -1, 1);
-      if (S.audio) {
-        VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), clamp(0.7 * e.strength, 0.1, 0.7), e.pan, { voice: 'person' });
-      }
+      if (S.audio) personEcho(e);
     }
     markerRipples(tPrev, S.clock);
     VCS.Ripple.prune(S.ripple, S.clock);
+  }
+
+  /** Audible echo of a person snapshot: object sonar equation (-40 log r + TS + class gain), not the old 0.7 * strength. */
+  function personEcho(e) {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const amp = A ? clamp(A.personAmp(e.dist, e.theta), 0.1, 0.7) : clamp(0.7 * e.strength, 0.1, 0.7);
+    VCS.Audio.echo(S.audio, clamp(e.dist / S.sonar.speed, 0, 6), amp, e.pan, { voice: 'person' });
   }
 
   /** Spawn one small ring on each crypt/safe/door spot a wavefront crossed this frame. */
@@ -1400,22 +1415,28 @@
     reactTo(p.x, p.y, 'ping');
     const a = S.audio;
     VCS.Audio.ping(a);
-    const lp = S.sonar.lastPulse;
-    if (lp) {
-      const A = VCS.SoundData && VCS.SoundData.acoustics;
-      // v0.11: the loudest wall return (beam B(theta) once, spread, material, air) with its material voice, grain tail and near-wall comb.
-      const best = A ? VCS.Sonar.strongestEcho(lp, p.angle) : null;
-      if (best) {
-        const opts = { voice: A.matOf(best.mat).voice, rough: best.rough, rp: A.repetition(best.dist) };
-        VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(best.dist, S.sonar.speed), 0, 6), A.gameAmp(best.level), echoPan(lp), opts);
-      } else {
-        const nearest = VCS.Sonar.nearestDist(lp);
-        const range = lp.range || 10;
-        VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
-      }
-    }
+    pingEcho(S.sonar.lastPulse);
+    floorBounce();
     bounceEchoes();
     return true;
+  }
+
+  /** The audible wall echo of a ping pulse lp. */
+  function pingEcho(lp) {
+    const a = S.audio;
+    const p = S.player;
+    if (!lp) return;
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    // v0.11: the loudest wall return (beam B(theta) once, spread, material, air) with its material voice, grain tail and near-wall comb.
+    const best = A ? VCS.Sonar.strongestEcho(lp, p.angle) : null;
+    if (best) {
+      const opts = { voice: A.matOf(best.mat).voice, rough: best.rough, rp: A.repetition(best.dist) };
+      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(best.dist, S.sonar.speed), 0, 6), A.gameAmp(best.level), echoPan(lp), opts);
+    } else {
+      const nearest = VCS.Sonar.nearestDist(lp);
+      const range = lp.range || 10;
+      VCS.Audio.echo(a, clamp(VCS.Sonar.echoDelay(nearest, S.sonar.speed), 0, 6), clamp(1 - nearest / range, 0.15, 1), echoPan(lp));
+    }
   }
 
   /** Sonar.emit may not set a source height; give the new ping and its bounces the ping height (head, 0.62) and fade. */
@@ -1888,6 +1909,7 @@
     set('set-draglook', 'checked', c.dragLook !== false);
     set('set-feedtoggle', 'checked', c.feedToggle === true);
     set('set-reduce', 'checked', c.reduceMotion === true);
+    set('set-vignette', 'checked', c.edgeVignette !== false);
     set('set-bip', 'checked', c.pingBip === true);
     set('set-large', 'checked', c.largeText === true);
     set('set-ambience', 'value', String(typeof c.ambienceGain === 'number' ? c.ambienceGain : 0.6));
@@ -1926,6 +1948,7 @@
     try {
       const b = root.document && root.document.body;
       if (b && b.classList) b.classList.toggle('large-text', cfgOn('largeText'));
+      if (b && b.classList) b.classList.toggle('no-vignette', S.config && S.config.edgeVignette === false);
     } catch (e) { /* ignore */ }
   }
 
@@ -1971,6 +1994,7 @@
     flag('set-draglook', 'dragLook');
     flag('set-feedtoggle', 'feedToggle');
     flag('set-reduce', 'reduceMotion');
+    flag('set-vignette', 'edgeVignette');
     flag('set-bip', 'pingBip');
     flag('set-large', 'largeText');
     bind('btn-reset', 'click', function () {
@@ -4320,6 +4344,12 @@
   }
 
   const Game = { boot: boot, debugState: debugState, fatal: fatal, getSnapshot: getSnapshot, applySnapshot: applySnapshot };
+  // Test hook: binds just enough state to exercise the audio helpers without booting.
+  Game.__test = {
+    bind: function (o) { Object.assign(S, o); },
+    firstSolid: firstSolid, blockMaterial: blockMaterial, occlusionTo: occlusionTo,
+    pingEcho: pingEcho, floorBounce: floorBounce, personEcho: personEcho
+  };
   VCS.Game = Game;
   if (typeof module !== 'undefined' && module.exports) module.exports = Game;
 

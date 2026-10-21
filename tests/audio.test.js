@@ -1252,3 +1252,183 @@ describe('audio-atmosphere (B4)', () => {
     assert.doesNotThrow(() => Audio.oneShotFar(b, 'bell'));
   });
 });
+
+describe('game-echo helpers (v0.11.2)', () => {
+
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const SoundData = require('../js/data/sounds.js');
+  globalThis.VCS = globalThis.VCS || {};
+  globalThis.VCS.SoundData = SoundData;
+  for (const m of ['log', 'raycast', 'world', 'sonar', 'ripple', 'people', 'struggle']) require('../js/' + m + '.js');
+  const Audio = require('../js/audio.js');
+  require('../js/game.js');
+  const VCS = globalThis.VCS;
+  const G = VCS.Game.__test;
+  const A = SoundData.acoustics;
+
+  // Wall column at x=6 (brick; glass w at row 2, door D at row 3); floor stone/wood/grass by argument.
+  const rows = ['###########', '#.....#...#', '#.....w...#', '#.....D...#', '#.....#...#', '###########'];
+  const FLOOR_CH = { stone: '.', wood: ',', grass: 'g' };
+  const mkWorld = (floor) => VCS.World.load({ name: 'occ', rows: rows.map((r) => r.replace(/[.]/g, FLOOR_CH[floor])), materials: { '#': 'brick' } }, { requireStart: false });
+  const near = (a, b, eps) => assert.ok(Math.abs(a - b) < (eps || 1e-9), a + ' vs ' + b);
+
+  // Records Audio.echo calls instead of making sound.
+  function spyEcho(fn) {
+    const calls = [];
+    const real = VCS.Audio.echo;
+    VCS.Audio.echo = (a, delay, strength, pan, opts) => { calls.push({ delay, strength, pan, opts }); };
+    try { fn(); } finally { VCS.Audio.echo = real; }
+    return calls;
+  }
+
+  test('firstSolid: clear line is null, blocked line returns the first solid point; short lines are ignored', () => {
+    G.bind({ world: mkWorld('stone') });
+    assert.strictEqual(G.firstSolid(1.5, 1.5, 4.5, 1.5), null);
+    const hit = G.firstSolid(1.5, 1.5, 7.5, 1.5);
+    assert.ok(hit && hit.x >= 6 && hit.x < 6.3 && hit.y === 1.5, 'stops at the wall column');
+    assert.strictEqual(G.firstSolid(5.9, 1.5, 6.1, 1.5), null, 'under 0.5 cells is never occluded');
+    G.bind({ world: null });
+    assert.strictEqual(G.firstSolid(0, 0, 5, 5), null, 'no world, no hit');
+  });
+
+  test('blockMaterial: closed door is door, walls give the world material, glass is glass', () => {
+    G.bind({ world: mkWorld('stone') });
+    assert.strictEqual(G.blockMaterial(6.5, 3.5), 'door');
+    assert.strictEqual(G.blockMaterial(6.5, 1.5), 'brick');
+    assert.strictEqual(G.blockMaterial(6.5, 2.5), 'glass');
+    G.bind({ world: {} });
+    assert.strictEqual(G.blockMaterial(1, 1), 'stone', 'no material API falls back to stone');
+  });
+
+  test('occlusionTo: null when clear, else the first blocking material', () => {
+    G.bind({ world: mkWorld('stone'), player: { x: 4.5, y: 1.5, angle: 0 } });
+    assert.strictEqual(G.occlusionTo(5.5, 2.5), null);
+    const brick = G.occlusionTo(7.5, 1.5);
+    assert.strictEqual(brick.mat, 'brick');
+    assert.strictEqual(brick.diff, null, 'no open doorway: no diffraction path');
+    G.bind({ player: { x: 4.5, y: 3.5, angle: 0 } });
+    assert.strictEqual(G.occlusionTo(7.5, 3.5).mat, 'door', 'closed door blocks');
+    G.bind({ player: { x: 4.5, y: 2.5, angle: 0 } });
+    assert.strictEqual(G.occlusionTo(7.5, 2.5).mat, 'glass');
+  });
+
+  test('occlusionTo: an open door lets sound through; a sound round the corner gets a doorway diff loss', () => {
+    const w = mkWorld('stone');
+    assert.ok(w.setDoor(6, 3, true));
+    G.bind({ world: w, player: { x: 4.5, y: 3.5, angle: 0 } });
+    assert.strictEqual(G.occlusionTo(7.5, 3.5), null, 'straight through the open door');
+    G.bind({ player: { x: 4.5, y: 1.5, angle: 0 } });
+    const o = G.occlusionTo(8.5, 1.5);
+    assert.ok(o && o.mat === 'brick');
+    assert.ok(typeof o.diff === 'number' && o.diff > 0, 'visible via the doorway: Maekawa loss ' + o.diff);
+    const direct = Math.hypot(8.5 - 4.5, 0);
+    const via = Math.hypot(6.5 - 4.5, 3.5 - 1.5) + Math.hypot(8.5 - 6.5, 1.5 - 3.5);
+    near(o.diff, A.maekawa((via - direct) * A.cellM, A.maekawaHz), 0.5);
+  });
+
+  test('strongestEcho -> gameAmp end to end: the game plays the echo at gameAmp(level) with the material voice and 2d/v delay', () => {
+    const w = mkWorld('stone');
+    const player = { x: 3.5, y: 2.5, angle: 0 };
+    const sonar = VCS.Sonar.create({ bounces: 0, visRays: 720 });
+    VCS.Sonar.emit(sonar, w, player.x, player.y, 0, { facing: 0 });
+    const lp = sonar.lastPulse;
+    G.bind({ world: w, player: player, sonar: sonar, audio: { room: 'indoor' } });
+    const best = VCS.Sonar.strongestEcho(lp, player.angle);
+    const calls = spyEcho(() => G.pingEcho(lp));
+    assert.strictEqual(calls.length, 1);
+    near(calls[0].strength, A.gameAmp(best.level));
+    near(calls[0].delay, Math.min(6, (2 * best.dist) / VCS.Sonar.SONAR_SPEED));
+    assert.strictEqual(calls[0].opts.voice, A.matOf(best.mat).voice);
+    assert.ok(calls[0].strength >= A.gameMin && calls[0].strength <= 1);
+    // Standing closer to a wall is louder (same path, different player).
+    const close = { x: 5.2, y: 2.5, angle: 0 };
+    G.bind({ player: close });
+    const s2 = VCS.Sonar.create({ bounces: 0, visRays: 720 });
+    VCS.Sonar.emit(s2, w, close.x, close.y, 0, { facing: 0 });
+    const nearCall = spyEcho(() => G.pingEcho(s2.lastPulse))[0];
+    assert.ok(nearCall.strength > calls[0].strength, 'a nearer wall echoes louder');
+  });
+
+  test('floor bounce: one echo per ping voiced by the floor; grass silent, stone louder and crisp, wood hollow', () => {
+    const run = (floor) => {
+      G.bind({ world: mkWorld(floor), player: { x: 3.5, y: 2.5, angle: 0 }, audio: { room: 'indoor' } });
+      return spyEcho(() => G.floorBounce());
+    };
+    assert.strictEqual(run('grass').length, 0, 'grass is ~silent: nothing played');
+    const stone = run('stone');
+    const wood = run('wood');
+    assert.strictEqual(stone.length, 1);
+    assert.strictEqual(wood.length, 1);
+    assert.strictEqual(stone[0].opts.voice, 'crisp');
+    assert.strictEqual(wood[0].opts.voice, 'hollow');
+    assert.ok(stone[0].strength > wood[0].strength);
+    near(stone[0].strength, A.floorAmp('stone'));
+    near(stone[0].delay, A.floor.delay);
+    assert.ok(A.floorAmp('grass') === 0 && A.floorLevel('grass') < A.floorLevel('wood') && A.floorLevel('wood') < A.floorLevel('stone'));
+    // The old bip setting keeps its single chirp.
+    G.bind({ world: mkWorld('stone'), audio: { room: 'indoor', pingBip: true } });
+    assert.strictEqual(spyEcho(() => G.floorBounce()).length, 0);
+  });
+
+  test('person echo level follows the object sonar equation: -40 log d, beam off axis, old clamp kept', () => {
+    G.bind({ audio: { room: 'indoor' }, sonar: { speed: VCS.Sonar.SONAR_SPEED } });
+    const at = (dist, theta) => spyEcho(() => G.personEcho({ dist: dist, theta: theta || 0, strength: 1, pan: 0.2 }))[0];
+    const a2 = at(2);
+    const a4 = at(4);
+    assert.strictEqual(a2.opts.voice, 'person');
+    near(a2.strength, Math.min(0.7, Math.max(0.1, A.personAmp(2, 0))));
+    assert.ok(a2.strength > a4.strength, 'doubling distance costs level');
+    near(A.echoLevel('person', 2, 0) - A.echoLevel('person', 4, 0), 40 * Math.log10(2) + 2 * 2 * A.airDbPerM);
+    assert.ok(at(3, Math.PI).strength < at(3, 0).strength, 'behind the mouth is quieter');
+    near(a2.delay, 2 / VCS.Sonar.SONAR_SPEED);
+    assert.ok(at(30).strength >= 0.1, 'never below the old floor');
+    assert.ok(at(0.2).strength <= 0.7, 'never above the old ceiling');
+  });
+
+  test('person echo record carries theta (off the mouth axis) from the ping facing', () => {
+    const w = mkWorld('stone');
+    const sonar = VCS.Sonar.create({ bounces: 0, visRays: 360 });
+    VCS.Sonar.emit(sonar, w, 1.5, 2.5, 0, { facing: 0, range: 8 });
+    const p = { id: 1, x: 4.5, y: 1.5, angle: 0, state: 'idle', look: null, lookAngle: 0, phase: 0 };
+    const made = VCS.People.updateEchoes({ people: [p], echoes: [] }, sonar, 0, 1);
+    assert.strictEqual(made.length, 1, 'the wavefront crossed the person');
+    near(made[0].theta, Math.atan2(1.5 - 2.5, 4.5 - 1.5), 0.02);
+  });
+
+  test('breath(): occlusion changes the actual output (quieter peak gain, duller buffer), not just the return value', () => {
+    const param = (v) => ({ value: v, ev: [], setValueAtTime(x, t) { this.ev.push(['set', x, t]); }, linearRampToValueAtTime(x, t) { this.ev.push(['lin', x, t]); }, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} });
+    const nd = () => ({ outputs: [], connect(d) { this.outputs.push(d); return d; }, disconnect() {} });
+    const mkCtx = () => {
+      const c = {
+        currentTime: 2, state: 'running', sampleRate: 1000, srcs: [], destination: nd(),
+        createGain() { const n = nd(); n.gain = param(1); return n; },
+        createBiquadFilter() { const n = nd(); n.frequency = param(1); return n; },
+        createStereoPanner() { const n = nd(); n.pan = param(0); return n; },
+        createBuffer(ch, n) { const d = new Float32Array(n); return { getChannelData: () => d }; },
+        createBufferSource() { const n = nd(); n.start = () => {}; n.stop = () => {}; c.srcs.push(n); return n; }
+      };
+      return c;
+    };
+    const play = (o) => {
+      const a = Audio.create({ volume: 1 });
+      a.ctx = mkCtx();
+      a.ok = true;
+      a.rand = () => 0.5;
+      assert.strictEqual(Audio.breath(a, o), true);
+      const src = a.ctx.srcs[0];
+      const peak = src.outputs[0].gain.ev.find((e) => e[0] === 'lin')[1];
+      return { peak, buf: src.buffer, bufs: a.ctx.__vcsBreath };
+    };
+    const open = play({ dist: 1 });
+    const brick = play({ dist: 1, occ: { mat: 'brick' } });
+    const iron = play({ dist: 1, occ: { mat: 'iron' } });
+    const bare = play({ dist: 1, occluded: true });
+    assert.strictEqual(open.buf, open.bufs.soft);
+    assert.strictEqual(brick.buf, brick.bufs.dull, 'occluded breath uses the dull buffer');
+    assert.ok(brick.peak < open.peak, 'brick lowers the level');
+    near(brick.peak, open.peak * A.occlusion('brick').gain);
+    assert.ok(brick.peak < iron.peak, 'brick blocks more than iron bars');
+    near(bare.peak, open.peak * 0.5);
+  });
+});
