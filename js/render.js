@@ -2151,6 +2151,8 @@
   const CHAT_HZ = 0.6;
 
   /** Child factor 0..1 from look.height (1 at 0.66 and below, 0 from 0.82 up); vol figures only. */
+  /** Half-width factor of a head kind (matches the hr scaling in posePerson and the outline in figure.js). */
+  function headKindW(k) { return k === 'egg' ? 0.92 * 0.9 : k === 'long' ? 0.8 * 0.9 : k === 'square' ? 0.95 : 0.9; }
   function kidK(lh) {
     const k = (0.82 - lh) / 0.16;
     return k <= 0 ? 0 : k >= 1 ? 1 : k;
@@ -2394,6 +2396,7 @@
     let eyesX = false;
     let handsOverHead = false;
     const modeAge = typeof e.modeAge === 'number' ? e.modeAge : 9;
+    let scratchVol = false;
     if (mode === 'grapple' && STRUGGLE_POSE) {
       // Held by the vampire: panic flailing, then pushing away, then slack as the blood goes (see struggle.js).
       const sp = STRUGGLE_POSE;
@@ -2512,6 +2515,7 @@
       lean = wary ? 0.03 * lh : 0.0;
       headF = wary ? 0.03 * lh : 0;
       const scratch = anim && !wary && (pid % 3 === 1) && Math.sin(tN * 0.5 + pid) > 0.55;
+      scratchVol = scratch;
       for (let side = 0; side < 2; side++) {
         const sg = side === 0 ? 1 : -1;
         const carry = side === 1 && holdR;
@@ -2539,7 +2543,15 @@
       if (stoop > 0 && free) {
         lean += stoop * 0.1 * lh; headF += stoop * 0.06 * lh; shU -= stoop * 0.04 * lh; headU -= stoop * 0.05 * lh;
       }
-      if (e.chat && !moving && free) {
+      if (scratchVol) {
+        // Head scratch: the hand rests on the side of the head (outside the hood) with the elbow out, instead of the
+        // line pose's hand-on-the-crown that pushes the solid forearm through the head.
+        const hk = headKindW(look.head) * (1 + 0.25 * kidK(lh));
+        const hrU = 0.088 * lh * Math.sqrt(bw) * hk * (look.hat === 'hood' || look.acc === 'hood' ? 1.22 : 1.1);
+        const jig = anim ? Math.sin(tN * 6) : 0;
+        handF[0] = lean + headF + 0.004 * lh * jig; handS[0] = headS + hrU + 0.012 * lh; handU[0] = headU + 0.035 * lh + 0.008 * lh * jig;
+        elbF[0] = lean - 0.01 * lh; elbS[0] = shS + 0.16 * lh; elbU[0] = shU + 0.08 * lh;
+      } else if (e.chat && !moving && free) {
         const lift = chatLift(tN, pid, lh, anim);
         handU[0] += lift; handF[0] += 0.05 * lh; elbU[0] += lift * 0.5;
       }

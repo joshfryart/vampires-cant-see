@@ -190,7 +190,7 @@
       kind: '', a: 0, b: 0, r0: 0, r1: 0, z: 0, ax: 0, ay: 0, bx: 0, by: 0,
       n: 0, px: new Float64Array(MAXPTS), py: new Float64Array(MAXPTS), y0: 0, y1: 0,
       nw: 0, wx: new Float64Array(3), wy: new Float64Array(3), wr: new Float64Array(3), wa: new Float64Array(3),
-      ux: 0, uy: 0, vx: 0, vy: 0, rh: 0, jx: 0, jy: 0, bend: 0
+      ux: 0, uy: 0, vx: 0, vy: 0, rh: 0, jx: 0, jy: 0, bend: 0, ns: 0
     };
   }
   /** Preallocated part pools: POOL for draw, HPOOL for hit / spanAt / flush (so a query never disturbs a draw). */
@@ -201,7 +201,7 @@
   function begin(out, i, kind, a, b, z) {
     let p = out[i];
     if (!p || !p.px || p.px.length < MAXPTS) p = out[i] = mkPart();
-    p.kind = kind; p.a = a; p.b = b; p.z = z; p.n = 0; p.nw = 0;
+    p.kind = kind; p.a = a; p.b = b; p.z = z; p.n = 0; p.nw = 0; p.ns = 0;
     return p;
   }
   function pushPt(p, x, y) {
@@ -345,6 +345,7 @@
    * Round caps at both ends. Rings at 35 %, 50 %, 70 % of the segment. K = samples per side - 1.
    */
   function sweep(p, Ax, Ay, Cx, Cy, Ex, Ey, t0, t1, T, R, A, k, fwd, K) {
+    p.ns = K;
     let lastNx = 1;
     let lastNy = 0;
     for (let s = 0; s <= K; s++) {
@@ -568,8 +569,9 @@
       for (let s = 0; s < 2; s++) {
         const h = 4 + s; const kn = 12 + s; const f = 8 + s;
         const lk = lhs * m.legK;
-        // One outline per leg along the hip -> knee -> foot curve (biased behind the pelvis unless it comes forward).
-        sweep(begin(out, n++, 'leg', h, f, 0.35 * zf(h) + 0.45 * zf(kn) + 0.2 * zf(f) + 0.05), X[h], Y[h], X[kn], Y[kn], X[f], Y[f], 0, 1, LEG_T, LEG_R, LEG_A, lk, fwd, K);
+        // One outline per leg along the hip -> knee -> foot curve, drawn over the pelvis (its root stroke is masked
+        // inside the torso, so the thighs continue the hips instead of hanging below a pair of briefs).
+        sweep(begin(out, n++, 'leg', h, f, 0.35 * zf(h) + 0.45 * zf(kn) + 0.2 * zf(f) - 0.02), X[h], Y[h], X[kn], Y[kn], X[f], Y[f], 0, 1, LEG_T, LEG_R, LEG_A, lk, fwd, K);
         buildFoot(begin(out, n++, 'foot', f, f, zf(f) - 0.01), X, Y, s, m);
         const sh = 2 + s; const el = 10 + s; const hd = 6 + s;
         const ak = lhs * m.armK;
@@ -728,8 +730,57 @@
     c.closePath();
   }
 
+  /**
+   * Limb roots: mark (HID) the outline points of an arm or leg near its root (the start cap and the first 40 % of both
+   * sides) that lie inside the torso hull, so the stroke leaves them out and the limb grows out of the body instead of
+   * showing a doll-joint circle at the shoulder or hip. The fill still covers the whole outline. Returns the count.
+   */
+  const HID = new Uint8Array(MAXPTS);
+  function maskRoot(p, torso) {
+    const n = p.n;
+    const K = p.ns;
+    for (let i = 0; i < n; i++) HID[i] = 0;
+    if (!torso || !(K > 1) || n !== 2 * K + 8) return 0;
+    const rs = Math.ceil(K * 0.4);
+    let hid = 0;
+    for (let i = 0; i < n; i++) {
+      const root = i <= rs || i >= 2 * K + 4 - rs;
+      if (root && contains(torso, p.px[i], p.py[i])) { HID[i] = 1; hid++; }
+    }
+    return hid;
+  }
+  /**
+   * Torso hull: mark (HID) its lower points (hips, seat and crotch, outline points 8..14) that lie inside a leg drawn
+   * over it, so the pelvis does not show a ghost of briefs through the thighs. Returns the count.
+   */
+  function maskPelvis(p, l0, l1) {
+    const n = p.n;
+    for (let i = 0; i < n; i++) HID[i] = 0;
+    if (n !== 2 * NT + 2 || (!l0 && !l1)) return 0;
+    let hid = 0;
+    for (let i = 8; i <= 14; i++) {
+      const x = p.px[i]; const y = p.py[i];
+      if ((l0 && contains(l0, x, y)) || (l1 && contains(l1, x, y))) { HID[i] = 1; hid++; }
+    }
+    return hid;
+  }
+  /** Open outline of p through the points not marked in HID (same curve as emitPoly). */
+  function emitMasked(c, p) {
+    const n = p.n;
+    const px = p.px;
+    const py = p.py;
+    let pen = false;
+    for (let i = 0; i < n; i++) {
+      if (HID[i]) { pen = false; continue; }
+      const a = i === 0 ? n - 1 : i - 1;
+      const b = i === n - 1 ? 0 : i + 1;
+      if (!pen) { c.moveTo((px[a] + px[i]) * 0.5, (py[a] + py[i]) * 0.5); pen = true; }
+      c.quadraticCurveTo(px[i], py[i], (px[i] + px[b]) * 0.5, (py[i] + py[b]) * 0.5);
+    }
+  }
+
   /** Rim: the runs of the outline whose outward normal faces the light side (+1 = screen right), tops not bottoms. */
-  function rimPart(c, p, side) {
+  function rimPart(c, p, side, masked) {
     const n = p.n;
     if (n < 3) return;
     const px = p.px;
@@ -747,7 +798,7 @@
       // Outward normal for orientation o (screen y down): (ty, -tx) * o.
       const nx = ty / L * o;
       const ny = -tx / L * o;
-      const lit = nx * side > 0.3 && ny < 0.75;
+      const lit = nx * side > 0.3 && ny < 0.75 && !(masked && HID[i]);
       if (lit) {
         if (!pen) { c.moveTo((px[a] + px[i]) * 0.5, (py[a] + py[i]) * 0.5); pen = true; }
         c.quadraticCurveTo(px[i], py[i], (px[i] + px[b]) * 0.5, (py[i] + py[b]) * 0.5);
@@ -764,6 +815,12 @@
     const cy = p.wy[q];
     c.moveTo(cx + r * Math.cos(ang + Math.PI * 0.5), cy + r * Math.sin(ang + Math.PI * 0.5));
     c.ellipse(cx, cy, Math.max(0.01, r), Math.max(0.01, r * minorK), ang + Math.PI * 0.5, 0, Math.PI, true);
+  }
+
+  /** Sleeve / trouser cuff ring on this limb (not under robes or cloaks, not on mail sleeves). */
+  function cuffOk(p, look, robe) {
+    const k = p.kind;
+    return (k === 'leg' || k === 'arm') && p.nw > 2 && !robe && look.outfit !== 'cloak' && !(k === 'arm' && look.outfit === 'mail');
   }
 
   /** Cloth creases fanning up from the belt line. */
@@ -867,7 +924,15 @@
       }
 
       sortBackToFront(POOL, n);
-      const sy = num(pose.sinYaw, num(pose.noseX, 0));
+      let torsoP = null;
+      let legA = null;
+      let legB = null;
+      for (let i = 0; i < n; i++) {
+        const p = POOL[i];
+        if (p.kind === 'torso') torsoP = p;
+        else if (p.kind === 'leg' && torsoP) { if (legA) legB = p; else legA = p; }
+      }
+      const sy =num(pose.sinYaw, num(pose.noseX, 0));
       const minorK = 0.15 + 0.35 * Math.min(1, Math.abs(sy));
       for (let i = 0; i < n; i++) {
         const p = POOL[i];
@@ -884,12 +949,17 @@
             clipped = true;
           }
         }
+        const masked = fx >= 1 && near && ((leg || p.kind === 'arm') ? maskRoot(p, torsoP) > 0 : p === torsoP && !robe && maskPelvis(p, legA, legB) > 0);
         c.beginPath();
         emitPoly(c, p);
         if (fx >= 2 && near && p.kind !== 'extra') {
           c.globalAlpha = Math.min(1, 0.55 * sa);
           c.fillStyle = BLACK;
           c.fill();
+        }
+        if (masked) {
+          c.beginPath();
+          emitMasked(c, p);
         }
         c.globalAlpha = alpha;
         c.strokeStyle = style;
@@ -900,7 +970,8 @@
           const dy = p.by - p.ay;
           if (dx * dx + dy * dy > p.r0 * p.r0 * 2) {
             wrapRing(c, p, 0, minorK);
-            if (fx >= 2 && p.nw > 1) wrapRing(c, p, 1, minorK);
+            // The lower ring sits right above the cuff; only draw it where no cuff follows (fewer stacked bands).
+            if (fx >= 2 && p.nw > 1 && !(lod >= 1 && cuffOk(p, look, robe))) wrapRing(c, p, 1, minorK);
           }
         }
         c.stroke();
@@ -909,13 +980,13 @@
           c.globalAlpha = clamp(0.55 * alpha, 0, 1);
           c.lineWidth = lw * 1.9;
           c.beginPath();
-          rimPart(c, p, -rimSide);
+          rimPart(c, p, -rimSide, masked);
           c.stroke();
           c.lineWidth = lw;
           c.globalAlpha = alpha;
         }
         if (lod >= 1 && fx >= 1 && near) {
-          if ((leg || p.kind === 'arm') && p.nw > 2 && !robe && look.outfit !== 'cloak' && !(p.kind === 'arm' && look.outfit === 'mail')) {
+          if (cuffOk(p, look, robe)) {
             c.globalAlpha = alpha * 0.8;
             c.lineWidth = lw * 0.9;
             c.beginPath();
@@ -932,7 +1003,7 @@
           c.strokeStyle = COL_RIM;
           c.lineWidth = lw * 0.8;
           c.beginPath();
-          rimPart(c, p, rimSide);
+          rimPart(c, p, rimSide, masked);
           c.stroke();
           c.strokeStyle = style;
         }
@@ -986,6 +1057,35 @@
     FP.d = f * cY - l * sY;
   }
 
+  /**
+   * Per-archetype face character (v0.19). ew/eh eye size, gap eye spacing, ev eye height, bl brow lift (negative is
+   * higher), bt brow inner tilt, bw brow length, heavy double brow, nose 0 wedge / 1 button / 2 hook / 3 bulb / 4 long,
+   * mw mouth width, mc mouth curve (+ smile), lop lopsided grin, lid sleepy lids, bag under-eye bags, wr wrinkles,
+   * ck cheek lines, lash lashes, rb one raised brow.
+   */
+  function face(o) {
+    const d = { ew: 1, eh: 1, gap: 1, ev: 0, bl: 0, bt: 0, bw: 1, heavy: 0, nose: 0, mw: 1, mc: 0, lop: 0, lid: 0, bag: 0, wr: 0, ck: 0, lash: 0, rb: 0 };
+    for (const k in o) d[k] = o[k];
+    return d;
+  }
+  const FACE_DEF = face({});
+  const FACE = {
+    patron: face({ mc: 0.01 }),
+    innkeeper: face({ nose: 1, mw: 1.3, mc: 0.035, ck: 1, ew: 0.9 }),
+    drunk: face({ lid: 1, nose: 3, lop: 1, mw: 1.15, mc: 0.02, ck: 1, bl: 0.03 }),
+    regular: face({ nose: 4, mw: 0.9, ev: 0.02, bt: -0.02 }),
+    priest: face({ bl: -0.05, bw: 1.15, nose: 4, mw: 0.7, mc: -0.04, ew: 0.9, eh: 0.85, bt: -0.04 }),
+    elder: face({ ew: 0.78, eh: 0.8, bt: -0.06, nose: 2, mw: 0.85, mc: -0.065, wr: 1, bag: 1 }),
+    farmer: face({ nose: 3, mw: 1.3, mc: 0.04, ck: 1, gap: 1.06, heavy: 1 }),
+    mother: face({ lash: 1, bl: -0.04, mc: 0.03, bt: -0.03, nose: 1, gap: 0.96 }),
+    insomniac: face({ ew: 1.18, eh: 1.25, bag: 1, bl: -0.05, mc: -0.06, mw: 0.8 }),
+    gravedigger: face({ bag: 1, nose: 4, mc: -0.085, mw: 0.85, bl: 0.04, heavy: 1, eh: 0.85 }),
+    guard: face({ heavy: 1, bl: 0.05, bt: 0.05, mc: -0.05, mw: 1.1, eh: 0.8, gap: 1.05 }),
+    child: face({ nose: 1, ck: 1, mc: 0.03, ew: 1.05, eh: 1.1 }),
+    merchant: face({ rb: 1, lop: 1, nose: 4, mw: 1.05, mc: 0.02, eh: 0.9 }),
+    hunter: face({ eh: 0.68, heavy: 1, bt: 0.07, bl: 0.03, nose: 2, mc: -0.04, mw: 0.9 })
+  };
+
   /** Mood from the pose: 0 calm, 1 wide-eyed (startle, flee, held), 2 squeezed (cower), 3 closed (fed), 4 wary. */
   function mood(pose) {
     const md = pose.mode;
@@ -1029,6 +1129,10 @@
     let cY = num(pose.cosYaw, NaN);
     if (!isFinite(cY)) cY = (faceVis ? -1 : 1) * Math.sqrt(Math.max(0, 1 - noseX * noseX));
     const md = mood(pose);
+    const F = typeof look.archetype === 'string' && Object.prototype.hasOwnProperty.call(FACE, look.archetype) ? FACE[look.archetype] : FACE_DEF;
+    // Per-person asymmetry (-1..1): one eye a touch higher, one brow lower, the mouth off centre.
+    const pidF = num(pose.pid, 0);
+    const asy = ((((Math.floor(pidF) * 53) % 9) + 9) % 9 - 4) / 4;
     const hair = hat === 'none' || hat === 'cap' || hat === 'bonnet' ? look.hair : 'none';
 
     // ---- Ears (hidden by a hood, bonnet or bob) ----
@@ -1058,14 +1162,29 @@
     }
 
     if (lod >= 1 && faceVis) {
-      const nz = (typeof look.nose === 'number' ? look.nose : 1) * (1 - 0.4 * kid);
+      const nk = F.nose;
+      const nz = (typeof look.nose === 'number' ? look.nose : 1) * (1 - 0.4 * kid) * (nk === 4 ? 1.3 : nk === 1 ? 0.6 : 1);
       // Nose: bridge, tip (sticks out past the outline in profile), base, plus nostril wings seen head-on.
       facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.96, 0.0);
       c.moveTo(FP.x, FP.y);
-      facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 1.0 + 0.26 * nz, 0.24 + 0.1 * nz);
-      c.lineTo(FP.x, FP.y);
+      if (nk === 2) {
+        // Hooked: the bridge bows out and the tip turns down.
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 1.0 + 0.3 * nz, 0.14 + 0.06 * nz);
+        const qx = FP.x; const qy = FP.y;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.98 + 0.2 * nz, 0.36 + 0.08 * nz);
+        c.quadraticCurveTo(qx, qy, FP.x, FP.y);
+      } else {
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 1.0 + 0.26 * nz, 0.24 + 0.1 * nz);
+        c.lineTo(FP.x, FP.y);
+      }
+      const tipX = FP.x; const tipY = FP.y;
       facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.93, 0.36 + 0.06 * nz);
       c.lineTo(FP.x, FP.y);
+      if (lod >= 2 && (nk === 1 || nk === 3)) {
+        // Button / bulb tip.
+        const br = Math.max(0.7, hr * (nk === 3 ? 0.11 : 0.065) * Math.sqrt(nz));
+        ell(c, tipX - noseX * br * 0.3, tipY - br * 0.2, br, br * 0.9, rot);
+      }
       if (lod >= 2 && cY < -0.55) {
         for (let side = -1; side <= 1; side += 2) {
           facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.13 * nz, 0.92, 0.33 + 0.06 * nz);
@@ -1076,20 +1195,40 @@
         }
       }
       if (look.beard && lod >= 2) {
-        c.moveTo(hx - hr * 0.55, hy + hry * 0.55);
-        c.lineTo(hx - hr * 0.3, hy + hry * 1.1);
-        c.lineTo(hx, hy + hry * 0.8);
-        c.lineTo(hx + hr * 0.3, hy + hry * 1.1);
-        c.lineTo(hx + hr * 0.55, hy + hry * 0.55);
+        // Beard: a full jaw line from cheek to cheek round a rounded chin, plus a moustache under the nose.
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, -0.8, 0.5, 0.3);
+        c.moveTo(FP.x, FP.y);
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, -0.62, 0.72, 1.12);
+        const qx0 = FP.x; const qy0 = FP.y;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.92, 1.2);
+        c.quadraticCurveTo(qx0, qy0, FP.x, FP.y);
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0.62, 0.72, 1.12);
+        const qx1 = FP.x; const qy1 = FP.y;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0.8, 0.5, 0.3);
+        c.quadraticCurveTo(qx1, qy1, FP.x, FP.y);
+        if (cY < -0.2) {
+          for (let side = -1; side <= 1; side += 2) {
+            // Moustache: each half sags under the nose and lifts at the tip.
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.03, 0.95, 0.43);
+            c.moveTo(FP.x, FP.y);
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.16, 0.9, 0.62);
+            const mx = FP.x; const my = FP.y;
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.34, 0.82, 0.46);
+            c.quadraticCurveTo(mx, my, FP.x, FP.y);
+          }
+        }
       }
-      // Mouth (lod 2): a mood curve on the face, foreshortened with the yaw.
+      // Mouth (lod 2): a mood curve on the face, foreshortened with the yaw; width, smile and lopsidedness per face.
       if (lod >= 2) {
         const mv = 0.56 - 0.04 * kid;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, -0.2, 0.86, mv);
+        const mw = 0.2 * F.mw;
+        const ms = asy * 0.035;
+        const lop = F.lop * (asy >= 0 ? 1 : -1) * 0.07;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, -mw + ms, 0.86, mv + lop);
         const x0 = FP.x; const y0 = FP.y; const d0 = FP.d;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0.2, 0.86, mv);
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, mw + ms, 0.86, mv - lop);
         const x1 = FP.x; const y1 = FP.y; const d1 = FP.d;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.9, mv);
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, ms, 0.9, mv);
         const xm = FP.x; const ym = FP.y;
         if (d0 < 0.15 || d1 < 0.15) {
           const half = Math.max(0.8, Math.abs(x1 - x0) * 0.5);
@@ -1102,7 +1241,7 @@
               c.quadraticCurveTo(lerp(x0, xm, 0.5), ym - hry * 0.06, xm, ym);
               c.quadraticCurveTo(lerp(xm, x1, 0.5), ym + hry * 0.06, x1, y1);
             } else {
-              const curve = md === 3 ? 0.03 : md === 4 ? -0.03 : 0.05;
+              const curve = (md === 3 ? 0.03 : md === 4 ? -0.03 : 0.05) + F.mc;
               c.moveTo(x0, y0);
               c.quadraticCurveTo(xm, ym + hry * curve * 2, x1, y1);
             }
@@ -1112,8 +1251,8 @@
     }
     if (lod >= 1 && eyesVis) {
       for (let side = -1; side <= 1; side += 2) {
-        const ev = -0.06 + 0.12 * kid;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.36, 0.88, ev);
+        const ev = -0.06 + 0.12 * kid + F.ev + (side > 0 ? 0.025 : -0.025) * asy;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.36 * F.gap, 0.88, ev);
         if (FP.d > -0.05) continue;
         const ex = FP.x;
         const ey = FP.y;
@@ -1129,8 +1268,12 @@
           continue;
         }
         const fore = clamp(-FP.d, 0.3, 1);
-        const ew = Math.max(0.8, hr * 0.12 * (1 + 0.3 * kid) * fore);
-        const eh = Math.max(0.7, hry * 0.09 * (1 + 0.35 * kid) * (md === 1 ? 1.3 : 1));
+        const ew = Math.max(0.8, hr * 0.12 * (1 + 0.3 * kid) * fore * F.ew);
+        const eh = Math.max(0.7, hry * 0.09 * (1 + 0.35 * kid) * (md === 1 ? 1.3 : 1) * F.eh);
+        // Toward the nose: +1 when the inner corner is to the right of this eye.
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.9, ev);
+        const innerRight = FP.x > ex;
+        const outer = innerRight ? -1 : 1;
         if (md === 2) {
           c.moveTo(ex - ew, ey + eh * 0.2);
           c.quadraticCurveTo(ex, ey - eh * 1.1, ex + ew, ey + eh * 0.2);
@@ -1139,21 +1282,70 @@
           c.quadraticCurveTo(ex, ey + eh * 0.9, ex + ew, ey);
         } else {
           ell(c, ex, ey, ew, eh, rot);
-          const pr = Math.max(0.45, eh * (md === 1 ? 0.32 : 0.48));
+          const sleepy = F.lid && md !== 1;
+          const pr = Math.max(0.45, eh * (md === 1 ? 0.32 : F.ew > 1.1 ? 0.34 : 0.48));
           const pdx = noseX * ew * 0.3;
-          c.moveTo(ex + pdx + pr, ey);
-          c.arc(ex + pdx, ey, pr, 0, TWO_PI);
+          const pdy = sleepy ? eh * 0.3 : 0;
+          c.moveTo(ex + pdx + pr, ey + pdy);
+          c.arc(ex + pdx, ey + pdy, pr, 0, TWO_PI);
+          if (sleepy) {
+            // Heavy lid across the top half.
+            c.moveTo(ex - ew, ey - eh * 0.05);
+            c.quadraticCurveTo(ex, ey - eh * 0.35, ex + ew, ey - eh * 0.05);
+          }
+          if (F.lash) {
+            c.moveTo(ex + outer * ew * 0.85, ey - eh * 0.45);
+            c.lineTo(ex + outer * ew * 1.35, ey - eh * 0.95);
+          }
         }
-        // Brows: the inner end (toward the nose) drops when wary, rises when sad or scared.
-        const lift = md === 1 ? -0.2 : md === 3 ? -0.04 : 0;
-        const tiltIn = md === 4 ? 0.09 : md === 3 ? -0.06 : md === 1 ? -0.04 : 0.02;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.36, 0.86, ev - 0.24 + lift);
+        if (F.bag) {
+          c.moveTo(ex - ew * 0.85, ey + eh * 1.45);
+          c.quadraticCurveTo(ex, ey + eh * 2.2, ex + ew * 0.85, ey + eh * 1.45);
+        }
+        if (F.wr) {
+          // Crow's feet at the outer corner.
+          for (let k = -1; k <= 1; k += 2) {
+            const w0 = Math.max(ew * 1.6, hr * 0.17);
+            c.moveTo(ex + outer * w0, ey + k * eh * 0.2);
+            c.lineTo(ex + outer * (w0 + hr * 0.08), ey + k * eh * 0.85);
+          }
+        }
+        // Brows: the inner end (toward the nose) drops when wary, rises when sad or scared; per-face lift and tilt.
+        const raised = F.rb && side * (asy >= 0 ? 1 : -1) > 0 ? -0.09 : 0;
+        const lift = (md === 1 ? -0.2 : md === 3 ? -0.04 : 0) + F.bl + raised + (side > 0 ? 0.02 : -0.02) * asy;
+        const tiltIn = (md === 4 ? 0.09 : md === 3 ? -0.06 : md === 1 ? -0.04 : 0.02) + F.bt;
+        facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.36 * F.gap, 0.86, ev - 0.24 + lift);
         const bxm = FP.x; const bym = FP.y;
-        facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.9, ev);
-        const innerRight = FP.x > bxm;
-        const bwid = Math.max(1, hr * 0.16 * fore);
-        c.moveTo(bxm - bwid, bym + (innerRight ? 0 : hry * tiltIn));
-        c.quadraticCurveTo(bxm, bym - hry * 0.05, bxm + bwid, bym + (innerRight ? hry * tiltIn : 0));
+        const bwid = Math.max(1, hr * 0.16 * fore * F.bw);
+        for (let q = 0; q <= F.heavy; q++) {
+          const dq = q * hry * 0.045;
+          c.moveTo(bxm - bwid, bym + dq + (innerRight ? 0 : hry * tiltIn));
+          c.quadraticCurveTo(bxm, bym + dq - hry * (0.05 - 0.02 * q), bxm + bwid, bym + dq + (innerRight ? hry * tiltIn : 0));
+        }
+      }
+      if (lod >= 2 && cY < -0.35 && (F.ck || F.wr)) {
+        for (let side = -1; side <= 1; side += 2) {
+          if (F.ck) {
+            // Round cheeks: a short arc under each eye, toward the jaw.
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, side * 0.55, 0.78, 0.22);
+            if (FP.d < -0.1) {
+              const cx = FP.x; const cy = FP.y;
+              c.moveTo(cx - hr * 0.09, cy - hry * 0.06);
+              c.quadraticCurveTo(cx, cy + hry * 0.08, cx + hr * 0.09, cy - hry * 0.06);
+            }
+          }
+        }
+        if (F.wr && md !== 1) {
+          // Forehead lines.
+          for (let k = 0; k < 2; k++) {
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, -0.28, 0.8, -0.5 - k * 0.12);
+            c.moveTo(FP.x, FP.y);
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, 0, 0.88, -0.56 - k * 0.12);
+            const mx = FP.x; const my = FP.y;
+            facePt(hx, hy, hrx, hry, noseX, cY, rot, 0.28, 0.8, -0.5 - k * 0.12);
+            c.quadraticCurveTo(mx, my, FP.x, FP.y);
+          }
+        }
       }
     }
     // Hair (only when no hat hides it).
@@ -1332,17 +1524,48 @@
         c.quadraticCurveTo((x0 + x1) * 0.5, uy + hry * 1.25, x1, uy + hry * 0.9);
       }
     }
-    // Finger hints on each hand (lod 2).
+    // Fingers (lod 2): a fist round a carried prop or role item, splayed when scared or struggling, else a relaxed curl.
     if (lod >= 2) {
+      const spread = mode === 'startle' || mode === 'cower' || mode === 'grapple' || md === 1;
+      const extra = look.extra;
       for (let i = 0; i < drawN; i++) {
         const p = POOL[i];
         if (!p || p.kind !== 'hand' || !(p.rh > 2)) continue;
-        for (let f = 0; f < 2; f++) {
-          const cc = f === 0 ? 0.2 : -0.22;
-          const x0 = p.ax + (p.ux * 0.92 + p.vx * cc) * p.rh;
-          const y0 = p.ay + (p.uy * 0.92 + p.vy * cc) * p.rh;
-          c.moveTo(x0, y0);
-          c.lineTo(p.ax + (p.ux * 1.36 + p.vx * cc * 0.9) * p.rh, p.ay + (p.uy * 1.36 + p.vy * cc * 0.9) * p.rh);
+        const r = p.rh;
+        const ax = p.ax; const ay = p.ay;
+        const ux = p.ux; const uy = p.uy; const vx = p.vx; const vy = p.vy;
+        const right = p.b === 7;
+        const grip = mode !== 'fed' && (right ? prop !== 'none' && !(prop === 'umbrella' && mode === 'cower') : !!extra && extra !== 'none' && extra !== 'bow');
+        if (grip) {
+          // Knuckle row across the tip, a curled finger crease and the thumb wrapped over.
+          for (let f = 0; f < 3; f++) {
+            const cc = 0.5 - f * 0.5;
+            const kx = ax + (ux * 1.12 + vx * cc) * r;
+            const ky = ay + (uy * 1.12 + vy * cc) * r;
+            c.moveTo(kx - vx * r * 0.22, ky - vy * r * 0.22);
+            c.quadraticCurveTo(kx + ux * r * 0.22, ky + uy * r * 0.22, kx + vx * r * 0.22, ky + vy * r * 0.22);
+          }
+          c.moveTo(ax + (ux * 0.55 + vx * 0.55) * r, ay + (uy * 0.55 + vy * 0.55) * r);
+          c.quadraticCurveTo(ax + (ux * 0.95 + vx * 0.2) * r, ay + (uy * 0.95 + vy * 0.2) * r, ax + (ux * 0.9 - vx * 0.25) * r, ay + (uy * 0.9 - vy * 0.25) * r);
+        } else if (spread) {
+          // Four splayed fingers fanning out from the palm.
+          for (let f = 0; f < 4; f++) {
+            const a = -0.55 + f * 0.37;
+            const ca = Math.cos(a); const sa2 = Math.sin(a);
+            const dx = ux * ca + vx * sa2;
+            const dy = uy * ca + vy * sa2;
+            c.moveTo(ax + dx * r * 0.95, ay + dy * r * 0.95);
+            c.lineTo(ax + dx * r * (1.75 - 0.12 * Math.abs(f - 1.5)), ay + dy * r * (1.75 - 0.12 * Math.abs(f - 1.5)));
+          }
+        } else {
+          // Relaxed: three fingers curling back toward the palm.
+          for (let f = 0; f < 3; f++) {
+            const cc = 0.32 - f * 0.3;
+            const x0 = ax + (ux * 0.9 + vx * cc) * r;
+            const y0 = ay + (uy * 0.9 + vy * cc) * r;
+            c.moveTo(x0, y0);
+            c.quadraticCurveTo(ax + (ux * 1.5 + vx * cc) * r, ay + (uy * 1.5 + vy * cc) * r, ax + (ux * 1.38 + vx * (cc + 0.18)) * r, ay + (uy * 1.38 + vy * (cc + 0.18)) * r);
+          }
         }
       }
     }
@@ -1383,6 +1606,20 @@
     } else {
       EX.gx = X[6]; EX.gy = Y[6];
       EX.tx = X[6] + m.hs * 0.02; EX.ty = Y[6] - m.vs * 0.28 * m.lh;
+    }
+  }
+
+  /** Hem from (x0, y) to (x1, y), bowing down by dip in the middle, in four soft scallops (folds meeting the hem). */
+  function hemWave(c, x0, y, x1, dip) {
+    let px = x0;
+    for (let i = 1; i <= 4; i++) {
+      const t = i / 4;
+      const tm = (i - 0.5) / 4;
+      const x = lerp(x0, x1, t);
+      const yb = y + dip * 4 * t * (1 - t);
+      const ym = y + dip * 4 * tm * (1 - tm) + dip * (i & 1 ? 0.7 : 0.45);
+      c.quadraticCurveTo((px + x) * 0.5, ym, x, yb);
+      px = x;
     }
   }
 
@@ -1444,16 +1681,44 @@
         const cx = m.hx + swing;
         const shL = X[2] <= X[3] ? 2 : 3;
         const shR = 5 - shL;
+        const dip = vs * (outfit === 'cloak' ? 0.025 : 0.02);
         if (outfit === 'robe') {
           c.moveTo(m.hx - m.r1, m.hy);
           c.quadraticCurveTo(m.hx - m.r1 * 1.2 + (cx - m.hx) * 0.3, (m.hy + hy) * 0.5, cx - half, hy);
-          c.quadraticCurveTo(cx, hy + vs * 0.02, cx + half, hy);
+          if (lod >= 1) hemWave(c, cx - half, hy, cx + half, dip);
+          else c.quadraticCurveTo(cx, hy + dip, cx + half, hy);
           c.quadraticCurveTo(m.hx + m.r1 * 1.2 + (cx - m.hx) * 0.3, (m.hy + hy) * 0.5, m.hx + m.r1, m.hy);
+          if (lod >= 2) {
+            // Folds falling from the girdle and spreading toward the hem (alternate ones stop short).
+            for (let k = 0; k < 3; k++) {
+              const f = -0.5 + k * 0.5;
+              const tx = m.hx + f * m.r1 * 0.75;
+              const ty = m.hy + vs * 0.02;
+              const len = k === 1 ? 1 : 0.72;
+              const bx = lerp(tx, cx + f * half * 0.72, len);
+              const by = lerp(ty, hy, len) + (len === 1 ? dip * 0.85 : 0);
+              c.moveTo(tx, ty);
+              c.quadraticCurveTo((tx + bx) * 0.5 + f * half * 0.08, (ty + by) * 0.5, bx, by);
+            }
+          }
         } else {
           c.moveTo(X[shL], Y[shL]);
           c.quadraticCurveTo(X[shL] - half * 0.6, (Y[shL] + hy) * 0.5, cx - half, hy);
-          c.quadraticCurveTo(cx, hy + vs * 0.025, cx + half, hy);
+          if (lod >= 1) hemWave(c, cx - half, hy, cx + half, dip);
+          else c.quadraticCurveTo(cx, hy + dip, cx + half, hy);
           c.quadraticCurveTo(X[shR] + half * 0.6, (Y[shR] + hy) * 0.5, X[shR], Y[shR]);
+          if (lod >= 2) {
+            // Long folds from each shoulder blade down the drape.
+            for (let s2 = 0; s2 < 2; s2++) {
+              const sh = s2 === 0 ? shL : shR;
+              const sg = s2 === 0 ? -1 : 1;
+              const tx = X[sh] + sg * half * 0.05;
+              const ty = Y[sh] + vs * 0.04;
+              const bx = cx + sg * half * 0.55;
+              c.moveTo(tx, ty);
+              c.quadraticCurveTo(tx + sg * half * 0.32, (ty + hy) * 0.5, bx, hy + dip * 0.7);
+            }
+          }
         }
       } else if (outfit === 'apron' || outfit === 'smock') {
         const hy = hemY(m, look, outfit === 'apron' ? 0.35 : 0.2);
@@ -1471,7 +1736,17 @@
         c.lineTo(cx1 + wb, cy1);
         const half = Math.max(wb, m.r1 * 1.05);
         c.moveTo(m.hx - half, hy);
-        c.quadraticCurveTo(m.hx, hy + vs * 0.02, m.hx + half, hy);
+        if (lod >= 1) hemWave(c, m.hx - half, hy, m.hx + half, vs * 0.016);
+        else c.quadraticCurveTo(m.hx, hy + vs * 0.02, m.hx + half, hy);
+        if (lod >= 2 && hy - cy1 > vs * 0.04) {
+          // Two soft folds hanging from the waist tie.
+          for (let k = -1; k <= 1; k += 2) {
+            const tx = cx1 + k * wb * 0.35;
+            const bx = m.hx + k * half * 0.45;
+            c.moveTo(tx, cy1 + vs * 0.01);
+            c.quadraticCurveTo(lerp(tx, bx, 0.5) - k * half * 0.06, (cy1 + hy) * 0.5, bx, hy + vs * 0.012);
+          }
+        }
       }
 
       // Role hat (replaces the ordinary hat; see draw()).

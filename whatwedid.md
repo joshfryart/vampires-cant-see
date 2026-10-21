@@ -92,3 +92,16 @@ All inside `draw()` in `js/figure.js`, Effects >= 1 and near figures only (the E
 - Cuffs: a third wrap ring per arm and leg (`sweep`, t 0.84) drawn at lod >= 1 as sleeve/trouser cuffs (skipped for robe, cloak, mail sleeves).
 - Torso creases (`torsoFolds`): three fine curves fanning up from the belt line at lod 2 (skipped for robe and cloak).
 Tests in `tests/` all pass unchanged. Still open: hood/arm overlap on the idle head-scratch, per-archetype faces, finger poses, robe folds.
+
+## v0.19.0 follow-up (third pass)
+
+Volumetric figure only (Effects >= 1); the Effects 0 line figure and both parity tests are unchanged.
+- Head scratch (`render.js`, inside `if (vol)`): the side-0 hand now rests on the side of the head, just outside the head or hood outline, elbow out and up. The forearm no longer passes through the hood.
+- Limb roots (`maskRoot`, `maskPelvis`, `emitMasked` in `figure.js`): arm and leg outlines skip their root points that lie inside the torso. The torso skips its hip, seat and crotch points that lie inside a leg drawn over it. Legs now sort over the pelvis (z bias -0.02 instead of +0.05). No more doll-joint circles at the shoulders, and no "briefs" ghost at the pelvis. Fills still cover the whole outline.
+- Fewer stacked bands: the lower limb wrap ring is dropped where a cuff ring follows (`cuffOk`).
+- Faces (`FACE` table keyed by `look.archetype`): eye size and spacing, brows (lift, tilt, length, heavy double), nose kind (wedge, button, hook, bulb, long), mouth width, smile, lopsided grin, sleepy lids, under-eye bags, crow's feet, forehead lines, cheek lines, lashes and one raised brow. A per-person asymmetry comes from `pid`. Beards are now a jaw line round the chin plus a moustache (it used to be a zigzag).
+- Fingers (lod 2): a fist on a hand holding a prop or role item, splayed fingers when scared or held, and three relaxed curled fingers otherwise.
+- Cloth: scalloped hems on robe, cloak, apron and smock (lod >= 1). Folds from the girdle (robe), the shoulders (cloak) and the waist tie (apron, smock) at lod 2.
+- Cost: about +14 us per figure in a no-op-canvas micro benchmark (54 -> 68 us), far inside the 2.5 ms frame budget.
+- Checked on the sheet at zoom 4, Effects 2: all archetypes front, plus several 3/4 and side views and the pose modes. Not checked visually: Effects 1, zoom 1 game scale, reduced motion. A permission prompt stopped browser access partway through.
+- Still open: hair and hat silhouettes per archetype; proportions and torso refinement in profile (the near thigh over the belly in side view could use a softer buttock line); a proper finger grip for the held victim (it uses the splayed hand).
