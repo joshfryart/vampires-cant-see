@@ -2826,6 +2826,15 @@
         const env = tm ? V.pulse(vein, i, age, tm, pws) : 1;
         VESSEL_NE[i] = env > 1 ? 1 : env;
       }
+      if (!vein) {
+        // Per-frame stats (Render.stats().vessels): brightest heart and foot this frame, for the smoke check.
+        const ha = VESSEL_NA[0] * VESSEL_NE[0];
+        if (ha > (r.vesselHeart || 0)) r.vesselHeart = ha;
+        for (let i = nodes.length - 2; i < nodes.length; i++) {
+          const fa = VESSEL_NA[i] * VESSEL_NE[i];
+          if (fa > (r.vesselFeet || 0)) r.vesselFeet = fa;
+        }
+      }
       // ---- Edges (quality 2+): dim base line glowing with its end nodes, then the travelling highlight ----
       if (edgeK > 0) {
         const es = V.edges(vein);
@@ -2904,6 +2913,7 @@
     }
     c.restore();
     c.globalAlpha = 1;
+    r.vesselNodes = (r.vesselNodes || 0) + n;
     return n;
   }
 
@@ -3604,6 +3614,9 @@
     r.horizon = r.oh / 2 + bob * (r.oh / BASE_H);
     // Vessel overlay through windows (P2b) needs a glass-aware line of sight; read only while vis.vessels is on.
     r.visWorld = world;
+    r.vesselNodes = 0;
+    r.vesselHeart = 0;
+    r.vesselFeet = 0;
     const hits = VCS.Raycast.cast(world, player.x, player.y, player.angle, fov, r.cols, MAX_DIST);
 
     const octx = r.octx;
@@ -3896,7 +3909,10 @@
 
   /** Stats from the last first-person frame. */
   function stats(r) {
-    return { litColumns: r.litColumns, sprites: r.sprites, quality: r.quality, echoes: r.echoesDrawn || 0, rings: r.ringsDrawn || 0 };
+    return {
+      litColumns: r.litColumns, sprites: r.sprites, quality: r.quality, echoes: r.echoesDrawn || 0, rings: r.ringsDrawn || 0,
+      vessels: { nodes: r.vesselNodes || 0, heart: r.vesselHeart || 0, feet: r.vesselFeet || 0 }
+    };
   }
 
   const Render = {

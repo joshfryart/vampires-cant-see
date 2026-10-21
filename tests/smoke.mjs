@@ -1824,6 +1824,82 @@ try {
   }
   } catch (e) { secFail("dev panel", e); }
   await closeLeaked([page, pg7, p8]);
+  try {
+  // ---------------- circulatory vessels (?sys=vis.vessels:on) ----------------
+  {
+    const pv = await newPg(browser, { viewport: { width: 640, height: 360 } });
+    const errsV = [];
+    pv.on('pageerror', (e) => errsV.push(String(e && e.message ? e.message : e)));
+    await pv.goto(INDEX_URL + '?seed=7&debug=1&sys=vis.vessels:on');
+    await waitF(pv, () => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, 5000);
+    await clickNew(pv);
+    await waitF(pv, () => window.VCS.Game.debugState().state === 'playing', null, 3000);
+    // Pin one calm villager in a dark open spot with the player 1.3 cells away facing it, then sample every frame for 3 s.
+    const vr = await pv.evaluate(() => new Promise((res) => {
+      const G = window.VCS.Game;
+      G.debugMap('town', null);
+      const ps = G.debugPeopleState();
+      const w = ps.world;
+      const v = ps.people[0];
+      let at = null;
+      for (let y = 2; y < w.height - 2 && !at; y++) for (let x = 2; x < w.width - 3 && !at; x++) {
+        const cx = x + 0.5, cy = y + 0.5;
+        if (w.blocks(cx, cy, 0.3) || w.blocks(cx - 1.3, cy, 0.3) || w.blocks(cx - 0.65, cy, 0.3)) continue;
+        if (w.lightAt(cx, cy) > 0.02 || w.lightAt(cx - 1.3, cy) > 0.02) continue;
+        if (ps.people.some((o) => o !== v && Math.hypot(o.x - cx, o.y - cy) < 4)) continue;
+        at = [cx, cy];
+      }
+      if (!at) { res({ none: true }); return; }
+      const out = { on: window.VCS.Flags.get('vis.vessels'), frames: [], beats: {}, fps: 0 };
+      // The 3 s window starts at the villager's first heartbeat echo (beats start 0.2-0.8 s after it is in range).
+      const tStart = performance.now();
+      let t0 = -1;
+      const tick = () => {
+        v.x = at[0]; v.y = at[1]; v.angle = Math.PI; v.wary = 0; v.left = v.pool;
+        if (v.mode === 'flee' || v.mode === 'startle' || v.mode === 'cower') v.mode = 'path';
+        G.debugTeleport(at[0] - 1.3, at[1], 0);
+        if (t0 < 0) {
+          if (G.debugEchoes().some((e) => e.kind === 'vheart' && e.personId === v.id) || performance.now() - tStart > 4000) t0 = performance.now() - 50;
+          requestAnimationFrame(tick);
+          return;
+        }
+        const st = G.debugVessels();
+        out.frames.push([performance.now() - t0, st ? st.heart : 0, st ? st.feet : 0]);
+        for (const e of G.debugEchoes()) if (e.kind === 'vheart' && e.personId === v.id) out.beats[e.t.toFixed(3)] = 1;
+        if (performance.now() - t0 < 3000) requestAnimationFrame(tick);
+        else {
+          out.fps = G.debugState().fps;
+          res(out);
+        }
+      };
+      requestAnimationFrame(tick);
+    }));
+    // Lub onsets: the heart rises by > 0.3 within 150 ms (the lub attack is 0.06 s; the dub adds only ~0.15). After each
+    // onset with a full 0.9 s window sampled, the brightest foot frame must come 0.15-0.9 s later (feet ~0.4 s after the chest).
+    const fr = vr.frames || [];
+    const lags = [];
+    let onsets = 0;
+    let lastOn = -1e9;
+    for (let i = 1; i < fr.length; i++) {
+      let lo = fr[i][1];
+      for (let j = i - 1; j >= 0 && fr[j][0] >= fr[i][0] - 150; j--) if (fr[j][1] < lo) lo = fr[j][1];
+      if (!(fr[i][1] - lo > 0.3) || fr[i][0] - lastOn < 400) continue;
+      lastOn = fr[i][0];
+      onsets++;
+      if (fr[i][0] + 900 > fr[fr.length - 1][0]) continue;
+      let best = i;
+      for (let j = i; j < fr.length && fr[j][0] <= fr[i][0] + 900; j++) if (fr[j][2] > fr[best][2]) best = j;
+      lags.push({ lag: +((fr[best][0] - fr[i][0]) / 1000).toFixed(3), feet: +fr[best][2].toFixed(3), atOnset: +fr[i][2].toFixed(3) });
+    }
+    const drawn = fr.filter((f) => f[1] > 0.02).length;
+    const beats = Object.keys(vr.beats || {}).length;
+    check('vessels: flag on from ?sys, villager heartbeat echoes drawn as vessels', vr.on === true && beats >= 2 && drawn > 10 && onsets >= 1, JSON.stringify({ on: vr.on, none: vr.none, beats, drawn, onsets, frames: fr.length }));
+    check('vessels: the foot lights after the chest (brightest foot 0.15-0.9 s after each lub)', lags.length >= 1 && lags.every((l) => l.lag > 0.15 && l.lag < 0.9 && l.feet > l.atOnset), JSON.stringify(lags));
+    check('vessels: fps sanity (>= 10 headless) and no page errors', vr.fps >= 10 && errsV.length === 0, JSON.stringify({ fps: vr.fps, errs: errsV }));
+    await pv.close();
+  }
+  } catch (e) { secFail("vessels", e); }
+  await closeLeaked([page, pg7, p8]);
 } catch (e) {
   check('smoke run completed', false, e && e.stack ? e.stack : String(e));
 } finally {

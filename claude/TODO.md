@@ -182,7 +182,7 @@ Goal: the whole vessel network pulses on each beat, strongest at the heart, trav
 - [x] P2b Window/wall muting: vessels clipped by walls like the outline; through window columns muted (`vessels.window` 0.35 x (1 - d/`vessels.windowRange` 2.5), glass-aware line of sight via `world.lineBlocked`).
 - [x] P2c Vampire vessel model: `Vessels.forBody('vampire')` anatomy with a frozen still state, never drawn as pulsing (player body only appears as grab arms), documented in DESIGN.md.
 - [x] P5 Edges with travelling highlight (`Vessels.edges/edgeFront/edgeCtrl/point`, limb edges follow drawPerson's quadratic limb curves, elbow/knee nodes on the curve midpoint; tuns `vessels.edges` 0.45, `vessels.highlight` 1), quality gating (q2 edges+nodes, q1 nodes, q0 chest only), reduced motion (no travel or highlight, one soft pulse over nodes + dim edges, alpha <= 0.5).
-- [ ] P6 State tuning, devpanel tuns, smoke check (foot lights after chest), DESIGN.md rows replacing "chest pulse".
+- [x] P6 State tuning checked end to end (fear: core brighter, hands/feet x0.75 net; blood loss: extremities f^2.5 vs core f^1.5; drained/fed none; mode table unchanged), devpanel tuns (all `vessels.*` auto-listed: + edges, highlight, window, windowRange), `Render.stats().vessels` + `Game.debugVessels`, smoke check (`?sys=vis.vessels:on`, 3 s from first beat: beats drawn, brightest foot ~0.4 s after each lub, fps, no errors), DESIGN.md rows (villager heartbeat chest pulse, vessel states).
 - [ ] P7 Playtest, then flag on by default.
 
 Physiology reference (adult ~1.7 m, game-tuned):

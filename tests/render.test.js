@@ -890,6 +890,26 @@ describe('render-vessels (circulatory P3)', () => {
     assert.strictEqual(Render.drawVesselsSeen(mk(0.6, 119), vh({ x: 3, y: 0 }), X, Y, 0.1, 0, 300, 3, pl), 0);
     Flags.set('vis.vessels', false);
   });
+  // ---- P6: state tuning end to end (Vessels.state -> echo fields -> vesselAlpha) ----
+  test('P6 state: fear dims hands/feet and keeps the core, blood loss dims extremities first, drained none', () => {
+    const o = { base: 0.3, hotK: 1, veinK: 0.6 };
+    const ev = (mode, f) => { const s = V.state('villager', mode, f); return vh({ bpm: s.bpm, stateK: s.stateK, periphK: s.periphK, headK: s.headK }); };
+    const A = (id, e) => Render.vesselAlpha(art(id), e, o);
+    const calm = ev('calm', 1);
+    const flee = ev('flee', 1);
+    for (const id of ['radialL', 'pedalL']) assert.ok(A(id, flee) < A(id, calm), id + ' dimmer in fear');
+    for (const id of ['heart', 'carotid', 'femoralL']) assert.ok(A(id, flee) >= A(id, calm), id + ' core kept in fear');
+    // Blood loss: the hands and feet fade faster than the heart.
+    const low = ev('calm', 0.4);
+    for (const id of ['radialL', 'pedalL']) assert.ok(A(id, low) / A(id, calm) < A('heart', low) / A('heart', calm), id);
+    assert.ok(A('heart', low) > 0);
+    // Drained (and fed): no pulse, nothing drawn.
+    for (const [m, f] of [['calm', 0], ['fed', 1], ['drained', 1]]) assert.strictEqual(V.state('villager', m, f).pulse, false, m);
+    Flags.set('vis.vessels', true);
+    assert.strictEqual(Render.drawVessels(rig(2), ev('calm', 0), X, Y, 0.1), 0);
+    Flags.set('vis.vessels', false);
+  });
 });
+
 
 

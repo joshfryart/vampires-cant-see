@@ -3513,6 +3513,7 @@
         };
         Game.debugFeedHold = debugFeedHold;
         Game.debugPeopleState = function () { return S.people; };
+        Game.debugVessels = function () { return S.renderer ? VCS.Render.stats(S.renderer).vessels : null; };
         Game.debugSleep = function () { return trySleep(true); };
         Game.debugNight = function () { return S.night ? VCS.Night.serialize(S.night) : null; };
       }
