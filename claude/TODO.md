@@ -192,7 +192,14 @@ Physiology reference (adult ~1.7 m, game-tuned):
 - States: calm 65 bpm strength 1.0; wary 90 / 1.15 (neck/temple brighter); fear/flight 130-140 / 1.4-1.6, hands/feet constrict (dim), big muscle bright; sleep 50-55 / 0.8; blood loss: extremities dim first, core stays, strength ~ blood_fraction^1.5, HR rises then collapses below ~40% blood, stops at empty. Cold extremities: distal 0.05-0.1 and delayed, blue-tinted.
 - Veins (optional, later): darker/bluer edge set, slow steady drift (~0.1-0.3 m/s), no sharp pulse.
 
-Open questions for the user: (1) real-time wave vs slowed `pwvScale` for readability; (2) full-body vessels leak limbs/pose, making heartbeat a stronger hunting cue than a ping, intended?; (3) show through walls like Warm sense, or only when the pulse is visible?; (4) keep 2.5-cell range and nearest-2 cap?; (5) dots vs vessel lines, coral vs warm-tinted white; (6) suppress villager heartbeat for the drink victim (drinkBeat already beats at a different rate)?
+Decisions (user, 2026-10-21):
+1. Wave is slowed for readability (`pwvScale` > 1, feet still lag head).
+2. Full-body vessels revealing limbs/pose is intended (heartbeat is a strong hunting cue).
+3. Visible only when the pulse itself is visible (same `visibleFrom` rule); through windows if close enough but muted.
+4. Keep 2.5-cell range and nearest-2 cap for now.
+5. Arteries red; veins deeper red-blue. The whole system also shows lub vs dub distinctly (lub = big arterial launch, dub = dimmer secondary ripple, and veins on their own slow tint) so the two phases read apart.
+6. Suppress villager `vheart` for the drink victim (drinkBeat owns it). Vampire (player) also gets a vessel model/physiology, but no heartbeat and no blood: undead, nothing pulses. (Interpretation of "update physiology of vampire as well, the model but not heartbeat or blood"; confirm.)
+Added phases: P2b window/wall muting (distance-scaled, muted alpha), P2c vampire vessel model (static anatomy only, no pulse/blood).
 
 ### Footstep rings (villagers)
 Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big full rings.
