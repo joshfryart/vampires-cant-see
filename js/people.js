@@ -1116,6 +1116,9 @@
     const pulses = sonar && sonar.pulses ? sonar.pulses : [];
     const ps = state.people;
     const es = state.echoes;
+    const VF = root.VCS.Flags;
+    const V = root.VCS.Vessels;
+    const vessels = !!(V && V.timing && VF && VF.get && VF.get('vis.vessels'));
     for (let k = 0; k < pulses.length; k++) {
       const pu = pulses[k];
       const str = typeof pu.strength === 'number' ? pu.strength : 1;
@@ -1126,7 +1129,10 @@
         const ey = p.y - pu.y;
         if (ex * ex + ey * ey > pu.range * pu.range) continue;
         const la = Sonar.litAt(pu, p.x, p.y);
-        if (!(la > tPrev && la <= t)) continue;
+        // A heartbeat is emitted after this pass (stepAmbient runs after simulateWorld), so for a body that has not moved
+        // its own beat lands exactly on the next tPrev; with vis.vessels on, count that edge too (dedupe below keeps one).
+        const lo = vessels && pu.kind === 'vheart' ? la >= tPrev : la > tPrev;
+        if (!(lo && la <= t)) continue;
         const dist = (la - pu.t0) * pu.speed;
         if (dist > pu.range) continue;
         if (str < 0.12 && dist > 6) continue;
@@ -1156,6 +1162,13 @@
           // Pose state for the renderer (snapshot of the moment the wavefront passed).
           mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
         };
+        if (echo.kind === 'vheart') {
+          // Circulatory state at this beat (set by game.js stepHeartbeats before the beat is emitted), for the vessel overlay.
+          echo.bpm = typeof p.heartBpm === 'number' ? p.heartBpm : 0;
+          echo.stateK = typeof p.heartStateK === 'number' ? p.heartStateK : 1;
+          echo.periphK = typeof p.heartPeriphK === 'number' ? p.heartPeriphK : 1;
+          echo.headK = typeof p.heartHeadK === 'number' ? p.heartHeadK : 1;
+        }
         if (dup >= 0) es.splice(dup, 1);
         es.push(echo);
         made.push(echo);
@@ -1163,7 +1176,12 @@
     }
     const fade = sonar && typeof sonar.fade === 'number' ? sonar.fade : 3;
     let w = 0;
-    for (let i = 0; i < es.length; i++) if (t - es[i].t < (es[i].fade || fade)) es[w++] = es[i];
+    for (let i = 0; i < es.length; i++) {
+      let life = es[i].fade || fade;
+      // Flag on: keep a heartbeat until its vessel wave (feet, dub, venous swell) has faded.
+      if (vessels && es[i].kind === 'vheart') { const vl = V.timing(es[i].bpm).life; if (vl > life) life = vl; }
+      if (t - es[i].t < life) es[w++] = es[i];
+    }
     es.length = w;
     // Cap the echo list; heartbeat snapshots have their own small budget so a crowd of footsteps cannot push them out.
     let hearts = 0;

@@ -125,6 +125,27 @@ describe('people.test.js', () => {
     assert.strictEqual(st.echoes.length, 0);
   });
 
+  test('vheart echo life: unchanged with vis.vessels off, extended to the vessel wave when on', () => {
+    require('../js/flags.js');
+    require('../js/data/vessels.js');
+    const Flags = globalThis.VCS.Flags;
+    Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+    const mk = () => [
+      { personId: 1, kind: 'vheart', t: 0, fade: 0.4, bpm: 65, strength: 1 },
+      { personId: 2, kind: 'ping', t: 0, fade: 0.4, strength: 1 }
+    ];
+    const run = (t) => { const st = { people: [], echoes: mk(), maxEchoes: 10 }; People.updateEchoes(st, { pulses: [], fade: 3 }, t - 0.01, t); return st.echoes.map((e) => e.kind); };
+    Flags.set('vis.vessels', false);
+    assert.deepStrictEqual(run(0.39), ['vheart', 'ping']);
+    assert.deepStrictEqual(run(0.41), []);
+    Flags.set('vis.vessels', true);
+    const life = globalThis.VCS.Vessels.timing(65).life;
+    assert.deepStrictEqual(run(0.41), ['vheart']);
+    assert.deepStrictEqual(run(life - 0.01), ['vheart']);
+    assert.deepStrictEqual(run(life + 0.01), []);
+    Flags.set('vis.vessels', false);
+  });
+
   test('echo cap holds', () => {
     const world = World.load(def);
     const st = People.create(world, def, { seed: 1, maxEchoes: 4 });
@@ -328,6 +349,50 @@ describe('people.test.js', () => {
     assert.ok(mine.length >= 1, 'the heartbeat shows its owner');
     assert.ok(Math.abs(mine[0].zMin - 0.45) < 1e-9 && Math.abs(mine[0].zMax - 0.85) < 1e-9, 'chest band ' + mine[0].zMin + '..' + mine[0].zMax);
     assert.strictEqual(mine[0].kind, 'vheart');
+  });
+
+  test('a vheart echo carries the circulatory snapshot fields (bpm, stateK, periphK, headK)', () => {
+    const world = World.load(def);
+    const st = People.create(world, def, { seed: 1 });
+    const sonar = Sonar.create({ speed: 12, range: 10, fade: 3, cooldown: 0, bounces: 0 });
+    const p = st.people[0];
+    Object.assign(p, { heartBpm: 84.5, heartStateK: 0.35, heartPeriphK: 0.5, heartHeadK: 1.25 });
+    Sonar.emitSound(sonar, world, p.x, p.y, 0, { kind: 'vheart', strength: 0.2, range: 0.5, z: 0.65, fade: 0.7, bounces: 0, visRays: 90 });
+    Sonar.emitSound(sonar, world, p.x, p.y, 0, { kind: 'personStep', strength: 0.35, range: 0.7, z: 0, fade: 0.7, bounces: 0, visRays: 90 });
+    let all = [];
+    let tPrev = -DT;
+    for (let t = 0; t <= 0.5; t += DT) { all = all.concat(People.updateEchoes(st, sonar, tPrev, t)); tPrev = t; }
+    const heart = all.find((e) => e.personId === p.id && e.kind === 'vheart');
+    assert.ok(heart);
+    assert.strictEqual(heart.bpm, 84.5);
+    assert.strictEqual(heart.stateK, 0.35);
+    assert.strictEqual(heart.periphK, 0.5);
+    assert.strictEqual(heart.headK, 1.25);
+    assert.ok(heart.strength > 0);
+    const step = all.find((e) => e.personId === p.id && e.kind === 'personStep');
+    assert.ok(step && step.bpm === undefined, 'only heartbeat echoes carry the fields');
+  });
+
+  test('a beat emitted after the echo pass still shows a standing owner when vis.vessels is on (flag off unchanged)', () => {
+    require('../js/flags.js');
+    require('../js/data/vessels.js');
+    const Flags = globalThis.VCS.Flags;
+    Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+    const run = (on) => {
+      Flags.set('vis.vessels', on);
+      const world = World.load(def);
+      const st = People.create(world, def, { seed: 1 });
+      const sonar = Sonar.create({ speed: 12, range: 10, fade: 3, cooldown: 0, bounces: 0 });
+      const p = st.people[0];
+      // Game order: updateEchoes(tPrev, T) has run, then stepAmbient emits the beat at T; the next pass is (T, T + DT].
+      const T = 1;
+      Sonar.emitSound(sonar, world, p.x, p.y, T, { kind: 'vheart', strength: 0.2, range: 0.5, z: 0.65, fade: 0.7, bounces: 0, visRays: 90 });
+      const made = People.updateEchoes(st, sonar, T, T + DT);
+      Flags.set('vis.vessels', false);
+      return made.filter((e) => e.personId === p.id && e.kind === 'vheart').length;
+    };
+    assert.strictEqual(run(false), 0, 'flag off: unchanged (strict tPrev edge)');
+    assert.strictEqual(run(true), 1, 'flag on: the standing owner shows its beat');
   });
 
   test('echoBrightness uses the echo own fade when present', () => {

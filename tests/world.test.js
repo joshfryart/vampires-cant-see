@@ -640,6 +640,12 @@ describe('world-v06.test.js', () => {
     assert.strictEqual(mk('#').lightAt(7.5, 3.5), 0);
   });
 
+  test('lineBlocked: glass is see-through, a stone wall blocks (vessels through windows, P2b)', () => {
+    const mk = (ch) => World.load(def(put(splitRows(false), 6, 3, ch), { props: TORCH6 }));
+    assert.strictEqual(mk('w').lineBlocked(5.5, 3.5, 7.5, 3.5), false);
+    assert.strictEqual(mk('#').lineBlocked(5.5, 3.5, 7.5, 3.5), true);
+  });
+
 });
 
 

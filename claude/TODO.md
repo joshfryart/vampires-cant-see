@@ -169,11 +169,39 @@ Now: lit ≥ 0.3 → warm edge vignette. Binary-feeling, easy to miss, reads as 
 - [ ] Tutorial hint `tut:light` first time meter > 50%.
 
 ### Villager heartbeat (circulatory)
-- [ ] Heartbeat audio when within ~2 cells: low thump-thump (≈60 Hz sine + 120 Hz click, lowpassed ~200 Hz, "through the body" muffled). Quiet, mono-ish, panned to villager.
-- [ ] Rate tracks state: calm 60–70 bpm, wary 90, fleeing/fear 130+, drinking slows as blood drains → stops at empty (dazed = faint slow).
-- [ ] Visual (optional): faint warm pulse in Warm-sense halo synced to beat; ≤3 Hz always holds (130 bpm = 2.2 Hz ok).
-- [ ] Only nearest 1–2 villagers audible (voice cap). Setting volume under Ambience.
-- [ ] Doubles as a stealth/hunt cue: hear a hidden villager behind a door (uses Echoes occlusion filter once v0.11 lands).
+Done (0.11.3 + 2026-10-21 commits 8fc8568..079d97f): heartbeat audio (`Audio.heartbeat`, level `vheart`), rate by state (`heartBpm`: calm 65, wary 90, startle 100, flee/cower 130, x `0.5+0.5*left/pool`), nearest 2 villagers, heard and shown within 2.5 cells, chest-high pulse per beat, brighter/longer pulse, quieter breathing. Not yet played by ear/eye.
+- [x] Heartbeat audio, state-driven rate, nearest 1-2 only, chest pulse (see above).
+- [ ] Occlusion: hear a hidden villager behind a door (Echoes occlusion filter). Volume setting under Ambience.
+
+#### Whole-body circulatory pulse (2026-10-21: P1-P7 done, `vis.vessels` on by default; headless review only, needs human play by ear/eye)
+Goal: the whole vessel network pulses on each beat, strongest at the heart, travelling out and fading toward hands/feet. Render-side overlay on the existing `vheart` echo; no extra sonar pulses. Flag `vis.vessels` (default off), tunables `vessels.*`.
+- [x] P1 Data + pure helpers: `js/data/vessels.js`, ~15-node tree rooted at heart, each node anchored to a `drawPerson` pose slot (0 head, 1 neck, 2/3 shoulders, 4/5 hips, 6/7 hands, 8/9 feet, 10/11 elbows, 12/13 knees, 14 torso) so it follows every pose. Per node: `pathLen`, delay `pathLen*m/PWV`, weight `w`, hotspot boost. Unit tests (tree, monotonic delay/weight).
+- [x] P2 Snapshot fields `bpm`, `stateK`, `periphK`, `headK` on the vheart echo (people.js updateEchoes) from `stepHeartbeats`; villager bpm follows the research curve via `Vessels.state` (audio too), cap 175 (<3 Hz); drink victim gets no villager `vheart` (drinkBeat owns it, unchanged, so its `50 + 70 x left/pool` formula stays separate). P2b (window/wall muting) and P2c (vampire vessel model) remain.
+- [x] P3 `drawVessels(r,e,X,Y,age)` in render.js behind flag (`vis.vessels`, tuns `vessels.alpha/size/hot/veins/halo/minQuality`), static nodes, drawn after the body outline and ignoring the chest-only strip mask (body outline stays chest-only).
+- [x] P4 Travel: per-node delay (`Vessels.travel`, pwvScale 1.75, tun `vessels.pwvScale`) + envelope (attack 0.06 s, decay tau 0.25 s) on echo age; lub-dub (dub 0.3 s at 65 bpm, ~1/sqrt(bpm), <= 45% of the period; 30% strength fading to 15% at 175 bpm); veins own later, slower swell (lag 0.08 s + 1.25x delay, attack 0.1, tau 0.3). vheart echo life = `Vessels.timing(bpm).life` (~1.0-1.05 s) in drawEchoes and people.js updateEchoes only while `vis.vessels` is on. Reduced motion: no travel, one soft pulse (0.7 s), alpha <= 0.5.
+- [x] P2b Window/wall muting: vessels clipped by walls like the outline; through window columns muted (`vessels.window` 0.35 x (1 - d/`vessels.windowRange` 2.5), glass-aware line of sight via `world.lineBlocked`).
+- [x] P2c Vampire vessel model: `Vessels.forBody('vampire')` anatomy with a frozen still state, never drawn as pulsing (player body only appears as grab arms), documented in DESIGN.md.
+- [x] P5 Edges with travelling highlight (`Vessels.edges/edgeFront/edgeCtrl/point`, limb edges follow drawPerson's quadratic limb curves, elbow/knee nodes on the curve midpoint; tuns `vessels.edges` 0.45, `vessels.highlight` 1), quality gating (q2 edges+nodes, q1 nodes, q0 chest only), reduced motion (no travel or highlight, one soft pulse over nodes + dim edges, alpha <= 0.5).
+- [x] P6 State tuning checked end to end (fear: core brighter, hands/feet x0.75 net; blood loss: extremities f^2.5 vs core f^1.5; drained/fed none; mode table unchanged), devpanel tuns (all `vessels.*` auto-listed: + edges, highlight, window, windowRange), `Render.stats().vessels` + `Game.debugVessels`, smoke check (`?sys=vis.vessels:on`, 3 s from first beat: beats drawn, brightest foot ~0.4 s after each lub, fps, no errors), DESIGN.md rows (villager heartbeat chest pulse, vessel states).
+- [x] P7 Flag `vis.vessels` on by default (2026-10-21). Headless review only, needs human play by ear/eye (look of the wave, halo/size, window muting, fps on real hardware). Headless review fixes (2026-10-21): halo 0.3 -> 0.2, size 1 -> 0.9, thinner highlight (0.85x radius), weak-heart easing `vessels.lowGamma` 0.5 (nearly drained villagers kept a faint core instead of vanishing), standing villagers' beats now make an echo with the flag on (strict tPrev edge dropped them).
+
+Physiology reference (adult ~1.7 m, game-tuned):
+- Path from heart (m): neck 0.25, head 0.40, wrist 0.90, fingertip 1.05, groin 0.70, knee 0.95, ankle 1.35, toes 1.50.
+- PWV default 6 m/s (child 5, old 8-9). Delays: carotid ~40 ms, head 65, wrist 150, groin 115, ankle 225, toes 250. May scale 1.5-2x (`pwvScale`) so travel reads, feet must still lag head.
+- Strength falloff (fraction of heart): arch 0.9, neck 0.75, head 0.5, upper arm 0.55, wrist 0.35, hand 0.2, groin 0.6, thigh 0.5, knee 0.4, ankle 0.25, foot 0.15 (~0.8 per 0.2 m in small vessels).
+- Hotspot bloom: carotid +60%, heart apex +50%, femoral +40%, radial +35%, temporal/brachial +25%, ankle/foot +20%, knee +15%.
+- Beat shape: lub = big launch, dub (dicrotic) ~0.3 s later at ~30% intensity; systole ~35% of cycle at rest, diastole shrinks faster at high bpm. At 130 bpm two waves can be in the body at once.
+- States: calm 65 bpm strength 1.0; wary 90 / 1.15 (neck/temple brighter); fear/flight 130-140 / 1.4-1.6, hands/feet constrict (dim), big muscle bright; sleep 50-55 / 0.8; blood loss: extremities dim first, core stays, strength ~ blood_fraction^1.5, HR rises then collapses below ~40% blood, stops at empty. Cold extremities: distal 0.05-0.1 and delayed, blue-tinted.
+- Veins (optional, later): darker/bluer edge set, slow steady drift (~0.1-0.3 m/s), no sharp pulse.
+
+Decisions (user, 2026-10-21):
+1. Wave is slowed for readability (`pwvScale` > 1, feet still lag head).
+2. Full-body vessels revealing limbs/pose is intended (heartbeat is a strong hunting cue).
+3. Visible only when the pulse itself is visible (same `visibleFrom` rule); through windows if close enough but muted.
+4. Keep 2.5-cell range and nearest-2 cap for now.
+5. Arteries red; veins deeper red-blue. The whole system also shows lub vs dub distinctly (lub = big arterial launch, dub = dimmer secondary ripple, and veins on their own slow tint) so the two phases read apart.
+6. Suppress villager `vheart` for the drink victim (drinkBeat owns it). Vampire (player) also gets a vessel model/physiology, but no heartbeat and no blood: undead, nothing pulses. (Interpretation of "update physiology of vampire as well, the model but not heartbeat or blood"; confirm.)
+Added phases: P2b window/wall muting (distance-scaled, muted alpha), P2c vampire vessel model (static anatomy only, no pulse/blood).
 
 ### Footstep rings (villagers)
 Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big full rings.

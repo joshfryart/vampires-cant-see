@@ -1453,3 +1453,94 @@ describe('game-echo helpers (v0.11.2)', () => {
     near(bare.peak, open.peak * 0.5);
   });
 });
+
+describe('villager heartbeat bpm and drink-victim suppression (circulatory P2)', () => {
+
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const SoundData = require('../js/data/sounds.js');
+  globalThis.VCS = globalThis.VCS || {};
+  globalThis.VCS.SoundData = SoundData;
+  require('../js/data/vessels.js');
+  for (const m of ['log', 'raycast', 'world', 'sonar', 'ripple', 'people', 'struggle']) require('../js/' + m + '.js');
+  require('../js/audio.js');
+  require('../js/game.js');
+  const VCS = globalThis.VCS;
+  const G = VCS.Game.__test;
+  const near = (a, b, eps) => assert.ok(Math.abs(a - b) < (eps || 1e-9), a + ' vs ' + b);
+  const v = (o) => Object.assign({ mode: 'path', wary: 0, pool: 40, left: 40, x: 2.5, y: 2.5 }, o);
+  const mkWorld = () => VCS.World.load({ name: 'hb', rows: ['#######', '#.....#', '#.....#', '#.....#', '#######'] }, { requireStart: false });
+
+  test('bpm per mode at full blood: calm 65, wary 90, startle/bumping 100, flee/cower 130', () => {
+    assert.strictEqual(G.heartBpm(v({})), 65);
+    assert.strictEqual(G.heartBpm(v({ mode: 'dazed' })), 65);
+    assert.strictEqual(G.heartBpm(v({ wary: 2 })), 90);
+    assert.strictEqual(G.heartBpm(v({ mode: 'startle' })), 100);
+    assert.strictEqual(G.heartBpm(v({ bumping: true })), 100);
+    assert.strictEqual(G.heartBpm(v({ mode: 'flee' })), 130);
+    assert.strictEqual(G.heartBpm(v({ mode: 'cower' })), 130);
+    assert.strictEqual(G.heartBpm(v({ mode: 'flee', wary: 3 })), 130, 'flight beats wariness');
+  });
+
+  test('blood curve follows the research: rises to ~1.3x at 40% blood, then falls to 0 at empty', () => {
+    const at = (f, o) => G.heartBpm(v(Object.assign({ left: 40 * f }, o)));
+    near(at(0.4), 65 * 1.3, 1e-6);
+    assert.ok(at(0.7) > at(1) && at(0.4) > at(0.7), 'rises as blood is lost down to 40%');
+    assert.ok(at(0.2) < at(0.4) && at(0.05) < at(0.2), 'collapses below 40%');
+    near(at(0.2), 65 * 1.3 * 0.5, 1e-6);
+    assert.strictEqual(at(0), 0, 'no pulse at empty');
+    assert.strictEqual(G.heartState(v({ left: 0 })).pulse, false);
+    assert.strictEqual(G.heartBpm(v({ pool: 0, left: 0 })), 65, 'unknown pool counts as full');
+    // Strength and peripheral dimming come along with the bpm (single source of truth).
+    const half = G.heartState(v({ left: 20 }));
+    near(half.stateK, Math.pow(0.5, 1.5), 1e-9);
+    near(half.periphK, 0.5, 1e-9);
+  });
+
+  test('bpm is capped at 175 (< 3 Hz)', () => {
+    // Flight at 40% blood would be 130 * 1.3 = 169; the cap is the guard for anything above.
+    near(G.heartBpm(v({ mode: 'flee', left: 16 })), 169, 1e-6);
+    for (let f = 0; f <= 1.0001; f += 0.05) {
+      for (const mode of ['path', 'startle', 'flee', 'cower']) assert.ok(G.heartBpm(v({ mode, wary: 1, left: 40 * f })) <= 175);
+    }
+    assert.strictEqual(VCS.Vessels.capBpm(400), 175);
+  });
+
+  function stepWith(list, drink) {
+    const beats = [];
+    const real = VCS.Audio.heartbeat;
+    VCS.Audio.heartbeat = (a, o) => { beats.push(Object.assign({}, o)); return true; };
+    const sonar = VCS.Sonar.create({ speed: 12, range: 10, fade: 3, cooldown: 0, bounces: 0 });
+    G.bind({ world: mkWorld(), player: { x: 2, y: 2.5, angle: 0 }, sonar: sonar, audio: {}, clock: 0, night: null, drink: drink || null });
+    try { G.stepHeartbeats(0.016, list); } finally { VCS.Audio.heartbeat = real; G.bind({ drink: null, sonar: null, audio: null }); }
+    return { beats, pulses: sonar.pulses.filter((p) => p.kind === 'vheart') };
+  }
+
+  test('a beat sets the snapshot fields on the villager and plays at the same bpm', () => {
+    const q = v({ mode: 'flee', left: 28, heartT: 0 });
+    const r = stepWith([q]);
+    assert.strictEqual(r.beats.length, 1);
+    assert.strictEqual(r.pulses.length, 1);
+    const hs = G.heartState(q);
+    assert.strictEqual(q.heartBpm, hs.bpm);
+    assert.strictEqual(r.beats[0].bpm, hs.bpm, 'audio and pulse share the bpm');
+    assert.strictEqual(q.heartStateK, hs.stateK);
+    assert.strictEqual(q.heartPeriphK, hs.periphK);
+    assert.strictEqual(q.heartHeadK, hs.headK);
+    near(q.heartT, 60 / hs.bpm, 1e-9);
+  });
+
+  test('the drink victim gets no villager vheart (audio or pulse); others still beat', () => {
+    const victim = v({ heartT: 0 });
+    const other = v({ x: 3, heartT: 0 });
+    const r = stepWith([victim, other], { person: victim });
+    assert.strictEqual(r.beats.length, 1, 'only the bystander is heard');
+    assert.strictEqual(r.pulses.length, 1);
+    assert.strictEqual(victim.heartBpm, undefined);
+    assert.strictEqual(other.heartBpm, 65);
+    const alone = stepWith([v({ heartT: 0 })].map((q) => q), null);
+    assert.strictEqual(alone.beats.length, 1, 'without a drink the same villager beats');
+    const solo = v({ heartT: 0 });
+    assert.strictEqual(stepWith([solo], { person: solo }).beats.length, 0);
+  });
+});
