@@ -1103,7 +1103,7 @@
       out[1] = Math.min(1.2, z + 0.15);
     }
     // Footsteps ring the floor: they reveal feet and lower shins only.
-    if ((pu.kind === 'step' || pu.kind === 'personStep') && out[1] > 0.3) out[1] = 0.3;
+    if ((pu.kind === 'step' || pu.kind === 'personStep') && out[1] > 0.22) out[1] = 0.22;
     // A heartbeat reveals just the chest.
     if (pu.kind === 'vheart') { out[0] = 0.45; out[1] = 0.85; }
     return out;
@@ -1136,7 +1136,8 @@
         // Bounce children and overlapping sounds: keep only the stronger snapshot of the same moment.
         let dup = -1;
         for (let m = es.length - 1; m >= 0; m--) {
-          if (es[m].personId === p.id && Math.abs(es[m].t - la) < 0.5) { dup = m; break; }
+          // Same person, same moment, same class of sound: a heartbeat never replaces (or is replaced by) a footstep.
+          if (es[m].personId === p.id && Math.abs(es[m].t - la) < 0.5 && (es[m].kind === 'vheart') === (pu.kind === 'vheart')) { dup = m; break; }
         }
         if (dup >= 0 && es[dup].strength >= strength) continue;
         heightBandOf(Sonar, pu, p.x, p.y, band);
@@ -1164,7 +1165,20 @@
     let w = 0;
     for (let i = 0; i < es.length; i++) if (t - es[i].t < (es[i].fade || fade)) es[w++] = es[i];
     es.length = w;
-    while (es.length > state.maxEchoes) es.shift();
+    // Cap the echo list; heartbeat snapshots have their own small budget so a crowd of footsteps cannot push them out.
+    let hearts = 0;
+    for (let i = 0; i < es.length; i++) if (es[i].kind === 'vheart') hearts++;
+    while (es.length - hearts > state.maxEchoes) {
+      const gone = es.findIndex((e) => e.kind !== 'vheart');
+      if (gone < 0) break;
+      es.splice(gone, 1);
+    }
+    while (hearts > 8) {
+      const gone = es.findIndex((e) => e.kind === 'vheart');
+      if (gone < 0) break;
+      es.splice(gone, 1);
+      hearts--;
+    }
     return made;
   }
 

@@ -152,7 +152,7 @@
   const SoundData = {
     levels: {
       step: { range: 1.1, strength: 0.3, z: 0, fade: 0.8, bounces: 0, gain: 0.08, interval: 0.48, footOffset: 0.15, footSide: 0.12 },
-      personStep: { range: 0.28, strength: 0.25, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
+      personStep: { range: 0.2, strength: 0.2, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
       door: { range: 5, strength: 0.5, z: 0.5, fade: 2.5, bounces: 1, gain: 0.25, hearDist: 18 },
       interact: { range: 3, strength: 0.35, z: 0.3, fade: 1.8, bounces: 1, gain: 0.15 },
       ping: { range: null, strength: 1, z: 0.62, fade: null, bounces: 2, gain: null },
@@ -182,7 +182,7 @@
       bell: { range: 0, strength: 0, z: 0.9, fade: 1, bounces: 0, gain: 0.3, hearDist: 80 },
       breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 },
       // villager heartbeat: heard and shown (a small chest-high pulse per beat) out to 5 cells = 2.5 x the old 2-cell hearing, gain +15%
-      vheart: { range: 0.5, strength: 0.2, z: 0.65, fade: 0.7, bounces: 0, gain: 0.069, hearDist: 5 }
+      vheart: { range: 0.5, strength: 0.7, z: 0.65, fade: 0.9, bounces: 0, gain: 0.069, hearDist: 5 }
     },
     // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
     stepScaleTable: {

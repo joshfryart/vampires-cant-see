@@ -1342,8 +1342,10 @@
     if (made.length) tutQueue('person');
     for (let i = 0; i < made.length; i++) {
       const e = made[i];
-      VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.6, life: 0.9, strength: e.strength });
-      VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
+      // Floor rings under the person: a heartbeat is a small ring at the chest's foot, a footstep a modest one, a ping the full size.
+      const small = e.kind === 'vheart' ? 0.4 : e.kind === 'personStep' || e.kind === 'step' ? 0.45 : 1;
+      VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.6 * small, life: 0.9 * (small < 1 ? 0.7 : 1), strength: e.strength });
+      if (small === 1) VCS.Ripple.spawn(S.ripple, e.x, e.y, S.clock, { kind: 'person', maxR: 1.2, life: 0.8, strength: e.strength * 0.6, delay: 0.18 });
       e.pan = clamp(Math.sin(Math.atan2(e.y - p.y, e.x - p.x) - p.angle), -1, 1);
       if (S.audio) personEcho(e);
     }

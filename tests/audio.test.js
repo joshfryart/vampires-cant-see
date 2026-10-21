@@ -674,7 +674,7 @@ describe('sounds.test.js', () => {
     const l = SoundData.levels;
     const row = (k, keys) => keys.map((x) => l[k][x]);
     assert.deepStrictEqual(row('step', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [1.1, 0.3, 0, 0.8, 0, 0.08]);
-    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.28, 0.25, 0, 0.6, 0, 0.12]);
+    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.2, 0.2, 0, 0.6, 0, 0.12]);
     assert.deepStrictEqual(row('door', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [5, 0.5, 0.5, 2.5, 1, 0.25]);
     assert.deepStrictEqual(row('interact', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [3, 0.35, 0.3, 1.8, 1, 0.15]);
     assert.strictEqual(l.ping.bounces, 2);

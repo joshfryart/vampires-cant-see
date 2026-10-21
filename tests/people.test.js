@@ -308,7 +308,7 @@ describe('people.test.js', () => {
     for (let t = 0; t <= 0.5; t += DT) { all = all.concat(People.updateEchoes(st, sonar, tPrev, t)); tPrev = t; }
     const mine = all.filter((e) => e.personId === p.id);
     assert.ok(mine.length >= 1);
-    assert.ok(mine[0].zMax <= 0.3 + 1e-9, 'feet and lower shins only, zMax ' + mine[0].zMax);
+    assert.ok(mine[0].zMax <= 0.22 + 1e-9, 'feet and lower shins only, zMax ' + mine[0].zMax);
     assert.ok(mine[0].zMin <= 0.01);
     assert.strictEqual(mine[0].fade, 0.7);
     assert.strictEqual(mine[0].kind, 'personStep');
