@@ -1,0 +1,44 @@
+DEVLOG: v0.11.0 to v0.20.1 - the village gets a voice, a pulse and a body
+
+Ten releases since the last devlog. The short version: the night now sounds like a place, the villagers talk, you can see their blood move, and the people themselves finally look like people (silly people, but people).
+
+New villager figure shots are attached to this post: the cast (priest, mother, guard, child, merchant, hunter, drunk, elder, gravedigger) and a tavern villager crying for help after a ping.
+
+
+THE VILLAGERS GOT BODIES (v0.14 to v0.19)
+- 14 villager types, each generated from a seed: height, build, head shape, hair, hats, outfits, props. The innkeeper carries a tray, the gravedigger a shovel, the merchant a ledger, the mother a basket, and so on. More can appear mid-night, and a scared village calls in reinforcements.
+- Characters are drawn as solid-feeling figures with a shaded side, a rim of light and a faint wrap line around chests and limbs, instead of flat sticks. Torsos, jaws, hands and shoes have real shapes. Each type has its own face (nose, brows, eyes, mouth), and every person is a little lopsided.
+- Cloth behaves like cloth: robes and cloaks have folds and scalloped hems, trousers and sleeves have cuffs, belts have creases.
+- Hands curl, clench around props and splay when someone is startled or held.
+- A new Effects setting (Off, Low, High) lets slower machines keep the old line figures. High adds bloom, a dusk and dawn colour grade, grain and tapered line weight. The game checks its own frame time and quietly drops to Low for ten seconds if it is struggling.
+- A character creator for tinkering (open it from the F9 dev panel, or open tools/character-creator.html): change any look field, pick a pose, turn the figure, save characters and export them as JSON.
+
+
+YOU CAN SEE BLOOD MOVE (v0.11.4 to v0.11.7)
+- A circulatory overlay: when a pulse reaches a villager you see their heart beat and a pulse wave travel through their arteries and veins, matched to their body. Frightened people run faster, still people slower. It shows on the victim you hold, too.
+- Villagers have heartbeats you can hear, but only inside about three cells.
+- Ground texture shows under your pings: grass blades, stone joints, wood planks, cobbles.
+- The version number now shows bottom right on every screen.
+
+
+THE NIGHT SOUNDS LIKE A PLACE (v0.11.1 to v0.12.0)
+- Your click leaves your mouth, so pings are brighter in front than behind. Materials colour their echoes (stone is crisp, wood is hollow, grass is nearly silent), and walls and doors muffle sound by what they are made of.
+- Floor echo, ceiling echo indoors, echoes off solid props and room reverb that depends on the room: the church rings long, the crypt stays dry, opening a door dries the sound.
+- Footsteps: villagers no longer thump in your ear on every step without a ping. Only your own ping comes back as an echo.
+
+
+THE VILLAGE TALKS (v0.12 to v0.13)
+- Villagers have synthesised voices, with role-flavoured daytalk, humming, gasps, alarm calls and cries for help. Guards call out the hour. Subtitles (and an optional translation) show within five cells.
+- Hold E at a lit window to listen in: a headcount on the HUD, and real conversations you can overhear. People eat dinner at tables by the windows and chat in pairs.
+- Struggling victims keep yelling until nearly drained, then slow, drop in pitch and slur.
+- Guards wear armour and sound like it, with a heavy boot thud (v0.20.1: I removed the little metallic clink from their steps, it read as a stray echo).
+- The mix is rebalanced: speech is clear, other sounds sit lower, pings and echoes keep their full level.
+
+
+OTHER BITS
+- Settings has new toggles for Effects, Villager voices, Subtitles and Translation, and Vignette.
+- 700+ unit tests pass. The browser smoke test is still advisory.
+
+
+WHAT'S NEXT
+Hair and hat outlines per villager type, a real grip hand for held victims, guard lanterns, and the first pass of children, drunks and gossip that spreads fear. Tell me what you would play first, and if any sound feels too loud, too soft or just wrong, say so.
