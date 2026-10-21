@@ -183,7 +183,7 @@ Goal: the whole vessel network pulses on each beat, strongest at the heart, trav
 - [x] P2c Vampire vessel model: `Vessels.forBody('vampire')` anatomy with a frozen still state, never drawn as pulsing (player body only appears as grab arms), documented in DESIGN.md.
 - [x] P5 Edges with travelling highlight (`Vessels.edges/edgeFront/edgeCtrl/point`, limb edges follow drawPerson's quadratic limb curves, elbow/knee nodes on the curve midpoint; tuns `vessels.edges` 0.45, `vessels.highlight` 1), quality gating (q2 edges+nodes, q1 nodes, q0 chest only), reduced motion (no travel or highlight, one soft pulse over nodes + dim edges, alpha <= 0.5).
 - [x] P6 State tuning checked end to end (fear: core brighter, hands/feet x0.75 net; blood loss: extremities f^2.5 vs core f^1.5; drained/fed none; mode table unchanged), devpanel tuns (all `vessels.*` auto-listed: + edges, highlight, window, windowRange), `Render.stats().vessels` + `Game.debugVessels`, smoke check (`?sys=vis.vessels:on`, 3 s from first beat: beats drawn, brightest foot ~0.4 s after each lub, fps, no errors), DESIGN.md rows (villager heartbeat chest pulse, vessel states).
-- [ ] P7 Playtest, then flag on by default.
+- [ ] P7 Playtest, then flag on by default. Headless review fixes (2026-10-21): halo 0.3 -> 0.2, size 1 -> 0.9, thinner highlight (0.85x radius), weak-heart easing `vessels.lowGamma` 0.5 (nearly drained villagers kept a faint core instead of vanishing), standing villagers' beats now make an echo with the flag on (strict tPrev edge dropped them).
 
 Physiology reference (adult ~1.7 m, game-tuned):
 - Path from heart (m): neck 0.25, head 0.40, wrist 0.90, fingertip 1.05, groin 0.70, knee 0.95, ankle 1.35, toes 1.50.

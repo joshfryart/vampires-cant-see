@@ -1116,6 +1116,9 @@
     const pulses = sonar && sonar.pulses ? sonar.pulses : [];
     const ps = state.people;
     const es = state.echoes;
+    const VF = root.VCS.Flags;
+    const V = root.VCS.Vessels;
+    const vessels = !!(V && V.timing && VF && VF.get && VF.get('vis.vessels'));
     for (let k = 0; k < pulses.length; k++) {
       const pu = pulses[k];
       const str = typeof pu.strength === 'number' ? pu.strength : 1;
@@ -1126,7 +1129,10 @@
         const ey = p.y - pu.y;
         if (ex * ex + ey * ey > pu.range * pu.range) continue;
         const la = Sonar.litAt(pu, p.x, p.y);
-        if (!(la > tPrev && la <= t)) continue;
+        // A heartbeat is emitted after this pass (stepAmbient runs after simulateWorld), so for a body that has not moved
+        // its own beat lands exactly on the next tPrev; with vis.vessels on, count that edge too (dedupe below keeps one).
+        const lo = vessels && pu.kind === 'vheart' ? la >= tPrev : la > tPrev;
+        if (!(lo && la <= t)) continue;
         const dist = (la - pu.t0) * pu.speed;
         if (dist > pu.range) continue;
         if (str < 0.12 && dist > 6) continue;
@@ -1170,9 +1176,6 @@
     }
     const fade = sonar && typeof sonar.fade === 'number' ? sonar.fade : 3;
     let w = 0;
-    const VF = root.VCS.Flags;
-    const V = root.VCS.Vessels;
-    const vessels = !!(V && V.timing && VF && VF.get && VF.get('vis.vessels'));
     for (let i = 0; i < es.length; i++) {
       let life = es[i].fade || fade;
       // Flag on: keep a heartbeat until its vessel wave (feet, dub, venous swell) has faded.

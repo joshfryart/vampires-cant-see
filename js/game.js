@@ -3381,15 +3381,16 @@
           VCS.Flags.register('dev.showFps', false, 'Show the FPS/debug overlay');
           VCS.Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
           VCS.Flags.registerTun('vessels', 'alpha', { value: 0.75, min: 0, max: 1, step: 0.05, desc: 'Vessel node base alpha' });
-          VCS.Flags.registerTun('vessels', 'size', { value: 1, min: 0.3, max: 3, step: 0.1, desc: 'Vessel dot size' });
+          VCS.Flags.registerTun('vessels', 'size', { value: 0.9, min: 0.3, max: 3, step: 0.1, desc: 'Vessel dot size' });
           VCS.Flags.registerTun('vessels', 'hot', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Hotspot bloom scale (carotid, femoral, radial)' });
           VCS.Flags.registerTun('vessels', 'veins', { value: 0.6, min: 0, max: 1, step: 0.05, desc: 'Vein alpha vs arteries' });
-          VCS.Flags.registerTun('vessels', 'halo', { value: 0.3, min: 0, max: 1, step: 0.05, desc: 'Soft halo alpha at quality 2+' });
+          VCS.Flags.registerTun('vessels', 'halo', { value: 0.2, min: 0, max: 1, step: 0.05, desc: 'Soft halo alpha at quality 2+' });
           VCS.Flags.registerTun('vessels', 'pwvScale', { value: 1.75, min: 1, max: 3, step: 0.05, desc: 'Pulse wave slow-down (travel delay x this)' });
           VCS.Flags.registerTun('vessels', 'minQuality', { value: 1, min: 1, max: 3, step: 1, desc: 'Lowest render quality that draws vessels' });
           VCS.Flags.registerTun('vessels', 'edges', { value: 0.45, min: 0, max: 1, step: 0.05, desc: 'Vessel edge line alpha (quality 2+)' });
           VCS.Flags.registerTun('vessels', 'window', { value: 0.35, min: 0, max: 1, step: 0.05, desc: 'Vessel alpha seen through a window (x distance falloff)' });
           VCS.Flags.registerTun('vessels', 'windowRange', { value: 2.5, min: 0.5, max: 5, step: 0.25, desc: 'Cells within which vessels show through glass' });
+          VCS.Flags.registerTun('vessels', 'lowGamma', { value: 0.5, min: 0.2, max: 1, step: 0.05, desc: 'Ease weak hearts (stateK < 1) so the core still shows when nearly drained' });
           VCS.Flags.registerTun('vessels', 'highlight', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Travelling highlight alpha along the edges' });
           VCS.Flags.load(root.location.search, debug);
           if (VCS.Flags.get('dev.showFps')) S.debugOn = true;

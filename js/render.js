@@ -2620,7 +2620,7 @@
 
   // ---- Circulatory pulse overlay (behind the `vis.vessels` flag): P3 nodes, P4 travelling lub-dub wave ----
   /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
-  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75, edges: 0.45, highlight: 1, window: 0.35, windowRange: 2.5 };
+  const VESSEL_TUN = { alpha: 0.75, size: 0.9, hot: 1, veins: 0.6, minQuality: 1, halo: 0.2, pwvScale: 1.75, edges: 0.45, highlight: 1, window: 0.35, windowRange: 2.5, lowGamma: 0.5 };
   const VESSEL_REDUCED_CAP = 0.5;
   /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
   const VESSEL_LEVELS = 6;
@@ -2648,7 +2648,7 @@
 
   /**
    * Static alpha (before the echo envelope) of one vessel node for a vheart echo e:
-   * base * w * stateK * lerp(1, periphK, periph) * (head ? headK : 1) * (1 + hot * hotK) (veins: * veinK, no hotspot).
+   * base * w * stateK' * lerp(1, periphK, periph) * (head ? headK : 1) * (1 + hot * hotK) (veins: * veinK, no hotspot); stateK' = stateK^vessels.lowGamma below 1.
    * opts {base, hotK, veinK, reduced}; reduced drops the hotspot bloom and caps at 0.5.
    */
   function vesselAlpha(n, e, opts) {
@@ -2659,7 +2659,11 @@
     const headK = typeof e.headK === 'number' ? e.headK : 1;
     const base = typeof o.base === 'number' ? o.base : VESSEL_TUN.alpha;
     const p = n.periph || 0;
-    let a = base * n.w * stateK * (1 - p + p * periphK) * (n.head ? headK : 1);
+    // Weak hearts (blood loss, sleep): stateK < 1 is eased by vessels.lowGamma (0.5) so the core still reads when nearly
+    // drained (15% blood: 0.06 -> 0.24) while periphK (~ blood) keeps fading the hands and feet first.
+    const g = vesselTun('lowGamma');
+    const k = stateK < 1 && g > 0 && g < 1 ? Math.pow(stateK, g) : stateK;
+    let a = base * n.w * k * (1 - p + p * periphK) * (n.head ? headK : 1);
     if (n.vein) a *= typeof o.veinK === 'number' ? o.veinK : VESSEL_TUN.veins;
     else if (!o.reduced) a *= 1 + (n.hot || 0) * (typeof o.hotK === 'number' ? o.hotK : VESSEL_TUN.hot);
     if (o.reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
@@ -2870,7 +2874,7 @@
           for (let k = 0; k < bk.length; k += 2) vesselSegment(c, nodes, bk[k], bk[k + 1], X, Y, 0, 1);
           c.stroke();
         }
-        c.lineWidth = Math.max(1, (vein ? 1.4 : 1.1) * rad);
+        c.lineWidth = Math.max(1, (vein ? 1.1 : 0.85) * rad);
         for (let lv = 1; lv <= VESSEL_LEVELS; lv++) {
           const bk = VESSEL_HL[lv];
           if (!bk.length) continue;

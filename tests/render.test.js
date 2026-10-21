@@ -780,9 +780,10 @@ describe('render-vessels (circulatory P3)', () => {
     Flags.set('vis.vessels', false);
   });
   // ---- P5: edges + travelling highlight ----
-  // Figure 200 px tall -> rad 3.2; artery highlight width 1.1 x rad, base line 0.55 x rad.
-  const HL_ART = 1.1 * 3.2;
-  const BASE_ART = 0.55 * 3.2;
+  // Figure 200 px tall -> rad 200 x 0.016 x size 0.9 = 2.88; artery highlight width 0.85 x rad, base line 0.55 x rad.
+  const RAD = 200 * 0.016 * 0.9;
+  const HL_ART = 0.85 * RAD;
+  const BASE_ART = 0.55 * RAD;
   const pts = (r, lw) => r.octx.calls.filter((c) => c.fn === 'lineTo' && Math.abs(c.lw - lw) < 1e-6);
   const strokes = (r) => r.octx.calls.filter((c) => c.fn === 'stroke');
 
