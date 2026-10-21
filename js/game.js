@@ -3379,7 +3379,7 @@
       try {
         if (VCS.Flags) {
           VCS.Flags.register('dev.showFps', false, 'Show the FPS/debug overlay');
-          VCS.Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+          VCS.Flags.register('vis.vessels', true, 'Circulatory pulse on villagers');
           VCS.Flags.registerTun('vessels', 'alpha', { value: 0.75, min: 0, max: 1, step: 0.05, desc: 'Vessel node base alpha' });
           VCS.Flags.registerTun('vessels', 'size', { value: 0.9, min: 0.3, max: 3, step: 0.1, desc: 'Vessel dot size' });
           VCS.Flags.registerTun('vessels', 'hot', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Hotspot bloom scale (carotid, femoral, radial)' });

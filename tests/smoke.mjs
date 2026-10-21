@@ -1897,6 +1897,16 @@ try {
     check('vessels: the foot lights after the chest (brightest foot 0.15-0.9 s after each lub)', lags.length >= 1 && lags.every((l) => l.lag > 0.15 && l.lag < 0.9 && l.feet > l.atOnset), JSON.stringify(lags));
     check('vessels: fps sanity (>= 10 headless) and no page errors', vr.fps >= 10 && errsV.length === 0, JSON.stringify({ fps: vr.fps, errs: errsV }));
     await pv.close();
+    // P7: on by default; ?sys=vis.vessels:off turns it off for the load.
+    const dflt = [];
+    for (const q of ['', '&sys=vis.vessels:off']) {
+      const pq = await newPg(browser, { viewport: { width: 640, height: 360 } });
+      await pq.goto(INDEX_URL + '?seed=7' + q);
+      await waitF(pq, () => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, 5000);
+      dflt.push(await pq.evaluate(() => window.VCS.Flags.get('vis.vessels')));
+      await pq.close();
+    }
+    check('vessels: vis.vessels on by default, ?sys=vis.vessels:off turns it off', dflt[0] === true && dflt[1] === false, JSON.stringify(dflt));
   }
   } catch (e) { secFail("vessels", e); }
   await closeLeaked([page, pg7, p8]);

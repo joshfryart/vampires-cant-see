@@ -74,6 +74,12 @@ torchlight shows you to people, so drink and hide in the dark.
   you drink, and anyone near it freezes and turns toward the sound. If another
   person sees you (torchlight, or within 1 cell) they flee and the drink ends.
   Grabbing someone from the front makes them gasp.
+- Up close (about 2.5 cells) you hear the nearest villagers' hearts. Each beat
+  lights their chest and sends a red pulse through their whole body: it
+  starts at the heart and travels out to the hands and feet (arteries red,
+  veins a deeper red-blue). Fear speeds it up and dims the hands and feet;
+  blood loss fades the limbs first. Walls hide it; through a window it shows
+  dimmer. Turn it off with `?sys=vis.vessels:off` or in the dev panel.
 - At 05:00 a bell chime sounds. From 05:30 your pulses fade outdoors.
 - At 06:00 dawn comes. If you are outdoors then, the run is lost. Indoors
   you can keep going, but stepping outside while it is day loses the run.
@@ -208,6 +214,10 @@ If something goes wrong, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 - `?map=NAME` (only with `?debug=1`): start on a named map, for example
   `?debug=1&map=test`.
 - `?safe=1`: ignore saved settings and start with defaults.
+- `?sys=ID:on|off` toggles a feature flag for this load, for example
+  `?sys=vis.vessels:off` turns off the whole-body heartbeat pulse (on by
+  default). `?tun=sys.key:value` sets a tunable, for example
+  `?tun=vessels.halo:0.3`.
 
 ## Debug hooks (debug builds only)
 
@@ -266,7 +276,7 @@ Playwright installed and writes a screenshot to `tests/out/smoke.png`.
       game.js           main loop, states, menus and overlays
       hunger.js         overflow gifts, powers and fear (pure state)
       data/hunger.js    gift, power and fear data
-      data/vessels.js   vessel graph for the body pulse (not wired in yet)
+      data/vessels.js   vessel graph and timing for the whole-body heartbeat pulse
     tests/              node:test unit tests and the smoke test
     tools/sim.mjs       economy simulation (node tools/sim.mjs)
     docs/DESIGN.md      rules, numbers and design for all modules
