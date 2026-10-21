@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="sheet-mode" content="dev">
+<title>Villager Figure Sheet</title>
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #141821; --line: #262c3a; --ink: #d9deea; --dim: #8b93a7; --accent: #ff8a78; --cell: 300px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(11, 13, 18, 0.96); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  h1 { font-size: 17px; margin: 0 0 6px; font-weight: 600; letter-spacing: 0.02em; }
+  h1 small { color: var(--dim); font-weight: 400; margin-left: 8px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .controls label { display: inline-flex; gap: 5px; align-items: center; color: var(--dim); white-space: nowrap; }
+  .controls select, .controls button, .controls input[type=range] { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; font: inherit; }
+  .controls input[type=range] { padding: 0; width: 140px; }
+  .controls button { cursor: pointer; min-width: 70px; }
+  .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tval { font-variant-numeric: tabular-nums; min-width: 4.5em; color: var(--ink); }
+  main { padding: 8px 16px 40px; }
+  section { margin: 18px 0 8px; }
+  section h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+  section p.note { margin: 0 0 8px; color: var(--dim); font-size: 13px; max-width: 70em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--cell), 100%), 1fr)); gap: 8px; }
+  .grid.pairs { grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--cell) * 2 + 8px), 100%), 1fr)); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
+  .pair > .cell { border: 0; padding: 0; }
+  .cell { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; margin: 0; min-width: 0; }
+  .cell canvas { display: block; width: 100%; height: auto; background: #000; border-radius: 5px; }
+  .cell figcaption { font-size: 12px; color: var(--dim); padding: 3px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell figcaption b { color: var(--ink); font-weight: 500; }
+  .wide canvas { width: 100%; }
+  .err { color: #ff6b5b; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+  @media (max-width: 640px) { header { position: static; } .controls input[type=range] { width: 100px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Villager figure sheet <small id="ver"></small></h1>
+  <div class="controls">
+    <label>Effects <select id="fx"><option value="0">0 Off (lines)</option><option value="1">1 Low</option><option value="2" selected>2 High</option></select></label>
+    <label>Quality <select id="q"><option>1</option><option>2</option><option selected>3</option></select></label>
+    <label>Zoom <select id="zoom"><option value="1">1x game</option><option value="2">2x</option><option value="3" selected>3x</option><option value="4">4x</option></select></label>
+    <label>Cells <select id="cellsz"><option value="200">S</option><option value="300" selected>M</option><option value="440">L</option><option value="640">XL</option></select></label>
+    <button id="play" type="button">Pause</button>
+    <label>Time <input id="time" type="range" min="0" max="20" step="0.01" value="0"><span class="tval" id="tval">0.00 s</span></label>
+    <label>Speed <select id="speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option></select></label>
+    <label>Seed <select id="seed"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+    <label>Pose look <select id="parch"></select></label>
+    <label><input id="sweep" type="checkbox"> pulse sweep</label>
+    <label><input id="rim" type="checkbox" checked> rim light</label>
+    <label><input id="reduced" type="checkbox"> reduced motion</label>
+    <label><input id="skel" type="checkbox"> skeleton slots</label>
+    <label><input id="graph" type="checkbox"> vessel graph</label>
+    <label><input id="parts" type="checkbox"> part outlines</label>
+    <label><input id="vall" type="checkbox"> vessels everywhere</label>
+  </div>
+</header>
+<main id="main"><noscript>This sheet needs JavaScript.</noscript></main>
+<script src="../js/log.js"></script>
+<script src="../js/flags.js"></script>
+<script src="../js/ripple.js"></script>
+<script src="../js/data/vessels.js"></script>
+<script src="../js/data/archetypes.js"></script>
+<script src="../js/data/voices.js"></script>
+<script src="../js/struggle.js"></script>
+<script src="../js/forge.js"></script>
+<script src="figure-v016.js"></script>
+<script src="../js/figure.js"></script>
+<script src="../js/render.js"></script>
+<script src="figure-sheet.js"></script>
+</body>
+</html>

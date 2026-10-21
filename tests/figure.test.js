@@ -80,16 +80,33 @@ test('sortBackToFront is stable and descending in z', () => {
   assert.deepStrictEqual(part.map((p) => p.z), [5, 1, 9]);
 });
 
-test('parts fills up to 16 sorted-ready parts with finite numbers', () => {
+test('parts: torso hull, neck, legs, feet, arms, hands, head (+ shovel shaft) as closed finite outlines', () => {
   const out = [];
   const n = Figure.parts(makeP(), POSE(), LOOK(), out);
-  assert.ok(n >= 15 && n <= 16);
+  assert.strictEqual(n, 11);
+  assert.deepStrictEqual(out.slice(0, n).map((p) => p.kind), ['torso', 'neck', 'leg', 'foot', 'arm', 'hand', 'leg', 'foot', 'arm', 'hand', 'head']);
   for (let i = 0; i < n; i++) {
     const p = out[i];
-    assert.ok(typeof p.kind === 'string' && p.kind);
     for (const k of ['r0', 'r1', 'z', 'ax', 'ay']) assert.ok(isFinite(p[k]), k);
+    assert.ok(p.n >= 12 && p.n <= Figure.MAX_POINTS, p.kind + ' ' + p.n);
+    for (let j = 0; j < p.n; j++) assert.ok(isFinite(p.px[j]) && isFinite(p.py[j]), p.kind);
   }
-  assert.strictEqual(Figure.parts(makeP(), POSE(), Object.assign(LOOK(), { extra: 'shovel' }), []), 16);
+  assert.ok(n <= Figure.MAX_PARTS);
+  assert.strictEqual(Figure.parts(makeP(), POSE(), Object.assign(LOOK(), { extra: 'shovel' }), []), 12);
+});
+
+test('limbs follow the line figure / vessel quadratic: elbow and knee curve midpoints are on the limb centreline', () => {
+  const P = makeP();
+  const out = [];
+  const n = Figure.parts(P, POSE(), LOOK(), out);
+  for (const [root, ctrl, end, kind] of [[2, 10, 6, 'arm'], [3, 11, 7, 'arm'], [4, 12, 8, 'leg'], [5, 13, 9, 'leg']]) {
+    const p = out.slice(0, n).find((q) => q.kind === kind && q.a === root);
+    const mx = 0.25 * P.X[root] + 0.5 * P.X[ctrl] + 0.25 * P.X[end];
+    const my = 0.25 * P.Y[root] + 0.5 * P.Y[ctrl] + 0.25 * P.Y[end];
+    assert.ok(Math.hypot(p.jx - mx, p.jy - my) < 1e-6, kind + ' joint at the curve midpoint');
+    assert.ok(Figure.contains(p, mx, my));
+    assert.ok(Figure.contains(p, P.X[root], P.Y[root]) || Figure.contains(out[0], P.X[root], P.Y[root]));
+  }
 });
 
 test('draw: fx 2 fills black occluders, fx 1 does not, fx 0 still strokes', () => {

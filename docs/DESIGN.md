@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.16.0)
+# Vampires Can't See - Design (v0.17.0)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.16.0'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.17.0'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map
@@ -224,8 +224,8 @@ Source: `js/figure.js` (`VCS.Figure`, a script before `render.js`), `js/render.j
   | fx | Figure | Black occlusion fill (near) | Wrap lines | Contact shadow | Flush | Grab arms |
   |---|---|---|---|---|---|---|
   | 0 | line figure only (`drawLineFigure`) | no | no | stroke | no | line |
-  | 1 | volumetric | no | 1 per torso, leg and upper/fore arm | stroke | no | volumetric |
-  | 2 | volumetric | yes, 0.55 x sa per part | 2 per part (t 0.35, 0.7) | filled 0.4 x sa + stroke | yes | volumetric |
+  | 1 | volumetric | no | 1 per torso, leg and arm (upper half) | stroke | no | volumetric |
+  | 2 | volumetric | yes, 0.55 x sa per part | torso 1, legs and arms 2 (t 0.25, 0.75) | filled 0.4 x sa + stroke | yes | volumetric |
 
 - **Volumetric gate.** `volWant = fx >= 1 && quality >= 1 && (locked || figMs <= figBudget)`. `vol = volWant && depth < 10`. The held victim skips the budget cut. Quality 0 and fx 0 never take this path.
 - **Near and far.** "Near" is depth < 6. Fills, wrap lines and the rim apply only when near. Depth 6..10 draws contours only.
@@ -233,10 +233,18 @@ Source: `js/figure.js` (`VCS.Figure`, a script before `render.js`), `js/render.j
   - Elder stoop from `look.stoop` (0..0.4): lean +0.1, head forward +0.06, shoulder -0.04, head -0.05, all times lh. Not in grapple, fed or cower.
   - Chat gesture when `e.chat && !moving`: side-0 hand lifts `0.06*lh*(0.5+0.5 sin(2 pi 0.6 t + pid))` and goes forward +0.05*lh. Reduced motion holds a static 0.03*lh.
   - Shovel (`extra`): over the shoulder while moving, planted beside foot 8 when idle. Bundle (`extra`) clutched at the chest while fleeing.
-- **Parts** (`Figure.parts`, up to 16): neck, torso (shoulders to hips, width from shoulder spread and yaw), and per side thigh, shin, foot, upper arm, forearm and hand (12). Then the head (ellipse, or rounded square for `headKind` square) and the shovel shaft when `extra` is shovel (the 16th). Limbs are tapered capsules, hands and feet are ellipses.
-- **Draw order.** Contact shadow, then parts sorted back to front (stable insertion sort, descending z). Per part: occlusion fill (fx 2, near, not the shovel shaft), contour stroke at `lw`, wrap arcs (fx >= 1, near, limbs and torso), rim stroke (near, k > 0.02). A robe clips legs to below the hem. Then `drawExtras` (mail, robe, cloak, apron, smock, role hats kettle and biretta, role items shovel, bundle, ledger, bow). Then the line-style details (nose and eyes, beard at lod 2, hair, hats, coat hem, seat edge, scarf, props, hands over head, stick body) and the dazed stars. Extras run only in vol mode and read slots 24/25 when set, else a point beside hand 6.
+- **Parts** (`Figure.parts`, v0.17 anatomy, 11 plus the shovel shaft): torso, neck, per side leg, foot, arm and hand, then the head. Every part is a closed outline (`px`/`py`, at most `MAX_POINTS` 40) drawn as a smooth curve through its edge midpoints.
+  - Torso: one hull from the neck base over the trapezius slope, shoulders (deltoid), ribcage, waist and pelvis to the crotch. Ten cross sections (lateral half-width W, depth D, forward offset F per body kind: bean, pear, stick, round, box; `look.shoulder`, `stoop` hunch, child belly) seen at the trunk yaw from the slot spreads: half extent `hs sqrt((W cr)^2 + (D sr)^2)`. One shoulder is up to 3.5% broader per person (wonk).
+  - Legs and arms: one outline each, swept along the SAME quadratic the line figure and the vessels use (root, elbow/knee slot as control, end). Radius and front/back bulge profiles over t (deltoid, biceps, elbow, forearm, wrist; thigh, kneecap, calf, ankle), scaled by body kind, build and child factor. The knee/elbow is the curve midpoint (t 0.5, where the vessel node sits). The inside of a bend is clamped to 0.85 x the curvature radius so nothing folds.
+  - Hands: a mitten palm with a thumb lobe (toward the front in profile, the middle head-on) and finger hints. Shoes: heel, instep and a slightly upturned toe, blended from a head-on dome by |sin yaw|. Head: cranium with jaw taper, chin and brow that follow the face direction, square/egg/long variants.
+  - Child (`look.height` <= 0.66, fading out by 0.82): head x1.25, chubbier limbs, rounder face, lower and bigger eyes; in vol mode `posePerson` also narrows shoulder and hip spreads by up to 32% (`kidW`, exactly 1 for line figures).
+  - Sorting z: legs +0.05 (behind the pelvis unless they come forward, e.g. seated), neck +0.03, head -0.08.
+  - Queries: `Figure.contains(part, x, y)` (nonzero winding), `Figure.hit` / `hitAll` (parts at a point, own pool), `Figure.spanAt` (silhouette span at a row; the band-front rings use it).
+- **Draw order.** Contact shadow, then parts sorted back to front (stable insertion sort, descending z). Per part: occlusion fill (fx 2, near, not the shovel shaft), contour stroke at `lw`, wrap arcs (fx >= 1, near, limbs and torso), rim stroke (near, k > 0.02). A robe clips legs to below the hem. Then `drawExtras` (mail, robe, cloak, apron, smock, role hats kettle and biretta, role items shovel, bundle, ledger, bow). Then the line-style details and the dazed stars. Face: ears (not under a hood, bonnet or bob), nose with nostrils head-on, and at lod 2 eyes with pupils and brows, and a mouth, all placed on the head as 3D points at the face yaw (`pose.cosYaw`, `noseX`). Mood from the mode: wide eyes and an open mouth (startle, flee, held), squeezed eyes (cower), closed (fed), knitted brows (wary), X eyes and a wavy mouth (dazed). Also beard, hair, hats, clavicles (bare neck, chest toward us), waistband, coat hem (corners sorted by x), seat edge, scarf, props, finger hints, kneecaps and elbow creases (lod 2), hands over head. Extras run only in vol mode and read slots 24/25 when set, else a point beside hand 6.
 - **Rim light.** `rimLight` picks the nearest `r.visWorld.lights` entry within 3 x radius of the echo. `k = 1 - d/(3 radius)`. Side is the sign of the light's offset along the camera right vector. Steady (lights do not flicker). Stroke `#ffcf8a` at `0.5 k sa`, width `0.8 lw`, on the lit side.
-- **Vessel flush** (fx 2 only). `drawVessels` writes `FLUSH[0..3]` (temporal, carotid, radial L, radial R) from the node pulse times stateK and periphK. `paintFlush` draws `#ff8a78` at the face (slot 0), neck (1) and wrists (6, 7). `a = min(cap, flush x skin x 0.25 x sa)`, skipped below 0.002. Cap 0.18, or 0.08 with reduced motion. It runs only from the two `drawVesselsSeen` call sites: `vheart` echoes with vessels on, and the held victim. The pulse follows the heart bpm, capped at 175 (`VESSELS.BPM_MAX`, 2.92 Hz).
+- **Vessel flush** (fx 2 only). `drawVessels` writes `FLUSH[0..3]` (temporal, carotid, radial L, radial R) from the node pulse times stateK and periphK. `paintFlush` draws `#ff8a78` fitted to the anatomy: the face (toward the facing side), along the neck part and over each wrist along the forearm. `a = min(cap, flush x skin x 0.25 x sa)`, skipped below 0.002. Cap 0.18, or 0.08 with reduced motion. It runs only from the two `drawVesselsSeen` call sites: `vheart` echoes with vessels on, and the held victim. The pulse follows the heart bpm, capped at 175 (`VESSELS.BPM_MAX`, 2.92 Hz).
+- **Circulation fit.** Vessel nodes and edges run inside the body for every archetype, body type, height, outfit, stoop, yaw and pose mode, including the held victim (`tests/figure-anatomy.test.js` checks each node against its owning part and samples every edge). On volumetric bodies `vesselRad` scales the dots by 0.8 (veins 1.35x instead of 1.6x) so they fit the wrists and ankles; line figures keep the v0.16 sizes.
+- **Figure sheet.** `tools/figure-sheet.html` draws the real figures through `Render.drawSolo` (archetypes x views, pose modes, body x head matrix, circulation, v0.16 before/after from `tools/figure-v016.js`). `node tools/build-figure-sheet.mjs [out]` regenerates that legacy copy from git and inlines everything into one offline HTML file.
 - **Budget guard.** `r.figMs`, `r.figVol` and `r.figLine` reset each frame in `drawFirstPerson`. Each vol `drawPerson` adds its `nowMs()` time to `figMs`. Once `figMs > figBudget` (default 2.5 ms, `figure.budgetMs` tunable 0.5..8 step 0.25), later non-held figures draw as lines that frame. `figureFrameEnd` runs after the echo pass: a frame is over when it had a vol figure and `figMs > figBudget`. 20 of the last 30 over frames at fxCfg 2 sets `r.fxCap = 1` for 10 s (High draws as Low), clears the history and logs once. The cap is lifted when the time runs out. `Render.stats().figure` is `{vol, line, ms, cap}`.
 - **3 Hz list.** Brightness: only the flush varies, and at most 2.92 Hz (bpm cap 175). Motion (position, not brightness):
   - chat hand 0.6 Hz (vol only; static when reduced)

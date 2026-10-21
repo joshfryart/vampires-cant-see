@@ -2140,6 +2140,8 @@
   /** Vessel flush strength per node (temporal, carotid, radialL, radialR), written by drawVessels, read by drawVesselsSeen. */
   const FLUSH = new Float32Array(4);
   const FLO = { look: null, alpha: 1, sa: 1, reduced: false };
+  /** Horizontal span of the volumetric silhouette at one screen row (Figure.spanAt), for the band-front rings. */
+  const SPAN = { x0: 0, x1: 0 };
   const FIG_BUDGET_MS = 2.5;
   const FIG_VOL_DEPTH = 10;
   const FIG_HIST = 30;
@@ -2147,6 +2149,12 @@
   const FIG_CAP_SECONDS = 10;
   /** Chat gesture frequency (Hz): the side-0 hand rises and falls. Well under 3 Hz. */
   const CHAT_HZ = 0.6;
+
+  /** Child factor 0..1 from look.height (1 at 0.66 and below, 0 from 0.82 up); vol figures only. */
+  function kidK(lh) {
+    const k = (0.82 - lh) / 0.16;
+    return k <= 0 ? 0 : k >= 1 ? 1 : k;
+  }
 
   /** Height offset of the chatting hand (lh units already applied); reduced motion holds a static 0.03. */
   function chatLift(tN, pid, lh, anim) {
@@ -2369,8 +2377,11 @@
     let headS = 0;          // sideways offset of the head (s), e.g. a lolling head
     let tilt = 0;           // head roll (screen radians)
     let bob = 0;
-    const hipS = (look.body === 'pear' ? 0.055 : look.body === 'round' ? 0.06 : look.body === 'stick' ? 0.03 : 0.04) * bw;
-    const shS = (look.body === 'round' ? 0.075 : look.body === 'stick' ? 0.05 : look.body === 'pear' ? 0.05 : 0.062) * bw;
+    // Vol only: a child (short look.height) gets narrower shoulders and hips so the bigger head reads as a child's.
+    // Exactly 1 for line figures, so their slots are bit-identical.
+    const kidW = vol ? 1 - 0.32 * kidK(lh) : 1;
+    const hipS = (look.body === 'pear' ? 0.055 : look.body === 'round' ? 0.06 : look.body === 'stick' ? 0.03 : 0.04) * bw * kidW;
+    const shS = (look.body === 'round' ? 0.075 : look.body === 'stick' ? 0.05 : look.body === 'pear' ? 0.05 : 0.062) * bw * kidW;
     let footF = [0, 0]; let footS = [hipS * 1.15, -hipS * 1.15]; let footU = [0, 0];
     let kneeF = [0.012 * lh, 0.012 * lh]; let kneeS = [hipS * 1.25, -hipS * 1.25]; let kneeU = [0, 0];
     let handF = [0, 0]; let handS = [0, 0]; let handU = [0, 0];
@@ -2621,6 +2632,8 @@
     P.faceVis = faceVis; P.eyesVis = eyesVis; P.gJolt = gJolt; P.minX = minX; P.maxX = maxX;
     P.hipS = hipS; P.lh = lh; P.look = look; P.acc = acc; P.pid = pid; P.tN = tN; P.anim = anim; P.sweeping = sweeping; P.dur = dur;
     P.vol = vol; P.sr = Math.sin(rel); P.cr = Math.cos(rel); P.vsy = vs * fig.sy; P.t = tN;
+    // Read only by the volumetric figure (face direction, shoulder half-span in body units).
+    P.cosYaw = Math.cos(yaw); P.shS = shS;
     return true;
   }
 
@@ -3037,8 +3050,12 @@
           if (zn < 0 || zn > 1.05) continue;
           const u = zn * fig.H;
           let rx;
+          let rcx = fig.cx + fig.sway * u * hs + sweepWave(zn, age) * 0.02 * hs;
           if (vol) {
-            rx = volRingRx(u);
+            // The ring hugs the volumetric silhouette at this height (Figure.spanAt), else the v0.15 radius estimate.
+            const ry = fig.floorY - u * fig.sy * vs;
+            if (Figure.spanAt && Figure.spanAt(PP, P, P.look, ry, SPAN)) { rx = (SPAN.x1 - SPAN.x0) * 0.5 * 1.08 + lw; rcx = (SPAN.x0 + SPAN.x1) * 0.5; }
+            else rx = volRingRx(u);
           } else {
             const rad = u < hipU ? hipS * 1.3 : u < shU ? bodyRx / hs / fig.sx : u < headU - 0.06 * lh ? 0.04 : hr / hs * 0.9;
             rx = rad * hs * 1.15;
@@ -3046,7 +3063,7 @@
           const g = (1 - age / SWEEP) * (1 - m * 0.3);
           c.globalAlpha = Math.min(1, alpha * g * 1.4);
           c.beginPath();
-          c.ellipse(fig.cx + fig.sway * u * hs + sweepWave(zn, age) * 0.02 * hs, fig.floorY - u * fig.sy * vs, rx, Math.max(1, rx * 0.22), 0, 0, TWO_PI);
+          c.ellipse(rcx, fig.floorY - u * fig.sy * vs, rx, Math.max(1, rx * 0.22), 0, 0, TWO_PI);
           c.stroke();
         }
       }
@@ -3072,6 +3089,11 @@
   /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
   const VESSEL_TUN = { alpha: 0.75, size: 0.9, hot: 1, veins: 0.6, minQuality: 1, halo: 0.2, pwvScale: 1.75, edges: 0.45, highlight: 1, window: 0.35, windowRange: 2.5, lowGamma: 0.5 };
   const VESSEL_REDUCED_CAP = 0.5;
+  /** Dot scale on volumetric bodies (artery radius x K, vein radius x VEIN instead of 1.6); see vesselRad. */
+  const VESSEL_VOL_K = 0.8;
+  const VESSEL_VOL_VEIN = 1.35;
+  /** True only inside drawVesselsSeen for the volumetric figure just posed. */
+  let vesselFit = false;
   /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
   const VESSEL_LEVELS = 6;
   const VESSEL_PT = { x: 0, y: 0 };
@@ -3168,6 +3190,23 @@
    * pulse passed Sonar.visibleFrom. Returns the nodes drawn (> 0 when anything showed).
    */
   function drawVesselsSeen(r, e, X, Y, age, x0, x1, depth, player) {
+    // Volumetric bodies get dots sized to sit inside their wrists and ankles (see vesselRad); line figures keep v0.16 sizes.
+    vesselFit = pose.vol && X === PX && Y === PY;
+    try { return drawVesselsSeenFit(r, e, X, Y, age, x0, x1, depth, player); } finally { vesselFit = false; }
+  }
+
+  /**
+   * Vessel dot radius (px) from the figure's on-screen height (head to lower foot): figPx x 0.016 x vessels.size, scaled
+   * by wscale (0.6..1.5). fit (volumetric body): x VESSEL_VOL_K so artery dots (and veins at VESSEL_VOL_VEIN x) stay
+   * inside the wrist and ankle radii of Figure's limb profiles.
+   */
+  function vesselRad(r, Y, fit) {
+    const figPx = Math.max(Math.abs(Y[8] - Y[0]), Math.abs(Y[9] - Y[0]), 1);
+    const rad = Math.max(1, figPx * 0.016 * vesselTun('size')) * (r.wscale > 0 ? Math.min(1.5, Math.max(0.6, r.wscale)) : 1);
+    return fit ? Math.max(0.75, rad * VESSEL_VOL_K) : rad;
+  }
+
+  function drawVesselsSeenFit(r, e, X, Y, age, x0, x1, depth, player) {
     let n = 0;
     clippedDraw(r, x0, x1, depth, function () { const k = drawVessels(r, e, X, Y, age); n += k; if (k > 0) paintFlush(r, e, X, Y, 1); });
     const m = vesselWindowMute(r, e, player);
@@ -3262,9 +3301,7 @@
     const tm = age >= 0 ? V.timing(e.bpm, reduced, pws) : null;
     if (tm && age >= tm.life) return 0;
     const opts = { base: vesselTun('alpha'), hotK: vesselTun('hot'), veinK: vesselTun('veins'), reduced: reduced };
-    // Dot size from the figure's on-screen height (head to lower foot).
-    const figPx = Math.max(Math.abs(Y[8] - Y[0]), Math.abs(Y[9] - Y[0]), 1);
-    const rad = Math.max(1, figPx * 0.016 * vesselTun('size')) * (r.wscale > 0 ? Math.min(1.5, Math.max(0.6, r.wscale)) : 1);
+    const rad = vesselRad(r, Y, vesselFit);
     const halo = !reduced && q >= 2 ? vesselTun('halo') : 0;
     const edgeK = q >= 2 ? vesselTun('edges') : 0;
     const hlK = q >= 2 && !reduced && tm ? vesselTun('highlight') : 0;
@@ -3281,7 +3318,7 @@
       const nodes = list[li];
       const vein = li === 0;
       const rgb = vein ? D.VEIN_RGB : D.ARTERY_RGB;
-      const rr = vein ? rad * 1.6 : rad;
+      const rr = vein ? rad * (vesselFit ? VESSEL_VOL_VEIN : 1.6) : rad;
       const style = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
       for (let i = 0; i < nodes.length; i++) {
         V.point(nodes[i], X, Y, VESSEL_PT);
@@ -4426,6 +4463,53 @@
   /** Test hook: the pose slots and scratch pose of the last figure posed (live arrays, read only). */
   function poseDebug() { return { X: PX, Y: PY, Z: PZ, pose: pose }; }
 
+  /**
+   * Tool hook (tools/figure-sheet.html, tests): draw one villager echo e into r.octx through the real drawPerson path
+   * (pose, pulse-strip masking, rim light, volumetric or line figure, vessels, grab arms) with no world: nothing occludes
+   * it. o = {fx 0..2, quality, t (clock s), age (s since the band reached it, -1 = lit), b (strength), lights
+   * [{x, y, radius}], player {x, y, angle}, lock {k, age, sp, rs} (draws e as the held victim)}. Does not clear octx.
+   * Returns true when something was drawn. Never throws.
+   */
+  function drawSolo(r, e, o) {
+    try {
+      o = o || {};
+      const cfg = r.config || {};
+      const fov = (typeof cfg.fovDeg === 'number' ? cfg.fovDeg : 66) * Math.PI / 180;
+      const tanHalf = Math.tan(fov / 2);
+      const player = o.player || { x: 0, y: 0, angle: 0 };
+      r.horizon = r.oh / 2;
+      r.zbuf.fill(1e9);
+      r.tch.fill(0);
+      r.visWorld = o.lights ? { lights: o.lights } : null;
+      const fx = typeof o.fx === 'number' && isFinite(o.fx) ? Math.round(Math.max(0, Math.min(2, o.fx))) : 2;
+      r.fxCfg = fx; r.fx = fx; r.fxCap = 0;
+      if (typeof o.quality === 'number') r.quality = o.quality;
+      r.fxTaper = r.fx === 2 && r.quality >= 3;
+      r.figMs = 0; r.figVol = 0; r.figLine = 0; r.figBudget = 1e9;
+      r.vesselNodes = 0; r.vesselHeart = 0; r.vesselFeet = 0;
+      const t = typeof o.t === 'number' ? o.t : 0;
+      r.boilOn = cfg.lineBoil !== false && !r.reduced && r.quality >= 2 && !!VCS.Ripple;
+      r.bf = r.boilOn ? VCS.Ripple.boilFrame(t) : 0;
+      r.octx.setTransform(1, 0, 0, 1, 0, 0);
+      const lk = o.lock;
+      if (lk) {
+        r.lockId = e.personId || 0;
+        r.lockK = typeof lk.k === 'number' ? lk.k : 0.5;
+        r.lockAge = typeof lk.age === 'number' ? lk.age : 1;
+        r.lockSp = typeof lk.sp === 'number' ? lk.sp : 9;
+        r.lockRs = typeof lk.rs === 'number' ? lk.rs : 0;
+        return drawPerson(r, player, tanHalf, e, 0.9, -1, false, t, true);
+      }
+      r.lockId = -1;
+      const age = typeof o.age === 'number' ? o.age : -1;
+      const b = typeof o.b === 'number' ? o.b : 1;
+      return drawPerson(r, player, tanHalf, e, b, age, age >= 0 && age < FLASH_AGE, t, false);
+    } catch (err) {
+      logOnce(r, 'solo', err);
+      return false;
+    }
+  }
+
   const Render = {
     create: create,
     setConfig: setConfig,
@@ -4438,6 +4522,8 @@
     setVignette: setVignette,
     stats: stats,
     poseDebug: poseDebug,
+    drawSolo: drawSolo,
+    vesselRad: vesselRad,
     chatLift: chatLift,
     flushValues: FLUSH,
     CHAT_HZ: CHAT_HZ,
