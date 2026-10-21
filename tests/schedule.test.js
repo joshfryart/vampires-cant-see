@@ -125,6 +125,53 @@ describe('schedule.test.js', () => {
     }
   });
 
+  test('high village fear sends everyone but the watch home early', () => {
+    const world = worlds.town;
+    const st = People.create(world, town, { seed: 11, shuffle: true });
+    const walkers = st.people.filter((p) => p.sched);
+    const nightSec = 240;
+    const indoors = (p) => !!p.sched.home && world.zoneAt(p.x, p.y) === p.sched.home;
+    for (let t = 0; t < 120; t += DT) { openDoorsNear(world, st); People.update(st, world, DT, { nightFrac: 0.1, nightSec: nightSec, fear: 0 }); }
+    assert.ok(walkers.some((p) => p.sched.role !== 'guard' && !indoors(p)), 'some are still out at 21:00');
+    for (let t = 0; t < 120; t += DT) { openDoorsNear(world, st); People.update(st, world, DT, { nightFrac: 0.1, nightSec: nightSec, fear: 12 }); }
+    for (const p of walkers) {
+      if (p.sched.role === 'guard') assert.ok(!world.zoneAt(p.x, p.y), 'the watch stays out');
+      else assert.ok(indoors(p), p.sched.role + ' ' + p.id + ' went home at high fear');
+    }
+  });
+
+  test('fleeing along a scheduled trip never wraps through the walls from its end back to its start', () => {
+    const world = worlds.town;
+    let fled = 0;
+    for (const seed of [3, 5, 8, 13]) {
+      const st = People.create(world, town, { seed: seed, shuffle: true });
+      let tr = [];
+      for (let t = 0; t < 240 && !tr.length; t += DT) {
+        openDoorsNear(world, st);
+        People.update(st, world, DT, { nightFrac: t / 240, nightSec: 240 });
+        tr = st.people.filter((q) => q.sched && q.sched.en && q.mode === 'path' && q.path.length > 3 && q.idx > 1);
+      }
+      for (const p of tr) {
+        p.mode = 'flee';
+        p.fleeFrom = { x: p.path[0].x, y: p.path[0].y };
+        p.calmLeft = 12;
+        p.idx = 1; // just left the start: wrapping 1 -> 0 -> last looks like the short way to the far end
+        p.x = p.path[1].x;
+        p.y = p.path[1].y;
+        fled++;
+      }
+      for (let t = 0; t < 10; t += DT) {
+        openDoorsNear(world, st);
+        People.update(st, world, DT, { nightFrac: 0.3, nightSec: 240 });
+        for (const p of st.people) {
+          assert.ok(!world.isSolid(p.x, p.y) || ['D', 'G'].includes(world.tileAt(p.x, p.y)), 'person ' + p.id + ' in a wall at seed ' + seed + ' t=' + t.toFixed(1));
+        }
+        for (const p of tr) if (p.mode === 'flee') assert.ok(p.idx > 0, 'person ' + p.id + ' fled back to the start of its trip (idx ' + p.idx + ')');
+      }
+    }
+    assert.ok(fled > 0, 'some walkers were mid-trip');
+  });
+
   test('home life: evening acts happen indoors at the home cells', () => {
     const world = worlds.town;
     const st = People.create(world, town, { seed: 4, shuffle: true });

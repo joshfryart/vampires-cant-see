@@ -1305,7 +1305,12 @@
         const e = out[i];
         const mat = stepMaterial(e.x, e.y);
         const sc = VCS.SoundData.stepScale(e.gait, mat, e.pace);
-        emitSound('personStep', e.x, e.y, { rangeMul: sc.range, strengthMul: sc.strength, fadeMul: sc.fade });
+        // The foot lands a little to the left or right of the body; the ring is a flat scuff stretched along the heading.
+        const side = (e.foot ? 1 : -1) * 0.12;
+        const fx = e.x - Math.sin(e.angle) * side;
+        const fy = e.y + Math.cos(e.angle) * side;
+        const spu = emitSound('personStep', fx, fy, { rangeMul: sc.range, strengthMul: sc.strength, fadeMul: sc.fade });
+        if (spu) spu.hd = e.angle;
         if (S.audio) VCS.Audio.play(S.audio, 'personStep', spatial(e.x, e.y, Math.min(1, lv.gain * sc.gain), { material: mat }));
       }
     }
@@ -1833,7 +1838,31 @@
       ' lit ' + (S.renderer ? VCS.Render.stats(S.renderer).litColumns : 0) + '\n' +
       'people ' + (S.people ? S.people.people.length : 0) +
       ' echoes ' + (S.people ? S.people.echoes.length : 0) +
-      ' rings ' + (S.ripple ? S.ripple.rings.length : 0) + '\n' + last;
+      ' rings ' + (S.ripple ? S.ripple.rings.length : 0) + '\n' + schedLines() + last;
+  }
+
+  /** V1 debug readout (?debug=1): role, now, next stop and ETA for the 6 nearest scheduled villagers. */
+  function schedLines() {
+    if (!S.debugEnabled || !S.people || !S.player) return '';
+    const near = [];
+    const list = S.people.people;
+    for (let i = 0; i < list.length; i++) {
+      const q = list[i];
+      if (!q.sched) continue;
+      near.push({ q: q, d: Math.hypot(q.x - S.player.x, q.y - S.player.y) });
+    }
+    near.sort(function (a, b) { return a.d - b.d; });
+    let out = '';
+    for (let i = 0; i < near.length && i < 6; i++) {
+      const q = near[i].q;
+      const s = q.sched;
+      const cur = s.stops[s.si];
+      const nx = s.stops[Math.min(s.stops.length - 1, Math.max(0, s.si) + 1)];
+      const eta = VCS.Schedule.eta(s.stops, Math.max(0, s.si), S.pctx.nightFrac, S.pctx.nightSec);
+      out += s.role + ' ' + (cur ? cur.place + ':' + cur.act : '-') + (s.en ? ' >' : ' @') + ' next ' + (nx ? nx.place : '-') +
+        ' eta ' + (typeof eta === 'number' && isFinite(eta) ? Math.round(eta) + 's' : '-') + (s.homeEarly ? ' HOME' : '') + ' d' + near[i].d.toFixed(0) + '\n';
+    }
+    return out;
   }
 
   /** One animation frame. */
@@ -3749,6 +3778,53 @@
       BREATH_OPTS.occluded = occludedTo(q.x, q.y);
       VCS.Audio.breath(a, BREATH_OPTS);
     }
+    stepHeartbeats(dt, list);
+  }
+
+  const HEART_OPTS = { pan: 0, dist: 1, behind: false, occluded: false, bpm: 70 };
+
+  /** Villager bpm by state: calm 65, wary 90, startled 100, fleeing or cowering 130; slows as blood drains. */
+  function heartBpm(q) {
+    let bpm = 65;
+    if (q.mode === 'flee' || q.mode === 'cower') bpm = 130;
+    else if (q.mode === 'startle' || q.bumping) bpm = 100;
+    else if (q.wary > 0) bpm = 90;
+    const k = q.pool > 0 ? clamp(q.left / q.pool, 0, 1) : 1;
+    return bpm * (0.5 + 0.5 * k);
+  }
+
+  /** Heartbeat of the nearest two villagers within 2 cells (also through a wall: the occlusion filter dulls it). */
+  function stepHeartbeats(dt, list) {
+    const a = S.audio;
+    const p = S.player;
+    let n1 = null;
+    let d1 = 4;
+    let n2 = null;
+    let d2 = 4;
+    for (let i = 0; i < list.length; i++) {
+      const q = list[i];
+      if (q.mode === 'fed') continue;
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const d = dx * dx + dy * dy;
+      if (d >= d2) continue;
+      if (d < d1) { n2 = n1; d2 = d1; n1 = q; d1 = d; } else { n2 = q; d2 = d; }
+    }
+    for (let k = 0; k < 2; k++) {
+      const q = k === 0 ? n1 : n2;
+      if (!q) continue;
+      if (q.heartT === undefined) q.heartT = 0.2 + frng() * 0.6;
+      q.heartT -= dt;
+      if (q.heartT > 0) continue;
+      const bpm = heartBpm(q);
+      q.heartT = 60 / bpm;
+      HEART_OPTS.dist = Math.sqrt(k === 0 ? d1 : d2);
+      HEART_OPTS.pan = panTo(q.x, q.y);
+      HEART_OPTS.behind = Math.cos(Math.atan2(q.y - p.y, q.x - p.x) - p.angle) < 0;
+      HEART_OPTS.occluded = occludedTo(q.x, q.y);
+      HEART_OPTS.bpm = bpm;
+      VCS.Audio.heartbeat(a, HEART_OPTS);
+    }
   }
 
   const TUT_TEXT = {
@@ -3756,7 +3832,8 @@
     person: 'Echoes that move are people — hold right-click close to drink',
     vial: 'Vial = blood. Drink past full for gifts',
     fear: 'Eyes by the clock = fear',
-    sleep: 'E at the crypt or a dark spot to sleep'
+    sleep: 'E at the crypt or a dark spot to sleep',
+    light: 'Eye = light on you. Stay dark to stay unseen'
   };
 
   /** Which tutorial hints were already seen in this browser (vcs.seen entries "tut:<id>"). */
@@ -3820,6 +3897,7 @@
     if (n) {
       if (n.blood < 50) tutQueue('vial');
       if (S.hunger && S.hunger.fear > 0) tutQueue('fear');
+      if (S.veilK > 0.5) tutQueue('light');
       if (n.night === 1 && n.min >= 510) tutQueue('sleep');
     }
     if (S.cardText !== null || S.hintT > 0) return;
@@ -3865,6 +3943,7 @@
     c.grace = S.grace;
     c.nightFrac = S.night ? VCS.Night.clock(S.night).frac : 0;
     c.nightSec = S.night ? S.night.nightSec : 0;
+    c.fear = S.hunger ? S.hunger.fear : 0;
     return c;
   }
 

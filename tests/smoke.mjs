@@ -18,6 +18,23 @@ const tmpOut = path.join(os.tmpdir(), 'vcs-smoke'); // outside OneDrive
 const outDir = path.join(tmpOut, 'out');
 fs.mkdirSync(outDir, { recursive: true });
 
+// Pages share one stable origin when served over http (file:// localStorage is flaky across pages in headless Chromium).
+// SMOKE_FILE=1 loads from file:// like a downloaded copy.
+import http from 'node:http';
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
+let INDEX_URL = 'file://' + path.join(root, 'index.html');
+let httpServer = null;
+if (!process.env.SMOKE_FILE) {
+  httpServer = http.createServer((req, res) => {
+    const f = path.join(root, decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html');
+    if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end(); return; }
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
+    fs.createReadStream(f).pipe(res);
+  });
+  await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
+  INDEX_URL = 'http://127.0.0.1:' + httpServer.address().port + '/index.html';
+}
+
 const failures = [];
 function check(name, ok, detail) {
   console.log((ok ? 'PASS ' : 'FAIL ') + name + (detail ? ' - ' + detail : ''));
@@ -62,7 +79,7 @@ async function launch() {
 }
 
 // Tutorial hints are first-time only (localStorage vcs.seen); suppress them by default so pixel checks stay clean.
-const SEEN_ALL = ['tut:ping', 'tut:person', 'tut:vial', 'tut:fear', 'tut:sleep'];
+const SEEN_ALL = ['tut:ping', 'tut:person', 'tut:vial', 'tut:fear', 'tut:sleep', 'tut:light'];
 const opened = [];
 // Deterministic Math.random for every page (mulberry32), so wander/idle/break-free rolls cannot flip a check.
 const PIN_RANDOM = () => {
@@ -115,7 +132,7 @@ if (process.argv.includes('--shots')) {
   const fps = {};
   let code = 0;
   try {
-    const url = 'file://' + path.join(root, 'index.html') + '?seed=7&debug=1';
+    const url = INDEX_URL + '?seed=7&debug=1';
     const open = async (start) => {
       const pg = await newPg(br, { viewport: { width: 1280, height: 720 } });
       pg.on('pageerror', (e) => console.log('pageerror: ' + (e && e.message ? e.message : e)));
@@ -241,7 +258,7 @@ try {
   });
   page.on('pageerror', (e) => pageErrors.push(String(e && e.message ? e.message : e)));
 
-  await page.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1&map=test');
+  await page.goto(INDEX_URL + '?seed=7&debug=1&map=test');
   await page.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state !== 'boot', null, { timeout: 5000 })
     ;
   const s0 = await page.evaluate(() => window.VCS && window.VCS.Game ? window.VCS.Game.debugState() : null);
@@ -449,7 +466,7 @@ try {
   const p6 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
   const errs6 = [];
   p6.on('pageerror', (e) => errs6.push(String(e && e.message ? e.message : e)));
-  await p6.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1');
+  await p6.goto(INDEX_URL + '?seed=7&debug=1');
   await p6.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   const b0 = await p6.evaluate(() => window.VCS.Game.debugState());
   check('boot without ?map starts on crypt', b0.map === 'crypt' && b0.state === 'title', 'map=' + b0.map + ' state=' + b0.state);
@@ -618,7 +635,7 @@ try {
   const page3 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
   const errs3 = [];
   page3.on('pageerror', (e) => errs3.push(String(e && e.message ? e.message : e)));
-  await page3.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1&safe=1&map=test');
+  await page3.goto(INDEX_URL + '?seed=7&debug=1&safe=1&map=test');
   await page3.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   await clickNew(page3);
   await sleep(300);
@@ -647,7 +664,7 @@ try {
   const page2 = await newPg(browser, { viewport: { width: 1000, height: 600 } });
   const errs2 = [];
   page2.on('pageerror', (e) => errs2.push(String(e && e.message ? e.message : e)));
-  await page2.goto('file://' + path.join(root, 'index.html'));
+  await page2.goto(INDEX_URL);
   await page2.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
   await clickNew(page2);
   await sleep(300);
@@ -662,7 +679,7 @@ try {
   await closeLeaked([page, pg7, p8]);
   try {
   // ---------------- v0.7 checks ----------------
-  url07 = 'file://' + path.join(root, 'index.html');
+  url07 = INDEX_URL;
   mk07 = async (query) => {
     const pg = await newPg(browser, { viewport: { width: 1000, height: 600 } });
     const errs = [];
@@ -1428,7 +1445,7 @@ try {
   try {
   // ---- v0.9.1: night length setting, guide, unlock sub line ----
   {
-    const urlG = 'file://' + path.join(root, 'index.html');
+    const urlG = INDEX_URL;
     const shotsG = path.join(tmpOut, 'shotsG');
     fs.mkdirSync(shotsG, { recursive: true });
     const errsG = [];
@@ -1510,7 +1527,7 @@ try {
   try {
   // ---- v0.10 wave B: saves, flags, audio, rules, tutorial, guide ----
   {
-    const urlB = 'file://' + path.join(root, 'index.html');
+    const urlB = INDEX_URL;
     const errsB = [];
     const VP = { viewport: { width: 1000, height: 600 } };
     const wire = (pg) => pg.on('pageerror', (e) => errsB.push(String(e && e.message ? e.message : e)));
@@ -1771,7 +1788,7 @@ try {
     const pd = await newPg(browser, { viewport: { width: 1000, height: 600 } });
     const errsD = [];
     pd.on('pageerror', (e) => errsD.push(String(e && e.message ? e.message : e)));
-    await pd.goto('file://' + path.join(root, 'index.html') + '?seed=7&debug=1');
+    await pd.goto(INDEX_URL + '?seed=7&debug=1');
     await waitF(pd, () => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, 5000);
     const hid0 = await pd.evaluate(() => document.getElementById('devpanel').hidden);
     await pd.keyboard.press('F9');
@@ -1785,7 +1802,7 @@ try {
     check('dev panel: no page errors', errsD.length === 0, errsD.join(' | '));
     await pd.close();
     const pn = await newPg(browser, { viewport: { width: 1000, height: 600 } });
-    await pn.goto('file://' + path.join(root, 'index.html') + '?seed=7');
+    await pn.goto(INDEX_URL + '?seed=7');
     await waitF(pn, () => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, 5000);
     const errsN = [];
     pn.on('pageerror', (e) => errsN.push(String(e)));

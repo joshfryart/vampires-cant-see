@@ -1005,6 +1005,85 @@
   }
 
   /**
+   * One heartbeat "lub-dub" felt through the body: 60 Hz and 80 Hz sine thumps with a short 120 Hz click, low-passed near 200 Hz.
+   * Quiet and mono-ish. opts {pan, dist, behind, occluded, bpm}: gain falls to 0 at hearDist (2 cells), bpm sets the lub-dub gap.
+   * @returns {boolean} true when played.
+   */
+  function heartbeat(a, opts) {
+    try {
+      if (!ready(a)) return false;
+      const o = opts || {};
+      const lv = levelOf('vheart', 0.06);
+      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 2;
+      let gain = lv.gain;
+      if (typeof o.dist === 'number' && Number.isFinite(o.dist) && o.dist >= 0) {
+        if (o.dist >= hear) return false;
+        gain *= 1 - o.dist / hear;
+      }
+      if (o.behind) gain *= 0.8;
+      if (o.occluded) gain *= 0.6;
+      gain *= a.volume;
+      if (!(gain > 0)) return false;
+      const ctx = a.ctx;
+      if (typeof ctx.createOscillator !== 'function') return false;
+      const bpm = typeof o.bpm === 'number' && Number.isFinite(o.bpm) ? Math.min(180, Math.max(30, o.bpm)) : 70;
+      const gap = Math.min(0.35, 60 / bpm * 0.32);
+      const t = ctx.currentTime || 0;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 200;
+      let node = null;
+      if (typeof o.pan === 'number' && Number.isFinite(o.pan) && typeof ctx.createStereoPanner === 'function') {
+        const pn = ctx.createStereoPanner();
+        if (pn && pn.pan) {
+          pn.pan.value = (o.pan < -1 ? -1 : o.pan > 1 ? 1 : o.pan) * 0.5;
+          pn.connect(master(ctx).out);
+          lp.connect(pn);
+          node = pn;
+        }
+      }
+      if (!node) lp.connect(master(ctx).out);
+      const thump = (at, freq, amp) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq * 1.6, at);
+        osc.frequency.exponentialRampToValueAtTime(freq, at + 0.05);
+        g.gain.setValueAtTime(0, at);
+        g.gain.linearRampToValueAtTime(gain * amp, at + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
+        osc.connect(g);
+        g.connect(lp);
+        osc.onended = function () {
+          try { g.disconnect(); } catch (e) { /* best effort */ }
+        };
+        osc.start(at);
+        osc.stop(at + 0.16);
+        return osc;
+      };
+      thump(t, 60, 1);
+      const last = thump(t + gap, 80, 0.7);
+      const clk = ctx.createOscillator();
+      const cg = ctx.createGain();
+      clk.type = 'sine';
+      clk.frequency.value = 120;
+      cg.gain.setValueAtTime(gain * 0.35, t);
+      cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+      clk.connect(cg);
+      cg.connect(lp);
+      clk.start(t);
+      clk.stop(t + 0.04);
+      last.addEventListener && last.addEventListener('ended', function () {
+        try { lp.disconnect(); if (node) node.disconnect(); } catch (e) { /* best effort */ }
+      });
+      return true;
+    } catch (e) {
+      reportFailure(a, 'Sound failed to play a heartbeat', e);
+      return false;
+    }
+  }
+
+  /**
    * Plays one soft breath swell (about 0.8 s in, 0.8 s out). Cheap: reuses a cached buffer; a gain node and a
    * source per call (plus a panner only when pan is given); cleans itself up when it ends.
    * @param {object} a Audio state.
@@ -1202,7 +1281,7 @@
     if (a) a.pingBip = bip === true;
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, fireBed };
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, heartbeat, fireBed };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;

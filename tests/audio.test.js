@@ -1214,6 +1214,17 @@ describe('audio-atmosphere (B4)', () => {
     assert.doesNotThrow(() => s.onended());
   });
 
+  test('villager heartbeat: plays within 2 cells, silent beyond, no-ops without a context', () => {
+    const a = mk();
+    assert.strictEqual(Audio.heartbeat(a, { dist: 1, bpm: 65 }), true);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 2 }), false);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 5 }), false);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 1, pan: 0.6, occluded: true, behind: true, bpm: 130 }), true);
+    assert.strictEqual(Audio.heartbeat(Audio.create({}), { dist: 1 }), false);
+    assert.doesNotThrow(() => Audio.heartbeat(null));
+    assert.ok(a.ctx.count.osc >= 3, 'lub, dub and click oscillators');
+  });
+
   test('breath swell is 0.8 s in/out, scales with distance and rate; beyond 6 cells drops', () => {
     const a = mk();
     const peakAt = (o) => {

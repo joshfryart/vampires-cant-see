@@ -19,6 +19,7 @@
   const LIT_MAX_STEPS = 15;
   const LIT_MIN = 0.3;
   const WARY_SEE_MUL = 0.5;
+  const FEAR_HOME = 8; // village fear at which scheduled villagers (not the watch) go home for the night
   const WHIMPER_GAP = 1.5;
   const MAX_EVENTS = 64;
   const NO_EVENTS = Object.freeze([]);
@@ -348,7 +349,7 @@
     const state = {
       people: [], echoes: [], seed: seed, rng: mulberry32(seed),
       maxEchoes: typeof o.maxEchoes === 'number' && o.maxEchoes > 0 ? Math.floor(o.maxEchoes) : 24,
-      radius: 0.2, hides: sanitizeHides(world, mapDef), time: 0, nightFrac: 0, nightSec: 0, litCache: new Map(), lastScream: -Infinity, events: [], world: world || null,
+      radius: 0.2, hides: sanitizeHides(world, mapDef), time: 0, nightFrac: 0, nightSec: 0, fear: 0, litCache: new Map(), lastScream: -Infinity, events: [], world: world || null,
       rp: {
         startleDist: REACT_DEFAULTS.startleDist, seeDist: REACT_DEFAULTS.seeDist, seeCone: REACT_DEFAULTS.seeCone,
         bumpDist: REACT_DEFAULTS.bumpDist, fleeMul: REACT_DEFAULTS.fleeMul, calmAfter: REACT_DEFAULTS.calmAfter,
@@ -515,6 +516,15 @@
     p.idx = fwd ? nf : nb;
   }
 
+  /**
+   * Flight route on a scheduled trip: the path is open (start to stop), so never wrap from its end back to its start
+   * through the walls in between. Step one waypoint toward goal g; when blocked (stay) keep the current target unless g lies behind.
+   */
+  function routeOpen(p, g, stay) {
+    if (g > p.idx) { p.fdir = 1; if (!stay && p.idx < p.path.length - 1) p.idx++; } else if (g < p.idx) { p.fdir = -1; p.idx--; } else p.fdir = 1;
+    if (p.idx < 0) p.idx = 0;
+  }
+
   function startCower(p, px, py) {
     p.route = null;
     p.mode = 'cower';
@@ -611,7 +621,9 @@
     const Sched = sched();
     const s = p.sched;
     if (s.en) { p.state = 'walk'; return; }
-    const want = Sched.stopAt(s.stops, state.nightFrac);
+    // High village fear sends everyone but the watch home for the rest of the night (the last stop is bed).
+    if (!s.homeEarly && state.fear >= FEAR_HOME && s.role !== 'guard') s.homeEarly = true;
+    const want = s.homeEarly ? s.stops.length - 1 : Sched.stopAt(s.stops, state.nightFrac);
     if (want === s.si && !s.retarget) return;
     const stop = s.stops[want];
     s.target = want;
@@ -743,6 +755,11 @@
       p.blockCount = 0;
       const g = farthestWaypoint(p, px, py);
       if (g < 0) { startCower(p, px, py); return; }
+      if (p.sched) {
+        if (g === p.idx) startCower(p, px, py);
+        else routeOpen(p, g);
+        return;
+      }
       route(p, g, (p.idx + 1) % n, (p.idx - 1 + n) % n, px, py);
       return;
     }
@@ -753,6 +770,7 @@
       // Blocked once: re-pick the goal from where we stand.
       const g = farthestWaypoint(p, px, py);
       if (g < 0) { startCower(p, px, py); return; }
+      if (p.sched) { routeOpen(p, g, true); return; }
       route(p, g, p.idx, (p.idx - p.fdir + n + n) % n, px, py);
     } else {
       p.blockCount = 0;
@@ -833,6 +851,7 @@
     const hasPlayer = !!pl && isFinite(pl.x) && isFinite(pl.y) && !(ctx.grace > 0);
     const lit = ctx && typeof ctx.playerLit === 'number' ? ctx.playerLit : 0;
     if (ctx && typeof ctx.nightFrac === 'number' && isFinite(ctx.nightFrac)) state.nightFrac = ctx.nightFrac;
+    state.fear = ctx && typeof ctx.fear === 'number' && isFinite(ctx.fear) ? ctx.fear : 0;
     if (ctx && typeof ctx.nightSec === 'number' && isFinite(ctx.nightSec)) state.nightSec = ctx.nightSec;
     // Pose bookkeeping for the renderer (no behaviour): seconds in the current mode, gait phase before this tick.
     for (let i = 0; i < ps.length; i++) {
@@ -1162,8 +1181,10 @@
       p.stepsReported = p.steps;
       for (let k = 0; k < todo; k++) {
         let e = pool[n];
-        if (!e) { e = { x: 0, y: 0, id: 0, gait: 'walk', pace: 1 }; pool[n] = e; }
+        if (!e) { e = { x: 0, y: 0, id: 0, gait: 'walk', pace: 1, angle: 0, foot: 0 }; pool[n] = e; }
         e.x = p.x; e.y = p.y; e.id = p.id;
+        e.angle = p.angle;
+        e.foot = (p.steps - todo + k) & 1; // alternate left/right foot
         e.gait = p.mode === 'flee' ? 'run' : p.wary > 0 ? 'sneak' : 'walk';
         e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;

@@ -1512,8 +1512,17 @@
         for (let s = 0; s <= FOOT_SEG; s++) {
           const th = (s / FOOT_SEG) * TWO_PI;
           const Rw = Ripple.wavyRadius(R, th, t * 3 + ph, 5, 0.06);
-          const wx = pu.x + Math.cos(th) * Rw;
-          const wy = pu.y + Math.sin(th) * Rw;
+          let wx = pu.x + Math.cos(th) * Rw;
+          let wy = pu.y + Math.sin(th) * Rw;
+          if (own && typeof pu.hd === 'number') {
+            // scuff: flat ellipse stretched along the walking direction
+            const lx = Math.cos(th) * Rw * 1.2;
+            const ly = Math.sin(th) * Rw * 0.5;
+            const ch = Math.cos(pu.hd);
+            const sh = Math.sin(pu.hd);
+            wx = pu.x + lx * ch - ly * sh;
+            wy = pu.y + lx * sh + ly * ch;
+          }
           const dx = wx - player.x;
           const dy = wy - player.y;
           const fwd = dx * ca + dy * sa;

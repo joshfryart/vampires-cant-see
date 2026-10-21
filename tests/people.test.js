@@ -160,6 +160,22 @@ describe('people.test.js', () => {
       }
     }
     assert.strictEqual(idleSteps, 0);
+    // Each person's plants alternate left/right foot and carry the heading.
+    const lastFoot = {};
+    let alternated = 0;
+    const st2 = People.create(world, def, { seed: 1 });
+    for (let i = 0; i < 60 * 12; i++) {
+      People.update(st2, world, DT);
+      People.stepEvents(st2, 0, 0, out);
+      for (let k = 0; k < out.length; k++) {
+        const e = out[k];
+        assert.ok(e.foot === 0 || e.foot === 1);
+        assert.ok(Number.isFinite(e.angle));
+        if (lastFoot[e.id] !== undefined && lastFoot[e.id] !== e.foot) alternated++;
+        lastFoot[e.id] = e.foot;
+      }
+    }
+    assert.ok(alternated > 5, 'feet alternate: ' + alternated);
     const walked = st.people.reduce((a, p) => a + p.walked, 0);
     // phase advances 9 rad per cell: two plants per 2*PI rad.
     const expected = walked * 9 / Math.PI;
