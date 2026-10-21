@@ -180,9 +180,9 @@
       room: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.02 },
       dog: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.2, hearDist: 60 },
       bell: { range: 0, strength: 0, z: 0.9, fade: 1, bounces: 0, gain: 0.3, hearDist: 80 },
-      breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 },
+      breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.018, hearDist: 6 },
       // villager heartbeat: heard and shown (a small chest-high pulse per beat) out to 5 cells = 2.5 x the old 2-cell hearing, gain +15%
-      vheart: { range: 0.5, strength: 0.7, z: 0.65, fade: 0.9, bounces: 0, gain: 0.069, hearDist: 5 }
+      vheart: { range: 0.5, strength: 1, z: 0.65, fade: 1.3, bounces: 0, gain: 0.069, hearDist: 5 }
     },
     // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
     stepScaleTable: {
