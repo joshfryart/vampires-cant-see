@@ -2315,8 +2315,15 @@
   function newTabId() {
     let r = '';
     try {
-      r = Math.random().toString(36).slice(2, 10);
+      const a = new Uint32Array(2);
+      root.crypto.getRandomValues(a);
+      r = a[0].toString(36) + a[1].toString(36);
     } catch (e) { /* ignore */ }
+    if (!r) {
+      try {
+        r = Math.random().toString(36).slice(2, 10);
+      } catch (e) { /* ignore */ }
+    }
     return 't' + (r || '0') + Math.floor(root.performance && root.performance.now ? root.performance.now() : 0).toString(36);
   }
 

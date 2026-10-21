@@ -78,6 +78,8 @@ async function closeLeaked(keep) {
     try { await p.context().close(); } catch (e) { /* already closed */ }
   }
 }
+// Let the page's localStorage writes reach the browser process before a reload/second tab reads them (Chromium flushes lazily under load).
+const settleReload = async (pg) => { await sleep(700); await pg.reload(); };
 function secFail(name, e) { check('section completed: ' + name, false, e && e.stack ? e.stack : String(e)); }
 // Click "New run" and wait for the run to actually start (no fixed sleep).
 async function clickNew(pg) {
@@ -1151,7 +1153,7 @@ try {
   check('v0.8: boon recorded, pending cleared', run1.boons.length === 1 && run1.pendingBoons === null && run1.seed === run0.seed, JSON.stringify(run1));
   await p8.evaluate(() => window.VCS.Game.debugSave());
   // Reload: Continue restores the same run.
-  await p8.reload();
+  await settleReload(p8);
   await toTitle();
   check('v0.8: after reload Continue is enabled', await p8.evaluate(() => !document.getElementById('btn-continue').disabled));
   await p8.click('#btn-continue', { timeout: 10000 });
@@ -1205,7 +1207,7 @@ try {
   check('v0.8: failed import left meta intact', (await p8.evaluate(() => window.VCS.Game.debugMeta())).upgrades.far_echo === 1);
   check('v0.8: parseImport rejects __proto__ keys', await p8.evaluate(() => VCS.Save.parseImport('{"app":"vcs","kind":"export","v":1,"game":"x","meta":null,"run":null,"__proto__":{"a":1}}').code) === 'E_SAVE_BAD_KEY');
   // Reload: the upgrade persists and shapes the next run.
-  await p8.reload();
+  await settleReload(p8);
   await toTitle();
   check('v0.8: upgrade tier persists across reload', (await p8.evaluate(() => window.VCS.Game.debugMeta())).upgrades.far_echo === 1);
   await clickNew(p8);
@@ -1214,7 +1216,7 @@ try {
   check('v0.8: far_echo tier 1 gives sonarRange 1.15', Math.abs(fx1.sonarRange - 1.15) < 1e-9, JSON.stringify(fx1));
   // Abandon flow needs the title with a stored run: reload (pagehide saves), then New run twice.
   await p8.evaluate(() => window.VCS.Game.debugSave());
-  await p8.reload();
+  await settleReload(p8);
   await toTitle();
   const runsBefore = (await p8.evaluate(() => window.VCS.Game.debugMeta())).stats.runs;
   await clickNew(p8);
@@ -1225,7 +1227,7 @@ try {
   check('v0.8: second click abandons (records a run) and starts a new one', (await ds(p8)).state === 'playing' && (await p8.evaluate(() => window.VCS.Game.debugMeta())).stats.runs === runsBefore + 1);
   // Corrupt main meta with a valid backup: reload restores the backup and says so.
   await p8.evaluate(() => { window.VCS.Game.debugSave(); window.VCS.Game.debugSave(); const o = JSON.parse(localStorage.getItem('vcs.meta')); o.sum = 'deadbeef'; localStorage.setItem('vcs.meta', JSON.stringify(o)); });
-  await p8.reload();
+  await settleReload(p8);
   await toTitle();
   const nt8 = await noticeText();
   check('v0.8: corrupt meta with a backup shows a restored-backup notice', /restored backup/.test(nt8), nt8);
@@ -1378,7 +1380,7 @@ try {
   // Save, reload, Continue: hunger survives.
   const pre = await hg();
   await v9(() => window.VCS.Game.debugSave());
-  await p9.reload();
+  await settleReload(p9);
   await title9();
   await sleep(300);
   await p9.click('#btn-continue', { timeout: 10000 });
@@ -1713,7 +1715,7 @@ try {
       await pg.evaluate(() => VCS.Game.debugAdvance(5.5));
       await pg.evaluate(() => { VCS.Game.debugTime(4, 30); VCS.Game.debugAdvance(0.2); });
       check('v0.10: sleep hint at 04:30 on night 1', (await dsB(pg)).tutHint === 'E at the crypt or a dark spot to sleep', JSON.stringify(await pg.evaluate(() => [VCS.Game.debugState().tutHint, VCS.Game.debugState().night.clock])));
-      await pg.reload();
+      await settleReload(pg);
       await pg.waitForFunction(() => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, { timeout: 20000 });
       await startB(pg);
       await pg.evaluate(() => VCS.Game.debugAdvance(2.8));
