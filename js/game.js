@@ -3790,28 +3790,50 @@
 
   const HEART_OPTS = { pan: 0, dist: 1, behind: false, occluded: false, bpm: 70 };
 
-  /** Villager bpm by state: calm 65, wary 90, startled 100, fleeing or cowering 130; slows as blood drains. */
-  function heartBpm(q) {
-    let bpm = 65;
-    if (q.mode === 'flee' || q.mode === 'cower') bpm = 130;
-    else if (q.mode === 'startle' || q.bumping) bpm = 100;
-    else if (q.wary > 0) bpm = 90;
-    const k = q.pool > 0 ? clamp(q.left / q.pool, 0, 1) : 1;
-    return bpm * (0.5 + 0.5 * k);
+  // Neutral pulse state when the vessel helpers are not loaded (bpm 65, no blood scaling).
+  const HEART_FALLBACK = { pulse: true, bpm: 65, stateK: 1, periphK: 1, headK: 1 };
+
+  /** Vessel mode name for a villager: flee/cower 130, startle (or bumping) 100, wary 90, otherwise calm 65. */
+  function heartMode(q) {
+    if (q.mode === 'flee' || q.mode === 'cower') return q.mode;
+    if (q.mode === 'startle' || q.bumping) return 'startle';
+    if (q.wary > 0) return 'wary';
+    return 'calm';
   }
 
-  /** Heartbeat of the nearest two villagers within hearDist (2.5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse. */
+  /**
+   * Villager pulse state (single source of truth for the audio heartbeat and the vheart echo): VCS.Vessels.state
+   * with blood = left/pool, so bpm follows the research curve (rises to ~1.3x at 40% blood, then falls to 0 at
+   * empty), capped at 175 bpm. Returns { pulse, bpm, stateK, periphK, headK }.
+   */
+  function heartState(q) {
+    const V = VCS.Vessels;
+    if (!V || typeof V.state !== 'function') return HEART_FALLBACK;
+    const blood = q.pool > 0 ? clamp(q.left / q.pool, 0, 1) : 1;
+    return V.state('villager', heartMode(q), blood);
+  }
+
+  /** Villager bpm (0 = no pulse). */
+  function heartBpm(q) {
+    return heartState(q).bpm;
+  }
+
+  /**
+   * Heartbeat of the nearest two villagers within hearDist (2.5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse.
+   * The drink victim is skipped: drinkBeat owns its beat while the player drinks.
+   */
   function stepHeartbeats(dt, list) {
     const a = S.audio;
     const p = S.player;
     const hear = level('vheart').hearDist || 2.5;
+    const victim = S.drink ? S.drink.person : null;
     let n1 = null;
     let d1 = hear * hear;
     let n2 = null;
     let d2 = hear * hear;
     for (let i = 0; i < list.length; i++) {
       const q = list[i];
-      if (q.mode === 'fed') continue;
+      if (q.mode === 'fed' || q === victim) continue;
       const dx = q.x - p.x;
       const dy = q.y - p.y;
       const d = dx * dx + dy * dy;
@@ -3824,8 +3846,15 @@
       if (q.heartT === undefined) q.heartT = 0.2 + frng() * 0.6;
       q.heartT -= dt;
       if (q.heartT > 0) continue;
-      const bpm = heartBpm(q);
+      const hs = heartState(q);
+      if (!hs.pulse || !(hs.bpm > 0)) { q.heartT = 0.5; continue; }
+      const bpm = hs.bpm;
       q.heartT = 60 / bpm;
+      // Snapshot fields for the vheart echo (People.updateEchoes copies them onto the echo).
+      q.heartBpm = bpm;
+      q.heartStateK = hs.stateK;
+      q.heartPeriphK = hs.periphK;
+      q.heartHeadK = hs.headK;
       HEART_OPTS.dist = Math.sqrt(k === 0 ? d1 : d2);
       HEART_OPTS.pan = panTo(q.x, q.y);
       HEART_OPTS.behind = Math.cos(Math.atan2(q.y - p.y, q.x - p.x) - p.angle) < 0;
@@ -4444,7 +4473,8 @@
   Game.__test = {
     bind: function (o) { Object.assign(S, o); },
     firstSolid: firstSolid, blockMaterial: blockMaterial, occlusionTo: occlusionTo,
-    pingEcho: pingEcho, floorBounce: floorBounce, personEcho: personEcho
+    pingEcho: pingEcho, floorBounce: floorBounce, personEcho: personEcho,
+    heartState: heartState, heartBpm: heartBpm, stepHeartbeats: stepHeartbeats
   };
   VCS.Game = Game;
   if (typeof module !== 'undefined' && module.exports) module.exports = Game;

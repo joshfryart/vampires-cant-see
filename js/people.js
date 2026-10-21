@@ -1156,6 +1156,13 @@
           // Pose state for the renderer (snapshot of the moment the wavefront passed).
           mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
         };
+        if (echo.kind === 'vheart') {
+          // Circulatory state at this beat (set by game.js stepHeartbeats before the beat is emitted), for the vessel overlay.
+          echo.bpm = typeof p.heartBpm === 'number' ? p.heartBpm : 0;
+          echo.stateK = typeof p.heartStateK === 'number' ? p.heartStateK : 1;
+          echo.periphK = typeof p.heartPeriphK === 'number' ? p.heartPeriphK : 1;
+          echo.headK = typeof p.heartHeadK === 'number' ? p.heartHeadK : 1;
+        }
         if (dup >= 0) es.splice(dup, 1);
         es.push(echo);
         made.push(echo);

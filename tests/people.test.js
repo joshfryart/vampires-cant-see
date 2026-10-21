@@ -330,6 +330,28 @@ describe('people.test.js', () => {
     assert.strictEqual(mine[0].kind, 'vheart');
   });
 
+  test('a vheart echo carries the circulatory snapshot fields (bpm, stateK, periphK, headK)', () => {
+    const world = World.load(def);
+    const st = People.create(world, def, { seed: 1 });
+    const sonar = Sonar.create({ speed: 12, range: 10, fade: 3, cooldown: 0, bounces: 0 });
+    const p = st.people[0];
+    Object.assign(p, { heartBpm: 84.5, heartStateK: 0.35, heartPeriphK: 0.5, heartHeadK: 1.25 });
+    Sonar.emitSound(sonar, world, p.x, p.y, 0, { kind: 'vheart', strength: 0.2, range: 0.5, z: 0.65, fade: 0.7, bounces: 0, visRays: 90 });
+    Sonar.emitSound(sonar, world, p.x, p.y, 0, { kind: 'personStep', strength: 0.35, range: 0.7, z: 0, fade: 0.7, bounces: 0, visRays: 90 });
+    let all = [];
+    let tPrev = -DT;
+    for (let t = 0; t <= 0.5; t += DT) { all = all.concat(People.updateEchoes(st, sonar, tPrev, t)); tPrev = t; }
+    const heart = all.find((e) => e.personId === p.id && e.kind === 'vheart');
+    assert.ok(heart);
+    assert.strictEqual(heart.bpm, 84.5);
+    assert.strictEqual(heart.stateK, 0.35);
+    assert.strictEqual(heart.periphK, 0.5);
+    assert.strictEqual(heart.headK, 1.25);
+    assert.ok(heart.strength > 0);
+    const step = all.find((e) => e.personId === p.id && e.kind === 'personStep');
+    assert.ok(step && step.bpm === undefined, 'only heartbeat echoes carry the fields');
+  });
+
   test('echoBrightness uses the echo own fade when present', () => {
     const e = { t: 0, strength: 1, fade: 0.5 };
     assert.ok(People.echoBrightness(e, 0.4, 3) > 0);
