@@ -1497,7 +1497,11 @@
       if (age < 0 || age >= fade) continue;
       const str = typeof pu.strength === 'number' ? pu.strength : 0.3;
       const own = pu.kind === 'personStep';
-      const nrk = own ? Math.min(nr, 2) : nr;
+      const nrk = own ? 1 : nr; // a villager's step is one flat scuff ellipse, not rings
+      const sideOff = own && typeof pu.side === 'number' ? pu.side * 0.09 : 0;
+      const heading = own && typeof pu.ang === 'number' ? pu.ang : 0;
+      const ha = Math.cos(heading);
+      const hb = Math.sin(heading);
       ctx.strokeStyle = own ? COL_RING_PERSON : '#e8f2ff';
       for (let m = 0; m < nrk; m++) {
         const R = Ripple.footRing(age, fade, pu.range * (1.8), m);
@@ -1512,8 +1516,18 @@
         for (let s = 0; s <= FOOT_SEG; s++) {
           const th = (s / FOOT_SEG) * TWO_PI;
           const Rw = Ripple.wavyRadius(R, th, t * 3 + ph, 5, 0.06);
-          const wx = pu.x + Math.cos(th) * Rw;
-          const wy = pu.y + Math.sin(th) * Rw;
+          let wx;
+          let wy;
+          if (own) {
+            // Ground-hugging ellipse long along the walking direction, the foot offset to its own side.
+            const ex = Math.cos(th) * Rw;
+            const ey = Math.sin(th) * Rw * 0.45;
+            wx = pu.x - hb * sideOff + ex * ha - ey * hb;
+            wy = pu.y + ha * sideOff + ex * hb + ey * ha;
+          } else {
+            wx = pu.x + Math.cos(th) * Rw;
+            wy = pu.y + Math.sin(th) * Rw;
+          }
           const dx = wx - player.x;
           const dy = wy - player.y;
           const fwd = dx * ca + dy * sa;

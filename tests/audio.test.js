@@ -1214,6 +1214,19 @@ describe('audio-atmosphere (B4)', () => {
     assert.doesNotThrow(() => s.onended());
   });
 
+  test('villagerHeart: lub-dub of low sines, quiet, drops beyond 2.5 cells, cleans up', () => {
+    const a = mk();
+    assert.strictEqual(Audio.villagerHeart(a, { dist: 2.5 }), false);
+    assert.strictEqual(Audio.villagerHeart(a, { dist: 9 }), false);
+    assert.strictEqual(Audio.villagerHeart(a, { dist: 1, pan: -0.3, bpm: 130 }), true);
+    const c = a.ctx;
+    assert.strictEqual(c.count.osc, 4, 'two thumps, each a 60 Hz body plus a 120 Hz click');
+    assert.strictEqual(c.count.src, 0, 'no noise buffers');
+    assert.doesNotThrow(() => Audio.villagerHeart(a, { dist: 1, occluded: true, bpm: 40 }));
+    assert.strictEqual(Audio.villagerHeart(a, { dist: 1, gain: 0 }), false);
+    assert.strictEqual(Audio.villagerHeart(null, { dist: 1 }), false);
+  });
+
   test('breath swell is 0.8 s in/out, scales with distance and rate; beyond 6 cells drops', () => {
     const a = mk();
     const peakAt = (o) => {

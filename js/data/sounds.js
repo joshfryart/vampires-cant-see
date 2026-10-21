@@ -180,7 +180,8 @@
       room: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.02 },
       dog: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.2, hearDist: 60 },
       bell: { range: 0, strength: 0, z: 0.9, fade: 1, bounces: 0, gain: 0.3, hearDist: 80 },
-      breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 }
+      breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 },
+      villagerHeart: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.07, hearDist: 2.5 }
     },
     // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
     stepScaleTable: {

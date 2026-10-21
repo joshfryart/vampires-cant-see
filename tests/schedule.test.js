@@ -156,6 +156,43 @@ describe('schedule.test.js', () => {
     assert.ok(Math.hypot(p.x - stop.x, p.y - stop.y) < 1.5);
   });
 
+  test('village fear pulls the night forward: the scared head to bed early, the watch never does', () => {
+    const world = worlds.town;
+    const targetActs = (fear) => {
+      const st = People.create(world, town, { seed: 6, shuffle: true });
+      for (let t = 0; t < 3; t += DT) People.update(st, world, DT, { nightFrac: 0.5, nightSec: 240, fear: fear });
+      return st.people.filter((q) => q.sched && q.sched.role !== 'guard' && q.sched.target >= 0)
+        .map((q) => q.sched.stops[q.sched.target].act);
+    };
+    const calm = targetActs(0).filter((x) => x === 'sleep').length;
+    const scared = targetActs(15).filter((x) => x === 'sleep').length;
+    assert.ok(scared > calm, 'more people bound for bed when scared: ' + scared + ' vs ' + calm);
+    const st = People.create(world, town, { seed: 6, shuffle: true });
+    for (let t = 0; t < 3; t += DT) People.update(st, world, DT, { nightFrac: 0.5, nightSec: 240, fear: 15 });
+    st.people.filter((q) => q.sched && q.sched.role === 'guard').forEach((g) => {
+      assert.strictEqual(g.sched.stops[g.sched.target].act, 'watch');
+    });
+  });
+
+  test('fleeing along a scheduled trip never wraps from its last waypoint to its first (no walking through walls)', () => {
+    const world = worlds.town;
+    for (let seed = 1; seed <= 3; seed++) {
+      const st = People.create(world, town, { seed: seed, shuffle: true });
+      for (let t = 0; t < 90; t += DT) {
+        openDoorsNear(world, st);
+        People.update(st, world, DT, { nightFrac: 0.2 + t / 600, nightSec: 240 });
+        if (Math.abs(t - 40) < DT) {
+          // Frighten everyone mid-trip from where they stand.
+          st.people.forEach((q) => { if (q.sched && q.mode === 'path') { q.mode = 'flee'; q.fleeFrom = { x: q.x + 0.6, y: q.y }; q.calmLeft = 4; q.route = null; q.blockCount = 0; } });
+        }
+        for (const q of st.people) {
+          if (!q.sched) continue;
+          assert.ok(!world.isSolid(q.x, q.y) || ['D', 'G'].includes(world.tileAt(q.x, q.y)), 'person ' + q.id + ' in a wall at t=' + t.toFixed(1) + ' seed ' + seed);
+        }
+      }
+    }
+  });
+
   test('snapshot exposes schedule info for the debug readout', () => {
     const world = worlds.town;
     const st = People.create(world, town, { seed: 3 });

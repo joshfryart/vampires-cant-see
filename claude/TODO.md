@@ -4,8 +4,8 @@ Each version: Opus pulls src → contract → agents → tests + smoke + screens
 
 ## Roadmap (agreed 2026-10-20)
 - **0.11.2** DONE 2026-10-20 (vignette setting, floor-bounce echo, roughness speckles, person echoes on object sonar equation, echo tests; 586 unit + smoke pass; not checked by ear/eye: floor echo loudness, speckles, perf fps).
-- **0.11.3** stealth feedback: notice/fear tied to veil exposure, `tut:light`, villager heartbeat, footstep scuff ellipse, V1 leftovers (debug schedule readout, go-home-early on fear, flee-through-wall bug).
-- **0.12.0** eavesdropping: W2 listen at windows, W3 synth voices (few presets), V4 dinner tables by lit windows, V2 villager-to-villager conversations (meetings, turn-taking chat) as the overheard content. Subtitles (V5) after.
+- **0.11.3** DONE 2026-10-21 (591 unit pass; smoke is flaky on Linux, same on the 0.11.2 baseline). Notice range scales with the veil value (60% of seeDist at the lightSeen threshold up to 100% at light 0.7), `tut:light` at veil > 50%, villager heartbeat (`Audio.villagerHeart`, nearest 2 within 2.5 cells, calm 65 / wary 90 / scared 135 / dazed 45 bpm, volume follows Ambience; the drink grab keeps its own slowing beat), footstep scuff ellipse (one flat ellipse along the heading, left/right offset per foot), `?debug=1` + F3 schedule readout (6 nearest), village fear pulls the schedule forward up to 0.2 of the night (not the watch), scheduled trips no longer wrap last waypoint -> first when fleeing (could not reproduce the old wall-cower in a fuzz run, so not proven fixed). Not checked by ear/eye: heartbeat loudness, scuff look. Open: fear gain per sighting (only the notice range scales so far), heartbeat visual pulse in the warm-sense halo.
+- **0.12.0** eavesdropping (W2 listen at windows + W3 synth voices ship together, W3 first because W2 needs something to hear): W2 listen at windows, W3 synth voices (few presets), V4 dinner tables by lit windows, V2 villager-to-villager conversations (meetings, turn-taking chat) as the overheard content. Subtitles (V5) after.
 - Later: bigger map, items/light, animals, watch (need building mockup first).
 
 ## Next (in order)
@@ -165,20 +165,20 @@ Now: lit ≥ 0.3 → warm edge vignette. Binary-feeling, easy to miss, reads as 
   - Colours: cold blue-grey hidden → candle gold exposed (match window/door tints). No flashing; gentle 0.5 Hz breathe at full exposure only (≤3 Hz rule).
   - Text alt for screen readers + large-text scaling.
 - [ ] Keep vignette but tone down (it becomes secondary); setting to turn it off.
-- [ ] Tie meter to real mechanic: villager notice/fear gain scales with exposure (check people.js spotting uses same value — one source of truth).
-- [ ] Tutorial hint `tut:light` first time meter > 50%.
+- [x] (0.11.3, notice range only) Tie meter to real mechanic: villager notice/fear gain scales with exposure (check people.js spotting uses same value — one source of truth).
+- [x] (0.11.3) Tutorial hint `tut:light` first time meter > 50%.
 
 ### Villager heartbeat (circulatory)
-- [ ] Heartbeat audio when within ~2 cells: low thump-thump (≈60 Hz sine + 120 Hz click, lowpassed ~200 Hz, "through the body" muffled). Quiet, mono-ish, panned to villager.
-- [ ] Rate tracks state: calm 60–70 bpm, wary 90, fleeing/fear 130+, drinking slows as blood drains → stops at empty (dazed = faint slow).
+- [x] (0.11.3) Heartbeat audio when within ~2 cells: low thump-thump (≈60 Hz sine + 120 Hz click, lowpassed ~200 Hz, "through the body" muffled). Quiet, mono-ish, panned to villager.
+- [x] (0.11.3) Rate tracks state: calm 60–70 bpm, wary 90, fleeing/fear 130+, drinking slows as blood drains → stops at empty (dazed = faint slow).
 - [ ] Visual (optional): faint warm pulse in Warm-sense halo synced to beat; ≤3 Hz always holds (130 bpm = 2.2 Hz ok).
-- [ ] Only nearest 1–2 villagers audible (voice cap). Setting volume under Ambience.
+- [x] (0.11.3) Only nearest 1–2 villagers audible (voice cap). Setting volume under Ambience.
 - [ ] Doubles as a stealth/hunt cue: hear a hidden villager behind a door (uses Echoes occlusion filter once v0.11 lands).
 
 ### Footstep rings (villagers)
 Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big full rings.
 - [x] (v0.10.13: range 0.4, strength 0.25) Shrink: range ~0.35, strength ~0.2, shorter fade.
-- [ ] Restyle: small floor-only ellipse "scuff" (flattened, ground-hugging), not a full ring; alternate left/right offset per step so it reads as feet; no bounce pass.
+- [x] (0.11.3) Restyle: small floor-only ellipse "scuff" (flattened, ground-hugging), not a full ring; alternate left/right offset per step so it reads as feet; no bounce pass.
 - [ ] Keep it lighting floor only (no walls) so player pulses stay the main reveal.
 
 ## Requested 2026-10-18 (c) — windows + eavesdropping, todo only
@@ -206,8 +206,8 @@ Now: personStep range 0.7, strength 0.35, fade 0.7 (sounds.js) → reads as big 
   - Roles: baker, innkeeper, drunk, watchman/lamplighter, priest, mother/father/child (family home), courting pair, elder, maid, dog-walker, insomniac.
   - Stops: home, tavern, church, well, a friend's house, bed. Times scale with nightLengthMin.
 - [x] (v0.10.19 `routeTo` lit-preferring Dijkstra) Paths prefer torch-lit streets (existing lightPref) and use a precomputed street graph (nodes at junctions/doors) instead of loose patrol loops; replaces the 9 hand loops.
-- [ ] Schedule visible in debug overlay (`?debug=1`): who, current stop, next stop, ETA.
-- [ ] Interruptions (fear, bumped, heard you) pause the schedule; they resume or go home early if fear is high.
+- [x] (0.11.3) Schedule visible in debug overlay (`?debug=1`): who, current stop, next stop, ETA.
+- [x] (0.11.3 fear shifts the schedule; flight already re-plans) Interruptions (fear, bumped, heard you) pause the schedule; they resume or go home early if fear is high.
 ### V2 Villager-to-villager interactions
 - [ ] Meetings: two villagers on the same node stop, face, short chat (voice synth), part.
 - [ ] Spouses greet at the door (hug pose + warm "Servus, Schatzl"); parent calls child in.

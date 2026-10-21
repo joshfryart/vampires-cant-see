@@ -1073,6 +1073,89 @@
   }
 
   /**
+   * Plays one heartbeat (lub-dub): a 60 Hz thump and a 120 Hz click per beat, low-passed near 200 Hz so it sounds
+   * "through the body". One-shot oscillators that clean themselves up.
+   * @param {object} a Audio state.
+   * @param {{pan?: number, dist?: number, gain?: number, occluded?: boolean, bpm?: number}} [opts] dist cells (villagerHeart hearDist drops beyond), gain 0..1 extra scale, bpm sets the lub-dub gap.
+   * @returns {boolean} true when played.
+   */
+  function villagerHeart(a, opts) {
+    try {
+      if (!ready(a)) return false;
+      const o = opts || {};
+      const lv = levelOf('villagerHeart', 0.07);
+      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 2.5;
+      let gain = lv.gain;
+      if (typeof o.dist === 'number' && Number.isFinite(o.dist) && o.dist >= 0) {
+        if (o.dist >= hear) return false;
+        gain *= 1 - o.dist / hear;
+      }
+      if (typeof o.gain === 'number' && Number.isFinite(o.gain) && o.gain >= 0) gain *= o.gain;
+      if (o.occluded) gain *= 0.5;
+      gain *= a.volume;
+      if (!(gain > 0)) return false;
+      const ctx = a.ctx;
+      if (typeof ctx.createOscillator !== 'function' || typeof ctx.createGain !== 'function') return false;
+      const t = ctx.currentTime || 0;
+      const bpm = typeof o.bpm === 'number' && Number.isFinite(o.bpm) ? Math.min(200, Math.max(30, o.bpm)) : 70;
+      const dub = Math.min(0.32, 0.45 * (60 / bpm)); // gap to the second thump
+      const out = ctx.createGain();
+      out.gain.value = 1;
+      let lp = null;
+      if (typeof ctx.createBiquadFilter === 'function') {
+        lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = o.occluded ? 150 : 200;
+        out.connect(lp);
+      }
+      let tail = lp || out;
+      let pan = null;
+      if (typeof o.pan === 'number' && Number.isFinite(o.pan) && typeof ctx.createStereoPanner === 'function') {
+        pan = ctx.createStereoPanner();
+        if (pan && pan.pan) {
+          pan.pan.value = o.pan < -1 ? -1 : o.pan > 1 ? 1 : o.pan;
+          tail.connect(pan);
+          tail = pan;
+        }
+      }
+      tail.connect(master(ctx).out);
+      let last = t;
+      let lastOsc = null;
+      [[0, 1], [dub, 0.7]].forEach(function (b) {
+        const t0 = t + b[0];
+        [[60, 0.12, 1], [120, 0.04, 0.5]].forEach(function (f) {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = f[0];
+          const peak = gain * b[1] * f[2];
+          g.gain.setValueAtTime(0, t0);
+          g.gain.linearRampToValueAtTime(peak, t0 + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + f[1] + 0.05);
+          osc.connect(g);
+          g.connect(out);
+          osc.start(t0);
+          osc.stop(t0 + f[1] + 0.08);
+          if (t0 + f[1] + 0.08 >= last) { last = t0 + f[1] + 0.08; lastOsc = osc; }
+        });
+      });
+      if (lastOsc) lastOsc.onended = function () {
+        try {
+          out.disconnect();
+          if (lp) lp.disconnect();
+          if (pan) pan.disconnect();
+        } catch (e) {
+          // best effort
+        }
+      };
+      return true;
+    } catch (e) {
+      reportFailure(a, 'Sound failed to play a heartbeat', e);
+      return false;
+    }
+  }
+
+  /**
    * Sets the volume, clamped to 0..1. Ignores non-numbers.
    * @param {object} a Audio state.
    * @param {number} v Volume.
@@ -1202,7 +1285,7 @@
     if (a) a.pingBip = bip === true;
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, fireBed };
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, villagerHeart, fireBed };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;

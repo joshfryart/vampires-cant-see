@@ -19,6 +19,10 @@
   const LIT_MAX_STEPS = 15;
   const LIT_MIN = 0.3;
   const WARY_SEE_MUL = 0.5;
+  const FEAR_SHIFT_PER = 0.015; // night fraction pulled forward per fear point (fear max 15)
+  const FEAR_SHIFT_MAX = 0.2;
+  const EXPOSE_FULL = 0.7; // light level at which a villager sees you from the full seeDist
+  const EXPOSE_MIN_MUL = 0.6; // seeDist share at the lightSeen threshold
   const WHIMPER_GAP = 1.5;
   const MAX_EVENTS = 64;
   const NO_EVENTS = Object.freeze([]);
@@ -449,6 +453,13 @@
     return segmentClear(world, person.x, person.y, px, py);
   }
 
+  /** Share of seeDist a villager sees you from at light level lit: EXPOSE_MIN_MUL at the lightSeen threshold up to 1 at EXPOSE_FULL (the veil meter's value). */
+  function exposureMul(lit, lightSeen) {
+    if (!(lit > lightSeen)) return EXPOSE_MIN_MUL;
+    if (lit >= EXPOSE_FULL || EXPOSE_FULL <= lightSeen) return 1;
+    return EXPOSE_MIN_MUL + (1 - EXPOSE_MIN_MUL) * (lit - lightSeen) / (EXPOSE_FULL - lightSeen);
+  }
+
   /**
    * 0 = not seen, 1 = seen (light + cone + line of sight), 2 = bump-noticed (touching).
    * Bump notice needs the person to face the player within bumpArc (half-angle, 100 deg), or the player to be lit;
@@ -460,8 +471,12 @@
     const d2 = dx * dx + dy * dy;
     const isLit = lit >= rp.lightSeen;
     if (isLit) {
-      const sd = typeof rp.seeDist === 'number' ? rp.seeDist : REACT_DEFAULTS.seeDist;
-      if (d2 <= sd * sd && sees(p, world, px, py, rp)) return 1;
+      const full = typeof rp.seeDist === 'number' ? rp.seeDist : REACT_DEFAULTS.seeDist;
+      const sd = full * exposureMul(lit, rp.lightSeen);
+      rp.seeDist = sd;
+      const hit = d2 <= sd * sd && sees(p, world, px, py, rp);
+      rp.seeDist = full;
+      if (hit) return 1;
     }
     if (rp.bumpDist > 0 && d2 <= rp.bumpDist * rp.bumpDist) {
       let near = isLit || d2 <= 1e-12;
@@ -503,6 +518,15 @@
   /** Choose the loop direction toward waypoint g given the next waypoint each way; sets p.idx and p.fdir. */
   function route(p, g, nf, nb, px, py) {
     const n = p.path.length;
+    if (p.sched && n > 1) {
+      // A scheduled trip is an open polyline: never wrap from its last waypoint to its first (that segment runs through walls).
+      const nfBad = nf === 0 && nb > nf;
+      const nbBad = nb === n - 1 && nf < nb;
+      const fwd = nfBad ? false : nbBad ? true : g >= nf;
+      p.fdir = fwd ? 1 : -1;
+      p.idx = fwd ? nf : nb;
+      return;
+    }
     const cf = (g - nf + n) % n;
     const cb = (nb - g + n) % n;
     let fwd = cf < cb;
@@ -611,7 +635,9 @@
     const Sched = sched();
     const s = p.sched;
     if (s.en) { p.state = 'walk'; return; }
-    const want = Sched.stopAt(s.stops, state.nightFrac);
+    // Village fear pulls the night forward: the scared go home early (the watch never does).
+    const shift = s.role === 'guard' ? 0 : (state.fearShift || 0);
+    const want = Sched.stopAt(s.stops, Math.min(1, state.nightFrac + shift));
     if (want === s.si && !s.retarget) return;
     const stop = s.stops[want];
     s.target = want;
@@ -833,6 +859,7 @@
     const hasPlayer = !!pl && isFinite(pl.x) && isFinite(pl.y) && !(ctx.grace > 0);
     const lit = ctx && typeof ctx.playerLit === 'number' ? ctx.playerLit : 0;
     if (ctx && typeof ctx.nightFrac === 'number' && isFinite(ctx.nightFrac)) state.nightFrac = ctx.nightFrac;
+    if (ctx && typeof ctx.fear === 'number' && isFinite(ctx.fear)) state.fearShift = Math.min(FEAR_SHIFT_MAX, Math.max(0, ctx.fear) * FEAR_SHIFT_PER);
     if (ctx && typeof ctx.nightSec === 'number' && isFinite(ctx.nightSec)) state.nightSec = ctx.nightSec;
     // Pose bookkeeping for the renderer (no behaviour): seconds in the current mode, gait phase before this tick.
     for (let i = 0; i < ps.length; i++) {
@@ -936,7 +963,7 @@
       let seesYou = false;
       if (hasPlayer && lit >= rp.lightSeen) {
         const sd = rp.seeDist;
-        if (p.wary > 0) rp.seeDist = sd * WARY_SEE_MUL;
+        rp.seeDist = sd * exposureMul(lit, rp.lightSeen) * (p.wary > 0 ? WARY_SEE_MUL : 1);
         seesYou = sees(p, world, pl.x, pl.y, rp);
         rp.seeDist = sd;
       }
@@ -1162,8 +1189,10 @@
       p.stepsReported = p.steps;
       for (let k = 0; k < todo; k++) {
         let e = pool[n];
-        if (!e) { e = { x: 0, y: 0, id: 0, gait: 'walk', pace: 1 }; pool[n] = e; }
+        if (!e) { e = { x: 0, y: 0, id: 0, gait: 'walk', pace: 1, angle: 0, side: 1 }; pool[n] = e; }
         e.x = p.x; e.y = p.y; e.id = p.id;
+        e.angle = p.angle;
+        e.side = ((p.steps - todo + k) & 1) ? 1 : -1; // feet alternate left/right
         e.gait = p.mode === 'flee' ? 'run' : p.wary > 0 ? 'sneak' : 'walk';
         e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;

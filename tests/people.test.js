@@ -407,6 +407,35 @@ describe('people-react.test.js', () => {
     assert.strictEqual(s.st.people[0].mode, 'flee');
   });
 
+  test('notice range scales with exposure: a dim glimpse is seen only from closer than a full one', () => {
+    const far = { x: 10.5, y: 4.5 }; // 6 cells east, inside the full 8-cell range
+    let s = scene(HALL, hallPaths());
+    People.update(s.st, s.world, DT, ctx(far, REACT.lightSeen + 0.01));
+    assert.strictEqual(s.st.people[0].mode, 'path', 'dim: not seen at 6 cells');
+    s = scene(HALL, hallPaths());
+    People.update(s.st, s.world, DT, ctx(far, 1));
+    assert.strictEqual(s.st.people[0].mode, 'flee', 'bright: seen at 6 cells');
+    s = scene(HALL, hallPaths());
+    People.update(s.st, s.world, DT, ctx(PLAYER_E, REACT.lightSeen + 0.01));
+    assert.strictEqual(s.st.people[0].mode, 'flee', 'dim: still seen at 3 cells');
+  });
+
+  test('step events carry heading and alternate sides', () => {
+    const { world, st } = scene(HALL, hallPaths());
+    const sides = [];
+    const out = [];
+    for (let i = 0; i < 600 && sides.length < 4; i++) {
+      People.update(st, world, DT);
+      People.stepEvents(st, 0, i * DT, out);
+      for (let k = 0; k < out.length; k++) {
+        assert.ok(Number.isFinite(out[k].angle));
+        sides.push(out[k].side);
+      }
+    }
+    assert.ok(sides.length >= 4, 'walked enough steps');
+    for (let i = 1; i < sides.length; i++) assert.notStrictEqual(sides[i], sides[i - 1], 'feet alternate');
+  });
+
   test('not seen in the dark beyond bumpDist', () => {
     const { world, st } = scene(HALL, hallPaths());
     People.update(st, world, DT, ctx(PLAYER_E, 0));
