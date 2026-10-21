@@ -3408,6 +3408,8 @@
         fatal(info.code, info.message, info);
       });
       L().info('Boot v' + VCS.Log.VERSION + ' debug=' + debug + ' safe=' + safe);
+      const verEl = $('version');
+      if (verEl) verEl.textContent = 'v' + VCS.Log.VERSION;
 
       const res = VCS.Checks.run(root);
       if (!res.ok) {

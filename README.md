@@ -5,7 +5,7 @@ each click sends out a sonar pulse that lights up the walls around you.
 At night, go out to find people and get back to your crypt or a safe dark
 space before dawn, so you can sleep through the day.
 
-Current build (v0.11.3): sonar pulse, first-person outline view, settings, people
+Current build (v0.11.4): sonar pulse, first-person outline view, settings, people
 who walk set paths through the maps, one night at a time (feed, sleep
 and dawn; see Night rules below), a main menu, an upgrade shop, night boons,
 random runs and saves. You never see a person directly:

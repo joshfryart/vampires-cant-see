@@ -508,11 +508,22 @@ body.large-text .panel dd,
 body.large-text .panel select,
 body.large-text .panel output { font-size: 13px; }
 
+#version {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  z-index: 30;
+  font-size: 11px;
+  color: rgba(207, 227, 255, 0.45);
+  pointer-events: none;
+  user-select: none;
+}
+
 #btn-devtool {
   display: none;
   position: fixed;
   right: 8px;
-  bottom: 8px;
+  bottom: 26px;
   z-index: 40;
   padding: 3px 7px;
   font-size: 11px;
