@@ -1435,11 +1435,64 @@
     tagPingHeight();
     reactTo(p.x, p.y, 'ping');
     const a = S.audio;
+    pingEnclosure(S.sonar.lastPulse, !room.outdoor);
     VCS.Audio.ping(a);
     pingEcho(S.sonar.lastPulse);
     floorBounce();
+    ceilingBounce(!room.outdoor);
+    propEchoes(S.sonar.lastPulse);
     bounceEchoes();
     return true;
+  }
+
+  /** v0.11.9: set the reverb send for this ping from how enclosed it is (walls, doors, ceiling, absorbent surfaces, props and people in range). */
+  function pingEnclosure(lp, indoor) {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const p = S.player;
+    if (!A || !S.audio || !lp || !p || typeof VCS.Audio.setWet !== 'function') return;
+    const e = VCS.Sonar.enclosure(lp);
+    let n = 0;
+    const range = lp.range || 10;
+    const near = S.world && typeof S.world.propsNear === 'function' ? S.world.propsNear(p.x, p.y, range) : [];
+    for (let i = 0; i < near.length; i++) if (near[i].solid) n++;
+    const ps = S.people ? S.people.people : [];
+    for (let i = 0; i < ps.length; i++) if (Math.hypot(ps[i].x - p.x, ps[i].y - p.y) <= range) n++;
+    VCS.Audio.setWet(S.audio, A.wetFor(e.hitFrac, e.meanAlpha, n, indoor));
+  }
+
+  /** v0.11.9 ceiling bounce: indoors each ping also returns off the ceiling of the player's zone (height and material from the acoustics data). */
+  function ceilingBounce(indoor) {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    if (!indoor || !A || !A.ceil || !S.audio || S.audio.pingBip === true) return;
+    const c = A.ceilingFor(S.roomZone);
+    const amp = A.ceilAmp(c.h, c.mat);
+    if (amp > 0) VCS.Audio.echo(S.audio, A.ceilDelay(c.h), amp, 0, { voice: A.matOf(c.mat).voice, rough: A.roughOf(c.mat) });
+  }
+
+  /** v0.11.9: the strongest few solid props in line of sight return their own echo (sonar equation, voiced by the prop's material). */
+  function propEchoes(lp) {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const p = S.player;
+    const w = S.world;
+    if (!A || !A.propEcho || !S.audio || S.audio.pingBip === true || !lp || !p || !w || typeof w.propsNear !== 'function') return;
+    const near = w.propsNear(p.x, p.y, lp.range || 10);
+    const found = [];
+    for (let i = 0; i < near.length; i++) {
+      const pr = near[i];
+      if (!pr.solid) continue;
+      const d = Math.hypot(pr.x - p.x, pr.y - p.y);
+      if (d < 0.3) continue;
+      const amp = A.propAmp(d, Math.atan2(pr.y - p.y, pr.x - p.x) - p.angle);
+      if (amp <= 0) continue;
+      const delay = VCS.Sonar.echoDelay(d, S.sonar.speed);
+      if (delay > 2 || firstSolid(p.x, p.y, pr.x, pr.y)) continue;
+      found.push({ amp: amp, delay: delay, x: pr.x, y: pr.y, mat: A.propMat[pr.type] || 'wood' });
+    }
+    found.sort(function (a, b) { return b.amp - a.amp; });
+    for (let i = 0; i < found.length && i < A.propEcho.max; i++) {
+      const f = found[i];
+      VCS.Audio.echo(S.audio, f.delay, f.amp, panTo(f.x, f.y), { voice: A.matOf(f.mat).voice, rough: A.roughOf(f.mat) });
+    }
   }
 
   /** The audible wall echo of a ping pulse lp. */

@@ -48,7 +48,18 @@
     // Click ping: ~8 ms, 3.2 kHz (the old bip stays as the pingBip setting).
     ping: { clickMs: 8, clickHz: 3200 },
     // Floor bounce: every ping returns a short floor echo (eye height eyeM), shaped by the floor material; absDb = extra dB per unit alpha.
-    floor: { eyeM: 1.6, delay: 0.035, db: -12, absDb: 20, minAmp: 0.06 }
+    floor: { eyeM: 1.6, delay: 0.035, db: -12, absDb: 20, minAmp: 0.06 },
+    // Ceiling bounce (v0.11.9): indoors every ping also returns off the ceiling, delayed like the floor bounce scaled by the gap above the head.
+    ceil: { defaultH: 3, defaultMat: 'stone', db: -12, absDb: 20, minAmp: 0.06 },
+    ceilMat: {
+      crypt: 'stone', mausoleum: 'stone', cellar: 'stone', church: 'roughStone',
+      tavern: 'wood', house1: 'wood', house2: 'wood', barn: 'wood', shed: 'wood'
+    },
+    // Solid props as reflectors (sonar equation, ts.prop): material per type, strongest few per ping.
+    propMat: { barrel: 'wood', bench: 'wood', chair: 'wood', table: 'wood', gravestone: 'stone', brazier: 'iron', well: 'roughStone' },
+    propEcho: { max: 3, minAmp: 0.06 },
+    // Enclosure: per-ping reverb send multiplier (see A.wetFor).
+    wet: { min: 0.1, max: 1.8, gain: 1.8, absorb: 0.8, scatter: 0.03, scatterMax: 8, base: 0.1 }
   };
   const EPS = 1e-9;
   function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
@@ -95,6 +106,38 @@
   };
   /** Floor-bounce amplitude 0..1 for a floor material; 0 when it is below floor.minAmp (nothing worth playing). */
   A.floorAmp = function (mat) { const a = A.gameAmp(A.floorLevel(mat)); return a < A.floor.minAmp ? 0 : a; };
+
+  /** Ceiling of a zone/map name: {h metres above the floor, mat}. Unknown names get ceil.defaultH / defaultMat. */
+  A.ceilingFor = function (name) {
+    const has = typeof name === 'string' && Object.prototype.hasOwnProperty.call(A.zone, name);
+    return {
+      h: has ? A.zone[name].h : A.ceil.defaultH,
+      mat: typeof name === 'string' && Object.prototype.hasOwnProperty.call(A.ceilMat, name) ? A.ceilMat[name] : A.ceil.defaultMat
+    };
+  };
+  /** Ceiling-bounce level (dB): image source at the gap above the head, ceiling material loss, softer by ceil.db and ceil.absDb x alpha. */
+  A.ceilLevel = function (h, mat) {
+    const c = A.ceil;
+    const gap = Math.max(num(h, c.defaultH) - A.floor.eyeM, 0.3);
+    return A.echoLevel('wall', gap / A.cellM, 0, mat) + c.db - c.absDb * A.matOf(mat).alpha;
+  };
+  /** Ceiling-bounce amplitude 0..1; 0 when below ceil.minAmp. */
+  A.ceilAmp = function (h, mat) { const a = A.gameAmp(A.ceilLevel(h, mat)); return a < A.ceil.minAmp ? 0 : a; };
+  /** Ceiling-bounce delay (s): the floor bounce delay scaled by the gap above the head over the eye height (a tall church returns later). */
+  A.ceilDelay = function (h) { return (A.floor.delay * Math.max(num(h, A.ceil.defaultH) - A.floor.eyeM, 0.3)) / A.floor.eyeM; };
+  /** Prop echo amplitude 0..1 for a prop type at rCells, theta off the facing direction; 0 when below propEcho.minAmp. */
+  A.propAmp = function (rCells, theta) { const a = A.gameAmp(A.echoLevel('prop', rCells, theta)); return a < A.propEcho.minAmp ? 0 : a; };
+  /**
+   * Per-ping reverb send multiplier (1 = the room's static send) from how enclosed the ping is: hitFrac 0..1 of rays that met a surface in
+   * range, meanAlpha mean absorption of those surfaces, scatterers solid props + people in range, indoor (a ceiling always closes the room).
+   */
+  A.wetFor = function (hitFrac, meanAlpha, scatterers, indoor) {
+    const w = A.wet;
+    const h = clampN(num(hitFrac, 0), 0, 1);
+    const enc = indoor ? 0.5 + 0.5 * h : 0.9 * h;
+    const v = w.gain * enc * (1 - w.absorb * clampN(num(meanAlpha, 0), 0, 1)) + w.scatter * Math.min(Math.max(num(scatterers, 0), 0), w.scatterMax) + w.base;
+    return clampN(v, w.min, w.max);
+  };
 
   /** Sabine RT60 = 0.161 V / A for a box w x d cells (cellM) of height h m and mean absorption alpha, clamped to t60Min..t60Max. */
   A.sabine = function (w, d, h, alpha) {

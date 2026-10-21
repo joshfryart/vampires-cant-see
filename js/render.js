@@ -1452,8 +1452,12 @@
     if (world) drawSurfaceTexture(r, world, sonar, t, player, tanHalf, true);
   }
 
-  /** Ceiling marks for a floor texture kind: grass has no ceiling analogue (timber), cobble becomes stone. */
-  function ceilTexKind(kind) { return kind === 'grass' ? 'plank' : kind === 'cobble' ? 'brick' : kind; }
+  /** Ceiling marks for the zone at (x,y): its ceiling material from the acoustics data (wood planks, stone joints, rough stone), else stone. */
+  function ceilTexKind(world, x, y) {
+    const A = VCS.SoundData && VCS.SoundData.acoustics;
+    const zone = typeof world.zoneAt === 'function' ? world.zoneAt(x, y) : null;
+    return floorTexKind(A ? A.ceilingFor(zone || world.name).mat : 'stone') || 'brick';
+  }
 
   /** One surface of drawFloorTexture; up=true draws the ceiling (mirrored about the horizon) over indoor cells only. */
   function drawSurfaceTexture(r, world, sonar, t, player, tanHalf, up) {
@@ -1522,7 +1526,7 @@
           if (!kind) continue;
           if (up) {
             if (hasKind && world.kindAt(mx, my) === 'outdoor') continue;
-            kind = ceilTexKind(kind);
+            kind = ceilTexKind(world, mx, my);
           }
           const bk = Math.min(TEX_BUCKETS - 1, Math.floor(g * TEX_BUCKETS * 1.2));
           sets[bk].push(cx, cy, kind, fwd);

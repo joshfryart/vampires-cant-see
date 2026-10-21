@@ -483,7 +483,25 @@
     return best;
   }
 
+  /** Enclosure of a pulse as heard from its origin: {hitFrac: share of rays that met a surface inside range, meanAlpha: mean absorption of those surfaces}. */
+  function enclosure(pulse) {
+    const A = acoustics();
+    if (!pulse || !pulse.vis || !pulse.vis.length) return { hitFrac: 0, meanAlpha: 0 };
+    const n = pulse.vis.length;
+    let hits = 0;
+    let alpha = 0;
+    for (let i = 0; i < n; i++) {
+      const d = pulse.vis[i];
+      if (!(d > 0) || d >= pulse.range - 1e-4) continue;
+      if (pulse.vnorm && pulse.vnorm[i] === NO_HIT) continue;
+      hits++;
+      if (A && pulse.vmat) alpha += A.matOf(MATS[pulse.vmat[i]]).alpha;
+    }
+    return { hitFrac: hits / n, meanAlpha: hits ? alpha / hits : 0 };
+  }
+
   const Sonar = {
+    enclosure: enclosure,
     MATS: MATS, beamAt: beamAt, hitInfo: hitInfo, strongestEcho: strongestEcho,
     SONAR_SPEED: SONAR_SPEED, echoDelay: echoDelay,
     DEFAULTS: DEFAULTS, create: create, emit: emit, emitSound: emitSound, wallArc: wallArc, nearestDist: nearestDist,

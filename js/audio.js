@@ -196,6 +196,29 @@
     }
   }
 
+  /** Feeds node into the reverb send, scaled by the current per-ping enclosure multiplier a.wet (1 when unset). */
+  function toSend(a, ctx, m, node) {
+    if (!m.send) return;
+    const w = a && typeof a.wet === 'number' && isFinite(a.wet) ? a.wet : 1;
+    if (w !== 1 && typeof ctx.createGain === 'function') {
+      const g = ctx.createGain();
+      g.gain.value = w;
+      node.connect(g);
+      g.connect(m.send);
+    } else {
+      node.connect(m.send);
+    }
+  }
+
+  /** Sets the reverb send multiplier (enclosure of the last ping, 0..2); setRoom resets it to 1. Never throws. */
+  function setWet(a, w) {
+    try {
+      if (a) a.wet = typeof w === 'number' && isFinite(w) ? Math.max(0, Math.min(2, w)) : 1;
+    } catch (e) {
+      // never throws
+    }
+  }
+
   /** Short filtered white-noise burst into target. Returns false when the context cannot make buffers. */
   function noise(ctx, target, t, dur, peak, ftype, freq, attack) {
     if (typeof ctx.createBuffer !== 'function' || typeof ctx.createBufferSource !== 'function') return false;
@@ -337,7 +360,7 @@
     osc.connect(gain);
     const m = master(ctx);
     gain.connect(m.out);
-    if (m.send) gain.connect(m.send);
+    toSend(a, ctx, m, gain);
     osc.start(t);
     osc.stop(t + dur);
     track(ctx, osc, gain, t + dur);
@@ -416,7 +439,7 @@
         }
       }
       filter.connect(out);
-      if (m.send && voice) filter.connect(m.send);
+      if (m.send && voice) toSend(a, ctx, m, filter);
       const t0 = ctx.currentTime + delaySec;
       if (!voice) {
         chirp(ctx, t0, peakFor(a, s), filter);
@@ -1178,6 +1201,7 @@
     try {
       if (!a || !Object.prototype.hasOwnProperty.call(ROOMS, kind)) return;
       a.room = kind;
+      a.wet = 1;
       a.t60 = typeof t60 === 'number' && isFinite(t60) ? t60 : undefined;
       tuneReverb(a, kind, a.t60);
     } catch (e) {
@@ -1284,7 +1308,7 @@
     if (a) a.pingBip = bip === true;
   }
 
-  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, heartbeat, fireBed };
+  const Audio = { create, unlock, ping, echo, step, play, setVolume, setRoom, setWet, setPingStyle, ECHO_VOICES, stopAll, ambience, oneShotFar, breath, heartbeat, fireBed };
 
   VCS.Audio = Audio;
   if (typeof module !== 'undefined' && module.exports) module.exports = Audio;
