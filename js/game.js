@@ -1454,9 +1454,9 @@
     let n = 0;
     const range = lp.range || 10;
     const near = S.world && typeof S.world.propsNear === 'function' ? S.world.propsNear(p.x, p.y, range) : [];
-    for (let i = 0; i < near.length; i++) if (near[i].solid) n++;
+    for (let i = 0; i < near.length; i++) if (near[i].solid && !firstSolid(p.x, p.y, near[i].x, near[i].y)) n++;
     const ps = S.people ? S.people.people : [];
-    for (let i = 0; i < ps.length; i++) if (Math.hypot(ps[i].x - p.x, ps[i].y - p.y) <= range) n++;
+    for (let i = 0; i < ps.length; i++) if (Math.hypot(ps[i].x - p.x, ps[i].y - p.y) <= range && !firstSolid(p.x, p.y, ps[i].x, ps[i].y)) n++;
     VCS.Audio.setWet(S.audio, A.wetFor(e.hitFrac, e.meanAlpha, n, indoor));
   }
 

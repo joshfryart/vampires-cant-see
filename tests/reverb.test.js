@@ -19,6 +19,7 @@ test('ceiling bounce: a tall church returns later and quieter than a low shed; w
   assert.ok(A.ceilDelay(8) > A.ceilDelay(2.4));
   assert.ok(A.ceilLevel(8, 'stone') < A.ceilLevel(2.4, 'stone'));
   assert.ok(A.ceilLevel(3, 'wood') < A.ceilLevel(3, 'stone'));
+  for (const h of [2.4, 2.5, 2.7, 3, 3.5, 4, 8]) assert.ok(Math.abs(A.ceilDelay(h) - A.floor.delay) >= A.ceil.minGap - 1e-9, 'ceiling clear of floor at h=' + h);
   assert.ok(A.ceilAmp(3, 'stone') > 0 && A.ceilAmp(3, 'stone') <= 1);
 });
 
@@ -30,7 +31,7 @@ test('propAmp: nearer props are louder, far ones vanish', () => {
 test('wetFor: enclosed rooms send more reverb than open ground; absorbers and props shift it; always clamped', () => {
   const closed = A.wetFor(1, 0.03, 0, true);
   const open = A.wetFor(0, 0, 0, false);
-  assert.ok(closed > 1 && open < 0.3 && closed > open);
+  assert.ok(closed > 0.8 && closed < 1.2 && open < 0.3 && closed > open, 'a closed stone room is about the static send');
   assert.ok(A.wetFor(1, 0.6, 0, true) < closed, 'grass-like absorption lowers it');
   assert.ok(A.wetFor(0.5, 0.03, 6, true) > A.wetFor(0.5, 0.03, 0, true), 'props scatter more');
   assert.ok(A.wetFor(1, 0, 99, true) <= A.wet.max && A.wetFor(0, 1, 0, false) >= A.wet.min);

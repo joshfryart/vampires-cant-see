@@ -1453,10 +1453,12 @@
   }
 
   /** Ceiling marks for the zone at (x,y): its ceiling material from the acoustics data (wood planks, stone joints, rough stone), else stone. */
+  const ceilKinds = {};
   function ceilTexKind(world, x, y) {
     const A = VCS.SoundData && VCS.SoundData.acoustics;
     const zone = typeof world.zoneAt === 'function' ? world.zoneAt(x, y) : null;
-    return floorTexKind(A ? A.ceilingFor(zone || world.name).mat : 'stone') || 'brick';
+    const key = String(zone || world.name);
+    return ceilKinds[key] || (ceilKinds[key] = floorTexKind(A ? A.ceilingFor(zone || world.name).mat : 'stone') || 'brick');
   }
 
   /** One surface of drawFloorTexture; up=true draws the ceiling (mirrored about the horizon) over indoor cells only. */
