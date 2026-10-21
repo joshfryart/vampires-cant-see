@@ -68,7 +68,8 @@
   btn('others', 'ping click', function () { A.ping(a); });
   btn('others', 'ping bip (old)', function () { A.setPingStyle(a, true); A.ping(a); A.setPingStyle(a, false); });
   btn('others', 'breath', function () { A.breath(a, { dist: 1 }); });
-  btn('others', 'villager heartbeat (new, 65 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('others', 'villager heartbeat, 1 cell (65 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('others', 'villager heartbeat, 4 cells (faint tail)', function () { A.heartbeat(a, { dist: 4, bpm: 65 }); });
   btn('others', 'villager heartbeat (fleeing, 130 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 130 }); });
   btn('others', 'wind bed', function () { A.ambience(a, { kind: 'outdoor' }); });
   btn('others', 'stop all', function () { A.stopAll(a); });

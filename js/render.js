@@ -1089,7 +1089,7 @@
     for (let k = 0; k < pulses.length; k++) {
       const pu = pulses[k];
       // Footsteps are drawn as floor ripples (drawFootRings), never as a body-high ring.
-      if (pu.kind === 'step' || pu.kind === 'personStep') continue;
+      if (pu.kind === 'step' || pu.kind === 'personStep' || pu.kind === 'vheart') continue;
       const R = Sonar.ringRadius(pu, t);
       if (R < 0.2 || R > pu.range) continue;
       const str = typeof pu.strength === 'number' ? pu.strength : 1;
@@ -1392,7 +1392,7 @@
     ctx.lineWidth = 1.5;
     for (let k = 0; k < pulses.length; k++) {
       const pu = pulses[k];
-      if (pu.gen > 0 || pu.kind === 'step' || pu.kind === 'personStep') continue;
+      if (pu.gen > 0 || pu.kind === 'step' || pu.kind === 'personStep' || pu.kind === 'vheart') continue;
       if (typeof pu.z === 'number' && pu.z > 0.7) continue;
       const R = Sonar.ringRadius(pu, t);
       if (R < 0.3 || R > pu.range) continue;

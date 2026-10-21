@@ -1007,7 +1007,7 @@
 
   /**
    * One heartbeat "lub-dub" felt through the body: 60 Hz and 80 Hz sine thumps with a short 120 Hz click, low-passed near 200 Hz.
-   * Quiet and mono-ish. opts {pan, dist, behind, occluded, bpm}: gain falls to 0 at hearDist (2 cells), bpm sets the lub-dub gap.
+   * Quiet and mono-ish. opts {pan, dist, behind, occluded, bpm}: gain is full within 0.4 x hearDist (2 cells) and fades to 0 at hearDist (5 cells), bpm sets the lub-dub gap.
    * @returns {boolean} true when played.
    */
   function heartbeat(a, opts) {
@@ -1015,11 +1015,13 @@
       if (!ready(a)) return false;
       const o = opts || {};
       const lv = levelOf('vheart', 0.06);
-      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 2;
+      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 5;
       let gain = lv.gain;
       if (typeof o.dist === 'number' && Number.isFinite(o.dist) && o.dist >= 0) {
         if (o.dist >= hear) return false;
-        gain *= 1 - o.dist / hear;
+        // Full strength within 2 cells (falling off as before, plus a floor of 0.1), then a faint tail out to hearDist.
+        const near = hear * 0.4;
+        gain *= o.dist < near ? 0.1 + 1.05 * (1 - o.dist / near) : 0.1 * (1 - (o.dist - near) / (hear - near));
       }
       if (o.behind) gain *= 0.8;
       if (o.occluded) gain *= 0.6;

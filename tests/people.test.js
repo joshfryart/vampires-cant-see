@@ -308,9 +308,26 @@ describe('people.test.js', () => {
     for (let t = 0; t <= 0.5; t += DT) { all = all.concat(People.updateEchoes(st, sonar, tPrev, t)); tPrev = t; }
     const mine = all.filter((e) => e.personId === p.id);
     assert.ok(mine.length >= 1);
-    assert.ok(mine[0].zMax < 0.8, 'zMax ' + mine[0].zMax);
+    assert.ok(mine[0].zMax <= 0.3 + 1e-9, 'feet and lower shins only, zMax ' + mine[0].zMax);
     assert.ok(mine[0].zMin <= 0.01);
     assert.strictEqual(mine[0].fade, 0.7);
+    assert.strictEqual(mine[0].kind, 'personStep');
+  });
+
+  test('a villager heartbeat pulse lights only the chest', () => {
+    if (typeof Sonar.heightBand !== 'function') return;
+    const world = World.load(def);
+    const st = People.create(world, def, { seed: 1 });
+    const sonar = Sonar.create({ speed: 12, range: 10, fade: 3, cooldown: 0, bounces: 0 });
+    const p = st.people[0];
+    Sonar.emitSound(sonar, world, p.x, p.y, 0, { kind: 'vheart', strength: 0.2, range: 0.5, z: 0.65, fade: 0.7, bounces: 0, visRays: 90 });
+    let all = [];
+    let tPrev = -DT;
+    for (let t = 0; t <= 0.5; t += DT) { all = all.concat(People.updateEchoes(st, sonar, tPrev, t)); tPrev = t; }
+    const mine = all.filter((e) => e.personId === p.id);
+    assert.ok(mine.length >= 1, 'the heartbeat shows its owner');
+    assert.ok(Math.abs(mine[0].zMin - 0.45) < 1e-9 && Math.abs(mine[0].zMax - 0.85) < 1e-9, 'chest band ' + mine[0].zMin + '..' + mine[0].zMax);
+    assert.strictEqual(mine[0].kind, 'vheart');
   });
 
   test('echoBrightness uses the echo own fade when present', () => {

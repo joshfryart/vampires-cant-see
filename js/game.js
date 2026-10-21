@@ -3798,14 +3798,15 @@
     return bpm * (0.5 + 0.5 * k);
   }
 
-  /** Heartbeat of the nearest two villagers within 2 cells (also through a wall: the occlusion filter dulls it). */
+  /** Heartbeat of the nearest two villagers within hearDist (5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse. */
   function stepHeartbeats(dt, list) {
     const a = S.audio;
     const p = S.player;
+    const hear = level('vheart').hearDist || 5;
     let n1 = null;
-    let d1 = 4;
+    let d1 = hear * hear;
     let n2 = null;
-    let d2 = 4;
+    let d2 = hear * hear;
     for (let i = 0; i < list.length; i++) {
       const q = list[i];
       if (q.mode === 'fed') continue;
@@ -3828,7 +3829,9 @@
       HEART_OPTS.behind = Math.cos(Math.atan2(q.y - p.y, q.x - p.x) - p.angle) < 0;
       HEART_OPTS.occluded = occludedTo(q.x, q.y);
       HEART_OPTS.bpm = bpm;
-      VCS.Audio.heartbeat(a, HEART_OPTS);
+      // Each beat also sends a small chest-high pulse (like a footstep does for the feet) that shows the chest.
+      emitSound('vheart', q.x, q.y, { z: 0.65 });
+      if (a) VCS.Audio.heartbeat(a, HEART_OPTS);
     }
   }
 

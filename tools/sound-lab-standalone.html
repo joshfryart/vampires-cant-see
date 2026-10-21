@@ -432,7 +432,7 @@
   const SoundData = {
     levels: {
       step: { range: 1.1, strength: 0.3, z: 0, fade: 0.8, bounces: 0, gain: 0.08, interval: 0.48, footOffset: 0.15, footSide: 0.12 },
-      personStep: { range: 0.4, strength: 0.25, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
+      personStep: { range: 0.28, strength: 0.25, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
       door: { range: 5, strength: 0.5, z: 0.5, fade: 2.5, bounces: 1, gain: 0.25, hearDist: 18 },
       interact: { range: 3, strength: 0.35, z: 0.3, fade: 1.8, bounces: 1, gain: 0.15 },
       ping: { range: null, strength: 1, z: 0.62, fade: null, bounces: 2, gain: null },
@@ -461,7 +461,8 @@
       dog: { range: 0, strength: 0, z: 0.5, fade: 1, bounces: 0, gain: 0.2, hearDist: 60 },
       bell: { range: 0, strength: 0, z: 0.9, fade: 1, bounces: 0, gain: 0.3, hearDist: 80 },
       breath: { range: 0, strength: 0, z: 0.7, fade: 1, bounces: 0, gain: 0.05, hearDist: 6 },
-      vheart: { range: 0, strength: 0, z: 0.6, fade: 1, bounces: 0, gain: 0.06, hearDist: 2 }
+      // villager heartbeat: heard and shown (a small chest-high pulse per beat) out to 5 cells = 2.5 x the old 2-cell hearing, gain +15%
+      vheart: { range: 0.5, strength: 0.2, z: 0.65, fade: 0.7, bounces: 0, gain: 0.069, hearDist: 5 }
     },
     // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
     stepScaleTable: {
@@ -1518,7 +1519,7 @@
 
   /**
    * One heartbeat "lub-dub" felt through the body: 60 Hz and 80 Hz sine thumps with a short 120 Hz click, low-passed near 200 Hz.
-   * Quiet and mono-ish. opts {pan, dist, behind, occluded, bpm}: gain falls to 0 at hearDist (2 cells), bpm sets the lub-dub gap.
+   * Quiet and mono-ish. opts {pan, dist, behind, occluded, bpm}: gain is full within 0.4 x hearDist (2 cells) and fades to 0 at hearDist (5 cells), bpm sets the lub-dub gap.
    * @returns {boolean} true when played.
    */
   function heartbeat(a, opts) {
@@ -1526,11 +1527,13 @@
       if (!ready(a)) return false;
       const o = opts || {};
       const lv = levelOf('vheart', 0.06);
-      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 2;
+      const hear = typeof lv.hearDist === 'number' ? lv.hearDist : 5;
       let gain = lv.gain;
       if (typeof o.dist === 'number' && Number.isFinite(o.dist) && o.dist >= 0) {
         if (o.dist >= hear) return false;
-        gain *= 1 - o.dist / hear;
+        // Full strength within 2 cells (falling off as before, plus a floor of 0.1), then a faint tail out to hearDist.
+        const near = hear * 0.4;
+        gain *= o.dist < near ? 0.1 + 1.05 * (1 - o.dist / near) : 0.1 * (1 - (o.dist - near) / (hear - near));
       }
       if (o.behind) gain *= 0.8;
       if (o.occluded) gain *= 0.6;
@@ -1828,7 +1831,8 @@
   btn('others', 'ping click', function () { A.ping(a); });
   btn('others', 'ping bip (old)', function () { A.setPingStyle(a, true); A.ping(a); A.setPingStyle(a, false); });
   btn('others', 'breath', function () { A.breath(a, { dist: 1 }); });
-  btn('others', 'villager heartbeat (new, 65 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('others', 'villager heartbeat, 1 cell (65 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('others', 'villager heartbeat, 4 cells (faint tail)', function () { A.heartbeat(a, { dist: 4, bpm: 65 }); });
   btn('others', 'villager heartbeat (fleeing, 130 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 130 }); });
   btn('others', 'wind bed', function () { A.ambience(a, { kind: 'outdoor' }); });
   btn('others', 'stop all', function () { A.stopAll(a); });

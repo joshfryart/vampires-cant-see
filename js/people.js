@@ -1102,8 +1102,10 @@
       out[0] = Math.max(0, z - 0.15);
       out[1] = Math.min(1.2, z + 0.15);
     }
-    // Footsteps ring the floor: they reveal feet and shins only.
-    if ((pu.kind === 'step' || pu.kind === 'personStep') && out[1] > 0.5) out[1] = 0.5;
+    // Footsteps ring the floor: they reveal feet and lower shins only.
+    if ((pu.kind === 'step' || pu.kind === 'personStep') && out[1] > 0.3) out[1] = 0.3;
+    // A heartbeat reveals just the chest.
+    if (pu.kind === 'vheart') { out[0] = 0.45; out[1] = 0.85; }
     return out;
   }
 

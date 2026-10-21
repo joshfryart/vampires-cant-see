@@ -674,7 +674,7 @@ describe('sounds.test.js', () => {
     const l = SoundData.levels;
     const row = (k, keys) => keys.map((x) => l[k][x]);
     assert.deepStrictEqual(row('step', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [1.1, 0.3, 0, 0.8, 0, 0.08]);
-    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.4, 0.25, 0, 0.6, 0, 0.12]);
+    assert.deepStrictEqual(row('personStep', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [0.28, 0.25, 0, 0.6, 0, 0.12]);
     assert.deepStrictEqual(row('door', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [5, 0.5, 0.5, 2.5, 1, 0.25]);
     assert.deepStrictEqual(row('interact', ['range', 'strength', 'z', 'fade', 'bounces', 'gain']), [3, 0.35, 0.3, 1.8, 1, 0.15]);
     assert.strictEqual(l.ping.bounces, 2);
@@ -1217,8 +1217,9 @@ describe('audio-atmosphere (B4)', () => {
   test('villager heartbeat: plays within 2 cells, silent beyond, no-ops without a context', () => {
     const a = mk();
     assert.strictEqual(Audio.heartbeat(a, { dist: 1, bpm: 65 }), true);
-    assert.strictEqual(Audio.heartbeat(a, { dist: 2 }), false);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 4.5 }), true, 'faint tail out to 2.5x the old 2 cells');
     assert.strictEqual(Audio.heartbeat(a, { dist: 5 }), false);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 9 }), false);
     assert.strictEqual(Audio.heartbeat(a, { dist: 1, pan: 0.6, occluded: true, behind: true, bpm: 130 }), true);
     assert.strictEqual(Audio.heartbeat(Audio.create({}), { dist: 1 }), false);
     assert.doesNotThrow(() => Audio.heartbeat(null));
