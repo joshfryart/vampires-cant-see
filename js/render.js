@@ -292,7 +292,7 @@
       r.grainLevel = l;
       const el = r.grainEl;
       if (!el || !el.style) return;
-      const o = r.quality >= 1 ? GRAIN_BASE * l : 0;
+      const o = r.quality >= 1 ? GRAIN_BASE * l * (r.grainFxK > 0 ? r.grainFxK : 1) : 0;
       if (o === r.grainApplied) return;
       r.grainApplied = o;
       el.style.opacity = String(o);
@@ -306,10 +306,12 @@
     try {
       if (!r) return;
       const o = !!on;
-      if (r.vignetteOn === o) return;
+      const val = o ? (r.vigOpacity > 0 && r.vigOpacity < 1 ? r.vigOpacity : 1) : 0;
+      if (r.vignetteOn === o && r.vignetteVal === val) return;
       r.vignetteOn = o;
+      r.vignetteVal = val;
       const el = r.vignetteEl;
-      if (el && el.style) el.style.opacity = o ? '1' : '0';
+      if (el && el.style) el.style.opacity = String(val);
     } catch (e) {
       logOnce(r, 'setVignette', e);
     }
@@ -411,10 +413,10 @@
   }
 
   /** Path2D for the bucket matching brightness, alpha, flash and width class. */
-  function pathFor(b, a, flash, thick) {
+  function pathFor(b, a, flash, thick, wcForce) {
     const ci = flash ? 4 : doorMode ? 7 + doorMode : Math.min(3, Math.floor(b * 4));
     if (doorMode && !flash) a = Math.min(1, a * DOOR_GAIN);
-    return pathForC(ci, a, thick || flash ? 1 : 0);
+    return pathForC(ci, a, wcForce === 2 ? 2 : thick || flash ? 1 : 0);
   }
 
   /** Stroke all buckets (optional wide glow pass first) and reset them. */
@@ -517,8 +519,24 @@
       if (b <= 0.01) continue;
       let a = lineAlpha(b, dist) * mul;
       if (flash) a = Math.min(1, a + 0.5 * (1 - age / FLASH_AGE) * mul);
-      const path = pathFor(b, a, flash && mul >= 1, mul >= 1 && dist < 1.5);
-      if (h === 0) { path.moveTo(x + lean, yt); path.lineTo(xm, ym); }
+      const fl = flash && mul >= 1;
+      const th = mul >= 1 && dist < 1.5;
+      const path = pathFor(b, a, fl, th);
+      if (r.fxTaper) {
+        // Taper: the outer 30% of each half goes to the thin bucket, the inner part keeps its class.
+        const thin = pathFor(b, a, fl, th, 2);
+        if (h === 0) {
+          const cx0 = x + lean + (xm - x - lean) * 0.3;
+          const cy0 = yt + (ym - yt) * 0.3;
+          thin.moveTo(x + lean, yt); thin.lineTo(cx0, cy0);
+          path.moveTo(cx0, cy0); path.lineTo(xm, ym);
+        } else {
+          const cx1 = x + (xm - x) * 0.3;
+          const cy1 = yb + (ym - yb) * 0.3;
+          path.moveTo(xm, ym); path.lineTo(cx1, cy1);
+          thin.moveTo(cx1, cy1); thin.lineTo(x, yb);
+        }
+      } else if (h === 0) { path.moveTo(x + lean, yt); path.lineTo(xm, ym); }
       else { path.moveTo(xm, ym); path.lineTo(x, yb); }
     }
   }
@@ -593,6 +611,15 @@
         if (hOk) {
           matH(r, i, v1 + w1, v1 + 0.015 * (cellHash(cx, cy, 5) - 0.5) - w1, bt, bb, dist, 2, j);
           matH(r, i, v2, v2 + 0.02 * (cellHash(cx, cy, 6) - 0.5) + w1, bt, bb, dist, 2, j);
+          if (r.fx >= 1) {
+            // Texture: two short slanted hatch strokes per block, low in the block (lower third), seeded by cell.
+            for (let k = 0; k < 2; k++) {
+              const hu = 0.1 + 0.7 * cellHash(cx, cy, 9 + k);
+              if (u1 < hu || u1 > hu + 0.1 || u0 < hu - 0.04) continue;
+              const hv = 0.7 + 0.12 * k + 0.08 * cellHash(cx, cy, 11 + k);
+              matH(r, i, hv, hv + 0.05, bt, bb, dist, 2, j);
+            }
+          }
         }
         const j0 = 0.2 + 0.6 * cellHash(cx, cy, 3);
         const j1 = 0.2 + 0.6 * cellHash(cx, cy, 4);
@@ -620,6 +647,7 @@
       case 87: { // 'W' wood: grain squiggles
         const ph = cellHash(cx, cy, 8) * 6;
         if (!(hz && hits[i - 2].side === h.side && r.tch[i - 2] === ch)) break;
+        if (r.fx >= 1 && ((i >> 1) & 1) !== 0) break; // texture: grain drawn as dashes
         const alongJ = h.side === 0 ? hits[j].hitY : hits[j].hitX;
         for (let k = 0; k < 3; k++) {
           const v = 0.2 + k * 0.3;
@@ -795,6 +823,24 @@
       if (u0 >= 0.22 && u0 <= 0.4 && u1 >= 0.22 && u1 <= 0.4) dD(r, i, 0.22 + (u0 - 0.22) * 1.3, 0.22 + (u1 - 0.22) * 1.3, bt, bb, dist, ci, 0, G);
       if (u0 >= 0.22 && u0 <= 0.32 && u1 >= 0.22 && u1 <= 0.32) dD(r, i, 0.32 + (u0 - 0.22) * 1.3, 0.32 + (u1 - 0.22) * 1.3, bt, bb, dist, ci, 2, G);
     }
+    if (r.fx === 2 && r.quality >= 2 && age >= 0) {
+      // One seeded glint per window: two crossed strokes that fade once with the ripple afterglow (no twinkle, alpha <= 0.3).
+      const dur = r.winDur > 0 ? r.winDur : 0.45;
+      const ga = 0.3 * glow(age, dur) * Math.min(1, lineAlpha(Math.max(bt, bb), dist) * 2);
+      if (ga >= 0.04) {
+        const gu = 0.2 + 0.6 * cellHash(h.cellX, h.cellY, 11);
+        const gv = 0.2 + 0.5 * cellHash(h.cellX, h.cellY, 12);
+        if (crossU(u0, u1, gu)) {
+          const yt = (r.ytopD[i - 1] + r.ytopD[i]) * 0.5;
+          const gy = yt + ((r.ybotD[i - 1] + r.ybotD[i]) * 0.5 - yt) * gv;
+          const gx = i * r.colW;
+          const hl = 1.5 * r.wscale;
+          const gp = pathForC(ci, Math.min(0.25, ga), 2);
+          gp.moveTo(gx - hl, gy - hl); gp.lineTo(gx + hl, gy + hl);
+          gp.moveTo(gx - hl, gy + hl); gp.lineTo(gx + hl, gy - hl);
+        }
+      }
+    }
   }
 
   /** Candle glow in the panes of a lit window column, drawn only while a ripple passes (v scales with ripple brightness). */
@@ -866,6 +912,7 @@
         }
         // Ripple-only vision: keep the brightness only for a short afterglow behind the front.
         if (b > 0.01) {
+          if (tcode === 119) r.winDur = glowDur(pf * WIN_LINGER);
           const g = glowMul(age, tcode === 119 ? pf * WIN_LINGER : pf);
           b0 *= g;
           b1 *= g;
@@ -1552,6 +1599,34 @@
    * Floor depth cue: each primary pulse's wavefront over open floor as a thin perspective-projected ellipse
    * arc, with a few seeded stipple dots trailing behind it. Cheap (one stroke + one fill per pulse).
    */
+  /** Begin a path and trace one floor-front arc of radius R around pulse pu (perspective-projected, occluded). */
+  function traceFront(r, ctx, pu, R, player, ca, sa, halfW, focal, horizon, half) {
+    ctx.beginPath();
+    let pen = false;
+    for (let s = 0; s <= FRONT_SEG; s++) {
+      const th = (s / FRONT_SEG) * TWO_PI;
+      const wx = pu.x + Math.cos(th) * R;
+      const wy = pu.y + Math.sin(th) * R;
+      const dx = wx - player.x;
+      const dy = wy - player.y;
+      const fwd = dx * ca + dy * sa;
+      let ok = fwd > 0.2;
+      let sx = 0;
+      let y = 0;
+      if (ok) {
+        sx = halfW + ((-dx * sa + dy * ca) / fwd) * focal;
+        y = horizon + half / fwd;
+        if (sx < -20 || sx > r.ow + 20 || y > r.oh * 4) ok = false;
+        else {
+          const col = Math.max(0, Math.min(r.cols - 1, Math.floor(sx / r.colW)));
+          if (fwd > r.zbuf[col] + 0.05 || !visibleFrom(pu, wx, wy)) ok = false;
+        }
+      }
+      if (!ok) { pen = false; continue; }
+      if (!pen) { ctx.moveTo(sx, y); pen = true; } else ctx.lineTo(sx, y);
+    }
+  }
+
   function drawFloorFront(r, world, sonar, t, player, tanHalf) {
     const pulses = sonar.pulses;
     if (!pulses || !pulses.length || r.quality < 2) return;
@@ -1581,31 +1656,18 @@
       if (pu.weak > 0) a *= r.reduced ? 0.7 : 1 - 0.3 * Math.min(1, pu.weak) * (0.5 + 0.5 * Math.sin(t * 15 + k));
       if (a < 0.04) continue;
       ctx.globalAlpha = a;
-      ctx.beginPath();
-      let pen = false;
-      for (let s = 0; s <= FRONT_SEG; s++) {
-        const th = (s / FRONT_SEG) * TWO_PI;
-        const wx = pu.x + Math.cos(th) * R;
-        const wy = pu.y + Math.sin(th) * R;
-        const dx = wx - player.x;
-        const dy = wy - player.y;
-        const fwd = dx * ca + dy * sa;
-        let ok = fwd > 0.2;
-        let sx = 0;
-        let y = 0;
-        if (ok) {
-          sx = halfW + ((-dx * sa + dy * ca) / fwd) * focal;
-          y = horizon + half / fwd;
-          if (sx < -20 || sx > r.ow + 20 || y > r.oh * 4) ok = false;
-          else {
-            const col = Math.max(0, Math.min(r.cols - 1, Math.floor(sx / r.colW)));
-            if (fwd > r.zbuf[col] + 0.05 || !visibleFrom(pu, wx, wy)) ok = false;
-          }
-        }
-        if (!ok) { pen = false; continue; }
-        if (!pen) { ctx.moveTo(sx, y); pen = true; } else ctx.lineTo(sx, y);
-      }
+      traceFront(r, ctx, pu, R, player, ca, sa, halfW, focal, horizon, half);
       ctx.stroke();
+      if (r.fx >= 1) {
+        // Soft gradient front: two fainter arcs trailing behind (static offsets, also under reduced motion).
+        for (let q = 0; q < 2; q++) {
+          const Rq = R - 0.06 * (q + 1);
+          if (Rq < 0.3) break;
+          ctx.globalAlpha = a * (q === 0 ? 0.45 : 0.2);
+          traceFront(r, ctx, pu, Rq, player, ca, sa, halfW, focal, horizon, half);
+          ctx.stroke();
+        }
+      }
       // Stipple behind the front: seeded per pulse so the dots hold still as the ring expands.
       const seed = Math.round(pu.t0 * 1000) + k * 7919;
       let nd = r.quality >= 3 ? FRONT_DOTS : FRONT_DOTS >> 1;
@@ -4035,6 +4097,17 @@
       try { const lg = VCS.Log && VCS.Log.get('render'); if (lg) lg.info('effects cap lifted, retrying High'); } catch (e) { /* ignore */ }
     }
     r.fx = r.fxCap && r.fxCfg > r.fxCap ? r.fxCap : r.fxCfg;
+    r.fxTaper = r.fx === 2 && r.quality >= 3;
+    // Post-FX scaling of the CSS overlays; effects 0 always keeps the classic grain and vignette.
+    const PF = VCS.PostFx;
+    r.grainFxK = 1;
+    r.vigOpacity = 1;
+    if (PF && r.fx > 0) {
+      try {
+        if (typeof PF.grainLevel === 'function') { const gl = Number(PF.grainLevel(r.fx)); if (gl > 0) r.grainFxK = Math.min(1.25, gl / GRAIN_BASE); }
+        if (typeof PF.vignetteOpacity === 'function') { const vo = Number(PF.vignetteOpacity(r.fx)); if (vo > 0 && vo <= 1) r.vigOpacity = vo; }
+      } catch (e) { logOnce(r, 'postfxK', e); }
+    }
     r.figMs = 0;
     r.figVol = 0;
     r.figLine = 0;
@@ -4093,7 +4166,12 @@
     if (anyPulse) {
       const smooth = r.ow !== r.canvas.width;
       ctx.globalCompositeOperation = 'lighter';
-      if (r.quality >= 4 && r.glow && (r.litColumns > 0 || drawn > 0 || echoes > 0)) {
+      const litAny = r.litColumns > 0 || drawn > 0 || echoes > 0;
+      let bloomed = false;
+      if (PF && typeof PF.bloom === 'function' && r.glow && litAny) {
+        try { bloomed = !!PF.bloom(r, ctx, r.fx); } catch (e) { logOnce(r, 'bloom', e); }
+      }
+      if (!bloomed && r.quality >= 4 && r.glow && litAny) {
         // Glow: half-res copy softened with a small blur (4x cheaper than blurring full-res).
         const gctx = r.gctx;
         gctx.globalCompositeOperation = 'copy';
@@ -4114,6 +4192,12 @@
     }
     if (opts && opts.warm) { try { drawWarm(r, player, tanHalf, opts.warm); } catch (e) { logOnce(r, 'warm', e); } }
     drawAtmosphere(r, opts && typeof opts.lit === 'number' ? opts.lit : 0, t, world, player);
+    if (PF && r.fx > 0 && typeof PF.grade === 'function' && opts && opts.grade) {
+      // Colour grade sits under the HUD (a separate canvas pass), so it never darkens the HUD.
+      try { PF.grade(r, ctx, opts.grade, r.fx); } catch (e) { logOnce(r, 'grade', e); }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
     if (opts && typeof opts.vignette === 'number' && opts.vignette > 0.001) drawFeedVignette(r, Math.min(1, opts.vignette));
     adapt(r, !!anyPulse && r.litColumns > 0);
   }

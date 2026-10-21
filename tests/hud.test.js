@@ -460,5 +460,34 @@ describe('hud-hunger.test.js', () => {
     });
   });
 
+  describe('v0.16 fx polish', () => {
+    const BAD_FX = [NaN, undefined, null, -5, 'x', {}, []];
+    const base = { blood01: 0.6, weak: 0, frac: 0.5, hour: 1, minute: 5, t: 1.3, boil: true, reduced: false, pulse01: 0, powers: [{ id: 'bat', state: 'ready', key: 'Q' }, { id: 'mist', state: 'cooldown', cd01: 0.4 }] };
+    const run = (fx, extra) => { const c = fakeCtx(); const o = Object.assign({}, base, extra); if (fx !== undefined) o.fx = fx; Hud.drawHud(Hud.create(), c, o); return c.calls; };
+    const sig = (calls) => calls.map((c) => c.fn + ':' + c.args.join(',') + ':' + c.alpha).join('|');
+
+    test('fx 0, missing and garbage fx make identical calls', () => {
+      const a = sig(run(undefined));
+      assert.strictEqual(sig(run(0)), a);
+      for (const v of BAD_FX) assert.strictEqual(sig(run(v)), a);
+    });
+
+    test('fx 1 and 2 add calls without throwing; alpha stays <= 0.55 for the additions', () => {
+      const n0 = run(0).length;
+      assert.ok(run(1).length > n0);
+      assert.ok(run(2).length >= run(1).length);
+            const extra = run(1).filter((c) => c.fn === 'stroke' && (c.alpha === 0.2 || c.alpha === 0.25));
+      assert.ok(extra.length >= 2);
+    });
+
+    test('fx works with reduced, large text, feeding and an empty vial', () => {
+      for (const fx of [0, 1, 2]) {
+        for (const e of [{ reduced: true }, { largeText: true }, { feeding: true }, { blood01: 0 }, { blood01: 1 }]) {
+          assert.doesNotThrow(() => run(fx, e));
+        }
+      }
+    });
+  });
+
 });
 

@@ -210,8 +210,28 @@ if (process.argv.includes('--shots')) {
     await snap(pg, 'dawn', false);
     await pg.evaluate(() => { const G = window.VCS.Game; G.debugTime(20, 30); G.debugBlood(15); G.debugAdvance(0.2); G.debugPulse(); G.debugAdvance(0.4); });
     await snap(pg, 'hud-weak', false);
+    // C4: dusk (20:05) at effects 2, outdoors on the tavern street spot.
+    await town(); await at(pt(doors.tavern, 3));
+    await pg.evaluate(() => { const G = window.VCS.Game; G.debugTime(20, 5); G.debugAdvance(0.1); G.debugPulse(); G.debugAdvance(0.4); });
+    await snap(pg, 'dusk', false);
     await pg.close();
 
+    // C4: the same scenes at effects 0, saved as base-<name>-fx0.png. Doors come from the map data read above.
+    const p0 = await open(true, 0);
+    const town0 = () => p0.evaluate(() => { window.VCS.Game.debugMap('town', null); window.VCS.Game.debugAdvance(0.1); });
+    const at0 = (p) => p0.evaluate(([X, Y, A]) => window.VCS.Game.debugTeleport(X, Y, A), [p.x, p.y, p.a]);
+    await town0(); await at0(pt(doors.tavern, 3));
+    await snap(p0, 'street-fx0', true);
+    await town0(); await at0(pt(doors.tavern, -3));
+    await snap(p0, 'tavern-fx0', true);
+    await town0(); await at0(pt(doors.church, -3));
+    await snap(p0, 'church-fx0', true);
+    await town0(); await at0(pt(doors.tavern, 3));
+    await p0.evaluate(() => { const G = window.VCS.Game; G.debugBlood(60); G.debugTime(5, 40); G.debugAdvance(0.2); G.debugPulse(); G.debugAdvance(0.4); });
+    await snap(p0, 'dawn-fx0', false);
+    await p0.evaluate(() => { const G = window.VCS.Game; G.debugTime(20, 30); G.debugBlood(15); G.debugAdvance(0.2); G.debugPulse(); G.debugAdvance(0.4); });
+    await snap(p0, 'hud-weak-fx0', false);
+    await p0.close();
 
     // Archetype lineup at effects 0, 1 and 2: one villager of each archetype in a row 1.6 cells apart, 2.5 cells ahead of
     // the player and facing them. people[i].mode is set directly (cycling the list below), then one pulse.

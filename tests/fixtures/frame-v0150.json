@@ -1,0 +1,51 @@
+{
+  "fixture": "frame",
+  "v": 1,
+  "baseline": "v0.15.0-pre",
+  "effects": 0,
+  "hash": "fnv1a-32 over the fake-ctx call log, one line per call: fn(args rounded to 1e-3) s=stroke a=alpha lw=lineWidth, joined by \\n",
+  "source": "drawFirstPerson at effects 0, scenes: crypt start, town street, window wall (open cell west of a w tile), dawn (town street, t and lit set for dawn)",
+  "count": 4,
+  "entries": [
+    {
+      "key": "crypt-start",
+      "map": "crypt",
+      "x": 2.5,
+      "y": 5.5,
+      "t": 60.15,
+      "hash": "e41a68f3",
+      "calls": 456,
+      "threw": null
+    },
+    {
+      "key": "town-street",
+      "map": "town",
+      "x": 1.5,
+      "y": 1.5,
+      "t": 60.15,
+      "hash": "e69e06cd",
+      "calls": 381,
+      "threw": null
+    },
+    {
+      "key": "window-wall",
+      "map": "town",
+      "x": 9.5,
+      "y": 4.5,
+      "t": 60.15,
+      "hash": "84e61d5a",
+      "calls": 30,
+      "threw": null
+    },
+    {
+      "key": "dawn",
+      "map": "town",
+      "x": 1.5,
+      "y": 1.5,
+      "t": 340.2,
+      "hash": "c2d5ca6b",
+      "calls": 381,
+      "threw": null
+    }
+  ]
+}

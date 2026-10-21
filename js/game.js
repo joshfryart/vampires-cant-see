@@ -2051,6 +2051,10 @@
         const base = cfgNum('fovDeg', 66) * Math.PI / 180;
         ro.fov = base * (1 - (1 - GRAB_FOV) * e);
       }
+      if (S.night && typeof S.night.min === 'number' && isFinite(S.night.min)) {
+        // C2 colour grade inputs (render ignores them at effects 0): dusk ramps in over the first 30 night minutes.
+        ro.grade = { dusk: S.night.min < 30 ? 1 - S.night.min / 30 : 0, dawn: VCS.Night.dawnK(S.night) };
+      }
       VCS.Render.drawFirstPerson(r, S.world, S.player, S.sonar, S.clock, ro);
     }
     if (S.state === 'runend') {
@@ -2132,6 +2136,7 @@
     hs.boil = boil;
     hs.reduced = S.reduced;
     hs.largeText = cfgOn('largeText');
+    hs.fx = Math.max(0, Math.min(2, Math.round(cfgNum('effects', 0))));
     HOPTS.largeText = hs.largeText;
     HOPTS.reduced = S.reduced;
     hs.pulse01 = S.hudA > 0.01 ? S.hudA * S.hudFrac : 0;
@@ -2367,6 +2372,7 @@
     try {
       const b = root.document && root.document.body;
       if (b && b.classList) b.classList.toggle('large-text', cfgOn('largeText'));
+      if (b && b.classList) b.classList.toggle('reduce-motion', !!S.reduced);
       if (b && b.classList) b.classList.toggle('no-vignette', S.config && S.config.edgeVignette === false);
     } catch (e) { /* ignore */ }
   }

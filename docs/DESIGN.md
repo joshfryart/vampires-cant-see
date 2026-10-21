@@ -1,4 +1,4 @@
-# Vampires Can't See - Design (v0.15.0)
+# Vampires Can't See - Design (v0.16.0)
 
 Single source of truth for rules and numbers. Code wins if this drifts; data lives in `js/data/*.js` and `js/config.js`.
 
@@ -17,7 +17,7 @@ Single source of truth for rules and numbers. Code wins if this drifts; data liv
 | Data modules | Deep-frozen |
 | CSP | No inline script, no external loads |
 | Tests | `node:test` in `tests/`; full suite must stay green |
-| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.15.0'`) |
+| Version | `VCS.Log.VERSION` in `js/log.js` (`'0.16.0'`) |
 | Style | Dim, hand-drawn, boiled thin lines; no blood or gore drawn; every cue has an audio and a visual twin; nothing flashes above 3 Hz |
 
 ## 2. Module map
@@ -302,6 +302,38 @@ Footsteps by floor: `stepMaterial(x,y)` reads `world.materialAt` (`grass`, `wood
 | Breathing | Each person within 6 cells breathes every 2-3 s (first breath 0.3-2.3 s in). Fed people are silent |
 | Timers | Seeded per night from run seed and night (`initAmbient`) |
 
+### 6.5 Post-FX and grade
+
+Source: `js/postfx.js` (`VCS.PostFx`), `js/render.js` (`drawFirstPerson`, grain and vignette, taper, glint, stone and wood texture), `js/game.js` (render opts `ro.grade`).
+
+Everything is gated on the effects level `fx` (0 Off, 1 Low, 2 High; `r.fx` is capped by the adaptive quality step). At fx 0 the output is the v0.15 frame.
+
+| fx | Bloom | Grade | Grain base | Vignette |
+|---|---|---|---|---|
+| 0 | off, except quality 4 at alpha 0.85 (unchanged) | none | 0.04 (`GRAIN_BASE`) | unchanged (1) |
+| 1 | quality 4 only (0.85) | dusk and dawn | 0.035 | 0.7 |
+| 2 | quality >= 3 with `filter` support: half-res blur(1.6px) copy, `lighter`, alpha 0.55 (quality 4 keeps 0.85) | dusk and dawn | 0.05 | 1 |
+
+Caps and inputs:
+- Bloom alpha is at most 0.85 (quality 4) and 0.55 at fx 2. Without `filter` the fx 2 bloom is skipped, not faked.
+- Grade `g = {dusk, dawn}` in 0..1. `ro.grade.dusk = 1 - night.min / 30` while `night.min < 30` (else 0). `ro.grade.dawn = Night.dawnK(night)`.
+  - Dusk: `multiply` `rgb(150,140,200)` at alpha <= 0.10.
+  - Dawn: `multiply` `rgb(255,205,185)` at alpha <= 0.12, then `saturation` grey `rgb(128,128,128)` at alpha <= 0.25 (skipped if the canvas does not take the mode).
+  - Each composite mode is set and read back; a mode the canvas refuses skips its pass. The pass restores `source-over` and alpha 1.
+- Grain scale is `min(1.25, level / 0.04)` applied to the existing grain. The vignette opacity is the value in the table; at fx 2 it is 1, the same as before.
+- Grade is drawn inside the render canvas after atmosphere, before the HUD canvas pass, so it never darkens the HUD. Public functions never throw; errors are logged once.
+
+Other fx >= 1 and fx 2 details (render.js):
+- Taper (fx 2, quality >= 3): each vertical segment is split at 30% from its outer end. The outer part goes to the thin bucket (`pathForC(ci, a, 2)`), the inner part keeps its class. No extra `stroke()` calls.
+- Floor front (fx >= 1): two trailing arcs at `R-0.06` and `R-0.12` cells, alpha x0.45 and x0.2.
+- Stone `#` (fx >= 1, material detail on, quality >= 2): two short slanted hatch strokes per block, in the lower third. Wood `W`: grain dashes only on every other block.
+- Window glint (fx 2, quality >= 2): one seeded pair of crossed strokes per pane, alpha <= 0.3 x glow. It fades once over the ripple afterglow (0.2 to 1.0 s, `glowDur`). It does not twinkle.
+
+Rate and motion notes:
+- Post-FX adds no periodic term. Bloom, grade, grain and vignette are static per frame apart from the existing grain.
+- The only new time-varying element is the window glint: one fade per ripple, lasting 0.2 to 1.0 s. A single pulse cannot make it blink or repeat inside its own fade. Its repeat rate follows the player's pulse rate; there is no timer that retriggers it.
+- Reduced motion does not change bloom or grade (both static). The glint is not gated on reduced motion; it is one fade, not a pulse. The v0.16 HUD marks (section 11) are static.
+
 ## 7. Saves
 
 Source: `js/save.js`, `js/game.js`.
@@ -485,6 +517,18 @@ Dim (alpha <= 0.55), boiled lines (10 fps), readable at 640x360. Every optional 
 | Dawn | `drawDawn(k)`: grey grain + edge vignette, no-op at k <= 0 |
 | Card | 28 px bold monospace boiled outline lettering, `CARD_DUR` 2.4 s |
 | Controls line | "WASD move - Arrows move/turn - Mouse look - Left click / Space pulse - Right click / R drink - E doors / sleep - Esc pause - Q shriek - Shift / C mist - F still" |
+
+v0.16 polish (all new marks are fx-gated, alpha <= 0.55, and static):
+
+| Element | fx | Look |
+|---|---|---|
+| Vial glass highlight | >= 1 | 1 px line down the left side, alpha 0.25 x flicker |
+| Vial meniscus | >= 1 | curled edge where the level meets the glass, alpha 0.4 |
+| Dial inner arc | >= 1 | thin second arc under the dotted track, alpha `feedDim` x 0.2 |
+| Ready power ring | >= 1 | static ring at r 11 on ready powers, alpha 0.2, no pulse |
+| Power and glyph taper | 2 | `icons.draw` `taper`: full length at 0.7 x width plus the middle 70% at full width |
+
+Menu buttons (`css/style.css`): ink underline on `:hover` and `:focus-visible`, 2 px `--ink` focus outline with a faint background tint, transitions 120 ms. Transitions are `none` under `prefers-reduced-motion: reduce` and `body.reduce-motion`.
 
 ### 11.1 Input
 

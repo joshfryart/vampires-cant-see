@@ -114,22 +114,48 @@
       [[-0.02, 0.0], [0.02, 0.0]]
     ]
   };
-  /** Stroke a smooth wobbly path through pts. j = jitter amplitude in unit space. */
-  function strokePts(ctx, pts, s, ox, oy, seed, fr, j, si) {
+  /** Stroke a smooth wobbly path through pts. j = jitter amplitude in unit space. tp (optional, number) = full line width:
+   *  the whole polyline is stroked at tp*0.7 and its middle 70% again at tp (a tapered stroke). */
+  function strokePts(ctx, pts, s, ox, oy, seed, fr, j, si, tp) {
     const n = pts.length;
     if (n < 2) return;
-    const px = function (i) { return ox + (pts[i][0] + (hash(seed + si * 31 + i, fr) - 0.5) * j) * s; };
-    const py = function (i) { return oy + (pts[i][1] + (hash(seed + si * 31 + i + 500, fr) - 0.5) * j) * s; };
-    ctx.beginPath();
-    ctx.moveTo(px(0), py(0));
-    if (n === 2) ctx.lineTo(px(1), py(1));
-    else {
-      for (let i = 1; i < n - 1; i++) {
-        ctx.quadraticCurveTo(px(i), py(i), (px(i) + px(i + 1)) / 2, (py(i) + py(i + 1)) / 2);
-      }
-      ctx.lineTo(px(n - 1), py(n - 1));
+    const P = [];
+    for (let i = 0; i < n; i++) {
+      P.push([
+        ox + (pts[i][0] + (hash(seed + si * 31 + i, fr) - 0.5) * j) * s,
+        oy + (pts[i][1] + (hash(seed + si * 31 + i + 500, fr) - 0.5) * j) * s
+      ]);
     }
-    ctx.stroke();
+    const run = function (Q) {
+      const m = Q.length;
+      ctx.beginPath();
+      ctx.moveTo(Q[0][0], Q[0][1]);
+      if (m === 2) ctx.lineTo(Q[1][0], Q[1][1]);
+      else {
+        for (let i = 1; i < m - 1; i++) {
+          ctx.quadraticCurveTo(Q[i][0], Q[i][1], (Q[i][0] + Q[i + 1][0]) / 2, (Q[i][1] + Q[i + 1][1]) / 2);
+        }
+        ctx.lineTo(Q[m - 1][0], Q[m - 1][1]);
+      }
+      ctx.stroke();
+    };
+    if (typeof tp === 'number' && tp > 0) {
+      ctx.lineWidth = tp * 0.7;
+      run(P);
+      // middle 70%: points between 15% and 85% of the way along the index range
+      let Q;
+      if (n === 2) {
+        Q = [[P[0][0] + (P[1][0] - P[0][0]) * 0.15, P[0][1] + (P[1][1] - P[0][1]) * 0.15],
+          [P[0][0] + (P[1][0] - P[0][0]) * 0.85, P[0][1] + (P[1][1] - P[0][1]) * 0.85]];
+      } else {
+        const lo = Math.floor((n - 1) * 0.15 + 0.5);
+        const hi = Math.max(lo + 1, Math.ceil((n - 1) * 0.85 - 0.5));
+        Q = P.slice(lo, Math.min(n, hi + 1));
+        if (Q.length < 2) Q = P;
+      }
+      ctx.lineWidth = tp;
+      run(Q);
+    } else run(P);
   }
 
   function setLine(ctx, color, lw, alpha) {
@@ -163,7 +189,8 @@
       }
       const seed = seedOf(name);
       const sh = SHAPES[name];
-      for (let i = 0; i < sh.length; i++) strokePts(ctx, sh[i], s, 0, 0, seed, fr, jit, i);
+      const tp = opts.taper === true ? 1.5 : 0;
+      for (let i = 0; i < sh.length; i++) strokePts(ctx, sh[i], s, 0, 0, seed, fr, jit, i, tp);
       ctx.restore();
       return true;
     } catch (e) {

@@ -59,3 +59,14 @@ test('tombstone and crypt menu draw, crypt stays cheap', () => {
     assert.ok(segs < 300, 'segments ' + segs);
   }
 });
+
+test('every icon draws with and without taper; taper adds a thinner full-length stroke', () => {
+  for (const n of Icons.NAMES) {
+    const a = rec(); const b = rec(); const c = rec();
+    assert.strictEqual(Icons.draw(a, n, 48, 1.2, { taper: false }), true, n);
+    assert.strictEqual(Icons.draw(b, n, 18, 1.2, { taper: true, still: true }), true, n);
+    assert.strictEqual(Icons.draw(c, n, 18, 1.2, { still: true }), true, n);
+    assert.ok(b.calls.filter((x) => x === 'stroke').length > c.calls.filter((x) => x === 'stroke').length, n);
+  }
+  assert.doesNotThrow(() => Icons.draw(rec(), 'nope', 18, 0, { taper: true }));
+});

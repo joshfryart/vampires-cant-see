@@ -1205,4 +1205,175 @@ describe('render-figure (volumetric integration, B4)', () => {
   });
 });
 
+describe('render-fx (C2: line taper, floor front, material texture, window glint, grade)', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  require('../js/log.js');
+  for (const m of ['ripple', 'raycast', 'world', 'sonar', 'people', 'struggle', 'data/maps', 'data/sounds', 'flags', 'data/vessels', 'night', 'postfx']) require('../js/' + m + '.js');
+  const Render = require('../js/render.js');
+  const VCS = globalThis.VCS;
+  VCS.Log.setConsole(false);
 
+  function fakeCtx(canvas) {
+    const calls = [];
+    const state = { globalAlpha: 1, fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, globalCompositeOperation: 'source-over' };
+    return new Proxy({ calls, canvas }, {
+      get(t, p) {
+        if (p in t) return t[p];
+        if (p in state) return state[p];
+        return function () {
+          calls.push({ fn: String(p), args: Array.prototype.slice.call(arguments), stroke: state.strokeStyle, fill: state.fillStyle, alpha: state.globalAlpha, lw: state.lineWidth });
+          if (p === 'createRadialGradient' || p === 'createLinearGradient') return { addColorStop() {} };
+          if (p === 'createPattern') return {};
+          if (p === 'createImageData') return { data: new Uint8ClampedArray(128 * 128 * 4) };
+          return undefined;
+        };
+      },
+      set(t, p, v) { state[p] = v; return true; }
+    });
+  }
+  function fakeCanvas(w, h) {
+    const c = { width: w, height: h, ownerDocument: null };
+    c.ownerDocument = { createElement() { return fakeCanvas(w, h); } };
+    c._ctx = null;
+    c.getContext = function () { return c._ctx || (c._ctx = fakeCtx(c)); };
+    return c;
+  }
+  // Path2D stub that counts its points so strokes can be compared.
+  class P2 { constructor() { this.n = 0; } moveTo() { this.n++; } lineTo() { this.n++; } }
+  function withPath2D(fn) {
+    const had = typeof globalThis.Path2D !== 'undefined';
+    if (!had) globalThis.Path2D = P2;
+    try { return fn(); } finally { if (!had) delete globalThis.Path2D; }
+  }
+  function setup(map, fx, q) {
+    const r = Render.create(fakeCanvas(640, 360), { effects: fx });
+    r.reduced = false;
+    r.quality = q;
+    const world = VCS.World.load(VCS.MapData.maps[map], { requireStart: map === VCS.MapData.startMap });
+    return { r, world, sonar: VCS.Sonar.create() };
+  }
+  function findCell(world, pred) {
+    for (let y = 0; y < world.height; y++) for (let x = 0; x < world.width; x++) if (pred(x, y)) return { x, y };
+    throw new Error('no cell');
+  }
+  const startPl = (world) => ({ x: Math.floor(world.start.x) + 0.5, y: Math.floor(world.start.y) + 0.5, angle: 0 });
+  const windowPl = (world) => {
+    const c = findCell(world, (x, y) => world.tileAt(x + 1, y) === 'w' && !world.isSolid(x + 0.5, y + 0.5));
+    return { x: c.x + 0.5, y: c.y + 0.5, angle: 0 };
+  };
+  // Draw one frame dt seconds after a pulse from the player; returns point totals per stroke bucket.
+  function frame(map, fx, q, plFn, dt, opts) {
+    return withPath2D(() => {
+      const f = setup(map, fx, q);
+      const pl = plFn(f.world);
+      VCS.Sonar.emit(f.sonar, f.world, pl.x, pl.y, 100);
+      Render.drawFirstPerson(f.r, f.world, pl, f.sonar, 100 + dt, opts || {});
+      let pts = 0;
+      const alphaPts = {};
+      const calls = f.r.octx.calls;
+      for (const c of calls) {
+        if (c.fn !== 'stroke' || !c.args[0] || typeof c.args[0].n !== 'number') continue;
+        pts += c.args[0].n;
+        const k = c.alpha + '|' + c.stroke + '|' + c.lw;
+        alphaPts[k] = (alphaPts[k] || 0) + c.args[0].n;
+      }
+      return { f, pts, alphaPts, strokes: calls.filter((c) => c.fn === 'stroke').length };
+    });
+  }
+
+  test('effects 0 stays hash-identical to the v0.15 frame fixture', () => {
+    const root = path.resolve(__dirname, '..');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vcs-c2-'));
+    const out = path.join(dir, 'frame.json');
+    try {
+      execFileSync(process.execPath, [path.join(root, 'tools', 'frame-golden.mjs'), out], { cwd: root, stdio: 'pipe' });
+      const want = JSON.parse(fs.readFileSync(path.join(root, 'tests', 'fixtures', 'frame-v0150.json'), 'utf8'));
+      const got = JSON.parse(fs.readFileSync(out, 'utf8'));
+      assert.strictEqual(got.count, want.count);
+      for (let i = 0; i < want.entries.length; i++) assert.deepStrictEqual(got.entries[i], want.entries[i], want.entries[i].key);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('stone hatching adds path segments only at fx >= 1', () => {
+    const a = frame('crypt', 0, 3, startPl, 0.8);
+    const b = frame('crypt', 1, 3, startPl, 0.8);
+    assert.ok(a.pts > 0);
+    assert.ok(b.pts > a.pts, 'fx1 ' + b.pts + ' > fx0 ' + a.pts);
+  });
+
+  test('taper adds no stroke() calls beyond the bucket count', () => {
+    const b = frame('crypt', 1, 3, startPl, 0.8);
+    const c = frame('crypt', 2, 3, startPl, 0.8);
+    assert.strictEqual(c.f.r.fxTaper, true);
+    assert.strictEqual(b.f.r.fxTaper, false);
+    // New thin buckets: at most 5 colours x 8 alphas, doubled by the glow pass.
+    assert.ok(c.strokes - b.strokes <= 80, 'extra strokes: ' + (c.strokes - b.strokes));
+    assert.ok(c.pts > b.pts, 'taper splits segments');
+  });
+
+  test('taper is off below quality 3 and at fx < 2', () => {
+    assert.strictEqual(frame('crypt', 2, 2, startPl, 0.8).f.r.fxTaper, false);
+    assert.strictEqual(frame('crypt', 0, 3, startPl, 0.8).f.r.fxTaper, false);
+  });
+
+  test('floor front trails two fainter arcs at fx >= 1 only', () => {
+    function arcs(fx) {
+      const f = setup('town', fx, 3);
+      const c = findCell(f.world, (x, y) => f.world.tileAt(x, y) === 'g' && f.world.tileAt(x + 1, y) === 'g' && f.world.kindAt(x + 0.5, y + 0.5) === 'outdoor');
+      const pl = { x: c.x + 0.5, y: c.y + 0.5, angle: 0 };
+      withPath2D(() => {
+        VCS.Sonar.emit(f.sonar, f.world, pl.x, pl.y, 100);
+        Render.drawFirstPerson(f.r, f.world, pl, f.sonar, 100.15, {});
+      });
+      return f.r.octx.calls.filter((k) => k.fn === 'stroke' && k.lw === 1.5 && k.stroke === '#e8f2ff').map((k) => k.alpha);
+    }
+    const a0 = arcs(0);
+    const a1 = arcs(1);
+    assert.ok(a0.length >= 1);
+    assert.ok(a1.length > a0.length, 'trailing arcs added: ' + a0.length + ' vs ' + a1.length);
+    assert.ok(a1[1] < a1[0] && a1[2] < a1[1], 'trail alphas fall: ' + a1.slice(0, 3).join(','));
+  });
+
+  test('window glint: fx 2 only, only while the afterglow lasts, alpha <= 0.3', () => {
+    const base = frame('town', 1, 2, windowPl, 0.12);
+    const hi = frame('town', 2, 2, windowPl, 0.12);
+    assert.ok(hi.pts > base.pts, 'glint adds segments during the pass: ' + hi.pts + ' vs ' + base.pts);
+    let grew = 0;
+    for (const k of Object.keys(hi.alphaPts)) {
+      if ((hi.alphaPts[k] || 0) > (base.alphaPts[k] || 0)) { grew++; assert.ok(Number(k.split('|')[0]) <= 0.3, 'glint bucket alpha ' + k); }
+    }
+    assert.ok(grew >= 1);
+    const lateBase = frame('town', 1, 2, windowPl, 1.9);
+    const lateHi = frame('town', 2, 2, windowPl, 1.9);
+    assert.strictEqual(lateHi.pts, lateBase.pts);
+  });
+
+  test('grade: zero inputs draw nothing; dusk and dawn tint only at fx >= 1; zero at night minute 300', () => {
+    const tints = (fx, g) => {
+      const x = frame('crypt', fx, 3, startPl, 0.8, { grade: g });
+      return x.f.r.ctx.calls.filter((c) => c.fn === 'fillRect' && (c.fill === 'rgb(150,140,200)' || c.fill === 'rgb(255,205,185)')).length;
+    };
+    const min = 300;
+    const g0 = { dusk: min < 30 ? 1 - min / 30 : 0, dawn: VCS.Night.dawnK({ min: min }) };
+    assert.deepStrictEqual(g0, { dusk: 0, dawn: 0 });
+    assert.strictEqual(tints(2, g0), 0);
+    assert.strictEqual(tints(0, { dusk: 1, dawn: 1 }), 0);
+    assert.ok(tints(2, { dusk: 1, dawn: 0 }) >= 1);
+    assert.ok(tints(2, { dusk: 0, dawn: 1 }) >= 1);
+  });
+
+  test('without PostFx the legacy glow block and overlays still work', () => {
+    const saved = VCS.PostFx;
+    try {
+      delete VCS.PostFx;
+      const x = frame('crypt', 2, 4, startPl, 0.8, { grade: { dusk: 1, dawn: 1 } });
+      assert.ok(x.pts > 0);
+      assert.ok(x.f.r.gctx.calls.some((c) => c.fn === 'drawImage'), 'legacy glow at quality 4');
+    } finally { VCS.PostFx = saved; }
+  });
+});

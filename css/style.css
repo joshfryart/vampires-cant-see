@@ -199,6 +199,29 @@ button:hover {
 
 button:focus-visible {
   background: rgba(207, 227, 255, 0.18);
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* v0.16 menu polish: ink underline on hover/focus, short transitions (none when motion is reduced) */
+button {
+  text-decoration: underline transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out, text-decoration-color 120ms ease-out;
+}
+
+button:hover,
+button:focus-visible {
+  text-decoration-color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
+}
+
+body.reduce-motion button {
+  transition: none;
 }
 
 input[type="range"]:focus-visible {
@@ -332,6 +355,7 @@ button:disabled {
 }
 
 button:disabled:hover {
+  text-decoration-color: transparent;
   background: transparent;
   border-color: var(--line);
   animation: none;

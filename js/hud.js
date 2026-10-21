@@ -131,6 +131,16 @@
     ctx.lineTo(34 + J(h, 13, 0) * sc, V_RIM - 0.5);
     ctx.stroke();
 
+    if (fx >= 1) {
+      // glass highlight: one thin line down the left side
+      ctx.globalAlpha = 0.25 * fl;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(25 + J(h, 14, 0) * sc, V_RIM + 5);
+      ctx.lineTo(24.8 + J(h, 15, 0) * sc, 325);
+      ctx.stroke();
+    }
+
     if (blood <= 0.005) return;
     const level = V_IN_BOT - (V_IN_BOT - V_IN_TOP) * blood;
     const amp = reduced ? 0 : 1.5;
@@ -160,6 +170,17 @@
       ctx.lineTo(x1, y + J(h, 38 + i, 0) * 0.4);
     }
     ctx.stroke();
+    if (fx >= 1 && level > V_IN_TOP + 1 && level < V_IN_BOT - 1) {
+      // meniscus: the level edges curl up where the blood meets the glass
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(24.2, level - 1.2);
+      ctx.quadraticCurveTo(25.8, level + 0.4, 28, level + 0.4);
+      ctx.moveTo(35.8, level - 1.2);
+      ctx.quadraticCurveTo(34.2, level + 0.4, 32, level + 0.4);
+      ctx.stroke();
+    }
   }
 
   // ---- moon -> sun dial ----
@@ -168,6 +189,7 @@
   const DR = 16;
 
   let lg = 1;      // text/icon scale for this draw call (1 or LARGE_K)
+  let fx = 0;      // effects level for this draw call (0 = v0.15 output, 1 Low, 2 High)
   let feedDim = 1; // dial + clock alpha multiplier (0.5 while feeding)
 
   // ---- veil meter: how visible you are (eye icon + 5 ticks), cold blue-grey hidden -> candle gold exposed ----
@@ -248,6 +270,15 @@
     }
     ctx.stroke();
     ctx.lineWidth = 1;
+    if (fx >= 1) {
+      // second thin inner arc under the dotted track
+      ctx.globalAlpha = feedDim * 0.2;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(DX + J(h, 82, 0) * 0.3, DY + J(h, 82, 1) * 0.3, DR - 4, Math.PI, TWO_PI, false);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
     // moon crescent at the left end (fades as the night wears on)
     const mx = DX - DR - 6;
     ctx.globalAlpha = feedDim * (0.45 * (1 - 0.5 * frac));
@@ -337,7 +368,7 @@
       ctx.translate(x, PW_Y);
       let ok = false;
       if (I && I.draw && typeof p.id === 'string' && I.NAMES.indexOf(p.id) >= 0) {
-        ok = I.draw(ctx, p.id, 18 * lg, t, { alpha: alpha, color: COL_BLUE, still: reduced });
+        ok = I.draw(ctx, p.id, 18 * lg, t, { alpha: alpha, color: COL_BLUE, still: reduced, taper: fx === 2 });
       }
       ctx.restore();
       ctx.strokeStyle = COL_BLUE;
@@ -356,7 +387,14 @@
           ctx.arc(x, PW_Y, 11 * lg, -Math.PI / 2, -Math.PI / 2 + TWO_PI * k);
           ctx.stroke();
         }
-      } else if (st === 'ready' && typeof p.key === 'string' && p.key) {
+      } else if (st === 'ready' && fx >= 1) {
+        // static soft ring on a ready power (no pulse)
+        ctx.globalAlpha = 0.2;
+        ctx.beginPath();
+        ctx.arc(x, PW_Y, 11 * lg, 0, TWO_PI);
+        ctx.stroke();
+      }
+      if (st === 'ready' && typeof p.key === 'string' && p.key) {
         ctx.globalAlpha = 0.7;
         ctx.fillStyle = COL_BLUE;
         ctx.font = (8 * lg) + 'px ' + FONT_MONO;
@@ -476,6 +514,7 @@
       const t = num(o.t, 0, -1e9, 1e9);
       const reduced = o.reduced === true;
       lg = o.largeText === true ? LARGE_K : 1;
+      fx = num(o.fx, 0, 0, 2) >= 2 ? 2 : num(o.fx, 0, 0, 2) >= 1 ? 1 : 0;
       const blood = num(o.blood01, 0, 0, 1);
       const weak = num(o.weak, 0, 0, 1);
       const frac = num(o.frac, 0, 0, 1);
@@ -517,10 +556,12 @@
       }
       try { drawHunger(h, ctx, o, t, reduced); } catch (e) { logOnce('hunger', e); }
       lg = 1;
+      fx = 0;
       ctx.globalAlpha = 1;
       if (ctx.restore) ctx.restore();
     } catch (e) {
       lg = 1;
+      fx = 0;
       logOnce('drawHud', e);
       try { if (ctx && ctx.restore) ctx.restore(); } catch (_) { /* ignore */ }
     }
