@@ -467,6 +467,16 @@ describe('render-feed.test.js', () => {
     }
   });
 
+  test('floor texture kind: grass blades, stone paving, wood planks, cobble stones; walls and doors none', () => {
+    assert.strictEqual(Render.floorTexKind('grass'), 'grass');
+    assert.strictEqual(Render.floorTexKind('stone'), 'brick');
+    assert.strictEqual(Render.floorTexKind('wood'), 'plank');
+    assert.strictEqual(Render.floorTexKind('cobble'), 'cobble');
+    assert.strictEqual(Render.floorTexKind('roughStone'), 'cobble');
+    assert.strictEqual(Render.floorTexKind('glass'), null);
+    assert.strictEqual(Render.floorTexKind(undefined), null);
+  });
+
   test('speckle scale: roughness thickens and lengthens the stipple, clamped 0..1', () => {
     const lo = Render.speckle(0.1);
     const hi = Render.speckle(0.8);

@@ -1370,6 +1370,164 @@
     return pu.rough;
   }
 
+  const TEX_MAX_CELLS = 520;
+  const TEX_BUCKETS = 3;
+
+  /**
+   * Floor texture kind for a material name: 'grass' blades, 'brick' paving (stone), 'plank' (wood), 'cobble' rounded stones (cobble, roughStone).
+   * Anything else is not a floor and gets no texture.
+   */
+  function floorTexKind(mat) {
+    if (mat === 'grass') return 'grass';
+    if (mat === 'stone') return 'brick';
+    if (mat === 'wood') return 'plank';
+    if (mat === 'cobble' || mat === 'roughStone') return 'cobble';
+    return null;
+  }
+
+  /** Add one floor cell's marks (blades / brick joints / planks / pebbles) to the current path. P projects floor (x,y) to ctx.px/py/pf (false when off screen). */
+  function addFloorCell(ctx, P, kind, cx, cy, hs) {
+    const pr = P.pt;
+    if (kind === 'grass') {
+      for (let i = 0; i < 9; i++) {
+        const u = cx + hash01(cx * 31 + i, cy * 17 + 3);
+        const v = cy + hash01(cx * 13 + i, cy * 29 + 5);
+        if (!pr(u, v)) continue;
+        const lean = (hash01(cx * 7 + i, cy * 11 + 9) - 0.5) * 0.06;
+        const h = Math.min(22, (0.045 + 0.06 * hash01(cx * 5 + i, cy * 3 + 1)) * 2 * hs / pr.f);
+        ctx.moveTo(pr.x, pr.y);
+        ctx.lineTo(pr.x + lean * pr.f2, pr.y - h);
+      }
+    } else if (kind === 'brick') {
+      // Two courses of half-cell bricks: course joints at v = 0, 0.5; staggered end joints at u = 0.5 (top course) and u = 0 (bottom course).
+      const seg = (u0, v0, u1, v1) => {
+        if (!pr(cx + u0, cy + v0)) return;
+        const x0 = pr.x;
+        const y0 = pr.y;
+        if (!pr(cx + u1, cy + v1)) return;
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(pr.x, pr.y);
+      };
+      seg(0, 0, 1, 0);
+      seg(0, 0.5, 1, 0.5);
+      seg(0.5, 0, 0.5, 0.5);
+      seg(0, 0.5, 0, 1);
+    } else if (kind === 'plank') {
+      // Three planks along x; each plank has a seeded end joint.
+      const seg = (u0, v0, u1, v1) => {
+        if (!pr(cx + u0, cy + v0)) return;
+        const x0 = pr.x;
+        const y0 = pr.y;
+        if (!pr(cx + u1, cy + v1)) return;
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(pr.x, pr.y);
+      };
+      for (let i = 0; i < 3; i++) {
+        const v = i / 3;
+        seg(0, v, 1, v);
+        const j = 0.2 + 0.6 * hash01(cx * 19 + i, cy * 23 + 2);
+        seg(j, v, j, v + 1 / 3);
+      }
+    } else {
+      for (let i = 0; i < 4; i++) {
+        const u = cx + 0.15 + 0.7 * hash01(cx * 41 + i, cy * 43 + 1);
+        const v = cy + 0.15 + 0.7 * hash01(cx * 47 + i, cy * 53 + 2);
+        if (!pr(u, v)) continue;
+        const rx = (0.1 + 0.07 * hash01(cx * 59 + i, cy * 61 + 4)) * pr.f2;
+        const ry = rx * 0.5;
+        if (rx < 0.8) continue;
+        ctx.moveTo(pr.x + rx, pr.y);
+        ctx.ellipse(pr.x, pr.y, rx, ry, 0, 0, TWO_PI);
+      }
+    }
+  }
+
+  /**
+   * Ground texture under the ripple (v0.11.7): as a primary pulse's wavefront sweeps over open floor, the cells behind it show their
+   * material for the afterglow (grass blades, brick paving joints, wood planks, cobble stones), seen in perspective. Same visibility
+   * rules as the floor front (walls and light-of-sight), gated on airOn; at most TEX_MAX_CELLS cells a frame.
+   */
+  function drawFloorTexture(r, world, sonar, t, player, tanHalf) {
+    const pulses = sonar.pulses;
+    if (!pulses || !pulses.length || !airOn(r) || !world || typeof world.materialAt !== 'function') return;
+    const ctx = r.octx;
+    const halfW = r.ow / 2;
+    const focal = halfW / tanHalf;
+    const ca = Math.cos(player.angle);
+    const sa = Math.sin(player.angle);
+    const horizon = r.horizon;
+    const half = r.oh / 2;
+    const pr = function (wx, wy) {
+      const dx = wx - player.x;
+      const dy = wy - player.y;
+      const fwd = dx * ca + dy * sa;
+      if (fwd < 0.3) return false;
+      pr.x = halfW + ((-dx * sa + dy * ca) / fwd) * focal;
+      pr.y = horizon + half / fwd;
+      pr.f = fwd;
+      pr.f2 = focal / fwd;
+      return pr.x > -40 && pr.x < r.ow + 40 && pr.y < r.oh * 3;
+    };
+    const P = { pt: pr };
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#d8ecff';
+    let budget = TEX_MAX_CELLS;
+    for (let k = 0; k < pulses.length && budget > 0; k++) {
+      const pu = pulses[k];
+      if (pu.gen > 0 || pu.kind === 'step' || pu.kind === 'personStep' || pu.kind === 'vheart') continue;
+      if (typeof pu.z === 'number' && pu.z > 0.7) continue;
+      const R = VCS.Sonar.ringRadius(pu, t);
+      if (R < 0.5) continue;
+      const fade = typeof pu.fade === 'number' && pu.fade > 0 ? pu.fade : sonar.fade;
+      const dur = glowDur(fade) * 1.5;
+      const band = dur * pu.speed;
+      const rMax = Math.min(R, pu.range);
+      const str = typeof pu.strength === 'number' ? pu.strength : 1;
+      let base = 0.85 * Math.min(1, str * 1.3);
+      if (pu.weak > 0) base *= r.reduced ? 0.7 : 1 - 0.3 * Math.min(1, pu.weak);
+      const x0 = Math.max(0, Math.floor(Math.min(player.x, pu.x) - rMax - 1));
+      const x1 = Math.ceil(Math.max(player.x, pu.x) + rMax + 1);
+      const y0 = Math.max(0, Math.floor(Math.min(player.y, pu.y) - rMax - 1));
+      const y1 = Math.ceil(Math.max(player.y, pu.y) + rMax + 1);
+      const sets = [];
+      for (let b = 0; b < TEX_BUCKETS; b++) sets.push([]);
+      const lo = Math.max(0, R - band);
+      for (let cy = y0; cy <= y1; cy++) {
+        for (let cx = x0; cx <= x1; cx++) {
+          const mx = cx + 0.5;
+          const my = cy + 0.5;
+          const d = Math.hypot(mx - pu.x, my - pu.y);
+          if (d > rMax || d < lo) continue;
+          const fwd = (mx - player.x) * ca + (my - player.y) * sa;
+          if (fwd < 0.3) continue;
+          const g = glow((R - d) / pu.speed, dur) * base * (1 - d / pu.range);
+          if (g < 0.05) continue;
+          const sx = halfW + ((-(mx - player.x) * sa + (my - player.y) * ca) / fwd) * focal;
+          if (sx < -40 || sx > r.ow + 40) continue;
+          const col = Math.max(0, Math.min(r.cols - 1, Math.floor(sx / r.colW)));
+          if (fwd > r.zbuf[col] + 0.05 || !visibleFrom(pu, mx, my)) continue;
+          if (world.isSolid(mx, my)) continue;
+          const kind = floorTexKind(world.materialAt(mx, my));
+          if (!kind) continue;
+          const bk = Math.min(TEX_BUCKETS - 1, Math.floor(g * TEX_BUCKETS * 1.2));
+          sets[bk].push(cx, cy, kind, fwd);
+          if (--budget <= 0) break;
+        }
+        if (budget <= 0) break;
+      }
+      for (let b = 0; b < TEX_BUCKETS; b++) {
+        const s = sets[b];
+        if (!s.length) continue;
+        ctx.globalAlpha = Math.min(0.9, base * (0.3 + 0.7 * ((b + 1) / TEX_BUCKETS)) * 0.8);
+        ctx.beginPath();
+        for (let i = 0; i < s.length; i += 4) addFloorCell(ctx, P, s[i + 2], s[i], s[i + 1], half);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   /**
    * Floor depth cue: each primary pulse's wavefront over open floor as a thin perspective-projected ellipse
    * arc, with a few seeded stipple dots trailing behind it. Cheap (one stroke + one fill per pulse).
@@ -3639,6 +3797,7 @@
     drawRipple(r, world, sonar, t, player, tanHalf);
     drawAirRings(r, world, sonar, t, player, tanHalf);
     drawWallVibe(r, hits, sonar, t, player, tanHalf);
+    drawFloorTexture(r, world, sonar, t, player, tanHalf);
     drawFloorFront(r, world, sonar, t, player, tanHalf);
     drawFootRings(r, sonar, t, player, tanHalf);
     const ripple = opts && opts.ripple;
@@ -3944,6 +4103,7 @@
     beamGain: beamGain,
     beamReach: beamReach,
     speckle: speckle,
+    floorTexKind: floorTexKind,
     pulseRough: pulseRough,
     drawVessels: drawVessels,
     drawVesselsSeen: drawVesselsSeen,
