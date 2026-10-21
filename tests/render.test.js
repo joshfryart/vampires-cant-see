@@ -629,3 +629,107 @@ describe('edge glow ramp', () => {
     assert.ok(f(0, 1) > 0 && f(0, 1) <= Render.edgeGlowAlpha(0.35) + 1e-9);
   });
 });
+
+describe('render-vessels (circulatory P3)', () => {
+  const test = require('node:test');
+  const assert = require('node:assert');
+  require('../js/log.js');
+  require('../js/flags.js');
+  require('../js/data/vessels.js');
+  const Render = require('../js/render.js');
+  const VCS = globalThis.VCS;
+  const Flags = VCS.Flags;
+  const D = VCS.VesselData;
+  Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+
+  function ctx() {
+    const calls = [];
+    const st = { globalAlpha: 1, fillStyle: '#000' };
+    return new Proxy({ calls }, {
+      get(t, p) {
+        if (p in t) return t[p];
+        if (p in st) return st[p];
+        return function () { calls.push({ fn: String(p), args: Array.from(arguments), alpha: st.globalAlpha, fill: st.fillStyle }); };
+      },
+      set(t, p, v) { st[p] = v; return true; }
+    });
+  }
+  function rig(q, reduced) { return { octx: ctx(), quality: q, reduced: !!reduced, wscale: 1 }; }
+  // Pose: head at top, feet 200 px below.
+  const X = new Float32Array(24).fill(100);
+  const Y = new Float32Array(24);
+  [20, 40, 50, 50, 120, 120, 110, 110, 220, 220, 80, 80, 170, 170, 85].forEach((v, i) => { Y[i] = v; });
+  function vh(o) { return Object.assign({ kind: 'vheart', strength: 1, fade: 3, bpm: 65, stateK: 1, periphK: 1, headK: 1 }, o || {}); }
+  const total = D.arteries.length + D.veins.length;
+
+  test('no-op when the flag is off (default)', () => {
+    Flags.set('vis.vessels', false);
+    const r = rig(2);
+    assert.strictEqual(Render.drawVessels(r, vh(), X, Y, 0), 0);
+    assert.strictEqual(r.octx.calls.length, 0);
+  });
+
+  test('draws every node at quality >= 1, nothing extra at quality 0 or for other echo kinds', () => {
+    Flags.set('vis.vessels', true);
+    for (const q of [1, 2, 3]) assert.strictEqual(Render.drawVessels(rig(q), vh(), X, Y, 0), total);
+    const r0 = rig(0);
+    assert.strictEqual(Render.drawVessels(r0, vh(), X, Y, 0), 0);
+    assert.strictEqual(r0.octx.calls.length, 0);
+    assert.strictEqual(Render.drawVessels(rig(2), vh({ kind: 'ping' }), X, Y, 0), 0);
+    // Batched: a handful of fills per figure, not one per node.
+    const r = rig(2);
+    Render.drawVessels(r, vh(), X, Y, 0);
+    const fills = r.octx.calls.filter((c) => c.fn === 'fill').length;
+    assert.ok(fills > 0 && fills <= 4 * 6, 'fills ' + fills);
+    // Halo only at quality 2+.
+    const r1 = rig(1);
+    Render.drawVessels(r1, vh(), X, Y, 0);
+    assert.ok(r1.octx.calls.filter((c) => c.fn === 'fill').length < fills);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('alpha scales with node weight and periphK, headK on head nodes', () => {
+    const o = { base: 0.5, hotK: 0, veinK: 0.6 };
+    const heart = D.arteries.find((n) => n.id === 'heart');
+    const radial = D.arteries.find((n) => n.id === 'radialL');
+    const temporal = D.arteries.find((n) => n.id === 'temporal');
+    assert.ok(Math.abs(Render.vesselAlpha(heart, vh(), o) - 0.5) < 1e-9);
+    assert.ok(Math.abs(Render.vesselAlpha(radial, vh(), o) - 0.5 * radial.w) < 1e-9);
+    assert.ok(Math.abs(Render.vesselAlpha(radial, vh({ periphK: 0.5 }), o) - 0.25 * radial.w) < 1e-9);
+    assert.strictEqual(Render.vesselAlpha(heart, vh({ periphK: 0.5 }), o), Render.vesselAlpha(heart, vh(), o));
+    assert.ok(Render.vesselAlpha(temporal, vh({ headK: 1.25 }), o) > Render.vesselAlpha(temporal, vh(), o));
+    assert.ok(Render.vesselAlpha(heart, vh({ stateK: 0.5 }), o) < Render.vesselAlpha(heart, vh(), o));
+    // Hotspot boost (heart +50%), veins dimmer than their artery.
+    assert.ok(Render.vesselAlpha(heart, vh(), { base: 0.5, hotK: 1 }) > Render.vesselAlpha(heart, vh(), o));
+    assert.ok(Render.vesselAlpha(D.veins[0], vh(), o) < Render.vesselAlpha(heart, vh(), o));
+    // periphK 0 drops the hands/feet (periph 1) from the drawn set.
+    Flags.set('vis.vessels', true);
+    const periph = D.arteries.concat(D.veins).filter((n) => n.periph >= 1).length;
+    assert.strictEqual(Render.drawVessels(rig(2), vh({ periphK: 0 }), X, Y, 0), total - periph);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('vampire, zero stateK or zero strength draws nothing', () => {
+    Flags.set('vis.vessels', true);
+    for (const e of [vh({ vampire: true }), vh({ body: 'vampire' }), vh({ stateK: 0 }), vh({ strength: 0 })]) {
+      const r = rig(2);
+      assert.strictEqual(Render.drawVessels(r, e, X, Y, 0), 0);
+      assert.strictEqual(r.octx.calls.filter((c) => c.fn === 'fill').length, 0);
+    }
+    // Past the echo's life: nothing.
+    assert.strictEqual(Render.drawVessels(rig(2), vh(), X, Y, 5), 0);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('reduced motion: no halo, every fill alpha <= 0.5', () => {
+    Flags.set('vis.vessels', true);
+    const r = rig(3, true);
+    const n = Render.drawVessels(r, vh({ stateK: 1.6, headK: 1.25 }), X, Y, 0);
+    assert.ok(n > 0);
+    const fills = r.octx.calls.filter((c) => c.fn === 'fill');
+    assert.ok(fills.length > 0);
+    for (const f of fills) assert.ok(f.alpha <= 0.5 + 1e-9, 'alpha ' + f.alpha);
+    for (const n2 of D.arteries) assert.ok(Render.vesselAlpha(n2, vh({ stateK: 2 }), { base: 1, reduced: true }) <= 0.5);
+    Flags.set('vis.vessels', false);
+  });
+});

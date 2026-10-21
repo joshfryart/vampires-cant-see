@@ -2603,9 +2603,113 @@
       }
     };
     clippedDraw(r, minX - lw, maxX + lw, depth, wrapped);
+    // Circulatory overlay: after the outline, not limited to the chest strip (the outline stays chest-only).
+    if (e.kind === 'vheart' && !locked && vesselsOn()) clippedDraw(r, minX - lw, maxX + lw, depth, function () { drawVessels(r, e, X, Y, age); });
     if (locked) drawGrabArms(r, X, Y, hs, lw, alpha, gJolt, tN, pid, baseStyle, r.lockRs || 0);
     ctx.globalAlpha = 1;
     return true;
+  }
+
+  // ---- Circulatory pulse overlay (P3: static vessel nodes, behind the `vis.vessels` flag) ----
+  /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
+  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3 };
+  const VESSEL_REDUCED_CAP = 0.5;
+  /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
+  const VESSEL_LEVELS = 6;
+  const VESSEL_PT = { x: 0, y: 0 };
+  const VESSEL_BUCKET = [];
+
+  function vesselTun(key) {
+    const F = VCS.Flags;
+    const v = F && F.tun ? F.tun('vessels', key) : undefined;
+    return typeof v === 'number' && isFinite(v) ? v : VESSEL_TUN[key];
+  }
+  function vesselsOn() {
+    return !!(VCS.Flags && VCS.Flags.get && VCS.Flags.get('vis.vessels'));
+  }
+
+  /**
+   * Static alpha (before the echo envelope) of one vessel node for a vheart echo e:
+   * base * w * stateK * lerp(1, periphK, periph) * (head ? headK : 1) * (1 + hot * hotK) (veins: * veinK, no hotspot).
+   * opts {base, hotK, veinK, reduced}; reduced drops the hotspot bloom and caps at 0.5.
+   */
+  function vesselAlpha(n, e, opts) {
+    const o = opts || {};
+    const stateK = typeof e.stateK === 'number' ? e.stateK : 1;
+    if (!(stateK > 0)) return 0;
+    const periphK = typeof e.periphK === 'number' ? e.periphK : 1;
+    const headK = typeof e.headK === 'number' ? e.headK : 1;
+    const base = typeof o.base === 'number' ? o.base : VESSEL_TUN.alpha;
+    const p = n.periph || 0;
+    let a = base * n.w * stateK * (1 - p + p * periphK) * (n.head ? headK : 1);
+    if (n.vein) a *= typeof o.veinK === 'number' ? o.veinK : VESSEL_TUN.veins;
+    else if (!o.reduced) a *= 1 + (n.hot || 0) * (typeof o.hotK === 'number' ? o.hotK : VESSEL_TUN.hot);
+    if (o.reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
+    return a > 1 ? 1 : a < 0 ? 0 : a;
+  }
+
+  /**
+   * Vessel nodes for one vheart echo e at pose slots X, Y (drawPerson's PX/PY), age s since the beat reached them.
+   * Static nodes only: a dot per node (arteries red, veins deeper red-blue, a bit larger and behind), plus a soft
+   * halo at quality >= 2. Not masked to the chest strip. Returns the number of nodes drawn (0 when off).
+   */
+  function drawVessels(r, e, X, Y, age) {
+    const V = VCS.Vessels;
+    const D = VCS.VesselData;
+    if (!V || !D || !e || e.kind !== 'vheart' || !vesselsOn()) return 0;
+    const q = typeof r.quality === 'number' ? r.quality : 2;
+    if (q < 1 || q < vesselTun('minQuality')) return 0;
+    if (e.vampire || e.body === 'vampire' || e.bodyKind === 'vampire') return 0;
+    const b = typeof e.strength === 'number' ? Math.min(1, e.strength) : 1;
+    if (!(b > 0.01) || !(typeof e.stateK === 'number' ? e.stateK > 0 : true)) return 0;
+    const fade = typeof e.fade === 'number' && e.fade > 0 ? e.fade : 3;
+    const env = age >= 0 ? glow(age, SWEEP + glowDur(fade)) : 1;
+    if (env <= 0.01) return 0;
+    const reduced = !!r.reduced;
+    const opts = { base: vesselTun('alpha'), hotK: vesselTun('hot'), veinK: vesselTun('veins'), reduced: reduced };
+    // Dot size from the figure's on-screen height (head to lower foot).
+    const figPx = Math.max(Math.abs(Y[8] - Y[0]), Math.abs(Y[9] - Y[0]), 1);
+    const rad = Math.max(1, figPx * 0.016 * vesselTun('size')) * (r.wscale > 0 ? Math.min(1.5, Math.max(0.6, r.wscale)) : 1);
+    const halo = !reduced && q >= 2 ? vesselTun('halo') : 0;
+    const c = r.octx;
+    const list = [D.veins, D.arteries];
+    let n = 0;
+    c.save();
+    for (let li = 0; li < 2; li++) {
+      const nodes = list[li];
+      const vein = li === 0;
+      const rgb = vein ? D.VEIN_RGB : D.ARTERY_RGB;
+      const rr = vein ? rad * 1.6 : rad;
+      for (let k = 0; k <= VESSEL_LEVELS; k++) VESSEL_BUCKET[k] = null;
+      for (let i = 0; i < nodes.length; i++) {
+        let a = vesselAlpha(nodes[i], e, opts) * b * env;
+        if (reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
+        if (a < 0.02) continue;
+        const lv = Math.max(1, Math.min(VESSEL_LEVELS, Math.round(a * VESSEL_LEVELS)));
+        (VESSEL_BUCKET[lv] || (VESSEL_BUCKET[lv] = [])).push(nodes[i]);
+        n++;
+      }
+      c.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+      for (let lv = 1; lv <= VESSEL_LEVELS; lv++) {
+        const bk = VESSEL_BUCKET[lv];
+        if (!bk) continue;
+        const a = lv / VESSEL_LEVELS;
+        for (let pass = halo > 0 ? 0 : 1; pass < 2; pass++) {
+          const pr = pass === 0 ? rr * 2.4 : rr;
+          c.globalAlpha = pass === 0 ? a * halo : a;
+          c.beginPath();
+          for (let i = 0; i < bk.length; i++) {
+            V.anchor(bk[i], X, Y, VESSEL_PT);
+            c.moveTo(VESSEL_PT.x + pr, VESSEL_PT.y);
+            c.arc(VESSEL_PT.x, VESSEL_PT.y, pr, 0, TWO_PI);
+          }
+          c.fill();
+        }
+      }
+    }
+    c.restore();
+    c.globalAlpha = 1;
+    return n;
   }
 
   // ---- Props: outline doodles drawn through the sprite path (lit only by pulses, height-masked) ----
@@ -3615,7 +3719,10 @@
     beamGain: beamGain,
     beamReach: beamReach,
     speckle: speckle,
-    pulseRough: pulseRough
+    pulseRough: pulseRough,
+    drawVessels: drawVessels,
+    vesselAlpha: vesselAlpha,
+    VESSEL_TUN: VESSEL_TUN
   };
   VCS.Render = Render;
   if (typeof module !== 'undefined' && module.exports) module.exports = Render;

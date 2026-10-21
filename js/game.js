@@ -3379,6 +3379,13 @@
       try {
         if (VCS.Flags) {
           VCS.Flags.register('dev.showFps', false, 'Show the FPS/debug overlay');
+          VCS.Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+          VCS.Flags.registerTun('vessels', 'alpha', { value: 0.75, min: 0, max: 1, step: 0.05, desc: 'Vessel node base alpha' });
+          VCS.Flags.registerTun('vessels', 'size', { value: 1, min: 0.3, max: 3, step: 0.1, desc: 'Vessel dot size' });
+          VCS.Flags.registerTun('vessels', 'hot', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Hotspot bloom scale (carotid, femoral, radial)' });
+          VCS.Flags.registerTun('vessels', 'veins', { value: 0.6, min: 0, max: 1, step: 0.05, desc: 'Vein alpha vs arteries' });
+          VCS.Flags.registerTun('vessels', 'halo', { value: 0.3, min: 0, max: 1, step: 0.05, desc: 'Soft halo alpha at quality 2+' });
+          VCS.Flags.registerTun('vessels', 'minQuality', { value: 1, min: 1, max: 3, step: 1, desc: 'Lowest render quality that draws vessels' });
           VCS.Flags.load(root.location.search, debug);
           if (VCS.Flags.get('dev.showFps')) S.debugOn = true;
           VCS.Flags.onChange(function (ev) {
