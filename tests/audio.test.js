@@ -1214,11 +1214,11 @@ describe('audio-atmosphere (B4)', () => {
     assert.doesNotThrow(() => s.onended());
   });
 
-  test('villager heartbeat: plays within 1 cell, silent beyond 2.5, no-ops without a context', () => {
+  test('villager heartbeat: plays within 1 cell, silent beyond 3, no-ops without a context', () => {
     const a = mk();
     assert.strictEqual(Audio.heartbeat(a, { dist: 1, bpm: 65 }), true);
-    assert.strictEqual(Audio.heartbeat(a, { dist: 2.2 }), true, 'faint tail out to 2.5 cells');
-    assert.strictEqual(Audio.heartbeat(a, { dist: 2.5 }), false);
+    assert.strictEqual(Audio.heartbeat(a, { dist: 2.8 }), true, 'faint tail out to 3 cells');
+    assert.strictEqual(Audio.heartbeat(a, { dist: 3 }), false);
     assert.strictEqual(Audio.heartbeat(a, { dist: 5 }), false);
     assert.strictEqual(Audio.heartbeat(a, { dist: 1, pan: 0.6, occluded: true, behind: true, bpm: 130 }), true);
     assert.strictEqual(Audio.heartbeat(Audio.create({}), { dist: 1 }), false);

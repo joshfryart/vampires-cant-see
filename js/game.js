@@ -3835,13 +3835,13 @@
   }
 
   /**
-   * Heartbeat of the nearest two villagers within hearDist (2.5 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse.
+   * Heartbeat of the nearest two villagers within hearDist (3 cells; also through a wall: the occlusion filter dulls it): sound plus a chest pulse.
    * The drink victim is skipped: drinkBeat owns its beat while the player drinks.
    */
   function stepHeartbeats(dt, list) {
     const a = S.audio;
     const p = S.player;
-    const hear = level('vheart').hearDist || 2.5;
+    const hear = level('vheart').hearDist || 3;
     const victim = S.drink ? S.drink.person : null;
     let n1 = null;
     let d1 = hear * hear;
