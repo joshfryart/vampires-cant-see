@@ -608,6 +608,16 @@
       }
       tone(ctx, out, 'sine', 110 * k, 60 * k, t, 0.004, 0.07, peak);
     },
+    // guard footstep (v0.14): mail clink (two metallic rings) over a heavy boot thud, a little scuff on stone
+    guardStep: function (ctx, out, t, peak, v) {
+      const k = v.pitch * (v.foot ? 1.06 : 1);
+      tone(ctx, out, 'sine', 70 * k, 40 * k, t, 0.005, 0.12, peak * 1.2);
+      tone(ctx, out, 'triangle', 140 * k, 80 * k, t, 0.004, 0.06, peak * 0.6);
+      tone(ctx, out, 'sine', 2300 * k, 2150 * k, t + 0.012, 0.002, 0.09, peak * 0.3);
+      tone(ctx, out, 'sine', 3350 * k, 3200 * k, t + 0.03, 0.002, 0.07, peak * 0.22);
+      noise(ctx, out, t, 0.04, peak * 0.5, 'bandpass', 3800, 0.002);
+      if (v.material !== 'grass') noise(ctx, out, t + 0.03, 0.05, peak * 0.3, 'highpass', 3000, 0.01);
+    },
     // cartoon creak: pitch bends up and wobbles back down through a band-pass
     doorOpen: function (ctx, out, t, peak, v) {
       const f = ctx.createBiquadFilter();
@@ -816,7 +826,7 @@
       } else if (o.occluded) lpHz = 600;
       const ctx = a.ctx;
       const bus = ctx.createGain();
-      bus.gain.value = 1;
+      bus.gain.value = mixOf(kind === 'doorOpen' || kind === 'doorClose' ? 'door' : kind); // v0.14 mix
       if (fx && fx.peakHz > 0) {
         const pk = ctx.createBiquadFilter();
         pk.type = 'peaking';
@@ -827,7 +837,7 @@
         routeOut(ctx, pk, o.pan, lpHz);
       } else routeOut(ctx, bus, o.pan, lpHz);
       const foot = a.foot ? 1 : 0;
-      if (kind === 'step' || kind === 'personStep') a.foot = !a.foot;
+      if (kind === 'step' || kind === 'personStep' || kind === 'guardStep') a.foot = !a.foot;
       const mat = o.material === 'grass' || o.material === 'wood' || o.material === 'stone' ? o.material : 'stone';
       const v = { pitch: 1 + (rnd(a) - 0.5) * 0.16, foot: typeof o.foot === 'number' ? (o.foot ? 1 : 0) : foot, material: mat };
       if (kind === 'dog') v.yips = 2 + Math.floor(rnd(a) * 2);
@@ -878,11 +888,17 @@
     return ctx.__vcsBreath;
   }
 
-  /** Level row from SoundData (or a fallback). @returns {{gain: number, hearDist?: number}} */
+  /** v0.14 mix multiplier for a kind (SoundData.mixOther, 1 for speech / ping / echo / shriek). */
+  function mixOf(kind) {
+    const SD = root.VCS && root.VCS.SoundData;
+    return SD && typeof SD.mixFor === 'function' ? SD.mixFor(kind) : 1;
+  }
+
+  /** Level row from SoundData (or a fallback), already scaled by the mix multiplier. @returns {{gain: number, hearDist?: number}} */
   function levelOf(kind, fallbackGain) {
     const sd = root.VCS && root.VCS.SoundData && root.VCS.SoundData.levels;
     const lv = sd && sd[kind];
-    return { gain: lv && typeof lv.gain === 'number' ? lv.gain : fallbackGain, hearDist: lv && lv.hearDist };
+    return { gain: (lv && typeof lv.gain === 'number' ? lv.gain : fallbackGain) * mixOf(kind), hearDist: lv && lv.hearDist };
   }
 
   /** Ramps an AudioParam from its current value to v over sec seconds. Best effort. */
@@ -1285,7 +1301,7 @@
       }
       const ctx2 = a.ctx;
       const now = ctx2.currentTime || 0;
-      const tgt = lv * a.volume * FIRE_MAX;
+      const tgt = lv * a.volume * FIRE_MAX * mixOf('fire');
       if (Math.abs(tgt - v.tgt) > FIRE_MAX * 0.01 || (tgt === 0 && v.tgt !== 0)) {
         v.lv = lv;
         v.tgt = tgt;
@@ -1309,6 +1325,7 @@
   }
 
   const MAX_SPEAKERS = 4;
+  const NEUTRAL_FORMANT = [500, 1500, 2500];
 
   /** VCS.VoiceData or null. */
   function voiceData() {
@@ -1322,9 +1339,23 @@
   }
 
   /** Total duration in seconds of a line, scaled by mood and voice speed. */
-  function scaledLength(VD, syls, moodRow, voice) {
-    const sp = Math.max(0.3, moodRow.speed * (voice && voice.speed > 0 ? voice.speed : 1));
+  function scaledLength(VD, syls, moodRow, voice, weak) {
+    const sp = Math.max(0.3, moodRow.speed * (voice && voice.speed > 0 ? voice.speed : 1) * weakSpeed(weak));
     return VD.lineLength(syls) / sp;
+  }
+
+  /** v0.14 weak 0 (healthy) .. 1 (nearly drained), clamped; anything else is 0. */
+  function weakOf(w) {
+    return typeof w === 'number' && Number.isFinite(w) ? (w < 0 ? 0 : w > 1 ? 1 : w) : 0;
+  }
+  /** Speed multiplier for a weak value: 1 down to 0.6. */
+  function weakSpeed(w) {
+    return 1 - 0.4 * weakOf(w);
+  }
+  /** Slur amount 0..1: starts at weak 0.6 (below ~40% blood), full at 1. */
+  function slurOf(w) {
+    const x = (weakOf(w) - 0.6) / 0.4;
+    return x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
   }
 
   /**
@@ -1333,15 +1364,16 @@
    * @param {string} kind chat|question|argue|laugh|murmur|greet|startle
    * @param {string} [mood] calm|whisper|worried|argue
    * @param {object|string} [voice] preset name or forPerson result (speed scales the length; default speed 1)
+   * @param {number} [weak] 0..1 struggle weakness (slower and a different line shape), default 0
    * @returns {number}
    */
-  function speakLength(seed, kind, mood, voice) {
+  function speakLength(seed, kind, mood, voice, weak) {
     try {
       const VD = voiceData();
       if (!VD) return 0;
       const mr = VD.MOODS[mood] || VD.MOODS.calm;
       const v = voice === undefined ? { speed: 1 } : resolveVoice(VD, voice);
-      return scaledLength(VD, VD.line(seed, kind, mood), mr, v);
+      return scaledLength(VD, VD.line(seed, kind, mood, typeof weak === 'number' ? weakOf(weak) : undefined), mr, v, weak);
     } catch (e) {
       return 0;
     }
@@ -1366,7 +1398,7 @@
    * consonants and whisper. At most 4 speakers at once: a 5th call drops the OLDEST speaker (it is silenced) and plays.
    * Level comes from SoundData.levels.voice (fallback 0.06) times master volume and opts.gain. Reverb via the shared send.
    * @param {object} a Audio state.
-   * @param {{voice?: (string|object), seed?: (number|string), kind?: string, mood?: string, pan?: number, lpHz?: number, gain?: number}} [opts]
+   * @param {{voice?: (string|object), seed?: (number|string), kind?: string, mood?: string, pan?: number, lpHz?: number, gain?: number, weak?: number}} [opts] weak 0..1 (v0.14): 0 healthy, 1 nearly drained (slower to 0.6x, lower, quieter, breathy, slurred past 0.6)
    * @returns {{end: number, stop: function(): void}|null} end = seconds the line lasts; null when not ready, muted or unsupported.
    */
   function speak(a, opts) {
@@ -1380,11 +1412,14 @@
       const mr = VD.MOODS[o.mood] || VD.MOODS.calm;
       const voice = resolveVoice(VD, o.voice);
       const og = typeof o.gain === 'number' && Number.isFinite(o.gain) ? clamp01(o.gain) : 1;
-      const peak = a.volume * levelOf('voice', 0.06).gain * mr.gain * og;
+      // v0.14 weak 0..1: a drained victim is slower (to 0.6x), lower, quieter, breathier and, below ~40% blood, slurred
+      const weak = weakOf(o.weak);
+      const slur = slurOf(weak);
+      const peak = a.volume * levelOf('voice', 0.06).gain * mr.gain * og * (1 - 0.6 * weak);
       if (!(peak > 0)) return null;
-      const syls = VD.line(o.seed === undefined ? 0 : o.seed, o.kind, o.mood);
+      const syls = VD.line(o.seed === undefined ? 0 : o.seed, o.kind, o.mood, typeof o.weak === 'number' ? weak : undefined);
       if (!syls.length) return null;
-      const sp = Math.max(0.3, mr.speed * (voice.speed > 0 ? voice.speed : 1));
+      const sp = Math.max(0.3, mr.speed * (voice.speed > 0 ? voice.speed : 1) * weakSpeed(weak));
       const total = VD.lineLength(syls) / sp;
 
       // concurrency cap: drop the oldest live speaker
@@ -1393,7 +1428,7 @@
       while (list.length >= MAX_SPEAKERS) killSpeaker(ctx, list.shift());
 
       const t0 = now + 0.02;
-      const breath = Math.min(1, voice.breath + mr.breath);
+      const breath = Math.min(1, voice.breath + mr.breath + 0.45 * weak);
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
       const env = ctx.createGain();
@@ -1420,7 +1455,7 @@
       env.connect(bus);
       routeOut(ctx, bus, o.pan, typeof o.lpHz === 'number' && o.lpHz > 0 ? o.lpHz : 1800);
 
-      const base = voice.pitch * mr.pitch;
+      const base = voice.pitch * mr.pitch * (1 - 0.2 * weak);
       let t = t0;
       const voiced = mr.voiced;
       for (let i = 0; i < syls.length; i++) {
@@ -1429,13 +1464,20 @@
         const fm = VD.VOWELS[s.vowel] || VD.VOWELS.a;
         const f0 = Math.max(40, base * s.pitchMul * (1 + (i % 2 ? 1 : -1) * voice.wobble * 0.04));
         osc.frequency.setValueAtTime(f0, t);
-        osc.frequency.linearRampToValueAtTime(f0 * (1 + voice.wobble * 0.03), t + d);
+        osc.frequency.linearRampToValueAtTime(f0 * (1 + voice.wobble * 0.03) * (1 - 0.12 * slur), t + d);
+        // slurred: formants smear toward a neutral vowel and drift within the syllable
+        const nxt = VD.VOWELS[(syls[i + 1] || s).vowel] || fm;
         for (let j = 0; j < 3; j++) {
-          const hz = fm[j] * (voice.formantMul || 1);
+          const neutral = NEUTRAL_FORMANT[j];
+          const hz = (fm[j] + (neutral - fm[j]) * 0.65 * slur) * (voice.formantMul || 1);
           fils[j].frequency.setValueAtTime(hz, t);
+          if (slur > 0) fils[j].frequency.linearRampToValueAtTime((hz + (nxt[j] * (voice.formantMul || 1) - hz) * 0.5 * slur), t + d);
         }
-        const c = VD.CONSONANTS[s.consonant] || VD.CONSONANTS[''];
-        const pk = peak * (0.7 + 0.3 * Math.min(1.5, s.pitchMul)) * voiced;
+        // slurred: consonants drop out (every other one, all of them when nearly gone) and the line trails off
+        const c0 = VD.CONSONANTS[s.consonant] || VD.CONSONANTS[''];
+        const c = slur > 0.5 && (slur > 0.9 || i % 2 === 0) ? VD.CONSONANTS[''] : c0;
+        const trail = 1 - 0.65 * slur * (syls.length > 1 ? i / (syls.length - 1) : 1);
+        const pk = peak * (0.7 + 0.3 * Math.min(1.5, s.pitchMul)) * voiced * trail;
         env.gain.setValueAtTime(0.0001, t);
         env.gain.linearRampToValueAtTime(Math.max(pk, 0.0001), t + Math.min(0.03, d * 0.25));
         if (c.rolled) {

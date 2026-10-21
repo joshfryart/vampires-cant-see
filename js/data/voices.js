@@ -46,7 +46,8 @@
     calm: { speed: 1, gain: 1, breath: 0, pitch: 1, voiced: 1 },
     whisper: { speed: 0.9, gain: 0.45, breath: 0.6, pitch: 1, voiced: 0.12 },
     worried: { speed: 1.1, gain: 0.8, breath: 0.15, pitch: 1.08, voiced: 1 },
-    argue: { speed: 1.25, gain: 1.35, breath: 0.05, pitch: 1.05, voiced: 1 }
+    argue: { speed: 1.25, gain: 1.35, breath: 0.05, pitch: 1.05, voiced: 1 },
+    call: { speed: 0.9, gain: 1.3, breath: 0.02, pitch: 0.97, voiced: 1 } // a guard's carrying call
   };
 
   // Named syllables (flavour). Each is a vowel + consonant seed used when composing lines.
@@ -69,9 +70,9 @@
     ke: { vowel: 'e', consonant: 'k', dur: 0.12 }
   };
   const SYL_KEYS = Object.keys(SYLLABLES);
-  const KINDS = ['chat', 'question', 'argue', 'laugh', 'murmur', 'greet', 'startle', 'notice', 'struggle', 'flee', 'cower', 'relief', 'alarm', 'daytalk', 'hum'];
+  const KINDS = ['chat', 'question', 'argue', 'laugh', 'murmur', 'greet', 'startle', 'notice', 'struggle', 'flee', 'cower', 'relief', 'alarm', 'daytalk', 'hum', 'halt', 'guardcall'];
   // Open-world bark kinds (js/barks.js) that are fear / alarm shouts (louder, higher).
-  const FEAR_KINDS = ['startle', 'notice', 'struggle', 'flee', 'cower', 'alarm'];
+  const FEAR_KINDS = ['startle', 'notice', 'struggle', 'flee', 'cower', 'alarm', 'halt'];
 
   /** Hashes a number or string into a 32-bit unsigned seed. @returns {number} */
   function hashSeed(seed) {
@@ -254,6 +255,48 @@
         { de: '...bitt...', en: '...please...' }
       ]
     },
+    // v0.14 guards: halt (shouted on spotting / hearing the player) and guardcall (patrol calls, the hour)
+    halt: {
+      calm: [
+        { de: 'Hoit! Wer da?', en: 'Halt! Who is there?' },
+        { de: 'Stehnbleibn! Im Nama vom Vogt!', en: 'Stand still! In the bailiff\'s name!' },
+        { de: 'Wer da? Gib Antwort!', en: 'Who goes there? Answer!' },
+        { de: 'Alarm! Zu de Waffn!', en: 'Alarm! To arms!' },
+        { de: 'Hoit, oder i stich zua!', en: 'Halt, or I will strike!' }
+      ],
+      worried: [
+        { de: 'Hoit! Da is wer! Wer da?', en: 'Halt! Someone is there! Who goes?' },
+        { de: 'Alarm! A Bluadsauger!', en: 'Alarm! A bloodsucker!' },
+        { de: 'Wachn! Zu mir! Wachn!', en: 'Guards! To me! Guards!' },
+        { de: 'Stehnbleibn, du Unhoid!', en: 'Stand still, you fiend!' }
+      ],
+      whisper: [
+        { de: 'Wer da? Leis...', en: 'Who is there? Quietly...' },
+        { de: 'Hoit... i hob di ghert...', en: 'Halt... I heard you...' }
+      ]
+    },
+    guardcall: {
+      calm: [
+        { de: 'Wer da? ... Olles ruhig!', en: 'Who is there? ... All quiet!' },
+        { de: 'Olles ruhig auf da Mauer!', en: 'All quiet on the wall!' },
+        { de: 'Ois ruhig, ois ruhig!', en: 'All calm, all calm!' },
+        { de: 'Es hod zehne gschlogn, und olles ruhig!', en: 'Ten has struck, and all is quiet!' },
+        { de: 'Zwöfe is s, und olles ruhig!', en: 'It is twelve, and all is quiet!' },
+        { de: 'Oans is s, und olles ruhig!', en: 'It is one, and all is quiet!' },
+        { de: 'Drei Uhr, und olles ruhig!', en: 'Three o\'clock, and all is quiet!' },
+        { de: 'Hoit! ... Ah, nur da Wind.', en: 'Halt! ... Ah, only the wind.' }
+      ],
+      worried: [
+        { de: 'Wer da? Zoag di!', en: 'Who is there? Show yourself!' },
+        { de: 'Do hod si wos grührt... Wer da?', en: 'Something stirred... Who is there?' },
+        { de: 'Seids wachsam, es is net ruhig!', en: 'Stay alert, it is not quiet!' },
+        { de: 'Hoit! Wer schleicht do rum?', en: 'Halt! Who is sneaking about?' }
+      ],
+      whisper: [
+        { de: 'Pst... olles ruhig...', en: 'Shh... all quiet...' },
+        { de: 'Wer da...? Leis...', en: 'Who is there...? Quietly...' }
+      ]
+    },
     flee: {
       calm: [
         { de: 'Hüfe! Hüfe!', en: 'Help! Help!' },
@@ -352,6 +395,51 @@
     }
   };
   Object.keys(BARK_SUBS).forEach(function (k) { SUBS[k] = BARK_SUBS[k]; });
+
+  // v0.14 struggle lines by weakness tier (weak = 1 - blood fraction): 0 shouts (< 0.3), 1 pleas / prayers / cries (< 0.6),
+  // 2 slurred (< 0.9), 3 groans and whimpers (the last ~10 % of blood).
+  const STRUGGLE_TIERS = [
+    [
+      { de: 'Loss mi aus! Loss mi aus!', en: 'Let me go! Let me go!' },
+      { de: 'Hüfe! Hüfe! Zu Hüf!', en: 'Help! Help! Come help!' },
+      { de: 'Du Teifi! Du Hund!', en: 'You devil! You dog!' },
+      { de: 'Verreck, du Viech!', en: 'Drop dead, you beast!' },
+      { de: 'Zu de Wachn! Schnö!', en: 'To the guards! Quick!' },
+      { de: 'Nehmt eich in Acht! A Bluadsauger!', en: 'Beware! A bloodsucker!' },
+      { de: 'Geh weg! Geh weg vo mir!', en: 'Get away! Get away from me!' }
+    ],
+    [
+      { de: 'Naa, bitt, bitt, ned...', en: 'No, please, please, not...' },
+      { de: 'Heilige Muatta Gottes, hüf ma...', en: 'Holy Mother of God, help me...' },
+      { de: 'Vata unsa, im Himme...', en: 'Our Father, in heaven...' },
+      { de: 'I hob a Frau dahoam, bitt...', en: 'I have a wife at home, please...' },
+      { de: 'Jessas Maria, loss mi...', en: 'Jesus Mary, let me...' },
+      { de: 'Gnod! Hobts Gnod!', en: 'Mercy! Have mercy!' },
+      { de: 'Is denn koaner do...? Hüfe...', en: 'Is no one there...? Help...' }
+    ],
+    [
+      { de: 'B-bitte... nit... nit...', en: 'P-please... no... no...' },
+      { de: 'Muatta... Mutt... hüf...', en: 'Mother... Moth... help...' },
+      { de: 'Lass... mi... ged... hoam...', en: 'Let... me... go... home...' },
+      { de: 'Ich... kann... ned... mea...', en: 'I... can... not... more...' },
+      { de: 'Kalt... s is... so kalt...', en: 'Cold... it is... so cold...' },
+      { de: 'Vata... unsa... im Hi...', en: 'Father... our... in hea...' },
+      { de: 'Wach... wach... dahoam...', en: 'Watch... watch... at home...' }
+    ],
+    [
+      { de: '...mmh...', en: '...mmh...' },
+      { de: 'Hhh... aah...', en: 'Hhh... aah...' },
+      { de: '...mutta...', en: '...mother...' },
+      { de: 'Nnh... hh...', en: 'Nnh... hh...' },
+      { de: '...bitt...', en: '...please...' },
+      { de: 'Aah... oh...', en: 'Aah... oh...' }
+    ]
+  ];
+  /** Struggle tier 0..3 for a weak value 0..1. */
+  function struggleTier(weak) {
+    const w = typeof weak === 'number' && isFinite(weak) ? weak : 0;
+    return w < 0.3 ? 0 : w < 0.6 ? 1 : w < 0.9 ? 2 : 3;
+  }
 
   // Role-flavoured daytalk (calm villagers muttering about their day). 12 per group. {de, en}.
   const DAYTALK = {
@@ -521,9 +609,15 @@
    * @param {string} kind chat|question|argue|laugh|murmur|greet|startle
    * @param {string} [mood] calm|whisper|worried|argue
    * @param {string} [role] daytalk only: a role or group; picks that group's role-flavoured pool (calm / worried tone)
+   * @param {number} [weak] struggle only (v0.14): 0..1 weakness, picks the shout / plea / slurred / groan pool
    * @returns {{de: string, en: string}}
    */
-  function subtitle(seed, kind, mood, role) {
+  function subtitle(seed, kind, mood, role, weak) {
+    if (kind === 'struggle' && typeof weak === 'number' && isFinite(weak)) {
+      const pool = STRUGGLE_TIERS[struggleTier(weak)];
+      const e0 = pool[hashSeed(seed) % pool.length];
+      return { de: e0.de, en: e0.en };
+    }
     const k = SUBS[kind] ? kind : 'chat';
     const tone = mood === 'whisper' ? 'whisper' : mood === 'worried' ? 'worried' : 'calm';
     let list = SUBS[k][tone];
@@ -544,7 +638,7 @@
    * @param {string} [mood] calm|whisper|worried|argue (nudges the pitch range only)
    * @returns {{vowel: string, consonant: string, dur: number, pitchMul: number, gap: number}[]}
    */
-  function line(seed, kind, mood) {
+  function line(seed, kind, mood, weak) {
     const k = KINDS.indexOf(kind) >= 0 ? kind : 'chat';
     const rng = prng(hashSeed(seed) ^ (KINDS.indexOf(k) + 1) * 7919);
     const range = mood === 'whisper' ? 0.05 : mood === 'argue' ? 0.2 : mood === 'worried' ? 0.16 : 0.12;
@@ -575,6 +669,41 @@
       out.push(syl('wo', r3(0.12 + rng() * 0.04), wander(), r3(0.02)));
       out.push(syl('da', r3(0.14 + rng() * 0.05), r3(1.2 + rng() * 0.25), r3(0.04)));
       if (rng() < 0.5) out.push(syl('ja', r3(0.12), r3(1.1 + rng() * 0.2), r3(0.04)));
+      return out;
+    }
+    if (k === 'halt') {
+      // "Hoit!": a sharp bark, then a loud "wer da"
+      out.push(syl('ha', r3(0.16 + rng() * 0.04), r3(1.2 + rng() * 0.1), r3(0.05)));
+      out.push(syl('oa', r3(0.26 + rng() * 0.06), r3(1.05 + rng() * 0.08), r3(0.12 + rng() * 0.05)));
+      out.push(syl('wo', r3(0.14), r3(1.1), r3(0.02)));
+      out.push(syl('da', r3(0.2 + rng() * 0.05), r3(1.25 + rng() * 0.1), r3(0.04)));
+      return out;
+    }
+    if (k === 'guardcall') {
+      // slow, carrying call with a long final syllable
+      const n = 4 + Math.floor(rng() * 4);
+      for (let i = 0; i < n; i++) {
+        out.push(syl(pick(rng, ['wo', 'da', 'oa', 'ha', 'mo']), r3(0.17 + rng() * 0.08 + (i === n - 1 ? 0.15 : 0)), r3(1.05 + (rng() - 0.5) * 0.14 - (i === n - 1 ? 0.12 : 0)), r3(0.05 + rng() * 0.08)));
+      }
+      return out;
+    }
+    if (k === 'struggle' && typeof weak === 'number' && isFinite(weak)) {
+      // v0.14 struggle by weakness: sharp shouts, pleas, slurred murmurs, groans (see STRUGGLE_TIERS); deterministic
+      const w = weak < 0 ? 0 : weak > 1 ? 1 : weak;
+      const tier = struggleTier(w);
+      if (tier === 0) {
+        const n = 3 + Math.floor(rng() * 3);
+        for (let i = 0; i < n; i++) out.push(syl(pick(rng, ['oa', 'ha', 'wo', 'oe', 'da', 'ja']), r3(0.09 + rng() * 0.06), r3(1.3 + rng() * 0.25), r3(0.02 + rng() * 0.03)));
+      } else if (tier === 1) {
+        const n = 3 + Math.floor(rng() * 3);
+        for (let i = 0; i < n; i++) out.push(syl(pick(rng, ['ue', 'oe', 'bi', 'mo', 'oa']), r3(0.14 + rng() * 0.08), r3(1.2 - i * 0.05 + (rng() - 0.5) * 0.06), r3(0.06 + rng() * 0.1)));
+      } else if (tier === 2) {
+        const n = 2 + Math.floor(rng() * 3);
+        for (let i = 0; i < n; i++) out.push(syl(pick(rng, ['mo', 'gu', 'ue', 'rr']), r3(0.2 + rng() * 0.12), r3(1.0 - i * 0.05 + (rng() - 0.5) * 0.04), r3(0.12 + rng() * 0.16)));
+      } else {
+        const n = 1 + Math.floor(rng() * 2);
+        for (let i = 0; i < n; i++) out.push(syl(pick(rng, ['mo', 'ha', 'oe', 'ue']), r3(0.3 + rng() * 0.2), r3(0.88 - i * 0.06 + (rng() - 0.5) * 0.03), r3(0.25 + rng() * 0.2)));
+      }
       return out;
     }
     if (k === 'struggle') {
@@ -702,7 +831,7 @@
     };
   }
 
-  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor, subtitle, SUBS, DAYTALK, DAYTALK_GROUPS, groupOf, FEAR_KINDS };
+  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor, subtitle, SUBS, STRUGGLE_TIERS, struggleTier, DAYTALK, DAYTALK_GROUPS, groupOf, FEAR_KINDS };
 
   VCS.VoiceData = VoiceData;
   if (typeof module !== 'undefined' && module.exports) module.exports = VoiceData;

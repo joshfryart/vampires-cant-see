@@ -17,12 +17,17 @@
   const BODY_SEEN = 5; // cells: a calm villager this close to a drained body raises the alarm
   // Per-villager cooldown (s) after a bark of that kind: [min, max]; struggle cries come a little faster while grabbed.
   const COOLDOWNS = {
-    notice: [8, 12], startle: [6, 9], flee: [6, 10], cower: [8, 12], struggle: [4, 6], relief: [10, 15],
-    alarm: [8, 12], daytalk: [9, 15], chat: [6, 10], hum: [12, 15]
+    notice: [8, 12], startle: [6, 9], flee: [6, 10], cower: [8, 12], struggle: [1, 2.2], relief: [10, 15],
+    alarm: [8, 12], daytalk: [9, 15], chat: [6, 10], hum: [12, 15], halt: [8, 12], guardcall: [10, 16]
   };
-  const PRIO = { alarm: 100, startle: 98, flee: 96, struggle: 94, notice: 92, cower: 90, relief: 60, daytalk: 20, hum: 10 };
-  const FEAR_KIND = { alarm: 1, startle: 1, flee: 1, struggle: 1, notice: 1, cower: 1 };
-  const GAIN = { alarm: 1, startle: 0.95, flee: 1, struggle: 0.7, notice: 0.9, cower: 0.6, relief: 0.6, daytalk: 0.65, hum: 0.4 };
+  // v0.14: a struggle bark's cooldown grows with weakness (1 - blood fraction): x (1 + STRUGGLE_SLOW * weak^1.5), so ~1.6-2.8 s between
+  // shouts when healthy and 6-12 s between groans near the end. Silence once the blood is gone (<= STRUGGLE_EMPTY).
+  const STRUGGLE_SLOW = 3.5;
+  const STRUGGLE_EMPTY = 0.02;
+  const PRIO = { alarm: 100, startle: 98, flee: 96, halt: 97, struggle: 94, notice: 92, cower: 90, relief: 60, guardcall: 30, daytalk: 20, hum: 10 };
+  const FEAR_KIND = { alarm: 1, startle: 1, flee: 1, struggle: 1, notice: 1, cower: 1, halt: 1 };
+  const GAIN = { alarm: 1, startle: 0.95, flee: 1, struggle: 0.95, notice: 0.9, cower: 0.6, relief: 0.6, daytalk: 0.65, hum: 0.4, halt: 1, guardcall: 0.9 };
+  const RESTRAIN_GAIN = 0.6; // restrained (held down, muffled): quieter
   const EST_LEN = 1.5; // seconds assumed for a line when no length function is supplied
 
   function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
@@ -44,6 +49,18 @@
 
   /** A villager's role (raw person or snapshot). */
   function roleOf(p) { return (p && (p.role || (p.sched && p.sched.role))) || ''; }
+  function isGuard(p) { return /guard|watch|soldier/i.test(roleOf(p)); }
+  /** Weakness 0 (full of blood) .. 1 (drained) from left / pool; 0 when unknown. */
+  function weakOf(p) {
+    const pool = num(p && p.pool, 0);
+    if (!(pool > 0)) return 0;
+    const f = num(p.left, pool) / pool;
+    return f <= 0 ? 1 : f >= 1 ? 0 : 1 - f;
+  }
+  /** Guards shout 'halt' where villagers would notice / flee / startle / raise the alarm. */
+  function kindFor(p, kind) {
+    return isGuard(p) && (kind === 'notice' || kind === 'flee' || kind === 'startle' || kind === 'alarm') ? 'halt' : kind;
+  }
 
   function create(seed) {
     return { seed: idNum(seed === undefined ? 1 : seed), v: Object.create(null), active: [], starts: [], pair: Object.create(null), lastFear: 0, fearAt: 0, init: false, bodies: Object.create(null), total: 0, recent: 0 };
@@ -66,33 +83,38 @@
   function silent(p) { return p.mode === 'fed' || p.mode === 'dazed' || p.dead === true || p.drained === true; }
   function calm(p) { return p.mode === 'path' && !isWary(p) && !p.bumping; }
   function toneFor(kind, fear) {
+    if (kind === 'guardcall') return fear >= WORRIED_FEAR ? 'worried' : 'calm';
     if (FEAR_KIND[kind]) return kind === 'cower' && fear >= WHISPER_FEAR ? 'whisper' : fear >= WORRIED_FEAR ? 'worried' : 'calm';
     return fear >= WHISPER_FEAR ? 'whisper' : fear >= WORRIED_FEAR ? 'worried' : 'calm';
   }
   /** Audio mood (VoiceData.MOODS key) for a kind and tone: shouts are loud, whispers hushed. */
-  function moodFor(kind, tone) {
+  function moodFor(kind, tone, weak) {
     if (tone === 'whisper') return 'whisper';
+    if (kind === 'halt') return 'argue';
+    if (kind === 'guardcall') return 'call';
+    if (kind === 'struggle') return weak < 0.3 ? 'argue' : 'worried'; // healthy victims shout sharply, drained ones murmur
     if (kind === 'alarm' || kind === 'flee' || kind === 'startle' || kind === 'notice') return 'argue';
-    if (kind === 'struggle' || kind === 'cower') return 'worried';
+    if (kind === 'cower') return 'worried';
     return tone === 'worried' ? 'worried' : 'calm';
   }
 
-  function cooldown(st, v, kind, n) {
+  function cooldown(st, v, kind, n, weak) {
     const r = COOLDOWNS[kind] || COOLDOWNS.daytalk;
-    return r[0] + (r[1] - r[0]) * unit(st.seed, v.key, n * 7 + 3);
+    const base = r[0] + (r[1] - r[0]) * unit(st.seed, v.key, n * 7 + 3);
+    return kind === 'struggle' ? base * (1 + STRUGGLE_SLOW * Math.pow(num(weak, 0), 1.5)) : base;
   }
 
   /** Subtitle {de, en} for a bark (same seed / kind / tone / role as the speech). */
   function subtitleFor(b) {
     const d = VD();
     if (!b || !d || typeof d.subtitle !== 'function') return { de: '', en: '' };
-    return d.subtitle(b.seed, b.kind, b.tone, b.role);
+    return d.subtitle(b.seed, b.kind, b.tone, b.role, b.kind === 'struggle' ? b.weak : undefined);
   }
 
   /**
    * One tick. ctx: {now (sim s), player {x,y}, people [raw or snapshot], fear (village fear), enabled (default true),
-   * lengthFn(seed, kind, mood, role)->s (optional)}.
-   * Returns {barks: [{id, x, y, dist, kind, seed, tone, mood, gain, loud, role, voiceSeed}], stop: [ids that fell silent]}.
+   * lengthFn(seed, kind, mood, role, weak)->s (optional), restrained (id of a victim being held down: muffled and quieter, optional)}.
+   * Returns {barks: [{id, x, y, dist, kind, seed, tone, mood, gain, loud, role, voiceSeed, weak, restrained}], stop: [ids that fell silent]}.
    * Never throws.
    */
   function step(st, ctx) {
@@ -134,7 +156,7 @@
         const prevWary = v.wary;
         v.mode = p.mode;
         v.wary = isWary(p);
-        if (silent(p)) {
+        if (silent(p) || (p.mode === 'grapple' && weakOf(p) >= 1 - STRUGGLE_EMPTY)) { // a drained victim goes quiet
           v.pend = null;
           if (st.active.some(function (a) { return a.id === p.id; })) {
             res.stop.push(p.id);
@@ -184,12 +206,14 @@
         if (v.pend && dist <= RANGE) {
           const lastCalm = v.lastKind === 'daytalk' || v.lastKind === 'hum' || v.lastKind === '';
           if (now >= v.nextAt || (FEAR_KIND[v.pend] && lastCalm)) {
-            cands.push({ p: p, v: v, kind: v.pend, dist: dist, prio: PRIO[v.pend] - dist * 0.5, chatKind: null });
+            const pk0 = kindFor(p, v.pend);
+            cands.push({ p: p, v: v, kind: pk0, dist: dist, prio: PRIO[pk0] - dist * 0.5, chatKind: null });
           }
           continue;
         }
         // --- calm daytalk / mumbling near the player
-        if (!calm(p) || dist > DAY_RANGE || now < v.nextAt) continue;
+        const guard = isGuard(p);
+        if (!calm(p) || dist > (guard ? RANGE : DAY_RANGE) || now < v.nextAt) continue; // guards call out farther
         const partner = p.chat && p.chat.partner !== undefined ? byId[p.chat.partner] : null;
         if (partner && !silent(partner) && partner.chat && partner.chat.partner === p.id) {
           // turn-taking: the partner must have spoken last (or nobody yet and I have the lower id), and not be speaking now
@@ -201,7 +225,8 @@
           }
         } else if (!p.chat && now >= v.aloneAt) {
           const roll = unit(st.seed, v.key, v.n * 13 + 5);
-          cands.push({ p: p, v: v, kind: roll < 0.4 ? 'hum' : 'daytalk', dist: dist, prio: PRIO.daytalk - dist * 0.5 - 5, chatKind: null, alone: true });
+          const ak = guard ? (roll < 0.55 ? 'guardcall' : 'daytalk') : roll < 0.4 ? 'hum' : 'daytalk';
+          cands.push({ p: p, v: v, kind: ak, dist: dist, prio: PRIO[ak] - dist * 0.5 - 5, chatKind: null, alone: true, guard: guard });
         }
       }
 
@@ -217,6 +242,8 @@
         const v = c.v;
         const role = roleOf(c.p);
         const tone0 = toneFor(c.kind, fear);
+        const weak = c.kind === 'struggle' ? weakOf(c.p) : 0;
+        const restrained = c.kind === 'struggle' && ctx.restrained !== undefined && ctx.restrained === c.p.id;
         // choose a line that is not the one this villager said last (try seeds; stay quiet if none differs)
         let seed = 0;
         const tone = tone0;
@@ -224,7 +251,7 @@
         const d = VD();
         for (let t = 0; t < 12 && d; t++) {
           seed = hash(v.key ^ st.seed, v.n * 16 + t + 1);
-          const s = d.subtitle(seed, c.kind, tone, role);
+          const s = d.subtitle(seed, c.kind, tone, role, c.kind === 'struggle' ? weak : undefined);
           if (s.de !== v.lastDe) { sub = s; break; }
         }
         if (d && !sub) { // cannot vary: stay quiet this time
@@ -233,15 +260,15 @@
           v.nextAt = now + 2;
           continue;
         }
-        const mood = moodFor(c.kind, tone);
-        const len = typeof ctx.lengthFn === 'function' ? num(ctx.lengthFn(seed, c.kind, mood, role), EST_LEN) : EST_LEN;
+        const mood = moodFor(c.kind, tone, weak);
+        const len = typeof ctx.lengthFn === 'function' ? num(ctx.lengthFn(seed, c.kind, mood, role, c.kind === 'struggle' ? weak : undefined), EST_LEN) : EST_LEN;
         const cdKind = c.kind === 'daytalk' && c.chatKind ? 'chat' : c.kind;
         v.n++;
         v.lastKind = c.kind;
         v.lastDe = sub ? sub.de : '';
         v.pend = null;
-        v.nextAt = now + Math.max(0.3, len) + cooldown(st, v, cdKind, v.n);
-        if (c.alone) v.aloneAt = now + 20 + 25 * unit(st.seed, v.key, v.n * 3 + 9);
+        v.nextAt = now + Math.max(0.3, len) + cooldown(st, v, cdKind, v.n, weak);
+        if (c.alone) v.aloneAt = c.guard ? now + 12 + 14 * unit(st.seed, v.key, v.n * 3 + 9) : now + 20 + 25 * unit(st.seed, v.key, v.n * 3 + 9);
         if (c.chatKind) st.pair[c.chatKind] = { last: c.p.id, end: now + Math.max(0.3, len) };
         st.starts.push(now);
         st.active.push({ id: c.p.id, end: now + Math.max(0.3, len) });
@@ -249,7 +276,7 @@
         st.recent++;
         res.barks.push({
           id: c.p.id, x: num(c.p.x, 0), y: num(c.p.y, 0), dist: c.dist, kind: c.kind, seed: seed, tone: tone, mood: mood,
-          gain: GAIN[c.kind] || 0.6, loud: !!FEAR_KIND[c.kind], role: role, voiceSeed: v.key, len: len
+          gain: (GAIN[c.kind] || 0.6) * (restrained ? RESTRAIN_GAIN : 1), loud: !!FEAR_KIND[c.kind], role: role, voiceSeed: v.key, len: len, weak: weak, restrained: restrained
         });
       }
     } catch (e) { /* never throw */ }
@@ -257,7 +284,7 @@
   }
 
   const Barks = {
-    RANGE: RANGE, DAY_RANGE: DAY_RANGE, MAX_STARTS: MAX_STARTS, MAX_ACTIVE: MAX_ACTIVE, COOLDOWNS: COOLDOWNS, PRIO: PRIO,
+    RANGE: RANGE, DAY_RANGE: DAY_RANGE, MAX_STARTS: MAX_STARTS, MAX_ACTIVE: MAX_ACTIVE, COOLDOWNS: COOLDOWNS, PRIO: PRIO, weakOf: weakOf, isGuard: isGuard, STRUGGLE_SLOW: STRUGGLE_SLOW,
     create: create, reset: reset, step: step, subtitleFor: subtitleFor, roleOf: roleOf, toneFor: toneFor, moodFor: moodFor
   };
   VCS.Barks = Barks;

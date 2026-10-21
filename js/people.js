@@ -416,7 +416,7 @@
       const sit = !!(def && def.sit === true);
       const pool = poolMin + (poolMax - poolMin) * state.rng();
       state.people.push({
-        pool: pool, left: pool, dazedLeft: 0,
+        pool: pool, left: pool, dazedLeft: 0, role: def && typeof def.role === 'string' ? def.role : '',
         id: i, x: path[0].x, y: path[0].y, angle: angle, speed: speed, path: path,
         idx: path.length > 1 && !sit ? 1 : 0, state: 'idle', idleLeft: path[0].wait,
         lookAngle: 0, lookTarget: 0, lookIn: 0.5 + state.rng() * 0.6, phase: 0, walked: 0,
@@ -1334,7 +1334,8 @@
         e.x = p.x; e.y = p.y; e.id = p.id;
         e.angle = p.angle;
         e.foot = (p.steps - todo + k) & 1; // alternate left/right foot
-        e.gait = p.mode === 'flee' ? 'run' : p.wary > 0 ? 'sneak' : 'walk';
+        // v0.14: a guard in armour walks with the heavy 'mail' gait (clink + thud) unless running
+        e.gait = p.mode === 'flee' ? 'run' : p.role === 'guard' || (p.sched && p.sched.role === 'guard') ? 'mail' : p.wary > 0 ? 'sneak' : 'walk';
         e.pace = p.speed / DEFAULT_SPEED;
         out[n] = e;
         n++;
@@ -1372,7 +1373,7 @@
     const ps = state && state.people ? state.people : [];
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
-      out.push({ id: p.id, x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0, sched: schedInfo(state, p), chat: p.chat ? { partner: p.chat.partner, kind: p.chat.kind, until: p.chat.until } : null });
+      out.push({ id: p.id, role: p.role || '', x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0, sched: schedInfo(state, p), chat: p.chat ? { partner: p.chat.partner, kind: p.chat.kind, until: p.chat.until } : null });
     }
     return out;
   }

@@ -565,6 +565,7 @@
         people: S.people.people,
         fear: S.hunger ? S.hunger.fear : 0,
         enabled: on,
+        restrained: S.drink && S.drink.rs > 0.5 ? S.drink.id : undefined,
         lengthFn: typeof VCS.Audio.speakLength === 'function' ? VCS.Audio.speakLength : null
       });
       if (!on && B.spk.length) endBarkVoices();
@@ -608,11 +609,12 @@
       gain *= occ.diff !== null && occ.diff !== undefined ? 0.7 : 0.55;
     }
     if (inOut) { lp = Math.min(lp, 380); gain *= 0.6; }
-    if (b.kind === 'struggle') lp = Math.min(lp, 700);
+    // struggle: sharp and open while healthy, duller as the victim weakens, muffled when pinned down (v0.14)
+    if (b.kind === 'struggle') lp = Math.min(lp, b.restrained ? 600 : 2200 - 1500 * (b.weak || 0));
     if (!(gain > 0.015)) return;
     const VDm = VCS.VoiceData;
     const voice = VDm && typeof VDm.forPerson === 'function' ? VDm.forPerson(b.voiceSeed, b.role) : undefined;
-    const h = VCS.Audio.speak(S.audio, { voice: voice, seed: b.seed, kind: b.kind, mood: b.mood, pan: panTo(b.x, b.y), lpHz: lp, gain: Math.min(1, gain) });
+    const h = VCS.Audio.speak(S.audio, { voice: voice, seed: b.seed, kind: b.kind, mood: b.mood, weak: b.kind === 'struggle' ? b.weak : undefined, pan: panTo(b.x, b.y), lpHz: lp, gain: Math.min(1, gain) });
     if (h) {
       B.spk = B.spk.filter(function (s) { return s.end > S.clock; });
       B.spk.push({ id: b.id, h: h, end: S.clock + (h.end || b.len || 1.5) });
@@ -1559,13 +1561,14 @@
         const e = out[i];
         const mat = stepMaterial(e.x, e.y);
         const sc = VCS.SoundData.stepScale(e.gait, mat, e.pace);
+        const guardStep = e.gait === 'mail';
         // The foot lands a little to the left or right of the body; the ring is a flat scuff stretched along the heading.
         const side = (e.foot ? 1 : -1) * 0.12;
         const fx = e.x - Math.sin(e.angle) * side;
         const fy = e.y + Math.cos(e.angle) * side;
         const spu = emitSound('personStep', fx, fy, { rangeMul: sc.range, strengthMul: sc.strength, fadeMul: sc.fade });
         if (spu) spu.hd = e.angle;
-        if (S.audio) VCS.Audio.play(S.audio, 'personStep', spatial(e.x, e.y, Math.min(1, lv.gain * sc.gain), { material: mat }));
+        if (S.audio) VCS.Audio.play(S.audio, guardStep ? 'guardStep' : 'personStep', spatial(e.x, e.y, Math.min(1, (guardStep ? level('guardStep').gain : lv.gain) * sc.gain), { material: mat }));
       }
     }
     // Choice: people open any closed door they come within 1 cell of; it stays open.

@@ -1171,7 +1171,49 @@ describe('audio-atmosphere (B4)', () => {
     const g = a.amb.bed.g.gain;
     Audio.setVolume(a, 0.5);
     const last = g.ev.filter((e) => e[0] === 'lin').pop();
-    assert.ok(Math.abs(last[1] - 0.5 * SoundData.levels.room.gain) < 1e-9);
+    // v0.14: beds follow the mixOther multiplier (assertion adjusted from the old absolute 0.5 * room.gain)
+    assert.ok(Math.abs(last[1] - 0.5 * SoundData.levels.room.gain * SoundData.mixOther) < 1e-9);
+  });
+
+  test('v0.14 mix: mixOther scales every sound except voice / ping / echo / shriek', () => {
+    assert.ok(SoundData.mixOther > 0 && SoundData.mixOther < 1);
+    for (const k of ['step', 'personStep', 'guardStep', 'door', 'scream', 'heartbeat', 'vheart', 'breath', 'wind', 'room', 'dog', 'bell', 'fire']) {
+      assert.strictEqual(SoundData.mixFor(k), SoundData.mixOther, k);
+    }
+    for (const k of ['voice', 'ping', 'echo', 'shriek']) assert.strictEqual(SoundData.mixFor(k), 1, k);
+    // ambience: outdoor bed target = volume * wind gain * mixOther
+    const a = mk();
+    Audio.ambience(a, { kind: 'outdoor' });
+    const last = a.amb.bed.g.gain.ev.filter((e) => e[0] === 'lin').pop();
+    assert.ok(Math.abs(last[1] - SoundData.levels.wind.gain * SoundData.mixOther) < 1e-9);
+    // play(): the per-sound bus carries the multiplier; shriek (gameplay critical) does not
+    const busGain = (kind) => {
+      const b = mk();
+      Audio.play(b, 'whimper'); // warm the shared master chain
+      const made = [];
+      const orig = b.ctx.createGain;
+      b.ctx.createGain = function () { const n = orig.call(b.ctx); made.push(n); return n; };
+      assert.strictEqual(Audio.play(b, kind), true, kind);
+      return made[0].gain.value;
+    };
+    assert.strictEqual(busGain('whimper'), SoundData.mixOther);
+    assert.strictEqual(busGain('doorOpen'), SoundData.mixOther);
+    assert.strictEqual(busGain('shriek'), 1);
+    assert.strictEqual(busGain('guardStep'), SoundData.mixOther);
+  });
+
+  test('v0.14 guard step: heavier and heard farther than a villager step', () => {
+    const L = SoundData.levels;
+    assert.strictEqual(L.guardStep.hearDist, 12);
+    assert.ok(L.guardStep.hearDist > L.personStep.hearDist);
+    const g = SoundData.stepScale('mail', 'stone', 1);
+    const w = SoundData.stepScale('walk', 'stone', 1);
+    assert.ok(g.gain * L.guardStep.gain > w.gain * L.personStep.gain * 1.5);
+    assert.ok(g.range > w.range && g.strength > w.strength);
+    const a = mk();
+    assert.strictEqual(Audio.play(a, 'guardStep', { dist: 11, material: 'stone' }), true);
+    assert.strictEqual(Audio.play(a, 'guardStep', { dist: 13, material: 'stone' }), false);
+    assert.strictEqual(Audio.play(a, 'personStep', { dist: 11 }), false);
   });
 
   test('oneShotFar: dog makes 2-3 yips, bell is long, unknown and too far drop', () => {

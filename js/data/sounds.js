@@ -200,6 +200,10 @@
     levels: {
       step: { range: 1.1, strength: 0.3, z: 0, fade: 0.8, bounces: 0, gain: 0.08, interval: 0.48, footOffset: 0.15, footSide: 0.12 },
       personStep: { range: 0.2, strength: 0.2, z: 0, fade: 0.6, bounces: 0, gain: 0.12, hearDist: 9 },
+      // v0.14 guard footstep: mail clink + heavy thud, heard farther than a villager's step
+      guardStep: { range: 0.3, strength: 0.28, z: 0, fade: 0.7, bounces: 0, gain: 0.2, hearDist: 12 },
+      // v0.14 villager speech: +4 dB over the old 0.06 fallback (0.06 x 1.585 ~ 0.095 -> 0.10); hearDist = barks RANGE
+      voice: { range: 0, strength: 0, z: 0.6, fade: 1, bounces: 0, gain: 0.1, hearDist: 16 },
       door: { range: 5, strength: 0.5, z: 0.5, fade: 2.5, bounces: 1, gain: 0.25, hearDist: 18 },
       interact: { range: 3, strength: 0.35, z: 0.3, fade: 1.8, bounces: 1, gain: 0.15 },
       ping: { range: null, strength: 1, z: 0.62, fade: null, bounces: 2, gain: null },
@@ -231,11 +235,15 @@
       // villager heartbeat: heard and shown (a small chest-high pulse per beat) out to 3 cells (+20% from 2.5), gain +15%
       vheart: { range: 0.5, strength: 1, z: 0.65, fade: 1.3, bounces: 0, gain: 0.069, hearDist: 3 }
     },
+    // v0.14 mix: one multiplier (-3 dB) on every sound except speech, the sonar ping / echo and the shriek (gameplay critical). Applied once in audio.js.
+    mixOther: 0.7,
+    mixExempt: { voice: true, ping: true, echo: true, shriek: true },
     // Villager step scaling (multipliers on the personStep row): gait x floor. Room (indoor/outdoor) scaling is applied on top by the game.
     stepScaleTable: {
       gait: {
         sneak: { range: 0.6, strength: 0.6, fade: 0.8, gain: 0.55 },
         walk: { range: 1, strength: 1, fade: 1, gain: 1 },
+        mail: { range: 1.4, strength: 1.3, fade: 1.1, gain: 1.15 }, // guard in armour: heavier, carries farther
         run: { range: 1.8, strength: 1.6, fade: 1.2, gain: 1.8 }
       },
       floor: {
@@ -269,6 +277,12 @@
     let k = typeof pace === 'number' && isFinite(pace) ? pace : 1;
     k = k < 0.8 ? 0.8 : k > 1.25 ? 1.25 : k;
     return { range: g.range * f.range * k, strength: g.strength * f.strength * k, fade: g.fade * f.fade, gain: g.gain * f.gain * k };
+  };
+
+  /** Mix multiplier for a sound kind: SoundData.mixOther, or 1 for exempt kinds (voice, ping, echo, shriek). */
+  SoundData.mixFor = function (kind) {
+    const k = SoundData.mixOther;
+    return SoundData.mixExempt[kind] || typeof k !== 'number' || !isFinite(k) ? 1 : k;
   };
 
   VCS.SoundData = SoundData;

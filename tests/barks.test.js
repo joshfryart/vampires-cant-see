@@ -158,3 +158,107 @@ test('reset re-baselines without barking and step never throws on junk', () => {
   ppl[0].mode = 'flee';
   assert.strictEqual(Barks.step(st, { now: 1, player: { x: 0, y: 0 }, people: ppl }).barks.length, 0);
 });
+
+// ---- v0.14: struggle voice by blood left, guards ---------------------------------------------------------------------------------
+function victim(left, extra) { return person(1, 3, 0, Object.assign({ pool: 40, left: left }, extra || {})); }
+// Calm for 2 s, then grabbed for `secs`; left may be a function of seconds since the grab. Returns barks with times.
+function grab(left, secs, opts) {
+  const o = opts || {};
+  const p = victim(typeof left === 'function' ? left(0) : left, o.extra);
+  const r = run(o.seed || 11, [p], secs + 2, {
+    mutate: (t, ppl) => {
+      if (t >= 2) { ppl[0].mode = 'grapple'; if (typeof left === 'function') ppl[0].left = left(t - 2); }
+    }
+  });
+  return r.out;
+}
+
+test('struggle keeps barking for the whole grab (healthy: every ~1.5-3 s)', () => {
+  const out = grab(40, 60);
+  assert.ok(out.length >= 18, 'barks ' + out.length);
+  assert.ok(out.every((b) => b.kind === 'struggle'));
+  for (let i = 1; i < out.length; i++) {
+    const gap = out[i].t - out[i - 1].t;
+    assert.ok(gap >= 1.4 && gap <= 3.6, 'gap ' + gap);
+  }
+  assert.ok(out[out.length - 1].t > 55, 'still going at the end');
+  assert.ok(out.every((b) => b.weak === 0 && b.mood === 'argue'));
+});
+
+test('cadence widens, gain and mood follow blood loss; weak rides on the bark', () => {
+  const avgGap = (left) => { const o = grab(left, 120); assert.ok(o.length >= 5, 'barks at ' + left + ': ' + o.length); return (o[o.length - 1].t - o[0].t) / (o.length - 1); };
+  const g100 = avgGap(40), g60 = avgGap(24), g30 = avgGap(12), g10 = avgGap(4);
+  assert.ok(g100 < g60 && g60 < g30 && g30 < g10, [g100, g60, g30, g10].join(' < '));
+  assert.ok(g100 < 3.4 && g10 > 5, 'ends of the range: ' + g100 + ' / ' + g10);
+  const b = grab(12, 20)[0];
+  assert.ok(Math.abs(b.weak - 0.7) < 1e-9);
+  assert.strictEqual(b.mood, 'worried');
+});
+
+test('struggle goes silent at empty and once drained', () => {
+  assert.strictEqual(grab(0, 30).length, 0, 'empty');
+  assert.strictEqual(grab(0.5, 30).length, 0, 'under 2 % left');
+  const out = grab((t) => Math.max(0, 40 - t * 2), 40);
+  assert.ok(out.length >= 6);
+  assert.ok(out[out.length - 1].t < 2 + 20 + 0.1, 'silent once drained, last at ' + out[out.length - 1].t);
+});
+
+test('struggle lines vary: never the same subtitle twice in a row, tiers follow weakness', () => {
+  const out = grab((t) => Math.max(1, 40 - t * 0.6), 60, { seed: 5 });
+  assert.ok(out.length >= 15);
+  let last = '';
+  for (const b of out) { const de = Barks.subtitleFor(b).de; assert.notStrictEqual(de, last); last = de; }
+  const first = Barks.subtitleFor(out[0]).de, lastDe = Barks.subtitleFor(out[out.length - 1]).de;
+  assert.ok(VD.STRUGGLE_TIERS[0].some((e) => e.de === first));
+  assert.ok(VD.STRUGGLE_TIERS[2].concat(VD.STRUGGLE_TIERS[3]).some((e) => e.de === lastDe), lastDe);
+  assert.ok(new Set(out.map((b) => Barks.subtitleFor(b).de)).size >= 8);
+});
+
+test('restrained victims are muffled and quieter', () => {
+  const gainOf = (restrained) => {
+    const st = Barks.create(3);
+    const ppl = [person(1, 3, 0, { pool: 40, left: 30 })];
+    let out = [];
+    for (let t = 0; t <= 6; t += 0.1) {
+      if (t >= 1) ppl[0].mode = 'grapple';
+      const r = Barks.step(st, { now: Math.round(t * 10) / 10, player: { x: 0, y: 0 }, people: ppl, fear: 0, lengthFn: () => 1, restrained: restrained ? 1 : undefined });
+      out = out.concat(r.barks);
+    }
+    return out[0];
+  };
+  const free = gainOf(false), held = gainOf(true);
+  assert.strictEqual(free.restrained, false);
+  assert.strictEqual(held.restrained, true);
+  assert.ok(held.gain < free.gain * 0.7);
+});
+
+test('guards: call out ("Wer da? Alles ruhig", the hour) from farther away and shout HALT on noticing you', () => {
+  const guard = (id, x, extra) => person(id, x, 0, Object.assign({ sched: { role: 'guard' } }, extra || {}));
+  assert.ok(Barks.isGuard(guard(1, 3)));
+  const out = run(6, [guard(1, 14)], 600).out; // 14 cells: past the villagers' 12 cell daytalk range
+  assert.ok(out.length >= 5, 'guard calls from 14 cells: ' + out.length);
+  assert.ok(out.some((b) => b.kind === 'guardcall'), 'guardcall kind');
+  assert.ok(out.every((b) => b.role === 'guard'));
+  const dess = new Set(out.filter((b) => b.kind === 'guardcall').map((b) => Barks.subtitleFor(b).de));
+  assert.ok(dess.size >= 4);
+  assert.ok(out.filter((b) => b.kind === 'guardcall').every((b) => b.mood === 'call'));
+  const farmer = run(6, [person(1, 14, 0)], 600).out;
+  assert.strictEqual(farmer.length, 0, 'villagers stay quiet at 14 cells');
+  const notice = (p) => run(2, [p], 6, { mutate: (t, ppl) => { if (t >= 1) ppl[0].mode = 'startle'; } }).out;
+  const g = notice(guard(1, 4)), f = notice(person(1, 4, 0));
+  assert.strictEqual(g[0].kind, 'halt');
+  assert.strictEqual(f[0].kind, 'notice');
+  assert.ok(/Hoit|Alarm|Stehnbleibn|Wer da|Wachn/.test(Barks.subtitleFor(g[0]).de));
+  assert.ok(g[0].loud);
+});
+
+test('people.stepEvents: guards walk with the heavy mail gait, runners still run', () => {
+  const People = require(path.join(ROOT, 'js', 'people.js'));
+  const mkp = (role, mode) => ({ id: 1, x: 1, y: 1, angle: 0, steps: 2, stepsReported: 0, mode: mode || 'path', wary: 0, speed: 1.3, role: role });
+  const out = [];
+  People.stepEvents({ people: [mkp('guard'), mkp('')] }, 0, 1, out);
+  assert.deepStrictEqual(out.map((e) => e.gait), ['mail', 'mail', 'walk', 'walk']);
+  People.stepEvents({ people: [Object.assign(mkp('guard'), { steps: 1 }), mkp('guard', 'flee')] }, 0, 1, out);
+  assert.strictEqual(out[0].gait, 'mail');
+  assert.strictEqual(out[1].gait, 'run');
+});
