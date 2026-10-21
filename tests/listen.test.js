@@ -4,6 +4,7 @@ const { describe } = require('node:test');
 describe('listen.test.js', () => {
   const test = require('node:test');
   const assert = require('node:assert');
+  require('../js/data/voices.js');
   const Listen = require('../js/listen.js');
 
   // 5x3 map: row 0 outdoor, row 1 wall with window at x=2, row 2 indoor.
@@ -69,6 +70,78 @@ describe('listen.test.js', () => {
     const st3 = Listen.create();
     Listen.step(st3, ctx({ holding: true }));
     assert.equal(st3.active, false);
+  });
+
+  test('V5 subtitle clarity: close and lit is readable, far or dark is muffled', () => {
+    assert.equal(Listen.subtitleClear(0.5, 0.5), true);
+    assert.equal(Listen.subtitleClear(Listen.SUB_DIST, 0.5), true);
+    assert.equal(Listen.subtitleClear(Listen.SUB_DIST + 0.2, 0.5), false);
+    assert.equal(Listen.subtitleClear(0.5, 0), false);
+    const m = Listen.subtitleFor(3, 'chat', 'calm', 0.5, 0);
+    assert.equal(m.de, '(muffled talking)');
+    assert.equal(m.muffled, true);
+    assert.equal(m.en, '');
+  });
+
+  test('V5 step emits the subtitle of the speech actually played', () => {
+    const VD = require('../js/data/voices.js');
+    const run = (lit) => {
+      const st = Listen.create();
+      const played = [];
+      const subs = [];
+      for (let t = 0; t < 8; t += 0.1) {
+        Listen.step(st, { now: t, held: true, holding: false, speed: 0, world: world(lit), player, people, fear: 0, speakLength: () => 1,
+          speak: (o) => { played.push(o); return null; }, onSubtitle: (sub) => subs.push(sub) });
+      }
+      return { played, subs, st };
+    };
+    const lit = run(0.5);
+    assert.ok(lit.subs.length >= 2 && lit.subs.length === lit.played.length);
+    lit.subs.forEach((s, i) => {
+      const o = lit.played[i];
+      const exp = VD.subtitle(o.seed, o.kind, o.mood);
+      assert.equal(s.de, exp.de);
+      assert.equal(s.en, exp.en);
+      assert.equal(s.muffled, false);
+    });
+    const dark = run(0);
+    assert.ok(dark.subs.length >= 1);
+    assert.ok(dark.subs.every((s) => s.muffled && s.de === '(muffled talking)'));
+  });
+
+  test('V2 overheard speakers follow People.conversationFor (partner, kind, mood)', () => {
+    const run = (conv) => {
+      const st = Listen.create();
+      const played = [];
+      const who = [];
+      for (let t = 0; t < 12; t += 0.1) {
+        Listen.step(st, { now: t, held: true, holding: false, speed: 0, world: world(0.5), player, people, fear: 0, speakLength: () => 1,
+          conversationFor: (id) => conv[id] || null,
+          speak: (o) => { played.push(o); return null; }, onSubtitle: (sub) => who.push(sub.speaker) });
+      }
+      return { played, who };
+    };
+    const curt = run({ 1: { partner: 3, kind: 'chat', mood: 'curt' }, 3: { partner: 1, kind: 'chat', mood: 'curt' } });
+    assert.ok(curt.played.length >= 3);
+    assert.deepStrictEqual([...new Set(curt.who)].sort(), [1, 3], 'the talking pair, not the nearest two');
+    assert.ok(curt.played.every((o) => ['argue', 'chat'].includes(o.kind)));
+    assert.ok(curt.played.some((o) => o.kind === 'argue'));
+    const hello = run({ 1: { partner: 2, kind: 'hello', mood: 'neutral' }, 2: { partner: 1, kind: 'hello', mood: 'neutral' } });
+    assert.ok(hello.played.every((o) => o.kind === 'greet'));
+    // Fear wins over the conversation mood; a partner outside the room falls back to generic talk.
+    assert.deepStrictEqual(Listen.conversationKinds({ mood: 'warm' }, 'whisper'), ['murmur', 'murmur', 'chat']);
+    const gone = run({ 1: { partner: 9, kind: 'chat', mood: 'curt' } });
+    assert.ok(gone.played.length && gone.played[0].kind === 'greet');
+  });
+
+  test('V5 subAlpha fades after the line', () => {
+    const sub = { end: 10 };
+    assert.equal(Listen.subAlpha(sub, 9), 1);
+    assert.equal(Listen.subAlpha(sub, 10), 1);
+    const mid = Listen.subAlpha(sub, 10 + Listen.SUB_FADE / 2);
+    assert.ok(mid > 0.4 && mid < 0.6);
+    assert.equal(Listen.subAlpha(sub, 11), 0);
+    assert.equal(Listen.subAlpha(null, 1), 0);
   });
 
   test('never throws on garbage', () => {

@@ -21,6 +21,14 @@
   const WARY_SEE_MUL = 0.5;
   const FEAR_HOME = 8; // village fear at which scheduled villagers (not the watch) go home for the night
   const WHIMPER_GAP = 1.5;
+  // V2 conversations.
+  const CHAT_DIST = 1.5; // cells between two calm villagers for a meeting to start
+  const TABLE_DIST = 2.8; // seated tablemates chat when this close
+  const CHAT_SCAN = 0.25; // seconds between proximity scans
+  const CHAT_COOL = [10, 22]; // seconds before someone is rolled for another meeting
+  const CHAT_FEAR = 3; // village fear at which talk stops and nobody starts any
+  const FOREVER = 1e9;
+  let lastState = null; // most recent state, for conversationFor(id)
   const MAX_EVENTS = 64;
   const NO_EVENTS = Object.freeze([]);
 
@@ -342,12 +350,39 @@
     }
   }
 
+  /** Seated eat/drink stops face the nearest table prop (within 1.6 cells) and remember their table group. */
+  function faceTables(s, mapDef) {
+    const props = mapDef && Array.isArray(mapDef.props) ? mapDef.props : [];
+    for (let i = 0; i < s.stops.length; i++) {
+      const st = s.stops[i];
+      if (st.act !== 'eat' && st.act !== 'drink') continue;
+      st.group = st.place.replace(/\d+$/, '');
+      let best = 2.56;
+      for (let k = 0; k < props.length; k++) {
+        const pr = props[k];
+        if (pr.type !== 'table') continue;
+        const d = (pr.col + 0.5 - st.x) * (pr.col + 0.5 - st.x) + (pr.row + 0.5 - st.y) * (pr.row + 0.5 - st.y);
+        if (d < best) { best = d; st.face = Math.atan2(pr.row + 0.5 - st.y, pr.col + 0.5 - st.x); }
+      }
+    }
+  }
+
+  /** End p's conversation (and its partner's, if it points back). */
+  function endChat(state, p) {
+    const c = p.chat;
+    if (!c) return;
+    p.chat = null;
+    const q = state && state.people ? state.people[c.partner] : null;
+    if (q && q.chat && q.chat.partner === p.id) q.chat = null;
+    if (state) p.chatCool = state.time + CHAT_COOL[0] + (CHAT_COOL[1] - CHAT_COOL[0]) * state.chatRng();
+  }
+
   /** Create people state from world spawns and map path data. */
   function create(world, mapDef, opts) {
     const o = opts || {};
     const seed = typeof o.seed === 'number' && isFinite(o.seed) ? o.seed : 1;
     const state = {
-      people: [], echoes: [], seed: seed, rng: mulberry32(seed),
+      people: [], echoes: [], seed: seed, rng: mulberry32(seed), chatRng: mulberry32((seed * 131 + 7) >>> 0), chatIn: 0,
       maxEchoes: typeof o.maxEchoes === 'number' && o.maxEchoes > 0 ? Math.floor(o.maxEchoes) : 24,
       radius: 0.2, hides: sanitizeHides(world, mapDef), time: 0, nightFrac: 0, nightSec: 0, fear: 0, litCache: new Map(), lastScream: -Infinity, events: [], world: world || null,
       rp: {
@@ -393,7 +428,7 @@
       const person = state.people[state.people.length - 1];
       if (Sched && !sit && def && Sched.hasRole(def.role)) {
         person.sched = Sched.make(def.role, places, { x: path[0].x, y: path[0].y }, mulberry32((seed * 31 + i * 977 + 5) >>> 0), { home: def.home, slot: i });
-        if (person.sched) person.idleLeft = 0;
+        if (person.sched) { person.idleLeft = 0; faceTables(person.sched, mapDef); }
       }
     }
     if (o.shuffle === true) {
@@ -410,6 +445,7 @@
         p.angle = Math.atan2(p.path[p.idx].y - p.y, p.path[p.idx].x - p.x);
       }
     }
+    lastState = state;
     const log = logger();
     if (log) log.info('people: ' + state.people.length + ' walkers, seed ' + seed);
     return state;
@@ -536,6 +572,7 @@
 
   function enterFlee(state, p, px, py, rp, opts) {
     const n = p.path.length;
+    if (p.chat) endChat(state, p);
     const quiet = !!(opts && opts.quiet);
     if (p.mode === 'path' || p.mode === 'startle' || p.mode === 'dazed') {
       // Person sits on the loop segment prev -> idx.
@@ -570,6 +607,7 @@
 
   /** Bump notice: freeze for rp.bumpFreeze (mode 'startle'), then flee. */
   function startBump(state, p, px, py, rp) {
+    if (p.chat) endChat(state, p);
     p.mode = 'startle';
     p.bumping = true;
     p.modeLeft = rp.bumpFreeze;
@@ -614,6 +652,7 @@
     p.state = 'idle';
     p.idleLeft = 0;
     p.seated = !!(s.stops[si] && sched().isSeated(s.stops[si].act));
+    if (p.seated && s.stops[si] && typeof s.stops[si].face === 'number') { p.angle = s.stops[si].face; p.lookAngle = 0; p.lookTarget = 0; }
   }
 
   /** Idle with a schedule: dwell until the night clock moves on (or a flight broke the trip), then route to the stop. */
@@ -641,7 +680,20 @@
     p.lookTarget = 0;
   }
 
+  /** Standing meeting: face the partner, stop walking, end on time. Tablemates (c.table) are not held here. */
+  function chatHold(state, p, dt) {
+    const c = p.chat;
+    const q = state.people[c.partner];
+    if (!q || state.time >= c.until) { endChat(state, p); return false; }
+    p.angle = Math.atan2(q.y - p.y, q.x - p.x);
+    p.lookAngle += (0 - p.lookAngle) * Math.min(1, 4 * dt);
+    p.phase *= Math.max(0, 1 - 8 * dt);
+    if (p.phase < 0.01) p.phase = 0;
+    return true;
+  }
+
   function stepPath(state, world, p, dt, r) {
+    if (p.chat && !p.chat.table && chatHold(state, p, dt)) return;
     // Walking back from a hide spot: retrace the cells before rejoining the loop.
     if (p.ret) {
       if (p.ri2 >= p.ret.length) { p.ret = null; } else {
@@ -839,6 +891,60 @@
    * Advance all people by dt seconds (clamped to 0.1). Optional ctx {player:{x,y}, playerLit, react, t, grace}
    * enables seeing/fleeing; without it people behave exactly as in v0.5.
    */
+  function chatReady(state, p) {
+    return !p.chat && p.mode === 'path' && !(p.wary > 0) && !p.bumping && !p.ret && !(p.chatCool > state.time) && !p.sit;
+  }
+
+  function startChat(state, a, b, kind, until, table) {
+    a.chat = { partner: b.id, kind: kind, until: until, table: table, mood: table ? 'warm' : 'neutral' };
+    b.chat = { partner: a.id, kind: kind, until: until, table: table, mood: table ? 'warm' : 'neutral' };
+    if (!table) {
+      a.angle = Math.atan2(b.y - a.y, b.x - a.x);
+      b.angle = Math.atan2(a.y - b.y, a.x - b.x);
+    }
+  }
+
+  /** Proximity scan (throttled): tablemates chat while seated; calm pairs within CHAT_DIST roll a meeting. */
+  function scanChats(state, world) {
+    const ps = state.people;
+    const Sched = sched();
+    if (!Sched || state.fear >= CHAT_FEAR) return;
+    const t2 = TABLE_DIST * TABLE_DIST;
+    const c2 = CHAT_DIST * CHAT_DIST;
+    for (let i = 0; i < ps.length; i++) {
+      const a = ps[i];
+      if (!a.sched || a.chat) continue;
+      for (let j = i + 1; j < ps.length; j++) {
+        const b = ps[j];
+        if (!b.sched || b.chat) continue;
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > t2) continue;
+        if (a.seated && b.seated) {
+          const sa = a.sched.stops[a.sched.si];
+          const sb = b.sched.stops[b.sched.si];
+          if (sa && sb && sa.group && sa.group === sb.group && !a.sched.en && !b.sched.en && a.mode === 'path' && b.mode === 'path' && !(a.wary > 0) && !(b.wary > 0)) {
+            startChat(state, a, b, 'chat', FOREVER, true);
+            break;
+          }
+          continue;
+        }
+        if (d2 > c2 || a.seated || b.seated) continue;
+        if (!chatReady(state, a) || !chatReady(state, b)) continue;
+        if (!segmentClear(world, a.x, a.y, b.x, b.y)) continue;
+        const same = !!(a.sched.home && a.sched.home === b.sched.home);
+        const roll = Sched.chatRoll(a.sched.role, b.sched.role, same, state.chatRng(), state.chatRng());
+        const cool = state.time + CHAT_COOL[0] + (CHAT_COOL[1] - CHAT_COOL[0]) * state.chatRng();
+        if (roll.kind === 'ignore') { a.chatCool = cool; b.chatCool = cool; continue; }
+        startChat(state, a, b, roll.kind, state.time + roll.sec, false);
+        a.chat.mood = roll.mood;
+        b.chat.mood = roll.mood;
+        break;
+      }
+    }
+  }
+
   function update(state, world, dt, ctx) {
     if (!(dt > 0)) return;
     if (dt > 0.1) dt = 0.1;
@@ -859,6 +965,14 @@
       if (p.mode !== p.modePrev) { p.modePrev = p.mode; p.modeAge = 0; } else p.modeAge = (p.modeAge || 0) + dt;
       p.ph0 = p.phase;
     }
+    // Conversations end at once on any alarm; then proximity scan a few times a second.
+    lastState = state;
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i];
+      if (p.chat && (p.mode !== 'path' || p.wary > 0 || state.fear >= CHAT_FEAR || (p.chat.table && !(p.seated && !p.sched.en)))) endChat(state, p);
+    }
+    state.chatIn -= dt;
+    if (state.chatIn <= 0) { state.chatIn = CHAT_SCAN; scanChats(state, world); }
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
       const mode = p.mode;
@@ -963,6 +1077,7 @@
         enterFlee(state, p, pl.x, pl.y, rp);
         continue;
       }
+      if (p.chat) endChat(state, p);
       p.mode = 'startle';
       p.modeLeft = rp.startleTime;
       p.preState = p.state;
@@ -1160,7 +1275,7 @@
           theta: typeof pu.facing === 'number' ? Math.atan2(ey, ex) - pu.facing : 0, // off the mouth axis, for the audio level
           zMin: band[0], zMax: band[1], fade: efade,
           // Pose state for the renderer (snapshot of the moment the wavefront passed).
-          mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
+          mode: p.mode, sit: !!(p.sit || p.seated), wary: p.wary > 0, chat: !!p.chat, modeAge: p.modeAge || 0, phaseRate: p.phaseRate || 0
         };
         if (echo.kind === 'vheart') {
           // Circulatory state at this beat (set by game.js stepHeartbeats before the beat is emitted), for the vessel overlay.
@@ -1257,12 +1372,26 @@
     const ps = state && state.people ? state.people : [];
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
-      out.push({ id: p.id, x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0, sched: schedInfo(state, p) });
+      out.push({ id: p.id, x: p.x, y: p.y, state: p.state, angle: p.angle, mode: p.mode, pool: p.pool, left: p.left, wary: p.wary > 0, waryLeft: p.wary > 0 ? p.wary : 0, sched: schedInfo(state, p), chat: p.chat ? { partner: p.chat.partner, kind: p.chat.kind, until: p.chat.until } : null });
     }
     return out;
   }
 
+  /**
+   * Who a villager is talking to: {partner, kind, mood} or null. conversationFor(state, id), or conversationFor(id)
+   * against the most recently created/updated people state. Mood hint: 'warm' | 'neutral' | 'curt' | 'hushed' (fear up).
+   */
+  function conversationFor(a, b) {
+    const state = typeof a === 'object' && a ? a : lastState;
+    const id = typeof a === 'object' && a ? b : a;
+    const p = state ? findPerson(state, id) : null;
+    if (!p || !p.chat) return null;
+    const c = p.chat;
+    return { partner: c.partner, kind: c.kind, mood: state.fear >= 1.5 ? 'hushed' : c.mood };
+  }
+
   const People = {
+    conversationFor: conversationFor,
     create: create, update: update, updateEchoes: updateEchoes, stepEvents: stepEvents, makeLook: makeLook,
     echoBrightness: echoBrightness, ACCESSORIES: ACCESSORIES, heightBandOf: heightBandOf, echoAge: echoAge, snapshot: snapshot,
     sees: sees, react: react, drainEvents: drainEvents, clearEchoes: clearEchoes, isFeedable: isFeedable,

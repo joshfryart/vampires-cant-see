@@ -525,6 +525,8 @@
         speak: canSpeak ? function (o) { return VCS.Audio.speak(S.audio, o); } : null,
         speakLength: typeof VCS.Audio.speakLength === 'function' ? VCS.Audio.speakLength : null,
         voiceFor: VCS.VoiceData && typeof VCS.VoiceData.forPerson === 'function' ? function (who, seed) { return VCS.VoiceData.forPerson(typeof who.id === 'number' ? who.id : seed, who.role); } : null,
+        conversationFor: S.people && typeof VCS.People.conversationFor === 'function' ? function (id) { return VCS.People.conversationFor(S.people, id); } : null,
+        onSubtitle: listenSub,
         onChange: function (on, info) {
           if (on) S.lisCount = info.count;
           if (on) L().info('Listening at window ' + (info.zone || '?') + ': ' + info.count + ' inside, lit ' + info.lit.toFixed(2));
@@ -537,6 +539,14 @@
         listenSr('Voices inside: ' + S.listen.count);
       } else if (!S.listen.active) S.lisCount = -1;
     } catch (e) { if (!S.lisWarned) { S.lisWarned = true; L().warn('stepListen failed', e); } }
+  }
+
+  /** V5: announce a new subtitle line to screen readers (honours the Subtitles / Translation settings). */
+  function listenSub(sub) {
+    try {
+      if (!sub || S.config.subtitles === false) return;
+      listenSr(sub.muffled || S.config.translation === false || !sub.en ? sub.de : sub.de + ' (' + sub.en + ')');
+    } catch (e) { /* ignore */ }
   }
 
   /** W2: drop any listening state (speech stopped, timers and speed tracking reset). Never throws. */
@@ -585,6 +595,22 @@
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.fillText(txt, 320, 262 - (k - 1) * 20);
+      // V5 subtitles: German line, English under it, fading after the line ends.
+      const sub = l.sub;
+      const a = VCS.Listen.subAlpha(sub, S.clock);
+      if (sub && a > 0 && S.config.subtitles !== false) {
+        const showEn = S.config.translation !== false && !!sub.en;
+        c.globalAlpha = 0.95 * a;
+        c.fillStyle = sub.muffled ? '#8fa0b8' : '#fff4d6';
+        c.font = (sub.muffled ? 'italic ' : '') + Math.round(13 * k) + 'px ui-monospace, Menlo, Consolas, monospace';
+        const y0 = 262 - (k - 1) * 20 - Math.round(24 * k) - (showEn ? Math.round(16 * k) : 0);
+        c.fillText(sub.de, 320, y0, 600);
+        if (showEn) {
+          c.fillStyle = '#b8c8e0';
+          c.font = 'italic ' + Math.round(11 * k) + 'px ui-monospace, Menlo, Consolas, monospace';
+          c.fillText(sub.en, 320, y0 + Math.round(16 * k), 600);
+        }
+      }
       c.restore();
     } catch (e) { /* ignore */ }
   }
@@ -2105,6 +2131,8 @@
     set('set-vignette', 'checked', c.edgeVignette !== false);
     set('set-bip', 'checked', c.pingBip === true);
     set('set-large', 'checked', c.largeText === true);
+    set('set-subs', 'checked', c.subtitles !== false);
+    set('set-trans', 'checked', c.translation !== false);
     set('set-ambience', 'value', String(typeof c.ambienceGain === 'number' ? c.ambienceGain : 0.6));
     const out = function (id, text) {
       const el = $(id);
@@ -2190,6 +2218,8 @@
     flag('set-vignette', 'edgeVignette');
     flag('set-bip', 'pingBip');
     flag('set-large', 'largeText');
+    flag('set-subs', 'subtitles');
+    flag('set-trans', 'translation');
     bind('btn-reset', 'click', function () {
       Object.assign(S.config, VCS.Config.DEFAULTS);
       applyConfig();
@@ -4550,7 +4580,8 @@
       night: nightInfo(),
       fed: S.night ? S.night.fedCount : 0,
       drink: S.drink ? { id: S.drink.id, left: S.drink.left, pool: S.drink.pool, drunk: S.drink.drunk, mode: S.drink.person.mode } : null,
-      victim: victimInfo()
+      victim: victimInfo(),
+      listen: S.listen ? { active: !!S.listen.active, count: S.listen.count, silent: !!S.listen.silent, sub: S.listen.sub ? { de: S.listen.sub.de, en: S.listen.sub.en, muffled: !!S.listen.sub.muffled } : null } : null
     };
   }
 

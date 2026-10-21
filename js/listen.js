@@ -11,6 +11,10 @@
   const MAX_SPEAKERS = 2;
   const LP_GLASS = 1200;
   const LP_DARK = 600;
+  const SUB_DIST = 1.2; // cells: words are readable only this close to the window...
+  const SUB_LIT = 0.15; // ...and when the window is lit (open glass, not dark and muffled)
+  const SUB_FADE = 0.6; // seconds a subtitle takes to fade after its line ends
+  const MUFFLED = '(muffled talking)';
 
   function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
   function hash(a, b) {
@@ -100,18 +104,56 @@
     return out;
   }
 
+  /** Can the words be made out? Pure: distance to the window (cells) and its light level. */
+  function subtitleClear(dist, lit) {
+    return num(dist, Infinity) <= SUB_DIST && num(lit, 0) > SUB_LIT;
+  }
+
+  /** The subtitle for a line (same seed/kind/mood as the speech): {de, en} or the muffled marker with empty en. */
+  function subtitleFor(seed, kind, mood, dist, lit) {
+    const VD = root.VCS && root.VCS.VoiceData;
+    if (!subtitleClear(dist, lit) || !VD || typeof VD.subtitle !== 'function') return { de: MUFFLED, en: '', muffled: true };
+    const t = VD.subtitle(seed, kind, mood);
+    return { de: t.de, en: t.en, muffled: false };
+  }
+
+  /** Opacity 0..1 of a subtitle at time `now`: full while the line runs, then a short fade. */
+  function subAlpha(sub, now) {
+    if (!sub) return 0;
+    const over = num(now, 0) - num(sub.end, 0);
+    if (over <= 0) return 1;
+    return Math.max(0, 1 - over / SUB_FADE);
+  }
+
   function moodFor(fear) {
     fear = num(fear, 0);
     return fear >= 8 ? 'whisper' : fear >= 4 ? 'worried' : 'calm';
   }
 
+  const KINDS_CALM = ['chat', 'chat', 'question', 'laugh', 'greet'];
+  const KINDS_WORRIED = ['murmur', 'question', 'chat'];
+  const KINDS_WHISPER = ['murmur', 'murmur', 'chat'];
+  const KINDS_WARM = ['chat', 'laugh', 'question', 'chat'];
+  const KINDS_NEUTRAL = ['chat', 'question', 'chat'];
+  const KINDS_CURT = ['argue', 'chat', 'argue'];
+  const KINDS_HUSHED = ['murmur', 'chat', 'question'];
+
+  /** Speech kinds for a line: from the real conversation (People.conversationFor) while calm, else by the fear mood. */
+  function conversationKinds(conv, mood) {
+    if (mood === 'worried') return KINDS_WORRIED;
+    if (mood === 'whisper') return KINDS_WHISPER;
+    if (!conv) return KINDS_CALM;
+    return conv.mood === 'warm' ? KINDS_WARM : conv.mood === 'curt' ? KINDS_CURT : conv.mood === 'hushed' ? KINDS_HUSHED : KINDS_NEUTRAL;
+  }
+
   function create() {
-    return { active: false, win: null, count: 0, silent: false, mood: 'calm', turn: 0, nextAt: 0, speaker: -1, cur: null, lpHz: LP_GLASS };
+    return { active: false, win: null, count: 0, silent: false, mood: 'calm', turn: 0, nextAt: 0, speaker: -1, cur: null, sub: null, lpHz: LP_GLASS };
   }
 
   function stopCur(st) {
     try { if (st.cur && typeof st.cur.stop === 'function') st.cur.stop(); } catch (e) { /* ignore */ }
     st.cur = null;
+    st.sub = null;
   }
 
   /**
@@ -154,15 +196,25 @@
         st.speaker = -1;
         if (ctx.onChange) ctx.onChange(true, { count: ins.length, zone: win.zone, lit: win.lit });
       }
+      if (st.sub && now > st.sub.end + SUB_FADE) st.sub = null;
       if (st.silent || !ins.length) { stopCur(st); return st; }
       if (now < st.nextAt || typeof ctx.speak !== 'function') return st;
       ins.sort(function (a, b) { return Math.hypot(a.x - win.x, a.y - win.y) - Math.hypot(b.x - win.x, b.y - win.y); });
-      const pool = ins.slice(0, MAX_SPEAKERS);
+      // V2: when the nearest villager is in a conversation, the overheard pair is them and their partner.
+      const convOf = typeof ctx.conversationFor === 'function' ? ctx.conversationFor : null;
+      let conv = convOf ? convOf(ins[0].id) : null;
+      let pool = ins.slice(0, MAX_SPEAKERS);
+      if (conv) {
+        let mate = null;
+        for (let i = 1; i < ins.length; i++) if (ins[i].id === conv.partner) { mate = ins[i]; break; }
+        if (mate) pool = [ins[0], mate];
+        else conv = null;
+      }
       st.speaker = pool.length > 1 ? (st.speaker + 1) % pool.length : 0;
       const who = pool[st.speaker];
       const seed = hash(idNum(who.id), st.turn);
-      const kinds = st.mood === 'calm' ? ['chat', 'chat', 'question', 'laugh', 'greet'] : st.mood === 'worried' ? ['murmur', 'question', 'chat'] : ['murmur', 'murmur', 'chat'];
-      const kind = st.turn === 0 && pool.length > 1 ? 'greet' : kinds[seed % kinds.length];
+      const kinds = conversationKinds(conv, st.mood);
+      const kind = conv && conv.kind === 'hello' ? 'greet' : st.turn === 0 && pool.length > 1 && !conv ? 'greet' : kinds[seed % kinds.length];
       const d = Math.hypot(who.x - win.x, who.y - win.y) + win.dist;
       const gain = Math.max(0.15, Math.min(1, 1 / (1 + d * 0.18)));
       const mood = st.mood;
@@ -174,13 +226,22 @@
       else if (typeof ctx.speakLength === 'function') len = num(ctx.speakLength(seed, kind, mood, voice), 1.2);
       const two = pool.length > 1;
       const pause = (two ? 0.35 : 1.6) + ((hash(seed, 99) % 100) / 100) * (two ? 0.9 : 2.4);
+      const sub = subtitleFor(seed, kind, mood, win.dist, win.lit);
+      sub.speaker = who.id;
+      sub.kind = kind;
+      sub.mood = mood;
+      sub.start = now;
+      sub.end = now + Math.max(0.3, len);
+      st.sub = sub;
+      st.subId = (st.subId || 0) + 1;
+      if (typeof ctx.onSubtitle === 'function') ctx.onSubtitle(sub, who);
       st.nextAt = now + Math.max(0.3, len) + pause;
       st.turn++;
     } catch (e) { /* never throw */ }
     return st;
   }
 
-  const Listen = { REACH: REACH, MOVE_K: MOVE_K, MAX_SPEAKERS: MAX_SPEAKERS, findWindow: findWindow, nearLitWindow: nearLitWindow, insiders: insiders, moodFor: moodFor, create: create, step: step, stop: stopCur };
+  const Listen = { REACH: REACH, MOVE_K: MOVE_K, MAX_SPEAKERS: MAX_SPEAKERS, SUB_DIST: SUB_DIST, SUB_FADE: SUB_FADE, MUFFLED: MUFFLED, subtitleClear: subtitleClear, subtitleFor: subtitleFor, subAlpha: subAlpha, conversationKinds: conversationKinds, findWindow: findWindow, nearLitWindow: nearLitWindow, insiders: insiders, moodFor: moodFor, create: create, step: step, stop: stopCur };
   VCS.Listen = Listen;
   if (typeof module !== 'undefined' && module.exports) module.exports = Listen;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -103,6 +103,135 @@
     return { vowel: s.vowel, consonant: s.consonant, dur: dur, pitchMul: pitchMul, gap: gap };
   }
 
+
+  // V5 subtitles: quasi-Bavarian lines with English translations. Per kind, per tone (calm | worried | whisper).
+  const SUBS = {
+    chat: {
+      calm: [
+        { de: 'Heid is a guada Obend, gell?', en: 'Good evening tonight, isn\'t it?' },
+        { de: 'Da Brunna host scho gseng? Staubi is er.', en: 'Have you seen the well? Dusty, it is.' },
+        { de: 'Mei Oide sagt, s Brot werd teia.', en: 'My wife says bread is getting dear.' },
+        { de: 'Morgn miass ma fria auf, Hans.', en: 'Tomorrow we must rise early, Hans.' },
+        { de: 'Nix is los, nur da Wind.', en: 'Nothing\'s going on, only the wind.' }
+      ],
+      worried: [
+        { de: 'Host des ghert? Draußn hod si wos grührt.', en: 'Did you hear that? Something stirred outside.' },
+        { de: 'I mog net, dass d Kerzn so flackert.', en: 'I don\'t like how the candle flickers.' },
+        { de: 'Schliaß d Fensta liaba zua.', en: 'Better shut the windows.' },
+        { de: 'Seit gestern is mir net wohl.', en: 'I\'ve felt uneasy since yesterday.' }
+      ],
+      whisper: [
+        { de: 'Pst. Is wer do?', en: 'Shh. Is someone there?' },
+        { de: 'Roar di net, bleib staad.', en: 'Don\'t stir, keep quiet.' },
+        { de: 'Des san d Bluadsauger, i sag da s.', en: 'It\'s the bloodsuckers, I tell you.' }
+      ]
+    },
+    question: {
+      calm: [
+        { de: 'Hast a Schmoiz fürs Brot?', en: 'Have you any lard for the bread?' },
+        { de: 'Wo is denn da Pfarrer heid?', en: 'Where is the priest tonight?' },
+        { de: 'Kimmst no auf a Bier eina?', en: 'Coming in for one more beer?' },
+        { de: 'Wia spaad is denn scho?', en: 'How late is it already?' }
+      ],
+      worried: [
+        { de: 'Wos woar des fia a Gschrei?', en: 'What kind of scream was that?' },
+        { de: 'Host d Tür aa guad versperrt?', en: 'Did you lock the door properly?' },
+        { de: 'Wo is da Bua hikemma?', en: 'Where did the boy go?' }
+      ],
+      whisper: [
+        { de: 'Siagst du des aa?', en: 'Do you see that too?' },
+        { de: 'Wer schleicht do ume?', en: 'Who is sneaking about?' }
+      ]
+    },
+    argue: {
+      calm: [
+        { de: 'Du Depp, des is mei Platz!', en: 'You fool, that is my seat!' },
+        { de: 'Gschwoabl, hoit dei Goschn!', en: 'Blabber, hold your tongue!' },
+        { de: 'Zoin soist, du Gizkragn!', en: 'You will pay, you skinflint!' }
+      ],
+      worried: [
+        { de: 'Des is alles dei Schuid!', en: 'This is all your fault!' },
+        { de: 'Hätt i auf mei Muatta ghört!', en: 'I should have listened to my mother!' }
+      ],
+      whisper: [
+        { de: 'Sei staad, sunst hert ma uns!', en: 'Be quiet, or they\'ll hear us!' }
+      ]
+    },
+    laugh: {
+      calm: [
+        { de: 'Hahaha, des is guad!', en: 'Hahaha, that\'s good!' },
+        { de: 'Ha ha, du Hamml!', en: 'Ha ha, you rascal!' },
+        { de: 'Hihi, na wirkli?', en: 'Hehe, no, really?' }
+      ],
+      worried: [
+        { de: 'Ha... ja, ja, freili.', en: 'Ha... yes, yes, of course.' },
+        { de: 'Hehe, sei froh, dass nix passiert is.', en: 'Hehe, be glad nothing happened.' }
+      ],
+      whisper: [
+        { de: 'Hihi... pst.', en: 'Hehe... shh.' }
+      ]
+    },
+    murmur: {
+      calm: [
+        { de: 'Mhm... jo, jo, mei...', en: 'Mhm... yes, yes, well...' },
+        { de: 'Oiso, oiso, wia ma s nimmt...', en: 'Well, well, as one takes it...' }
+      ],
+      worried: [
+        { de: 'Heiliger Gott, bewahr uns...', en: 'Holy God, protect us...' },
+        { de: 'Es wird scho wieda, es wird scho...', en: 'It will be all right, it will...' },
+        { de: 'Wenn s nur da Morgn war...', en: 'If only it were morning...' }
+      ],
+      whisper: [
+        { de: 'Gott schütz uns, Gott schütz uns...', en: 'God shield us, God shield us...' },
+        { de: 'Ned umschaun... ned umschaun...', en: 'Don\'t look round... don\'t look round...' },
+        { de: 'Es is do... i spier s...', en: 'It is here... I feel it...' }
+      ]
+    },
+    greet: {
+      calm: [
+        { de: 'Servus, wia geht s da?', en: 'Hello, how are you?' },
+        { de: 'Griaß di, Nachbar!', en: 'Greetings, neighbour!' },
+        { de: 'Servus, na, ja, du aa do?', en: 'Hello, well, you here too?' }
+      ],
+      worried: [
+        { de: 'Servus... host wos gseng?', en: 'Hello... have you seen anything?' },
+        { de: 'Griaß di, bleib liaba herinnen.', en: 'Greetings, better stay inside.' }
+      ],
+      whisper: [
+        { de: 'Servus, pst, leise.', en: 'Hello, shh, quietly.' }
+      ]
+    },
+    startle: {
+      calm: [
+        { de: 'Jessas! Hob i mi derschrock!', en: 'Jesus! You gave me a fright!' },
+        { de: 'Oha! Wos woar des?', en: 'Whoa! What was that?' }
+      ],
+      worried: [
+        { de: 'Jessas Maria, da is wer!', en: 'Jesus Mary, someone\'s there!' },
+        { de: 'Oa! Schaug do hi!', en: 'Oh! Look over there!' }
+      ],
+      whisper: [
+        { de: 'Oh... nur ned schrein.', en: 'Oh... just don\'t scream.' }
+      ]
+    }
+  };
+
+  /**
+   * V5 subtitle for a spoken line: {de, en}, pure and deterministic. Uses the same seed/kind/mood as line() / the played speech.
+   * mood whisper -> whisper table, worried -> worried table, anything else (calm, argue) -> calm table.
+   * @param {number|string} seed
+   * @param {string} kind chat|question|argue|laugh|murmur|greet|startle
+   * @param {string} [mood] calm|whisper|worried|argue
+   * @returns {{de: string, en: string}}
+   */
+  function subtitle(seed, kind, mood) {
+    const k = SUBS[kind] ? kind : 'chat';
+    const tone = mood === 'whisper' ? 'whisper' : mood === 'worried' ? 'worried' : 'calm';
+    const list = SUBS[k][tone];
+    const e = list[hashSeed(seed) % list.length];
+    return { de: e.de, en: e.en };
+  }
+
   /** Round to 3 decimals so sums are stable. */
   function r3(v) {
     return Math.round(v * 1000) / 1000;
@@ -217,7 +346,7 @@
     };
   }
 
-  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor };
+  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor, subtitle, SUBS };
 
   VCS.VoiceData = VoiceData;
   if (typeof module !== 'undefined' && module.exports) module.exports = VoiceData;

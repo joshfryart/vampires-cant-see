@@ -87,7 +87,9 @@ test('DEFAULTS is frozen and has the contract values', () => {
     largeText: false,
     ambienceGain: 0.6,
     pingBip: false,
-    devButton: true
+    devButton: true,
+    subtitles: true,
+    translation: true
   });
 });
 
@@ -193,7 +195,9 @@ test('sanitize keeps valid values, including range bounds', () => {
     largeText: true,
     ambienceGain: 1,
     pingBip: true,
-    devButton: false
+    devButton: false,
+    subtitles: false,
+    translation: false
   };
   const r = sanitize(input);
   assert.deepStrictEqual(r.warnings, []);
@@ -443,4 +447,18 @@ test('ambienceGain defaults to 0.6 and is range checked 0..1', () => {
   assert.strictEqual(hi.config.ambienceGain, 0.6);
   assert.strictEqual(hi.warnings.length, 1);
   assert.strictEqual(sanitize({ ambienceGain: 'loud' }).config.ambienceGain, 0.6);
+});
+
+test('subtitle settings default on, accept booleans and reject other types', () => {
+  const d = sanitize({}).config;
+  assert.strictEqual(d.subtitles, true);
+  assert.strictEqual(d.translation, true);
+  const off = sanitize({ subtitles: false, translation: false });
+  assert.deepStrictEqual(off.warnings, []);
+  assert.strictEqual(off.config.subtitles, false);
+  assert.strictEqual(off.config.translation, false);
+  const bad = sanitize({ subtitles: 'no', translation: 0 });
+  assert.strictEqual(bad.config.subtitles, true);
+  assert.strictEqual(bad.config.translation, true);
+  assert.strictEqual(bad.warnings.length, 2);
 });

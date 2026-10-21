@@ -87,3 +87,31 @@ test('speak never throws and returns null without a ctx or when muted', () => {
   assert.strictEqual(Audio.speak({ ok: true, ctx: {}, volume: 1, warned: false }, { seed: 1 }), null);
   assert.strictEqual(Audio.speak(audio(fakeCtx()), { seed: 1, kind: 'bogus', mood: 'x', voice: 'nope' }) !== undefined, true);
 });
+
+test('V5 subtitle is deterministic, shaped {de,en} and covers every kind and mood', () => {
+  for (const kind of VD.KINDS) {
+    for (const mood of ['calm', 'worried', 'whisper', 'argue']) {
+      for (let seed = 0; seed < 20; seed++) {
+        const a = VD.subtitle(seed, kind, mood);
+        const b = VD.subtitle(seed, kind, mood);
+        assert.deepStrictEqual(a, b);
+        assert.ok(typeof a.de === 'string' && a.de.length > 0, kind + '/' + mood);
+        assert.ok(typeof a.en === 'string' && a.en.length > 0, kind + '/' + mood);
+      }
+    }
+  }
+  assert.deepStrictEqual(VD.subtitle('x', 'nonsense', 'calm'), VD.subtitle('x', 'chat', 'calm'));
+});
+
+test('V5 subtitles vary by seed, kind and mood; whisper and worried differ from calm', () => {
+  const seen = new Set();
+  for (let s = 0; s < 50; s++) seen.add(VD.subtitle(s, 'chat', 'calm').de);
+  assert.ok(seen.size >= 3);
+  const kinds = new Set(VD.KINDS.map((k) => VD.subtitle(1, k, 'calm').de));
+  assert.equal(kinds.size, VD.KINDS.length);
+  for (const kind of VD.KINDS) {
+    const calm = new Set(VD.SUBS[kind].calm.map((e) => e.de));
+    assert.ok(VD.SUBS[kind].whisper.every((e) => !calm.has(e.de)), kind);
+    assert.ok(VD.SUBS[kind].worried.every((e) => !calm.has(e.de)), kind);
+  }
+});

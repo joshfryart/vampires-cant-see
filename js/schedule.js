@@ -13,11 +13,11 @@
   const ROLES = {
     innkeeper: [[['tavern_a'], 0.30, 'work'], [['tavern_b'], 0.45, 'work'], [['tavern_c'], 0.52, 'work'], [['@hearth'], 0.60, 'cook'], [['@bed'], 1, 'sleep']],
     drunk: [[['tavern_c', 'tavern_b'], 0.26, 'drink'], [['square'], 0.32, 'sing'], [['@bed'], 1, 'sleep']],
-    regular: [[['tavern_b'], 0.30, 'drink'], [['@table'], 0.55, 'eat'], [['@work'], 0.66, 'mend'], [['@bed'], 1, 'sleep']],
+    regular: [[['tavern_t'], 0.16, 'drink'], [['@table'], 0.50, 'eat'], [['@work'], 0.66, 'mend'], [['@bed'], 1, 'sleep']],
     priest: [[['church_a'], 0.25, 'pray'], [['church_c'], 0.45, 'read'], [['church_b'], 0.58, 'pray'], [['@bed'], 1, 'sleep']],
     elder: [[['church_c'], 0.20, 'pray'], [['square'], 0.30, 'rest'], [['@hearth'], 0.54, 'sit'], [['@bed'], 1, 'sleep']],
-    farmer: [[['barn_b'], 0.14, 'work'], [['barn'], 0.22, 'work'], [['well'], 0.30, 'draw water'], [['@hearth'], 0.52, 'cook'], [['@table'], 0.62, 'eat'], [['@bed'], 1, 'sleep']],
-    mother: [[['well'], 0.10, 'draw water'], [['@hearth'], 0.40, 'cook'], [['@table'], 0.52, 'eat'], [['@work'], 0.64, 'spin'], [['@bed'], 1, 'sleep']],
+    farmer: [[['barn_b'], 0.08, 'work'], [['barn'], 0.13, 'work'], [['well'], 0.20, 'draw water'], [['@hearth'], 0.30, 'cook'], [['@table'], 0.48, 'eat'], [['@work'], 0.62, 'mend'], [['@bed'], 1, 'sleep']],
+    mother: [[['well'], 0.06, 'draw water'], [['@hearth'], 0.26, 'cook'], [['@table'], 0.48, 'eat'], [['@work'], 0.64, 'spin'], [['@bed'], 1, 'sleep']],
     // Night owls: still about after 01:00.
     insomniac: [[['lane_s'], 0.22, 'pace'], [['street_mid'], 0.40, 'pace'], [['well'], 0.56, 'sit'], [['@work'], 0.68, 'whittle'], [['@bed'], 1, 'sleep']],
     gravedigger: [[['grave'], 0.30, 'dig'], [['road_s'], 0.45, 'rest'], [['grave'], 0.66, 'dig'], [['@hearth'], 0.76, 'cook'], [['@bed'], 1, 'sleep']]
@@ -124,7 +124,43 @@
   /** Night fraction of 01:00 (the village is indoors by then, apart from the watch and night owls). */
   const CURFEW = 0.5;
 
-  const Schedule = { ROLES: ROLES, CURFEW: CURFEW, hasRole: hasRole, isSeated: isSeated, build: build, make: make, stopAt: stopAt, simplify: simplify, eta: eta };
+  // V2 meetings: weights [chat, hello, ignore] by role pair ('a|b', roles sorted); 'family' = housemates, 'default' otherwise.
+  // chat = stop and talk 4-10 s, hello = a nod and a word (1.5-3 s), ignore = walk on. mood is a hint for the voices.
+  const CHAT = {
+    family: { w: [0.7, 0.25, 0.05], mood: 'warm' },
+    'default': { w: [0.25, 0.4, 0.35], mood: 'neutral' },
+    pairs: {
+      'drunk|priest': { w: [0.15, 0.25, 0.6], mood: 'curt' },
+      'drunk|guard': { w: [0.1, 0.3, 0.6], mood: 'curt' },
+      'guard|guard': { w: [0.3, 0.5, 0.2], mood: 'neutral' },
+      'elder|priest': { w: [0.6, 0.3, 0.1], mood: 'warm' },
+      'innkeeper|regular': { w: [0.6, 0.3, 0.1], mood: 'warm' },
+      'drunk|innkeeper': { w: [0.4, 0.3, 0.3], mood: 'neutral' },
+      'insomniac|insomniac': { w: [0.4, 0.4, 0.2], mood: 'neutral' }
+    },
+    chatSec: [4, 10], helloSec: [1.5, 3]
+  };
+  const CHAT_KINDS = ['chat', 'hello', 'ignore'];
+
+  /** Weights entry for a role pair. */
+  function chatEntry(roleA, roleB, sameHome) {
+    if (sameHome) return CHAT.family;
+    const key = String(roleA) < String(roleB) ? roleA + '|' + roleB : roleB + '|' + roleA;
+    return hasOwn(CHAT.pairs, key) ? CHAT.pairs[key] : CHAT['default'];
+  }
+
+  /** Pick 'chat' | 'hello' | 'ignore' with r1 in [0,1); duration via r2: {kind, mood, sec}. */
+  function chatRoll(roleA, roleB, sameHome, r1, r2) {
+    const e = chatEntry(roleA, roleB, sameHome);
+    let acc = 0;
+    let k = 2;
+    for (let i = 0; i < 3; i++) { acc += e.w[i]; if (r1 < acc) { k = i; break; } }
+    const kind = CHAT_KINDS[k];
+    const rng = kind === 'chat' ? CHAT.chatSec : CHAT.helloSec;
+    return { kind: kind, mood: e.mood, sec: kind === 'ignore' ? 0 : rng[0] + (rng[1] - rng[0]) * r2 };
+  }
+
+  const Schedule = { CHAT: CHAT, chatEntry: chatEntry, chatRoll: chatRoll, ROLES: ROLES, CURFEW: CURFEW, hasRole: hasRole, isSeated: isSeated, build: build, make: make, stopAt: stopAt, simplify: simplify, eta: eta };
   VCS.Schedule = Schedule;
   if (typeof module !== 'undefined' && module.exports) module.exports = Schedule;
 })(typeof window !== 'undefined' ? window : globalThis);

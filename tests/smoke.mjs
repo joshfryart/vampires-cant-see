@@ -1909,6 +1909,53 @@ try {
     check('vessels: vis.vessels on by default, ?sys=vis.vessels:off turns it off', dflt[0] === true && dflt[1] === false, JSON.stringify(dflt));
   }
   } catch (e) { secFail("vessels", e); }
+  try {
+  // ---------------- W4: listening at a lit window ----------------
+  {
+    const pl = await newPg(browser, { viewport: { width: 640, height: 360 } });
+    const errsL = [];
+    pl.on('pageerror', (e) => errsL.push(String(e && e.message ? e.message : e)));
+    pl.on('console', (m) => { if (m.type() === 'error') errsL.push(m.text()); });
+    await pl.goto(INDEX_URL + '?seed=7&debug=1');
+    await waitF(pl, () => window.VCS && window.VCS.Game && window.VCS.Game.debugState().state === 'title', null, 5000);
+    await clickNew(pl);
+    await waitF(pl, () => window.VCS.Game.debugState().state === 'playing', null, 3000);
+    const spot = await pl.evaluate(() => {
+      const G = window.VCS.Game;
+      G.debugMap('town', null);
+      const w = G.debugPeopleState().world;
+      let best = null;
+      for (let cy = 0; cy < w.height; cy++) for (let cx = 0; cx < w.width; cx++) {
+        if (w.tileAt(cx, cy) !== 'w') continue;
+        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+          const px = cx + 0.5 + dx * 0.7, py = cy + 0.5 + dy * 0.7;
+          if (w.kindAt(px, py) !== 'outdoor' || w.kindAt(cx + 0.5 - dx, cy + 0.5 - dy) !== 'indoor') continue;
+          const lit = Math.max(w.lightAt(cx + 0.5, cy + 0.5), w.lightAt(cx + 0.5 - dx, cy + 0.5 - dy));
+          if (!best || lit > best.lit) best = { px, py, ang: Math.atan2(-dy, -dx), lit };
+        }
+      }
+      if (best) G.debugTeleport(best.px, best.py, best.ang);
+      return best;
+    });
+    check('listen smoke: found a window to stand at', !!spot, JSON.stringify(spot));
+    if (spot) {
+      await pl.keyboard.down('KeyE');
+      await waitF(pl, () => window.VCS.Game.debugState().listen && window.VCS.Game.debugState().listen.active, null, 4000).catch(() => {});
+      await pl.waitForTimeout(3500);
+      const ds = await pl.evaluate(() => { const d = window.VCS.Game.debugState(); return { listen: d.listen, voices: d.voices, errors: d.errors }; });
+      await pl.keyboard.up('KeyE');
+      check('listen smoke: holding E at the window starts listening', !!(ds.listen && ds.listen.active), JSON.stringify(ds.listen));
+      check('listen smoke: headcount is a number (HUD "Voices inside")', !!(ds.listen && typeof ds.listen.count === 'number' && ds.listen.count >= 0), JSON.stringify(ds.listen));
+      check('listen smoke: voice count <= 96', ds.voices <= 96, String(ds.voices));
+      check('listen smoke: subtitle, when present, has a line (lit: ' + (spot.lit > 0.15) + ')', !ds.listen || !ds.listen.sub || (typeof ds.listen.sub.de === 'string' && ds.listen.sub.de.length > 0), JSON.stringify(ds.listen && ds.listen.sub));
+      await pl.waitForTimeout(300);
+      const off = await pl.evaluate(() => { const d = window.VCS.Game.debugState(); return d.listen && d.listen.active; });
+      check('listen smoke: releasing E stops listening', !off, String(off));
+    }
+    check('listen smoke: no console or page errors', errsL.length === 0, JSON.stringify(errsL));
+    await pl.close();
+  }
+  } catch (e) { secFail("listen", e); }
   await closeLeaked([page, pg7, p8]);
 } catch (e) {
   check('smoke run completed', false, e && e.stack ? e.stack : String(e));
