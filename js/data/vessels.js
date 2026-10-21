@@ -235,8 +235,93 @@
     return (envelope(t, D.ATTACK, D.DECAY) + tm.dubK * envelope(t - tm.dub, D.ATTACK, D.DECAY)) * tail;
   }
 
+  // ---- P5 edges: geometry on drawPerson's limb curves, travelling highlight position ----
+  // drawPerson draws each limb as one quadratic curve root -> (control = elbow/knee slot) -> end. A node on a control
+  // slot (elbow 10/11, knee 12/13) is drawn at the curve midpoint so it sits on the limb; an edge between the limb
+  // root and the joint, or the joint and the end, is the matching half of that curve (de Casteljau split at 0.5).
+  const LIMB = { 10: [2, 6], 11: [3, 7], 12: [4, 8], 13: [5, 9] };
+
+  function limbOf(n) {
+    return n && (n.to === undefined || n.to === n.slot) && !n.t ? LIMB[n.slot] || null : null;
+  }
+
+  /** Screen point of a node: Vessels.anchor, except elbow/knee nodes sit on the limb curve midpoint. */
+  function point(n, X, Y, out) {
+    const L = limbOf(n);
+    if (!L) return anchor(n, X, Y, out);
+    const o = out || { x: 0, y: 0 };
+    const c = n.slot;
+    o.x = 0.25 * X[L[0]] + 0.5 * X[c] + 0.25 * X[L[1]];
+    o.y = 0.25 * Y[L[0]] + 0.5 * Y[c] + 0.25 * Y[L[1]];
+    return o;
+  }
+
+  /**
+   * Control point of the edge parent -> child when it runs along a limb curve (writes out, returns true), else
+   * false (straight segment). Root -> joint: (root + C) / 2; joint -> end: (C + end) / 2.
+   */
+  function edgeCtrl(parent, child, X, Y, out) {
+    let L = limbOf(child);
+    if (L && parent.slot === L[0] && !parent.t) {
+      out.x = 0.5 * (X[L[0]] + X[child.slot]);
+      out.y = 0.5 * (Y[L[0]] + Y[child.slot]);
+      return true;
+    }
+    L = limbOf(parent);
+    if (L && child.slot === L[1] && !child.t) {
+      out.x = 0.5 * (X[parent.slot] + X[L[1]]);
+      out.y = 0.5 * (Y[parent.slot] + Y[L[1]]);
+      return true;
+    }
+    return false;
+  }
+
+  /** Point at s (0..1) on the edge a -> b (quadratic through ctrl when given, else straight). */
+  function edgeAt(a, ctrl, b, s, out) {
+    const o = out || { x: 0, y: 0 };
+    if (ctrl) {
+      const u = 1 - s;
+      o.x = u * u * a.x + 2 * u * s * ctrl.x + s * s * b.x;
+      o.y = u * u * a.y + 2 * u * s * ctrl.y + s * s * b.y;
+    } else {
+      o.x = a.x + (b.x - a.x) * s;
+      o.y = a.y + (b.y - a.y) * s;
+    }
+    return o;
+  }
+
+  const EDGE_CACHE = {};
+  /** Edges of the artery (vein false) or vein tree as [{ i: child index, p: parent index }] (cached, frozen). */
+  function edges(vein) {
+    const key = vein ? 'v' : 'a';
+    if (EDGE_CACHE[key]) return EDGE_CACHE[key];
+    const list = vein ? VEINS : ARTERIES;
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      if (!list[i].parent) continue;
+      for (let j = 0; j < list.length; j++) if (list[j].id === list[i].parent) { out.push(Object.freeze({ i: i, p: j })); break; }
+    }
+    EDGE_CACHE[key] = Object.freeze(out);
+    return EDGE_CACHE[key];
+  }
+
+  /**
+   * Travelling highlight position on an edge: (age - dParent) / (dChild - dParent). < 0 not yet launched, > 1 passed.
+   * A zero-length delay span (same arrival) is all-or-nothing.
+   */
+  function edgeFront(age, dParent, dChild) {
+    const span = dChild - dParent;
+    if (!(span > 1e-6)) return age >= dParent ? 1 : -1;
+    return (age - dParent) / span;
+  }
+
   const Vessels = {
     data: VesselData,
+    point: point,
+    edgeCtrl: edgeCtrl,
+    edgeAt: edgeAt,
+    edges: edges,
+    edgeFront: edgeFront,
     travel: travel,
     envelope: envelope,
     timing: timing,

@@ -3387,6 +3387,8 @@
           VCS.Flags.registerTun('vessels', 'halo', { value: 0.3, min: 0, max: 1, step: 0.05, desc: 'Soft halo alpha at quality 2+' });
           VCS.Flags.registerTun('vessels', 'pwvScale', { value: 1.75, min: 1, max: 3, step: 0.05, desc: 'Pulse wave slow-down (travel delay x this)' });
           VCS.Flags.registerTun('vessels', 'minQuality', { value: 1, min: 1, max: 3, step: 1, desc: 'Lowest render quality that draws vessels' });
+          VCS.Flags.registerTun('vessels', 'edges', { value: 0.45, min: 0, max: 1, step: 0.05, desc: 'Vessel edge line alpha (quality 2+)' });
+          VCS.Flags.registerTun('vessels', 'highlight', { value: 1, min: 0, max: 2, step: 0.1, desc: 'Travelling highlight alpha along the edges' });
           VCS.Flags.load(root.location.search, debug);
           if (VCS.Flags.get('dev.showFps')) S.debugOn = true;
           VCS.Flags.onChange(function (ev) {

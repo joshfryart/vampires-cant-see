@@ -255,3 +255,55 @@ test('P4 vessel life covers feet + dub + decay, ~1 s', () => {
   // Larger pwvScale = later feet.
   assert.ok(V.travel(2.5).art[idx('pedalL')] > V.travel().art[idx('pedalL')]);
 });
+
+// ---- P5 edges ----
+test('P5 edges: one per non-root node, parent index valid, cached', () => {
+  for (const vein of [false, true]) {
+    const set = vein ? D.veins : D.arteries;
+    const es = V.edges(vein);
+    assert.strictEqual(es.length, set.length - 1);
+    for (const e of es) assert.strictEqual(set[e.p].id, set[e.i].parent);
+    assert.strictEqual(V.edges(vein), es);
+  }
+});
+
+test('P5 edge front: 0 at the parent arrival, 1 at the child, monotonic', () => {
+  near(V.edgeFront(0.1, 0.1, 0.3), 0);
+  near(V.edgeFront(0.3, 0.1, 0.3), 1);
+  near(V.edgeFront(0.2, 0.1, 0.3), 0.5);
+  assert.ok(V.edgeFront(0.05, 0.1, 0.3) < 0);
+  assert.strictEqual(V.edgeFront(0.2, 0.2, 0.2), 1);
+  assert.strictEqual(V.edgeFront(0.1, 0.2, 0.2), -1);
+  const tr = V.travel(1.75);
+  for (const e of V.edges(false)) assert.ok(tr.art[e.i] >= tr.art[e.p], D.arteries[e.i].id);
+});
+
+test('P5 limb geometry: elbow/knee nodes on the limb curve midpoint, limb edges are its halves', () => {
+  const X = new Float32Array(24);
+  const Y = new Float32Array(24);
+  // Shoulder (2) at 0,0, elbow control (10) at 10,0, hand (6) at 10,10.
+  X[2] = 0; Y[2] = 0; X[10] = 10; Y[10] = 0; X[6] = 10; Y[6] = 10;
+  const sub = D.arteries.find((n) => n.id === 'subclavL');
+  const bra = D.arteries.find((n) => n.id === 'brachialL');
+  const rad = D.arteries.find((n) => n.id === 'radialL');
+  const m = V.point(bra, X, Y);
+  near(m.x, 7.5); near(m.y, 2.5);
+  const a = V.point(sub, X, Y);
+  const c = { x: 0, y: 0 };
+  assert.ok(V.edgeCtrl(sub, bra, X, Y, c));
+  // The half curve ends at the midpoint of the full limb curve.
+  const end = V.edgeAt(a, c, m, 1);
+  near(end.x, 7.5); near(end.y, 2.5);
+  const mid = V.edgeAt(a, c, m, 0.5);
+  // Full curve at t = 0.25: 0.5625 P0 + 0.375 C + 0.0625 P2.
+  near(mid.x, 0.375 * 10 + 0.0625 * 10); near(mid.y, 0.0625 * 10);
+  assert.ok(V.edgeCtrl(bra, rad, X, Y, c));
+  near(c.x, 10); near(c.y, 5);
+  // Torso edges stay straight.
+  const heart = D.arteries.find((n) => n.id === 'heart');
+  const arch = D.arteries.find((n) => n.id === 'arch');
+  assert.strictEqual(V.edgeCtrl(heart, arch, X, Y, c), false);
+  // Straight edgeAt is a lerp.
+  const s = V.edgeAt({ x: 0, y: 0 }, null, { x: 4, y: 8 }, 0.25);
+  near(s.x, 1); near(s.y, 2);
+});

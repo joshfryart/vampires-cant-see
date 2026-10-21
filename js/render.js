@@ -2621,7 +2621,7 @@
 
   // ---- Circulatory pulse overlay (behind the `vis.vessels` flag): P3 nodes, P4 travelling lub-dub wave ----
   /** Tunable defaults (used when the Flags system has not registered `vessels.*`, e.g. in unit tests). */
-  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75 };
+  const VESSEL_TUN = { alpha: 0.75, size: 1, hot: 1, veins: 0.6, minQuality: 1, halo: 0.3, pwvScale: 1.75, edges: 0.45, highlight: 1 };
   const VESSEL_REDUCED_CAP = 0.5;
   /** Alpha levels the nodes are bucketed into so a figure costs a handful of fills, not one per node. */
   const VESSEL_LEVELS = 6;
@@ -2667,21 +2667,75 @@
     return a > 1 ? 1 : a < 0 ? 0 : a;
   }
 
+  /** Per-node screen points and alphas for one drawVessels call (reused, no per-frame allocation). */
+  const VESSEL_NX = new Float32Array(32);
+  const VESSEL_NY = new Float32Array(32);
+  const VESSEL_NA = new Float32Array(32);
+  const VESSEL_NE = new Float32Array(32);
+  const VESSEL_CTRL = { x: 0, y: 0 };
+  const VESSEL_A = { x: 0, y: 0 };
+  const VESSEL_B = { x: 0, y: 0 };
+  /** Edge buckets by alpha level: base lines hold (child, parent) pairs, highlights (child, parent, s0, s1). */
+  const VESSEL_LINE = [];
+  const VESSEL_HL = [];
+  for (let k = 0; k <= VESSEL_LEVELS; k++) { VESSEL_LINE.push([]); VESSEL_HL.push([]); }
+  /** Highlight trail length (fraction of the edge) behind the front: arteries short and sharp, veins long and soft. */
+  const VESSEL_TRAIL_ART = 0.35;
+  const VESSEL_TRAIL_VEIN = 0.7;
+
+  function vesselLevel(a) {
+    return Math.max(1, Math.min(VESSEL_LEVELS, Math.round(a * VESSEL_LEVELS)));
+  }
+
+  /** Path segment of edge (child i, parent p) from s0 to s1 (0..1) into c (along the limb curve when there is one). */
+  function vesselSegment(c, nodes, i, p, X, Y, s0, s1) {
+    const V = VCS.Vessels;
+    VESSEL_A.x = VESSEL_NX[p]; VESSEL_A.y = VESSEL_NY[p];
+    VESSEL_B.x = VESSEL_NX[i]; VESSEL_B.y = VESSEL_NY[i];
+    const curved = V.edgeCtrl(nodes[p], nodes[i], X, Y, VESSEL_CTRL);
+    if (s0 <= 0 && s1 >= 1) {
+      c.moveTo(VESSEL_A.x, VESSEL_A.y);
+      if (curved) c.quadraticCurveTo(VESSEL_CTRL.x, VESSEL_CTRL.y, VESSEL_B.x, VESSEL_B.y);
+      else c.lineTo(VESSEL_B.x, VESSEL_B.y);
+      return;
+    }
+    const ctrl = curved ? VESSEL_CTRL : null;
+    const steps = curved ? 4 : 1;
+    for (let k = 0; k <= steps; k++) {
+      V.edgeAt(VESSEL_A, ctrl, VESSEL_B, s0 + (s1 - s0) * k / steps, VESSEL_PT);
+      if (k === 0) c.moveTo(VESSEL_PT.x, VESSEL_PT.y);
+      else c.lineTo(VESSEL_PT.x, VESSEL_PT.y);
+    }
+  }
+
+  /** Queue the travelling highlight of edge (child i, parent p) at front position s (lub or dub) with peak alpha a. */
+  function vesselQueueHl(i, p, s, trail, a) {
+    if (!(s >= 0) || s > 1 + trail || a < 0.02) return;
+    const s0 = Math.max(0, s - trail);
+    const s1 = Math.min(1, s);
+    if (s1 - s0 < 0.01) return;
+    VESSEL_HL[vesselLevel(a)].push(i, p, s0, s1);
+  }
+
   /**
-   * Vessel nodes for one vheart echo e at pose slots X, Y (drawPerson's PX/PY), age s since the beat reached them.
-   * A dot per node (arteries red, veins deeper red-blue, a bit larger and behind), plus a soft halo at quality >= 2.
-   * Alpha = vesselAlpha x strength x Vessels.pulse: the lub launches at the heart and reaches each node after its
-   * travel delay, a ~30% dub ripple follows, veins swell later and slower; reduced motion: one soft pulse, no travel.
-   * age < 0 draws the static nodes. Not masked to the chest strip. Returns the number of nodes drawn (0 when off).
+   * Vessel network for one vheart echo e at pose slots X, Y (drawPerson's PX/PY), age s since the beat reached them.
+   * Nodes: a dot per node (arteries red, veins deeper red-blue, a bit larger and behind), soft halo at quality >= 2.
+   * Edges (P5, quality >= 2 only): a dim line per vessel that glows while the wave is on it, plus a travelling
+   * highlight at (age - d_parent) / (d_child - d_parent) (lub, then a dimmer dub; veins a long soft swell), along the
+   * limb curves drawPerson draws. Quality 1: nodes only; quality 0: nothing (chest outline only).
+   * Alpha = vesselAlpha x strength x Vessels.pulse x mute (mute < 1 seen through a window, P2b). Reduced motion: no
+   * travel and no highlight, one soft pulse over the whole network, alpha <= 0.5. age < 0 draws the static network.
+   * Not masked to the chest strip. Returns the number of nodes drawn (0 when off).
    */
-  function drawVessels(r, e, X, Y, age) {
+  function drawVessels(r, e, X, Y, age, mute) {
     const V = VCS.Vessels;
     const D = VCS.VesselData;
     if (!V || !D || !e || e.kind !== 'vheart' || !vesselsOn()) return 0;
     const q = typeof r.quality === 'number' ? r.quality : 2;
     if (q < 1 || q < vesselTun('minQuality')) return 0;
     if (e.vampire || e.body === 'vampire' || e.bodyKind === 'vampire') return 0;
-    const b = typeof e.strength === 'number' ? Math.min(1, e.strength) : 1;
+    const mk = typeof mute === 'number' ? (mute > 1 ? 1 : mute) : 1;
+    const b = (typeof e.strength === 'number' ? Math.min(1, e.strength) : 1) * mk;
     if (!(b > 0.01) || !(typeof e.stateK === 'number' ? e.stateK > 0 : true)) return 0;
     const reduced = !!r.reduced;
     // P4: the beat launches at the heart (age 0) and travels out; age < 0 (no beat clock) draws the static P3 nodes.
@@ -2693,27 +2747,89 @@
     const figPx = Math.max(Math.abs(Y[8] - Y[0]), Math.abs(Y[9] - Y[0]), 1);
     const rad = Math.max(1, figPx * 0.016 * vesselTun('size')) * (r.wscale > 0 ? Math.min(1.5, Math.max(0.6, r.wscale)) : 1);
     const halo = !reduced && q >= 2 ? vesselTun('halo') : 0;
+    const edgeK = q >= 2 ? vesselTun('edges') : 0;
+    const hlK = q >= 2 && !reduced && tm ? vesselTun('highlight') : 0;
+    const cap = reduced ? VESSEL_REDUCED_CAP : 1;
+    const tr = tm && !reduced ? V.travel(pws) : null;
+    const tail = tm && tm.life - age < D.TAIL ? (tm.life - age) / D.TAIL : 1;
     const c = r.octx;
     const list = [D.veins, D.arteries];
     let n = 0;
     c.save();
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
     for (let li = 0; li < 2; li++) {
       const nodes = list[li];
       const vein = li === 0;
       const rgb = vein ? D.VEIN_RGB : D.ARTERY_RGB;
       const rr = vein ? rad * 1.6 : rad;
+      const style = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+      for (let i = 0; i < nodes.length; i++) {
+        V.point(nodes[i], X, Y, VESSEL_PT);
+        VESSEL_NX[i] = VESSEL_PT.x;
+        VESSEL_NY[i] = VESSEL_PT.y;
+        VESSEL_NA[i] = vesselAlpha(nodes[i], e, opts) * b;
+        const env = tm ? V.pulse(vein, i, age, tm, pws) : 1;
+        VESSEL_NE[i] = env > 1 ? 1 : env;
+      }
+      // ---- Edges (quality 2+): dim base line glowing with its end nodes, then the travelling highlight ----
+      if (edgeK > 0) {
+        const es = V.edges(vein);
+        for (let k = 0; k <= VESSEL_LEVELS; k++) { VESSEL_LINE[k].length = 0; VESSEL_HL[k].length = 0; }
+        const dl = tr ? (vein ? tr.vein : tr.art) : null;
+        const trail = vein ? VESSEL_TRAIL_VEIN : VESSEL_TRAIL_ART;
+        for (let k = 0; k < es.length; k++) {
+          const i = es[k].i;
+          const p = es[k].p;
+          const env = Math.max(VESSEL_NE[i], VESSEL_NE[p]);
+          let a = edgeK * VESSEL_NA[i] * env;
+          if (a > cap) a = cap;
+          if (a >= 0.02) VESSEL_LINE[vesselLevel(a)].push(i, p);
+          if (hlK > 0 && dl) {
+            const ap = VESSEL_NA[p];
+            const ai = VESSEL_NA[i];
+            const s = V.edgeFront(age, dl[p], dl[i]);
+            const hv = vein ? 0.5 : 1;
+            vesselQueueHl(i, p, s, trail, Math.min(1, hlK * hv * tail * (ap + (ai - ap) * Math.min(1, Math.max(0, s)))));
+            if (!vein && tm.dubK > 0) {
+              const s2 = V.edgeFront(age - tm.dub, dl[p], dl[i]);
+              vesselQueueHl(i, p, s2, trail, Math.min(1, hlK * tm.dubK * tail * (ap + (ai - ap) * Math.min(1, Math.max(0, s2)))));
+            }
+          }
+        }
+        c.strokeStyle = style;
+        c.lineWidth = Math.max(0.75, (vein ? 0.9 : 0.55) * rad);
+        for (let lv = 1; lv <= VESSEL_LEVELS; lv++) {
+          const bk = VESSEL_LINE[lv];
+          if (!bk.length) continue;
+          c.globalAlpha = lv / VESSEL_LEVELS;
+          c.beginPath();
+          for (let k = 0; k < bk.length; k += 2) vesselSegment(c, nodes, bk[k], bk[k + 1], X, Y, 0, 1);
+          c.stroke();
+        }
+        c.lineWidth = Math.max(1, (vein ? 1.4 : 1.1) * rad);
+        for (let lv = 1; lv <= VESSEL_LEVELS; lv++) {
+          const bk = VESSEL_HL[lv];
+          if (!bk.length) continue;
+          c.globalAlpha = lv / VESSEL_LEVELS;
+          c.beginPath();
+          for (let k = 0; k < bk.length; k += 4) vesselSegment(c, nodes, bk[k], bk[k + 1], X, Y, bk[k + 2], bk[k + 3]);
+          c.stroke();
+        }
+      }
+      // ---- Nodes ----
       for (let k = 0; k <= VESSEL_LEVELS; k++) VESSEL_BUCKET[k] = null;
       for (let i = 0; i < nodes.length; i++) {
-        const env = tm ? V.pulse(vein, i, age, tm, pws) : 1;
+        const env = VESSEL_NE[i];
         if (env <= 0.005) continue;
-        let a = vesselAlpha(nodes[i], e, opts) * b * (env > 1 ? 1 : env);
-        if (reduced && a > VESSEL_REDUCED_CAP) a = VESSEL_REDUCED_CAP;
+        let a = VESSEL_NA[i] * env;
+        if (a > cap) a = cap;
         if (a < 0.02) continue;
-        const lv = Math.max(1, Math.min(VESSEL_LEVELS, Math.round(a * VESSEL_LEVELS)));
-        (VESSEL_BUCKET[lv] || (VESSEL_BUCKET[lv] = [])).push(nodes[i]);
+        const lv = vesselLevel(a);
+        (VESSEL_BUCKET[lv] || (VESSEL_BUCKET[lv] = [])).push(i);
         n++;
       }
-      c.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+      c.fillStyle = style;
       for (let lv = 1; lv <= VESSEL_LEVELS; lv++) {
         const bk = VESSEL_BUCKET[lv];
         if (!bk) continue;
@@ -2722,10 +2838,11 @@
           const pr = pass === 0 ? rr * 2.4 : rr;
           c.globalAlpha = pass === 0 ? a * halo : a;
           c.beginPath();
-          for (let i = 0; i < bk.length; i++) {
-            V.anchor(bk[i], X, Y, VESSEL_PT);
-            c.moveTo(VESSEL_PT.x + pr, VESSEL_PT.y);
-            c.arc(VESSEL_PT.x, VESSEL_PT.y, pr, 0, TWO_PI);
+          for (let k = 0; k < bk.length; k++) {
+            const x = VESSEL_NX[bk[k]];
+            const y = VESSEL_NY[bk[k]];
+            c.moveTo(x + pr, y);
+            c.arc(x, y, pr, 0, TWO_PI);
           }
           c.fill();
         }

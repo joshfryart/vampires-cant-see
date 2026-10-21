@@ -649,7 +649,7 @@ describe('render-vessels (circulatory P3)', () => {
       get(t, p) {
         if (p in t) return t[p];
         if (p in st) return st[p];
-        return function () { calls.push({ fn: String(p), args: Array.from(arguments), alpha: st.globalAlpha, fill: st.fillStyle }); };
+        return function () { calls.push({ fn: String(p), args: Array.from(arguments), alpha: st.globalAlpha, fill: st.fillStyle, lw: st.lineWidth }); };
       },
       set(t, p, v) { st[p] = v; return true; }
     });
@@ -777,4 +777,83 @@ describe('render-vessels (circulatory P3)', () => {
     for (const f of r.octx.calls.filter((c) => c.fn === 'fill')) assert.ok(f.alpha <= 0.5 + 1e-9);
     Flags.set('vis.vessels', false);
   });
+  // ---- P5: edges + travelling highlight ----
+  // Figure 200 px tall -> rad 3.2; artery highlight width 1.1 x rad, base line 0.55 x rad.
+  const HL_ART = 1.1 * 3.2;
+  const BASE_ART = 0.55 * 3.2;
+  const pts = (r, lw) => r.octx.calls.filter((c) => c.fn === 'lineTo' && Math.abs(c.lw - lw) < 1e-6);
+  const strokes = (r) => r.octx.calls.filter((c) => c.fn === 'stroke');
+
+  test('P5 quality gating: q2+ edges and nodes, q1 nodes only, q0 nothing', () => {
+    Flags.set('vis.vessels', true);
+    for (const q of [2, 3]) {
+      const r = rig(q);
+      assert.ok(Render.drawVessels(r, vh(), X, Y, 0.2) > 0);
+      assert.ok(strokes(r).length > 0, 'edges at q' + q);
+    }
+    const r1 = rig(1);
+    assert.ok(Render.drawVessels(r1, vh(), X, Y, 0.2) > 0);
+    assert.strictEqual(strokes(r1).length, 0);
+    const r0 = rig(0);
+    assert.strictEqual(Render.drawVessels(r0, vh(), X, Y, 0.2), 0);
+    assert.strictEqual(r0.octx.calls.length, 0);
+    // Batched: one stroke per alpha level and pass, not one per edge.
+    const r = rig(2);
+    Render.drawVessels(r, vh(), X, Y, 0.2);
+    assert.ok(strokes(r).length <= 4 * 6, 'strokes ' + strokes(r).length);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('P5 highlight travels outward along the edges, lub then dub', () => {
+    Flags.set('vis.vessels', true);
+    const lowest = (a) => { const r = rig(2); Render.drawVessels(r, vh(), X, Y, a); const p = pts(r, HL_ART); return p.length ? Math.max(...p.map((c) => c.args[1])) : -1; };
+    const ys = [0.03, 0.1, 0.2, 0.3].map(lowest);
+    for (let k = 1; k < ys.length; k++) assert.ok(ys[k] >= ys[k - 1], 'front moves down ' + ys);
+    assert.ok(ys[0] > 0 && ys[0] < 120, 'starts in the torso ' + ys[0]);
+    // Long after the lub has reached the feet only the dub (and later nothing) travels.
+    const tr = V.travel(1.75);
+    const after = tr.artMax + 0.05;
+    const r = rig(2);
+    Render.drawVessels(r, vh(), X, Y, after);
+    const hl = r.octx.calls.filter((c) => c.fn === 'stroke' && Math.abs(c.lw - HL_ART) < 1e-6);
+    // The dub (~30%) is still on its way: dimmer than the lub peak.
+    const rl = rig(2);
+    Render.drawVessels(rl, vh(), X, Y, 0.15);
+    const lubMax = Math.max(...rl.octx.calls.filter((c) => c.fn === 'stroke' && Math.abs(c.lw - HL_ART) < 1e-6).map((c) => c.alpha));
+    assert.ok(hl.length > 0, 'dub highlight');
+    assert.ok(Math.max(...hl.map((c) => c.alpha)) < lubMax);
+    Flags.set('vis.vessels', false);
+  });
+
+  test('P5 edges follow the limb curves (quadratic through the elbow and knee)', () => {
+    Flags.set('vis.vessels', true);
+    const r = rig(2);
+    Render.drawVessels(r, vh(), X, Y, -1);
+    assert.ok(r.octx.calls.some((c) => c.fn === 'quadraticCurveTo' && Math.abs(c.lw - BASE_ART) < 1e-6));
+    Flags.set('vis.vessels', false);
+  });
+
+  test('P5 reduced motion: no highlight, edges and nodes alpha <= 0.5', () => {
+    Flags.set('vis.vessels', true);
+    for (const a of [0.05, 0.2, 0.4]) {
+      const r = rig(3, true);
+      Render.drawVessels(r, vh({ stateK: 1.6, headK: 1.25 }), X, Y, a);
+      assert.strictEqual(pts(r, HL_ART).length, 0);
+      for (const c of r.octx.calls) if (c.fn === 'stroke' || c.fn === 'fill') assert.ok(c.alpha <= 0.5 + 1e-9, c.fn + ' ' + c.alpha);
+    }
+    Flags.set('vis.vessels', false);
+  });
+
+  test('mute scales every vessel alpha down (window, P2b)', () => {
+    Flags.set('vis.vessels', true);
+    const full = rig(2);
+    Render.drawVessels(full, vh(), X, Y, 0.1);
+    const half = rig(2);
+    Render.drawVessels(half, vh(), X, Y, 0.1, 0.3);
+    const mx = (r) => Math.max(...r.octx.calls.filter((c) => c.fn === 'fill' || c.fn === 'stroke').map((c) => c.alpha));
+    assert.ok(mx(half) < mx(full) * 0.5, mx(half) + ' vs ' + mx(full));
+    assert.strictEqual(Render.drawVessels(rig(2), vh(), X, Y, 0.1, 0), 0);
+    Flags.set('vis.vessels', false);
+  });
 });
+
