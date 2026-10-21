@@ -1351,7 +1351,7 @@
     VCS.Ripple.prune(S.ripple, S.clock);
   }
 
-  const PERSON_ECHO_GAIN = 0.5; // villager echoes sit well under the wall echoes
+  const PERSON_ECHO_GAIN = 0.08; // villager echoes at 8% of the object-sonar level (user request); distance falloff kept
 
   /** Audible echo of a person snapshot: object sonar equation (-40 log r + TS + class gain), not the old 0.7 * strength. */
   function personEcho(e) {
