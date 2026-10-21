@@ -1835,3 +1835,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log('SMOKE PASSED');
+if (httpServer) httpServer.close();
+process.exit(0);
