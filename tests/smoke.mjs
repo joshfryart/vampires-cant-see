@@ -605,6 +605,41 @@ try {
   else if (!flee.tried) console.log('WARN villager flee not tested: no lit spot found near any villager (no stable hook to place light)');
   else check('lit player in front of villager makes it flee', flee.fled, JSON.stringify(flee));
 
+  // Villager barks (guarded): standing near the town's villagers for a while makes some of them speak; voices stay bounded, no errors.
+  try {
+    const bk = await p6.evaluate(() => {
+      const G = window.VCS.Game;
+      G.debugMap('town', null);
+      G.debugAdvance(0.5);
+      const out = { barks: 0, maxVoices: 0, secs: 0, people: 0, enabledByDefault: true };
+      const n = G.debugState().people.length;
+      out.people = n;
+      if (!n) return out;
+      const w = G.debugPeopleState().world;
+      for (let i = 0; i < 90 && out.barks === 0; i++) {
+        const v = G.debugState().people[i % n];
+        for (const d of [[3, 0], [-3, 0], [0, 3], [0, -3], [2, 2]]) {
+          if (w.blocks(v.x + d[0], v.y + d[1], 0.25)) continue;
+          G.debugTeleport(v.x + d[0], v.y + d[1], Math.atan2(-d[1], -d[0]));
+          break;
+        }
+        G.debugAdvance(1);
+        out.secs++;
+        const s = G.debugState();
+        out.barks = s.barks;
+        out.maxVoices = Math.max(out.maxVoices, s.voices || 0);
+      }
+      for (let i = 0; i < 20; i++) { G.debugAdvance(1); out.maxVoices = Math.max(out.maxVoices, G.debugState().voices || 0); }
+      out.barks = G.debugState().barks;
+      out.errors = G.debugState().errors;
+      return out;
+    });
+    console.log('barks probe: ' + JSON.stringify(bk));
+    check('barks: villagers bark in town within 90 s', bk.people > 0 && bk.barks > 0, JSON.stringify(bk));
+    check('barks: voices <= 96', bk.maxVoices <= 96, 'max=' + bk.maxVoices);
+    check('barks: no errors', bk.errors === 0, 'errors=' + bk.errors);
+  } catch (e) { secFail('villager barks', e); }
+
   // FPS on the street and inside the tavern, fully lit.
   for (const [label, k] of [['street', 3], ['tavern', -3]]) {
     await p6.evaluate(() => window.VCS.Game.debugMap('town', null));

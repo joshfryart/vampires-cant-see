@@ -89,7 +89,8 @@ test('DEFAULTS is frozen and has the contract values', () => {
     pingBip: false,
     devButton: true,
     subtitles: true,
-    translation: true
+    translation: true,
+    villagerVoices: true
   });
 });
 
@@ -197,7 +198,8 @@ test('sanitize keeps valid values, including range bounds', () => {
     pingBip: true,
     devButton: false,
     subtitles: false,
-    translation: false
+    translation: false,
+    villagerVoices: false
   };
   const r = sanitize(input);
   assert.deepStrictEqual(r.warnings, []);
@@ -447,6 +449,16 @@ test('ambienceGain defaults to 0.6 and is range checked 0..1', () => {
   assert.strictEqual(hi.config.ambienceGain, 0.6);
   assert.strictEqual(hi.warnings.length, 1);
   assert.strictEqual(sanitize({ ambienceGain: 'loud' }).config.ambienceGain, 0.6);
+});
+
+test('villagerVoices defaults on, accepts booleans, rejects other types', () => {
+  assert.strictEqual(sanitize({}).config.villagerVoices, true);
+  const off = sanitize({ villagerVoices: false });
+  assert.deepStrictEqual(off.warnings, []);
+  assert.strictEqual(off.config.villagerVoices, false);
+  const bad = sanitize({ villagerVoices: 'off' });
+  assert.strictEqual(bad.config.villagerVoices, true);
+  assert.strictEqual(bad.warnings.length, 1);
 });
 
 test('subtitle settings default on, accept booleans and reject other types', () => {

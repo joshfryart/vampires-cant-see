@@ -115,3 +115,33 @@ test('V5 subtitles vary by seed, kind and mood; whisper and worried differ from 
     assert.ok(VD.SUBS[kind].worried.every((e) => !calm.has(e.de)), kind);
   }
 });
+
+test('bark kinds: every new kind has a line, subtitles in all tones, and distinct text from calm', () => {
+  const barkKinds = ['notice', 'struggle', 'flee', 'cower', 'relief', 'alarm', 'daytalk', 'hum'];
+  for (const k of barkKinds) {
+    assert.ok(VD.KINDS.includes(k), k);
+    for (let s = 0; s < 10; s++) assert.ok(VD.line(s, k, 'calm').length > 0, k);
+    assert.deepStrictEqual(VD.line(3, k), VD.line(3, k));
+    for (const tone of ['calm', 'worried', 'whisper']) assert.ok(VD.SUBS[k][tone].length >= 1, k + '/' + tone);
+  }
+  assert.ok(VD.line(1, 'notice').length >= 3);
+  assert.ok(VD.lineLength(VD.line(1, 'alarm')) > 0.3);
+  for (const k of VD.FEAR_KINDS) assert.ok(VD.KINDS.includes(k));
+});
+
+test('daytalk has 10+ distinct role-flavoured lines per group and groupOf maps roles', () => {
+  for (const g of ['farmer', 'innkeeper', 'priest', 'drunk', 'guard', 'gravedigger', 'elder', 'mother', 'child']) {
+    const list = VD.DAYTALK[g];
+    assert.ok(list.length >= 10, g);
+    assert.strictEqual(new Set(list.map((e) => e.de)).size, list.length, g);
+    for (const e of list) assert.ok(e.de && e.en, g);
+    const seen = new Set();
+    for (let s = 0; s < 200; s++) seen.add(VD.subtitle(s, 'daytalk', 'calm', g).de);
+    assert.ok(seen.size >= 10, g + ' variety ' + seen.size);
+    assert.ok([...seen].every((d) => list.some((e) => e.de === d)), g);
+  }
+  assert.strictEqual(VD.groupOf('regular'), 'innkeeper');
+  assert.strictEqual(VD.groupOf('insomniac'), 'villager');
+  assert.strictEqual(VD.groupOf('guard'), 'guard');
+  assert.notStrictEqual(VD.subtitle(1, 'daytalk', 'calm', 'child').de, VD.subtitle(1, 'daytalk', 'calm', 'priest').de);
+});

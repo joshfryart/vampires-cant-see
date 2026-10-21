@@ -44,7 +44,8 @@
     pingBip: false,
     devButton: true,
     subtitles: true,
-    translation: true
+    translation: true,
+    villagerVoices: true
   });
 
   const SCHEMA = Object.freeze({
@@ -84,7 +85,8 @@
     pingBip: Object.freeze({ type: 'boolean' }),
     devButton: Object.freeze({ type: 'boolean' }),
     subtitles: Object.freeze({ type: 'boolean' }),
-    translation: Object.freeze({ type: 'boolean' })
+    translation: Object.freeze({ type: 'boolean' }),
+    villagerVoices: Object.freeze({ type: 'boolean' })
   });
 
   /** Returns the 'config' logger, or a no-op logger when VCS.Log is missing. @returns {object} */

@@ -193,7 +193,7 @@
     if (S.state === next) return;
     L().info('State ' + S.state + ' -> ' + next);
     S.state = next;
-    if (next !== 'playing') endListen();
+    if (next !== 'playing') { endListen(); endBarks(); }
     if (next !== 'paused') S.guideOpen = false;
     show(S.els.pause, next === 'paused' && !S.guideOpen);
     if (next === 'paused') showSettings(false);
@@ -481,6 +481,7 @@
     if (clicks > 0) pulse(); // v0.10.17: echolocate while holding a victim (click no longer lets go)
     VCS.Sonar.prune(S.sonar, S.clock);
     simulateWorld(dt);
+    stepBarks(dt);
     stepAmbient(dt);
     crackleTorches();
     if (stepNight(dt)) return;
@@ -547,6 +548,129 @@
       if (!sub || S.config.subtitles === false) return;
       listenSr(sub.muffled || S.config.translation === false || !sub.en ? sub.de : sub.de + ' (' + sub.en + ')');
     } catch (e) { /* ignore */ }
+  }
+
+
+  /** Villager barks (open world): notice / startle / flee / struggle / daytalk. Decisions come from VCS.Barks; this plays them. Never throws. */
+  function stepBarks(dt) {
+    try {
+      const p = S.player;
+      if (!VCS.Barks || !p || S.state !== 'playing' || !S.world || !S.people) return;
+      if (!S.barks) S.barks = { st: VCS.Barks.create(S.mapName ? S.mapName.length * 131 + 7 : 1), spk: [], sub: null, logAt: S.clock + 60, lastTotal: 0 };
+      const B = S.barks;
+      const on = S.config.villagerVoices !== false && !(S.listen && S.listen.active) && !S.mist;
+      const res = VCS.Barks.step(B.st, {
+        now: S.clock,
+        player: p,
+        people: S.people.people,
+        fear: S.hunger ? S.hunger.fear : 0,
+        enabled: on,
+        lengthFn: typeof VCS.Audio.speakLength === 'function' ? VCS.Audio.speakLength : null
+      });
+      if (!on && B.spk.length) endBarkVoices();
+      for (let i = 0; i < res.stop.length; i++) stopBarkVoice(res.stop[i]);
+      for (let i = 0; i < res.barks.length; i++) playBark(res.barks[i]);
+      if (B.sub && S.clock > B.sub.end + VCS.Listen.SUB_FADE) B.sub = null;
+      if (S.clock >= B.logAt) {
+        B.logAt = S.clock + 60;
+        if (B.st.total !== B.lastTotal) L().info('Villager barks: ' + (B.st.total - B.lastTotal) + ' in the last minute (' + B.st.total + ' total)');
+        B.lastTotal = B.st.total;
+      }
+    } catch (e) { if (!S.barkWarned) { S.barkWarned = true; L().warn('stepBarks failed', e); } }
+  }
+
+  /** Plays one bark: distance gain, pan, muffling by walls / doors / indoors, subtitle when close and in sight. */
+  function playBark(b) {
+    const p = S.player;
+    const B = S.barks;
+    const d = b.dist;
+    const occ = occlusionTo(b.x, b.y);
+    const inOut = S.world.kindAt(p.x, p.y) !== S.world.kindAt(b.x, b.y);
+    // subtitle: within 5 cells and in line of sight; the nearest speaker wins
+    if (d <= 5 && !occ && S.config.subtitles !== false) {
+      const cur = B.sub;
+      if (!cur || S.clock > cur.end || d <= cur.dist) {
+        const t = VCS.Barks.subtitleFor(b);
+        if (t.de) {
+          B.sub = { de: t.de, en: t.en, muffled: false, speaker: b.id, dist: d, start: S.clock, end: S.clock + Math.max(0.5, b.len || 1.5) };
+          listenSub(B.sub);
+        }
+      }
+    }
+    if (!S.audio || typeof VCS.Audio.speak !== 'function') return;
+    const fall = Math.max(0, 1 - d / 14);
+    // linear fall (squared left calm talk at 5-8 cells ~15 dB under the window-listening level)
+    let gain = fall * b.gain * (b.loud ? 1.15 : 1);
+    let lp = 2400 * (1 - 0.45 * Math.min(1, d / 14));
+    if (occ) {
+      const mat = occ.mat;
+      lp = occ.diff !== null && occ.diff !== undefined ? 1000 : mat === 'door' ? 650 : mat === 'glass' ? 900 : 420;
+      gain *= occ.diff !== null && occ.diff !== undefined ? 0.7 : 0.55;
+    }
+    if (inOut) { lp = Math.min(lp, 380); gain *= 0.6; }
+    if (b.kind === 'struggle') lp = Math.min(lp, 700);
+    if (!(gain > 0.015)) return;
+    const VDm = VCS.VoiceData;
+    const voice = VDm && typeof VDm.forPerson === 'function' ? VDm.forPerson(b.voiceSeed, b.role) : undefined;
+    const h = VCS.Audio.speak(S.audio, { voice: voice, seed: b.seed, kind: b.kind, mood: b.mood, pan: panTo(b.x, b.y), lpHz: lp, gain: Math.min(1, gain) });
+    if (h) {
+      B.spk = B.spk.filter(function (s) { return s.end > S.clock; });
+      B.spk.push({ id: b.id, h: h, end: S.clock + (h.end || b.len || 1.5) });
+    }
+  }
+
+  function stopBarkVoice(id) {
+    const B = S.barks;
+    if (!B) return;
+    B.spk = B.spk.filter(function (s) {
+      if (s.id !== id) return true;
+      try { s.h.stop(); } catch (e) { /* ignore */ }
+      return false;
+    });
+  }
+
+  function endBarkVoices() {
+    const B = S.barks;
+    if (!B) return;
+    for (let i = 0; i < B.spk.length; i++) { try { B.spk[i].h.stop(); } catch (e) { /* ignore */ } }
+    B.spk = [];
+    B.sub = null;
+  }
+
+  /** Drop bark state (voices stopped, timers re-baselined on the next step). Never throws. */
+  function endBarks() {
+    try { endBarkVoices(); } catch (e) { /* ignore */ }
+    S.barks = null;
+  }
+
+  /** Subtitle drawn for a bark (German line, English under it), above the tutorial hint. */
+  function drawBarkSub(c) {
+    try {
+      const B = S.barks;
+      if (!B || !B.sub || S.config.subtitles === false || (S.listen && S.listen.active)) return;
+      const a = VCS.Listen.subAlpha(B.sub, S.clock);
+      if (!(a > 0)) return;
+      const k = cfgOn('largeText') ? 1.3 : 1;
+      c.save();
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      drawSubLines(c, B.sub, a, k);
+      c.restore();
+    } catch (e) { /* ignore */ }
+  }
+
+  function drawSubLines(c, sub, a, k) {
+    const showEn = S.config.translation !== false && !!sub.en;
+    c.globalAlpha = 0.95 * a;
+    c.fillStyle = sub.muffled ? '#8fa0b8' : '#fff4d6';
+    c.font = (sub.muffled ? 'italic ' : '') + Math.round(13 * k) + 'px ui-monospace, Menlo, Consolas, monospace';
+    const y0 = 262 - (k - 1) * 20 - Math.round(24 * k) - (showEn ? Math.round(16 * k) : 0);
+    c.fillText(sub.de, 320, y0, 600);
+    if (showEn) {
+      c.fillStyle = '#b8c8e0';
+      c.font = 'italic ' + Math.round(11 * k) + 'px ui-monospace, Menlo, Consolas, monospace';
+      c.fillText(sub.en, 320, y0 + Math.round(16 * k), 600);
+    }
   }
 
   /** W2: drop any listening state (speech stopped, timers and speed tracking reset). Never throws. */
@@ -1125,6 +1249,7 @@
     S.mistVis = 0;
     S.overAcc = 0;
     endListen();
+    endBarks();
   }
 
   /** Begin a brand new run (from the menu or the run-end panel). True if it started. */
@@ -1953,6 +2078,7 @@
       Hud.drawHint(S.hud, c, S.tutCur.text, S.tutAge, S.clock, HOPTS);
     }
     drawListen(c);
+    drawBarkSub(c);
     drawSaveDot(c);
   }
 
@@ -2133,6 +2259,7 @@
     set('set-large', 'checked', c.largeText === true);
     set('set-subs', 'checked', c.subtitles !== false);
     set('set-trans', 'checked', c.translation !== false);
+    set('set-voices', 'checked', c.villagerVoices !== false);
     set('set-ambience', 'value', String(typeof c.ambienceGain === 'number' ? c.ambienceGain : 0.6));
     const out = function (id, text) {
       const el = $(id);
@@ -2220,6 +2347,7 @@
     flag('set-large', 'largeText');
     flag('set-subs', 'subtitles');
     flag('set-trans', 'translation');
+    flag('set-voices', 'villagerVoices');
     bind('btn-reset', 'click', function () {
       Object.assign(S.config, VCS.Config.DEFAULTS);
       applyConfig();
@@ -4342,6 +4470,7 @@
   function enterMap(name, x, y, angle, doorId) {
     endDrink('map');
     endListen();
+    endBarks();
     S.landings.length = 0;
     const old = S.people;
     if (old) VCS.People.clearEchoes(old);
@@ -4556,6 +4685,7 @@
       view: S.view,
       pulses: S.sonar ? S.sonar.pulses.length : 0,
       voices: S.audio && S.audio.ctx && S.audio.ctx.__vcsVoices ? S.audio.ctx.__vcsVoices.length : 0,
+      barks: S.barks ? S.barks.st.total : 0,
       pingMats: pingMaterials(),
       litColumns: S.renderer ? VCS.Render.stats(S.renderer).litColumns : 0,
       people: S.people ? VCS.People.snapshot(S.people) : [],

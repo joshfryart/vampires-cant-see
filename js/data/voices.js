@@ -69,7 +69,9 @@
     ke: { vowel: 'e', consonant: 'k', dur: 0.12 }
   };
   const SYL_KEYS = Object.keys(SYLLABLES);
-  const KINDS = ['chat', 'question', 'argue', 'laugh', 'murmur', 'greet', 'startle'];
+  const KINDS = ['chat', 'question', 'argue', 'laugh', 'murmur', 'greet', 'startle', 'notice', 'struggle', 'flee', 'cower', 'relief', 'alarm', 'daytalk', 'hum'];
+  // Open-world bark kinds (js/barks.js) that are fear / alarm shouts (louder, higher).
+  const FEAR_KINDS = ['startle', 'notice', 'struggle', 'flee', 'cower', 'alarm'];
 
   /** Hashes a number or string into a 32-bit unsigned seed. @returns {number} */
   function hashSeed(seed) {
@@ -216,18 +218,316 @@
     }
   };
 
+
+  // Bark subtitle pools (open world). {de, en}; tones as above.
+  const BARK_SUBS = {
+    notice: {
+      calm: [
+        { de: 'Wer da?', en: 'Who is there?' },
+        { de: 'Da is wer!', en: 'Someone is there!' },
+        { de: 'Hoit! Wer geht do?', en: 'Halt! Who goes there?' },
+        { de: 'Hob i do wos gseng?', en: 'Did I just see something?' }
+      ],
+      worried: [
+        { de: 'Jessas, da steht oana!', en: 'Jesus, someone is standing there!' },
+        { de: 'Des is koa Mensch ned!', en: 'That is no human!' },
+        { de: 'Bleib staad, wer bist du?', en: 'Stay still, who are you?' }
+      ],
+      whisper: [
+        { de: 'Pst... do drent...', en: 'Shh... over there...' },
+        { de: 'I siech wen... bleib staad...', en: 'I see someone... keep still...' }
+      ]
+    },
+    struggle: {
+      calm: [
+        { de: 'Mmpf! Loss mi aus!', en: 'Mmph! Let me go!' },
+        { de: 'Hmmf... naa... bitt...', en: 'Mmm... no... please...' },
+        { de: 'Mmmh! Hüf...!', en: 'Mmh! Help...!' }
+      ],
+      worried: [
+        { de: 'Naa, naa, des ned...', en: 'No, no, not that...' },
+        { de: 'Mmpf... Muatta Gottes...', en: 'Mmph... Mother of God...' },
+        { de: 'Lass mi... bitt... lass mi...', en: 'Let me... please... let me...' }
+      ],
+      whisper: [
+        { de: 'Hmm... hmm... naa...', en: 'Hmm... hmm... no...' },
+        { de: '...bitt...', en: '...please...' }
+      ]
+    },
+    flee: {
+      calm: [
+        { de: 'Hüfe! Hüfe!', en: 'Help! Help!' },
+        { de: 'Lauft! Lauft um eier Lebn!', en: 'Run! Run for your lives!' },
+        { de: 'Da Teife! Da Teife is do!', en: 'The devil! The devil is here!' },
+        { de: 'Zu de Wachn! Schnö!', en: 'To the guards! Quick!' }
+      ],
+      worried: [
+        { de: 'A Bluadsauger! Hüfe!', en: 'A bloodsucker! Help!' },
+        { de: 'Jessas Maria, rennts!', en: 'Jesus Mary, run!' },
+        { de: 'Rettets mi, rettets mi!', en: 'Save me, save me!' }
+      ],
+      whisper: [
+        { de: 'Lauf... lauf...', en: 'Run... run...' },
+        { de: 'Hüf... wer hüft ma...', en: 'Help... who will help me...' }
+      ]
+    },
+    cower: {
+      calm: [
+        { de: 'Bitte, bitte, tuats mir nix.', en: 'Please, please, do not hurt me.' },
+        { de: 'Vata unser, im Himme...', en: 'Our Father, in heaven...' },
+        { de: 'Nur ned, nur ned...', en: 'Not that, not that...' }
+      ],
+      worried: [
+        { de: 'Heiliga Maria, bitt fia uns...', en: 'Holy Mary, pray for us...' },
+        { de: 'I hob nix doa, i hob nix doa...', en: 'I did nothing, I did nothing...' },
+        { de: 'Geh weg, geh weg, geh weg...', en: 'Go away, go away, go away...' }
+      ],
+      whisper: [
+        { de: 'Hhh... bitte...', en: 'Hhh... please...' },
+        { de: '...Gott schütz mi...', en: '...God protect me...' }
+      ]
+    },
+    relief: {
+      calm: [
+        { de: 'Gott sei Dank, weg is er.', en: 'Thank God, it is gone.' },
+        { de: 'Uff... des war knapp.', en: 'Phew... that was close.' },
+        { de: 'Mei, mei, mei Herz...', en: 'Oh dear, my heart...' }
+      ],
+      worried: [
+        { de: 'Is er weg? Is er wirkli weg?', en: 'Is it gone? Is it really gone?' },
+        { de: 'Dank dir, Herrgott, dank dir.', en: 'Thank you, Lord, thank you.' }
+      ],
+      whisper: [
+        { de: 'Huh... huh... vorbei...', en: 'Huh... huh... over...' },
+        { de: 'Staad... jetzt is er weg...', en: 'Quiet... now it is gone...' }
+      ]
+    },
+    alarm: {
+      calm: [
+        { de: 'Do liegt oana! Jessas!', en: 'Someone is lying there! Jesus!' },
+        { de: 'Alarm! Alarm! Wachn!', en: 'Alarm! Alarm! Guards!' },
+        { de: 'Moard! Do is a Moard gschehn!', en: 'Murder! A murder has happened!' }
+      ],
+      worried: [
+        { de: 'Blutleer is er, blutleer!', en: 'He is drained, drained of blood!' },
+        { de: 'Des waren de Bluadsauger!', en: 'It was the bloodsuckers!' }
+      ],
+      whisper: [
+        { de: 'Heiliger Gott... a Toter...', en: 'Holy God... a dead man...' },
+        { de: 'Do... do liegt wer... staad...', en: 'There... someone is lying there... quiet...' }
+      ]
+    },
+    hum: {
+      calm: [
+        { de: 'Mmm-mm, mmm-mm-mmm...', en: '(humming a tune)' },
+        { de: 'Lalala, lalala, la...', en: '(humming)' },
+        { de: 'Hm hm hmmm, hm hm...', en: '(humming to himself)' }
+      ],
+      worried: [
+        { de: 'Hm... hm... hmmm...', en: '(a nervous hum)' },
+        { de: 'Mmm... mm... mmm...', en: '(humming to keep calm)' }
+      ],
+      whisper: [
+        { de: 'Mm... mm...', en: '(a barely audible hum)' },
+        { de: 'Hm... hmm... hm...', en: '(a faint, shaky hum)' },
+        { de: 'Mmm... la... mm...', en: '(a thin little tune)' }
+      ]
+    },
+    daytalk: {
+      calm: [
+        { de: 'Ja mei, so is des Lebn.', en: 'Well, such is life.' },
+        { de: 'Wos da Tag ned olles bringt.', en: 'What a day brings along.' },
+        { de: 'Hmm, wia spaad is scho?', en: 'Hmm, how late is it already?' }
+      ],
+      worried: [
+        { de: 'Heid is ma net wohl... gar net wohl.', en: 'I am not well tonight... not well at all.' },
+        { de: 'S is zu staad im Dorf.', en: 'The village is too quiet.' }
+      ],
+      whisper: [
+        { de: 'Hast s aa ghert? Pst...', en: 'Did you hear it too? Shh...' },
+        { de: 'Red leise, d Wänd ham Ohrn.', en: 'Speak softly, walls have ears.' },
+        { de: 'Geh liaba hoam, s is ned guad heid.', en: 'Better go home, it is not good tonight.' },
+        { de: 'Pst... i hob wos gseng, bei da Kirch...', en: 'Shh... I saw something, by the church...' }
+      ]
+    }
+  };
+  Object.keys(BARK_SUBS).forEach(function (k) { SUBS[k] = BARK_SUBS[k]; });
+
+  // Role-flavoured daytalk (calm villagers muttering about their day). 12 per group. {de, en}.
+  const DAYTALK = {
+    farmer: [
+      { de: 'D Ernte werd heuer mager, i sag s da.', en: 'The harvest will be lean this year, I tell you.' },
+      { de: 'Da Weizn steht guad, wenn s net hagelt.', en: 'The wheat stands well, if it does not hail.' },
+      { de: 'Mei Ochs hod scho wieda a Hax liahm.', en: 'My ox has gone lame in the leg again.' },
+      { de: 'Morgn miass i fria raus aufs Fei.', en: 'Tomorrow I must be out in the field early.' },
+      { de: 'Dea Reng kimmt, i spia s in de Knia.', en: 'Rain is coming, I feel it in my knees.' },
+      { de: 'D Kia gebn kaum mehr Milch.', en: 'The cows hardly give any milk now.' },
+      { de: 'Des Heu muaß no drocknan.', en: 'The hay still has to dry.' },
+      { de: 'Da Zehnt drückt mi, da Zehnt.', en: 'The tithe weighs on me, the tithe.' },
+      { de: 'Hob a Wurzn ausgrobn, groß wia a Kopf.', en: 'Dug up a root as big as a head.' },
+      { de: 'Im Wirtshaus gibts heid a frisches Bier.', en: 'There is fresh beer at the tavern tonight.' },
+      { de: 'Mei Kreiz tuat weh vom Mähn.', en: 'My back hurts from mowing.' },
+      { de: 'Da Pfarrer sogt, mia sollns Feld segnen.', en: 'The priest says we should bless the field.' }
+    ],
+    innkeeper: [
+      { de: 'Zwoa Fassl Bier no, dann is Schluss.', en: 'Two more kegs of beer, then that is it.' },
+      { de: 'Wer zoit des Gschirr, wer?', en: 'Who pays for the crockery, who?' },
+      { de: 'D Gäst wern imma durschtiga.', en: 'The guests get thirstier every day.' },
+      { de: 'I miass da Suppn nachwürzn.', en: 'I must season the soup some more.' },
+      { de: 'Mei Kellerin hod d Schlüssel valorn.', en: 'My cellar maid has lost the keys.' },
+      { de: 'Da Wirt schaugt alles, da Wirt hert alles.', en: 'The innkeeper sees all, the innkeeper hears all.' },
+      { de: 'Heid war da Hans scho wieda ohne Geld do.', en: 'Hans was here again without any money today.' },
+      { de: 'Es Schmoiz werd a teia, wirkli.', en: 'Lard is getting dear too, really.' },
+      { de: 'Wenn s so staad bleibt, sperr i bald zua.', en: 'If it stays this quiet I will close soon.' },
+      { de: 'Da Bierdeckl is scho wieda feicht.', en: 'The coaster is damp again already.' },
+      { de: 'Aa a Wirt braucht amoi seine Ruah.', en: 'Even an innkeeper needs his rest sometime.' },
+      { de: 'Da Gockl vom Nachbarn is a Plog.', en: 'The neighbour\'s rooster is a plague.' }
+    ],
+    priest: [
+      { de: 'Herr, erbarme dich unser...', en: 'Lord, have mercy upon us...' },
+      { de: 'D Glockn miassat mal gschmiert wern.', en: 'The bells really need greasing.' },
+      { de: 'D Leit kemma kaum mehr zur Messe.', en: 'The people hardly come to Mass anymore.' },
+      { de: 'Wer d Beicht ned macht, schlaft schlecht.', en: 'Whoever skips confession sleeps badly.' },
+      { de: 'Des Opferstockl is scho wieda leer.', en: 'The alms box is empty again.' },
+      { de: 'Mir wor, i hob wos im Kirchhof gseng.', en: 'I thought I saw something in the churchyard.' },
+      { de: 'Dominus vobiscum... a so a Wetta.', en: 'Dominus vobiscum... what weather.' },
+      { de: 'Da Meßwein werd imma weniga.', en: 'The Mass wine keeps getting less.' },
+      { de: 'Gott prüft uns, gwiss prüft er uns.', en: 'God tests us, surely he tests us.' },
+      { de: 'Mei Rückn, mei Rückn vom vuin Bet.', en: 'My back, my back from all the praying.' },
+      { de: 'Es Dach vo da Kirch tropft scho wieda.', en: 'The church roof is dripping again.' },
+      { de: 'Beten wir fürs Dorf, beten wir.', en: 'Let us pray for the village, let us pray.' }
+    ],
+    drunk: [
+      { de: 'Hicks... no a Schluckerl, no oans...', en: 'Hic... just one more sip, one more...' },
+      { de: 'Wo is mei Kruag hikemma?', en: 'Where did my mug go?' },
+      { de: 'I bin goar ned b-b-b-bsoffn!', en: 'I am not d-d-drunk at all!' },
+      { de: 'Da Mond lacht mi aus, da Mond.', en: 'The moon is laughing at me, the moon.' },
+      { de: 'Wer hod do d Gassn so schief baut?', en: 'Who built the street so crooked?' },
+      { de: 'Oans, zwoa, g\'suffa!', en: 'One, two, down the hatch!' },
+      { de: 'Mei Oide schimpft, mei Oide...', en: 'My wife scolds, my wife...' },
+      { de: 'Hob i no a Münz? Na, koane.', en: 'Have I still a coin? No, none.' },
+      { de: 'Da Wirt schuidet ma no a Bier.', en: 'The innkeeper still owes me a beer.' },
+      { de: 'Lalala... de Nacht is no jung...', en: 'Lalala... the night is still young...' },
+      { de: 'Mir dreht si olles, olles im Kreis.', en: 'Everything is spinning around me.' },
+      { de: 'Prost, du Hund, auf unsa Dorf!', en: 'Cheers, you dog, to our village!' }
+    ],
+    guard: [
+      { de: 'Olles ruhig, olles ruhig.', en: 'All quiet, all quiet.' },
+      { de: 'Mei Hellebarde werd imma schwara.', en: 'My halberd gets heavier all the time.' },
+      { de: 'Wer ko do scho um d Zeit aussi sei?', en: 'Who could be out at this hour?' },
+      { de: 'D Wach is lang, da Wein is kurz.', en: 'The watch is long, the wine is short.' },
+      { de: 'I schau no amoi bei da Mauer noch.', en: 'I will check the wall once more.' },
+      { de: 'Mei Fuaß, mei Fuaß, de Stiefl druckn.', en: 'My foot, my foot, the boots pinch.' },
+      { de: 'Da Hauptmo vaschlaft de Wach wieda.', en: 'The captain sleeps through the watch again.' },
+      { de: 'A Nocht wia de ander, hoff i.', en: 'A night like any other, I hope.' },
+      { de: 'Stehnbleibn! Ah na, nur a Katz.', en: 'Halt! Ah no, only a cat.' },
+      { de: 'Wann wird s endli Morgn?', en: 'When will it finally be morning?' },
+      { de: 'Koa Dieb kimmt an mia vorbei.', en: 'No thief gets past me.' },
+      { de: 'Es Tor is zua, olles bestens.', en: 'The gate is shut, all is well.' }
+    ],
+    gravedigger: [
+      { de: 'Grobn, grobn, nix wia grobn.', en: 'Dig, dig, nothing but digging.' },
+      { de: 'D Erdn is heid wieda stoanhart.', en: 'The earth is rock hard again today.' },
+      { de: 'Mei Schaufe kennt jeden im Dorf.', en: 'My shovel knows everyone in the village.' },
+      { de: 'De Toten red\'n wenigstens ned zruck.', en: 'At least the dead do not talk back.' },
+      { de: 'Oana geht, oana kimmt, so is da Lauf.', en: 'One goes, one comes, such is the way.' },
+      { de: 'Heid nacht hob i wos gscharrt ghert.', en: 'I heard scratching tonight.' },
+      { de: 'Kreiz um Kreiz in da Reih.', en: 'Cross upon cross in a row.' },
+      { de: 'A tiafs Loch, a guads Loch.', en: 'A deep hole, a good hole.' },
+      { de: 'De Friedhofserdn is fett, fett!', en: 'The churchyard soil is rich, rich!' },
+      { de: 'Wer zoit mi fia de Nachtschicht?', en: 'Who pays me for the night shift?' },
+      { de: 'I siech olle, aber olle siechn mi ned.', en: 'I see them all, but nobody sees me.' },
+      { de: 'D Wuazln stengan scho wieda im Weg.', en: 'The roots are in the way again.' }
+    ],
+    elder: [
+      { de: 'Frieha, do war des anders...', en: 'In the old days it was different...' },
+      { de: 'Mei Knia sagt, es werd a Gwitta.', en: 'My knee says a storm is coming.' },
+      { de: 'De Junga hoitn nix mehr aus.', en: 'The young ones can bear nothing anymore.' },
+      { de: 'I hob scho gsehn, wos de ned kenna.', en: 'I have seen things that they cannot imagine.' },
+      { de: 'Mei Gschicht, mei laaange Gschicht...', en: 'My story, my long story...' },
+      { de: 'Heid is a Wedda zum Schlafn.', en: 'It is weather for sleeping.' },
+      { de: 'Wo is mei Stecka, wo is er?', en: 'Where is my stick, where is it?' },
+      { de: 'Aa de Berg ham si veränd\'rt.', en: 'Even the mountains have changed.' },
+      { de: 'Mei Oide, Gott hab sie selig...', en: 'My wife, God rest her soul...' },
+      { de: 'A Gschwoabl is des, nix als Gschwoabl.', en: 'Chatter, that is all it is, only chatter.' },
+      { de: 'Des Dorf hod scho Schlimmers erlebt.', en: 'The village has seen worse.' },
+      { de: 'Mei Rückn is a Wetterfrosch.', en: 'My back is a weather frog.' }
+    ],
+    mother: [
+      { de: 'Wo steckt denn da Bua scho wieda?', en: 'Where is the boy hiding again?' },
+      { de: 'Es Essn werd kolt, kemmts eina!', en: 'The food is getting cold, come in!' },
+      { de: 'Dea Brotteig geht heid ned auf.', en: 'The bread dough will not rise today.' },
+      { de: 'Mei Maxl hod scho wieda a Loch in da Hosn.', en: 'My little Max has a hole in his trousers again.' },
+      { de: 'Wann kimmt da Mo endli hoam?', en: 'When is my husband coming home at last?' },
+      { de: 'Is no a Ei im Stoi, i woaß ned.', en: 'Is there still an egg in the shed, I do not know.' },
+      { de: 'D Wasch muaß no auf d Leinen.', en: 'The washing still has to go on the line.' },
+      { de: 'Schlof guad, mei Schatzl, schlof guad.', en: 'Sleep well, my little treasure, sleep well.' },
+      { de: 'De Nachbarin hod wieda gredt...', en: 'The neighbour woman has been talking again...' },
+      { de: 'Oans fia di, oans fia mi, ois fia d Kinda.', en: 'One for you, one for me, all for the children.' },
+      { de: 'Mei Hend san ganz rau vom Spüln.', en: 'My hands are quite rough from washing up.' },
+      { de: 'Bleib ma ja ned zspat drauß, hearst?', en: 'Do not stay out too late, you hear?' }
+    ],
+    child: [
+      { de: 'Fangas, fangas, du kriagst mi ned!', en: 'Tag, tag, you will not catch me!' },
+      { de: 'I hob an Fruasch gfonga, an groaßn!', en: 'I caught a frog, a big one!' },
+      { de: 'Mama, i hob an Hunga!', en: 'Mama, I am hungry!' },
+      { de: 'Hupf, hupf, hupf, af oam Fuaß...', en: 'Hop, hop, hop, on one foot...' },
+      { de: 'Wer is da Bluadsauger? I ned, du!', en: 'Who is the bloodsucker? Not me, you!' },
+      { de: 'Schau, a Stan, a ganz a schöna!', en: 'Look, a stone, such a pretty one!' },
+      { de: 'Dea Hund hod mi gschleckt, hihi!', en: 'The dog licked me, hehe!' },
+      { de: 'I mog ned ins Bett, i mog ned!', en: 'I do not want to go to bed, I do not!' },
+      { de: 'Eins, zwei, drei, vier, eckstein...', en: 'One, two, three, four, cornerstone...' },
+      { de: 'Mei Kuchl, wer hod mei Kuchl gnumma?', en: 'My cake, who took my cake?' },
+      { de: 'Da Pfarrer hod a lustige Nosn.', en: 'The priest has a funny nose.' },
+      { de: 'Wann is Weihnachtn, wann denn?', en: 'When is Christmas, when?' }
+    ],
+    villager: [
+      { de: 'Da Wind is heid gscheit kolt.', en: 'The wind is awfully cold today.' },
+      { de: 'Des Brot is wieda teia wordn.', en: 'Bread has got dear again.' },
+      { de: 'Hast ghert, wos da Müller gsogt hod?', en: 'Did you hear what the miller said?' },
+      { de: 'Da Pfarrer predigt a bissl lang.', en: 'The priest preaches a bit long.' },
+      { de: 'Heid is a guada Tag zum Ausruhn.', en: 'Today is a good day for resting.' },
+      { de: 'Mei Hax tuat weh, de Wetterlag...', en: 'My leg hurts, the weather...' },
+      { de: 'Wirt, a Bier, bitte, a koids!', en: 'Innkeeper, a beer, please, a cold one!' },
+      { de: 'Da Nachbar hod wieda a neis Schwein.', en: 'The neighbour has a new pig again.' },
+      { de: 'Oiso, i muaß weida, d Oawat wart.', en: 'Well, I must get on, work is waiting.' },
+      { de: 'Hast de Gschicht vom Gspenst ghert?', en: 'Have you heard the ghost story?' },
+      { de: 'Mei, is des a Wedda, mei, mei.', en: 'My, what weather, my, my.' },
+      { de: 'Da Brunna is wieda verstopft.', en: 'The well is clogged again.' }
+    ]
+  };
+  const DAYTALK_GROUPS = Object.keys(DAYTALK);
+
+  /** Daytalk group for a role: farmer|innkeeper|priest|drunk|guard|gravedigger|elder|mother|child, else 'villager'. */
+  function groupOf(role) {
+    const r = String(role || '').toLowerCase();
+    if (DAYTALK[r]) return r;
+    if (/inn|regular|barkeep|tavern|baker/.test(r)) return 'innkeeper';
+    if (/priest|monk|nun|sexton/.test(r)) return 'priest';
+    if (/drunk/.test(r)) return 'drunk';
+    if (/guard|watch|soldier/.test(r)) return 'guard';
+    if (/grave|undertaker/.test(r)) return 'gravedigger';
+    if (/elder|old|grand/.test(r)) return 'elder';
+    if (/mother|wife|woman|maid/.test(r)) return 'mother';
+    if (/child|kid|boy|girl/.test(r)) return 'child';
+    if (/farm|herd|shepherd|miller/.test(r)) return 'farmer';
+    return 'villager';
+  }
+
   /**
    * V5 subtitle for a spoken line: {de, en}, pure and deterministic. Uses the same seed/kind/mood as line() / the played speech.
    * mood whisper -> whisper table, worried -> worried table, anything else (calm, argue) -> calm table.
    * @param {number|string} seed
    * @param {string} kind chat|question|argue|laugh|murmur|greet|startle
    * @param {string} [mood] calm|whisper|worried|argue
+   * @param {string} [role] daytalk only: a role or group; picks that group's role-flavoured pool (calm / worried tone)
    * @returns {{de: string, en: string}}
    */
-  function subtitle(seed, kind, mood) {
+  function subtitle(seed, kind, mood, role) {
     const k = SUBS[kind] ? kind : 'chat';
     const tone = mood === 'whisper' ? 'whisper' : mood === 'worried' ? 'worried' : 'calm';
-    const list = SUBS[k][tone];
+    let list = SUBS[k][tone];
+    if (k === 'daytalk' && role !== undefined && role !== null && tone === 'calm') list = DAYTALK[groupOf(role)];
     const e = list[hashSeed(seed) % list.length];
     return { de: e.de, en: e.en };
   }
@@ -267,6 +567,62 @@
     if (k === 'startle') {
       out.push(syl(rng() < 0.5 ? 'oa' : 'oe', r3(0.14 + rng() * 0.06), r3(1.35 + rng() * 0.2), r3(0.05)));
       if (rng() < 0.6) out.push(syl('sch', r3(0.1 + rng() * 0.05), r3(1.2 + rng() * 0.1), r3(0.03)));
+      return out;
+    }
+    if (k === 'notice') {
+      // gasp then "Wer da?"
+      out.push(syl(rng() < 0.5 ? 'oa' : 'oe', r3(0.1 + rng() * 0.05), r3(1.3 + rng() * 0.15), r3(0.06)));
+      out.push(syl('wo', r3(0.12 + rng() * 0.04), wander(), r3(0.02)));
+      out.push(syl('da', r3(0.14 + rng() * 0.05), r3(1.2 + rng() * 0.25), r3(0.04)));
+      if (rng() < 0.5) out.push(syl('ja', r3(0.12), r3(1.1 + rng() * 0.2), r3(0.04)));
+      return out;
+    }
+    if (k === 'struggle') {
+      // muffled cries: short, pressed, mostly humming syllables
+      const n = 3 + Math.floor(rng() * 4);
+      for (let i = 0; i < n; i++) {
+        out.push(syl(pick(rng, ['mo', 'gu', 'rr', 'mo']), r3(0.1 + rng() * 0.1), r3(1.15 + rng() * 0.3), r3(0.03 + rng() * 0.07)));
+      }
+      return out;
+    }
+    if (k === 'flee') {
+      // shouts for help: loud, high, rapid
+      const n = 3 + Math.floor(rng() * 3);
+      for (let i = 0; i < n; i++) {
+        out.push(syl(pick(rng, ['oa', 'ha', 'wo', 'oe', 'da']), r3(0.13 + rng() * 0.07), r3(1.3 + rng() * 0.25), r3(0.03 + rng() * 0.04)));
+      }
+      return out;
+    }
+    if (k === 'cower') {
+      // whimper / prayer: soft rising-falling, long gaps
+      const n = 3 + Math.floor(rng() * 3);
+      for (let i = 0; i < n; i++) {
+        out.push(syl(pick(rng, ['ue', 'oe', 'mo', 'bi']), r3(0.16 + rng() * 0.1), r3(1.25 - i * 0.07 + (rng() - 0.5) * 0.06), r3(0.12 + rng() * 0.16)));
+      }
+      return out;
+    }
+    if (k === 'relief') {
+      // a long exhale and a mutter
+      out.push(syl('ha', r3(0.32 + rng() * 0.12), r3(1.1), r3(0.12)));
+      out.push(syl(rng() < 0.5 ? 'oa' : 'ue', r3(0.24 + rng() * 0.1), r3(0.92 + rng() * 0.05), r3(0.1)));
+      if (rng() < 0.5) out.push(syl('mo', r3(0.18), r3(0.88), r3(0.05)));
+      return out;
+    }
+    if (k === 'alarm') {
+      // one long shocked cry, then hurried shouting
+      out.push(syl('oa', r3(0.26 + rng() * 0.1), r3(1.5 + rng() * 0.15), r3(0.08)));
+      const n = 2 + Math.floor(rng() * 3);
+      for (let i = 0; i < n; i++) out.push(syl(pick(rng, ['sch', 'ha', 'oe', 'wo']), r3(0.12 + rng() * 0.05), r3(1.3 + rng() * 0.2), r3(0.04)));
+      return out;
+    }
+    if (k === 'hum') {
+      // a wandering tune
+      const n = 4 + Math.floor(rng() * 4);
+      let p = 1;
+      for (let i = 0; i < n; i++) {
+        p = Math.max(0.8, Math.min(1.25, p + (rng() - 0.5) * 0.22));
+        out.push(syl(rng() < 0.7 ? 'mo' : 'na', r3(0.26 + rng() * 0.14), r3(p), r3(0.03 + rng() * 0.05)));
+      }
       return out;
     }
     if (k === 'murmur') {
@@ -346,7 +702,7 @@
     };
   }
 
-  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor, subtitle, SUBS };
+  const VoiceData = { VOWELS, CONSONANTS, PRESETS, MOODS, SYLLABLES, KINDS, hashSeed, prng, line, lineLength, forPerson, presetFor, subtitle, SUBS, DAYTALK, DAYTALK_GROUPS, groupOf, FEAR_KINDS };
 
   VCS.VoiceData = VoiceData;
   if (typeof module !== 'undefined' && module.exports) module.exports = VoiceData;
