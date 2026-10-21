@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound lab</title>
+<style>
+  body { background: #101216; color: #d8dde6; font: 15px/1.4 system-ui, sans-serif; margin: 0; padding: 16px; max-width: 760px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 22px 0 6px; color: #9fb4d8; }
+  p { margin: 4px 0 8px; color: #9aa3b2; }
+  button { background: #222834; color: #e6ebf5; border: 1px solid #3a4457; border-radius: 6px; padding: 8px 12px; margin: 3px 4px 3px 0; font: inherit; cursor: pointer; }
+  button:hover { background: #2c3546; }
+  button.on { background: #6b3b1e; border-color: #d98b4a; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; }
+  label { margin-right: 14px; }
+  #vol { width: 160px; }
+</style>
+</head>
+<body>
+<h1>Sound lab</h1>
+<p>Every sound in the game is synthesised in <code>js/audio.js</code> (no sound files). Click to play one; toggle the loops to hear what a walking villager sounds like.</p>
+<div class="row"><label>Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.7"></label><span id="ctxState"></span></div>
+
+<h2>Villager walking (loops at the real step rate)</h2>
+<p>Steps per second = speed × 9 rad/cell ÷ π (about 3.4/s at a walk). Start one, then add the extras to find the culprit.</p>
+<div class="row" id="walks"></div>
+<div class="row" id="extras"></div>
+
+<h2>One-shot sounds (the game's <code>KINDS</code>)</h2>
+<div class="row" id="kinds"></div>
+
+<h2>Echo voices (what comes back after a ping)</h2>
+<div class="row" id="echoes"></div>
+
+<h2>Other</h2>
+<div class="row" id="others"></div>
+
+<script src="../js/log.js"></script>
+<script src="../js/data/sounds.js"></script>
+<script src="../js/audio.js"></script>
+<script>
+(function () {
+  var VCS = window.VCS, A = VCS.Audio, SD = VCS.SoundData;
+  var a = A.create({ volume: 0.7 });
+  function go() { A.unlock(a); document.getElementById('ctxState').textContent = a.ctx ? ' audio: ' + a.ctx.state : ''; }
+  document.getElementById('vol').addEventListener('input', function (e) { A.setVolume(a, Number(e.target.value)); });
+  document.addEventListener('click', go);
+
+  function btn(parent, label, fn) {
+    var b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', function () { go(); fn(b); });
+    document.getElementById(parent).appendChild(b);
+    return b;
+  }
+
+  var KINDS = ['step', 'personStep', 'doorOpen', 'doorClose', 'creak', 'scream', 'startle', 'interact', 'chime', 'heartbeat', 'feed', 'gulp', 'struggle', 'clatter', 'scuffle', 'gasp', 'miss', 'yawn', 'shriek', 'mist', 'still', 'gift', 'overflow', 'whimper', 'dog', 'bell'];
+  KINDS.forEach(function (k) { btn('kinds', k, function () { A.play(a, k, { gain: 0.6 }); }); });
+
+  Object.keys(A.ECHO_VOICES).forEach(function (v) {
+    btn('echoes', 'echo: ' + v, function () { A.echo(a, 0, 0.7, 0, { voice: v }); });
+  });
+
+  btn('others', 'ping click', function () { A.ping(a); });
+  btn('others', 'ping bip (old)', function () { A.setPingStyle(a, true); A.ping(a); A.setPingStyle(a, false); });
+  btn('others', 'breath', function () { A.breath(a, { dist: 1 }); });
+  btn('others', 'villager heartbeat (new, 65 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('others', 'villager heartbeat (fleeing, 130 bpm)', function () { A.heartbeat(a, { dist: 1, bpm: 130 }); });
+  btn('others', 'wind bed', function () { A.ambience(a, { kind: 'outdoor' }); });
+  btn('others', 'stop all', function () { A.stopAll(a); });
+
+  // ---- walking loops ----
+  var timers = {};
+  var extra = { echo: null, breath: null, heart: null };
+  var gaitPace = { walk: 1, sneak: 0.8, run: 1.25 };
+  var stepMs = function (gait) { return 1000 / (1.2 * gaitPace[gait] * 9 / Math.PI * (gait === 'run' ? 1.6 : gait === 'sneak' ? 0.6 : 1)); };
+  var lv = SD.levels.personStep;
+  var foot = 0;
+  function walkLoop(gait, mat, b) {
+    var key = gait + mat;
+    if (timers[key]) { clearInterval(timers[key]); timers[key] = null; b.classList.remove('on'); return; }
+    b.classList.add('on');
+    timers[key] = setInterval(function () {
+      var sc = SD.stepScale(gait, mat, gaitPace[gait]);
+      A.play(a, 'personStep', { gain: Math.min(1, lv.gain * sc.gain), material: mat, pan: 0, foot: (foot++ & 1) });
+    }, stepMs(gait));
+  }
+  ['walk', 'sneak', 'run'].forEach(function (g) {
+    ['grass', 'wood', 'stone'].forEach(function (m) {
+      var b = btn('walks', g + ' on ' + m + ' (' + (1000 / stepMs(g)).toFixed(1) + '/s)', function (bb) { walkLoop(g, m, bb); });
+    });
+  });
+  function toggle(name, ms, fn) {
+    btn('extras', '+ ' + name, function (b) {
+      if (extra[name]) { clearInterval(extra[name]); extra[name] = null; b.classList.remove('on'); return; }
+      b.classList.add('on');
+      extra[name] = setInterval(fn, ms);
+    });
+  }
+  toggle('echo', 800, function () { A.echo(a, 0.1, 0.5, 0, { voice: 'person' }); });
+  toggle('breath', 2600, function () { A.breath(a, { dist: 1 }); });
+  toggle('heart', 920, function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
+  btn('extras', 'stop everything', function () {
+    Object.keys(timers).forEach(function (k) { if (timers[k]) clearInterval(timers[k]); timers[k] = null; });
+    Object.keys(extra).forEach(function (k) { if (extra[k]) clearInterval(extra[k]); extra[k] = null; });
+    document.querySelectorAll('button.on').forEach(function (x) { x.classList.remove('on'); });
+    A.stopAll(a);
+  });
+})();
+</script>
+</body>
+</html>
