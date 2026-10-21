@@ -48,9 +48,9 @@
     // Click ping: ~8 ms, 3.2 kHz (the old bip stays as the pingBip setting).
     ping: { clickMs: 8, clickHz: 3200 },
     // Floor bounce: every ping returns a short floor echo (eye height eyeM), shaped by the floor material; absDb = extra dB per unit alpha.
-    floor: { eyeM: 1.6, delay: 0.035, db: -12, absDb: 20, minAmp: 0.06 },
+    floor: { eyeM: 1.6, delay: 0.035, db: -16, absDb: 20, minAmp: 0.06 },
     // Ceiling bounce (v0.11.9): indoors every ping also returns off the ceiling, delayed like the floor bounce scaled by the gap above the head.
-    ceil: { minGap: 0.012, defaultH: 3, defaultMat: 'stone', db: -12, absDb: 20, minAmp: 0.06 },
+    ceil: { minGap: 0.012, defaultH: 3, defaultMat: 'stone', db: -16, absDb: 20, minAmp: 0.06 },
     ceilMat: {
       crypt: 'stone', mausoleum: 'stone', cellar: 'stone', church: 'roughStone',
       tavern: 'wood', house1: 'wood', house2: 'wood', barn: 'wood', shed: 'wood'
@@ -59,7 +59,7 @@
     propMat: { barrel: 'wood', bench: 'wood', chair: 'wood', table: 'wood', gravestone: 'stone', brazier: 'iron', well: 'roughStone' },
     propEcho: { max: 3, minAmp: 0.06 },
     // Enclosure: per-ping reverb send multiplier (see A.wetFor).
-    wet: { min: 0.1, max: 1.5, gain: 0.95, absorb: 0.8, scatter: 0.03, scatterMax: 8, base: 0 }
+    wet: { min: 0.1, max: 1.5, gain: 0.75, absorb: 0.8, scatter: 0.03, scatterMax: 8, base: 0 }
   };
   const EPS = 1e-9;
   function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }

@@ -31,7 +31,7 @@ test('propAmp: nearer props are louder, far ones vanish', () => {
 test('wetFor: enclosed rooms send more reverb than open ground; absorbers and props shift it; always clamped', () => {
   const closed = A.wetFor(1, 0.03, 0, true);
   const open = A.wetFor(0, 0, 0, false);
-  assert.ok(closed > 0.8 && closed < 1.2 && open < 0.3 && closed > open, 'a closed stone room is about the static send');
+  assert.ok(closed > 0.6 && closed < 1.2 && open < 0.3 && closed > open, 'a closed stone room is about the static send');
   assert.ok(A.wetFor(1, 0.6, 0, true) < closed, 'grass-like absorption lowers it');
   assert.ok(A.wetFor(0.5, 0.03, 6, true) > A.wetFor(0.5, 0.03, 0, true), 'props scatter more');
   assert.ok(A.wetFor(1, 0, 99, true) <= A.wet.max && A.wetFor(0, 1, 0, false) >= A.wet.min);
