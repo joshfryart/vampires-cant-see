@@ -21,6 +21,7 @@
 <h1>Sound lab</h1>
 <p>Every sound in the game is synthesised in <code>js/audio.js</code> (no sound files). Click to play one; toggle the loops to hear what a walking villager sounds like.</p>
 <div class="row"><label>Volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.7"></label><span id="ctxState"></span></div>
+<div class="row"><label>Person echo level <input id="pel" type="range" min="0" max="0.7" step="0.005" value="0.014"> <output id="pelOut">0.014</output> (game at 2 cells: 0.479 x 0.03 = 0.014)</label></div>
 
 <h2>Villager walking (loops at the real step rate)</h2>
 <p>Steps per second = speed × 9 rad/cell ÷ π (about 3.4/s at a walk). Start one, then add the extras to find the culprit.</p>
@@ -142,7 +143,7 @@
   }
 
   const Log = {
-    VERSION: '0.11.2',
+    VERSION: '0.11.3',
     LEVELS: LEVELS,
 
     /** Set the minimum level by name (DEBUG/INFO/WARN/ERROR). */
@@ -1806,6 +1807,8 @@
   function go() { A.unlock(a); document.getElementById('ctxState').textContent = a.ctx ? ' audio: ' + a.ctx.state : ''; }
   document.getElementById('vol').addEventListener('input', function (e) { A.setVolume(a, Number(e.target.value)); });
   document.addEventListener('click', go);
+  var pel = function () { return Number(document.getElementById('pel').value); };
+  document.getElementById('pel').addEventListener('input', function () { document.getElementById('pelOut').textContent = pel().toFixed(3); });
 
   function btn(parent, label, fn) {
     var b = document.createElement('button');
@@ -1819,7 +1822,7 @@
   KINDS.forEach(function (k) { btn('kinds', k, function () { A.play(a, k, { gain: 0.6 }); }); });
 
   Object.keys(A.ECHO_VOICES).forEach(function (v) {
-    btn('echoes', 'echo: ' + v, function () { A.echo(a, 0, 0.7, 0, { voice: v }); });
+    btn('echoes', 'echo: ' + v + (v === 'person' ? ' (level slider)' : ''), function () { A.echo(a, 0, v === 'person' ? pel() : 0.7, 0, { voice: v }); });
   });
 
   btn('others', 'ping click', function () { A.ping(a); });
@@ -1858,7 +1861,7 @@
       extra[name] = setInterval(fn, ms);
     });
   }
-  toggle('echo', 800, function () { A.echo(a, 0.1, 0.5, 0, { voice: 'person' }); });
+  toggle('echo', 800, function () { A.echo(a, 0.1, pel(), 0, { voice: 'person' }); });
   toggle('breath', 2600, function () { A.breath(a, { dist: 1 }); });
   toggle('heart', 920, function () { A.heartbeat(a, { dist: 1, bpm: 65 }); });
   btn('extras', 'stop everything', function () {
