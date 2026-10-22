@@ -1,0 +1,1630 @@
+{
+ "VOWELS": {
+  "a": [
+   700,
+   1200,
+   2500
+  ],
+  "e": [
+   450,
+   1900,
+   2600
+  ],
+  "i": [
+   300,
+   2200,
+   3000
+  ],
+  "o": [
+   450,
+   800,
+   2500
+  ],
+  "u": [
+   320,
+   700,
+   2400
+  ],
+  "oa": [
+   550,
+   950,
+   2500
+  ],
+  "ue": [
+   300,
+   1700,
+   2300
+  ],
+  "oe": [
+   430,
+   1450,
+   2400
+  ]
+ },
+ "CONSONANTS": {
+  "": {
+   "hz": 0,
+   "noise": 0,
+   "rolled": false
+  },
+  "sch": {
+   "hz": 3200,
+   "noise": 0.55,
+   "rolled": false
+  },
+  "s": {
+   "hz": 5500,
+   "noise": 0.45,
+   "rolled": false
+  },
+  "r": {
+   "hz": 600,
+   "noise": 0.15,
+   "rolled": true
+  },
+  "j": {
+   "hz": 2200,
+   "noise": 0.1,
+   "rolled": false
+  },
+  "n": {
+   "hz": 400,
+   "noise": 0.05,
+   "rolled": false
+  },
+  "m": {
+   "hz": 300,
+   "noise": 0.05,
+   "rolled": false
+  },
+  "h": {
+   "hz": 1800,
+   "noise": 0.5,
+   "rolled": false
+  },
+  "g": {
+   "hz": 1500,
+   "noise": 0.2,
+   "rolled": false
+  },
+  "b": {
+   "hz": 800,
+   "noise": 0.15,
+   "rolled": false
+  },
+  "d": {
+   "hz": 2000,
+   "noise": 0.2,
+   "rolled": false
+  },
+  "k": {
+   "hz": 2600,
+   "noise": 0.35,
+   "rolled": false
+  },
+  "w": {
+   "hz": 700,
+   "noise": 0.05,
+   "rolled": false
+  }
+ },
+ "PRESETS": {
+  "man": {
+   "name": "man",
+   "pitch": 105,
+   "speed": 1,
+   "wobble": 0.1,
+   "breath": 0.1,
+   "formantMul": 1
+  },
+  "woman": {
+   "name": "woman",
+   "pitch": 205,
+   "speed": 1.05,
+   "wobble": 0.12,
+   "breath": 0.14,
+   "formantMul": 1.17
+  },
+  "elder": {
+   "name": "elder",
+   "pitch": 118,
+   "speed": 0.78,
+   "wobble": 0.3,
+   "breath": 0.28,
+   "formantMul": 0.97
+  },
+  "child": {
+   "name": "child",
+   "pitch": 290,
+   "speed": 1.2,
+   "wobble": 0.14,
+   "breath": 0.1,
+   "formantMul": 1.35
+  }
+ },
+ "MOODS": {
+  "calm": {
+   "speed": 1,
+   "gain": 1,
+   "breath": 0,
+   "pitch": 1,
+   "voiced": 1
+  },
+  "whisper": {
+   "speed": 0.9,
+   "gain": 0.45,
+   "breath": 0.6,
+   "pitch": 1,
+   "voiced": 0.12
+  },
+  "worried": {
+   "speed": 1.1,
+   "gain": 0.8,
+   "breath": 0.15,
+   "pitch": 1.08,
+   "voiced": 1
+  },
+  "argue": {
+   "speed": 1.25,
+   "gain": 1.35,
+   "breath": 0.05,
+   "pitch": 1.05,
+   "voiced": 1
+  },
+  "call": {
+   "speed": 0.9,
+   "gain": 1.3,
+   "breath": 0.02,
+   "pitch": 0.97,
+   "voiced": 1
+  }
+ },
+ "SYLLABLES": {
+  "oa": {
+   "vowel": "oa",
+   "consonant": "",
+   "dur": 0.2
+  },
+  "ue": {
+   "vowel": "ue",
+   "consonant": "",
+   "dur": 0.17
+  },
+  "oe": {
+   "vowel": "oe",
+   "consonant": "",
+   "dur": 0.17
+  },
+  "sch": {
+   "vowel": "u",
+   "consonant": "sch",
+   "dur": 0.16
+  },
+  "rr": {
+   "vowel": "o",
+   "consonant": "r",
+   "dur": 0.2
+  },
+  "ja": {
+   "vowel": "a",
+   "consonant": "j",
+   "dur": 0.15
+  },
+  "na": {
+   "vowel": "a",
+   "consonant": "n",
+   "dur": 0.14
+  },
+  "ser": {
+   "vowel": "e",
+   "consonant": "s",
+   "dur": 0.14
+  },
+  "vus": {
+   "vowel": "u",
+   "consonant": "s",
+   "dur": 0.2
+  },
+  "ha": {
+   "vowel": "a",
+   "consonant": "h",
+   "dur": 0.13
+  },
+  "mo": {
+   "vowel": "o",
+   "consonant": "m",
+   "dur": 0.16
+  },
+  "gu": {
+   "vowel": "u",
+   "consonant": "g",
+   "dur": 0.15
+  },
+  "bi": {
+   "vowel": "i",
+   "consonant": "b",
+   "dur": 0.12
+  },
+  "da": {
+   "vowel": "a",
+   "consonant": "d",
+   "dur": 0.13
+  },
+  "wo": {
+   "vowel": "o",
+   "consonant": "w",
+   "dur": 0.15
+  },
+  "ke": {
+   "vowel": "e",
+   "consonant": "k",
+   "dur": 0.12
+  }
+ },
+ "KINDS": [
+  "chat",
+  "question",
+  "argue",
+  "laugh",
+  "murmur",
+  "greet",
+  "startle",
+  "notice",
+  "struggle",
+  "flee",
+  "cower",
+  "relief",
+  "alarm",
+  "daytalk",
+  "hum",
+  "halt",
+  "guardcall"
+ ],
+ "SUBS": {
+  "chat": {
+   "calm": [
+    {
+     "de": "Heid is a guada Obend, gell?",
+     "en": "Good evening tonight, isn't it?"
+    },
+    {
+     "de": "Da Brunna host scho gseng? Staubi is er.",
+     "en": "Have you seen the well? Dusty, it is."
+    },
+    {
+     "de": "Mei Oide sagt, s Brot werd teia.",
+     "en": "My wife says bread is getting dear."
+    },
+    {
+     "de": "Morgn miass ma fria auf, Hans.",
+     "en": "Tomorrow we must rise early, Hans."
+    },
+    {
+     "de": "Nix is los, nur da Wind.",
+     "en": "Nothing's going on, only the wind."
+    }
+   ],
+   "worried": [
+    {
+     "de": "Host des ghert? Draußn hod si wos grührt.",
+     "en": "Did you hear that? Something stirred outside."
+    },
+    {
+     "de": "I mog net, dass d Kerzn so flackert.",
+     "en": "I don't like how the candle flickers."
+    },
+    {
+     "de": "Schliaß d Fensta liaba zua.",
+     "en": "Better shut the windows."
+    },
+    {
+     "de": "Seit gestern is mir net wohl.",
+     "en": "I've felt uneasy since yesterday."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Pst. Is wer do?",
+     "en": "Shh. Is someone there?"
+    },
+    {
+     "de": "Roar di net, bleib staad.",
+     "en": "Don't stir, keep quiet."
+    },
+    {
+     "de": "Des san d Bluadsauger, i sag da s.",
+     "en": "It's the bloodsuckers, I tell you."
+    }
+   ]
+  },
+  "question": {
+   "calm": [
+    {
+     "de": "Hast a Schmoiz fürs Brot?",
+     "en": "Have you any lard for the bread?"
+    },
+    {
+     "de": "Wo is denn da Pfarrer heid?",
+     "en": "Where is the priest tonight?"
+    },
+    {
+     "de": "Kimmst no auf a Bier eina?",
+     "en": "Coming in for one more beer?"
+    },
+    {
+     "de": "Wia spaad is denn scho?",
+     "en": "How late is it already?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Wos woar des fia a Gschrei?",
+     "en": "What kind of scream was that?"
+    },
+    {
+     "de": "Host d Tür aa guad versperrt?",
+     "en": "Did you lock the door properly?"
+    },
+    {
+     "de": "Wo is da Bua hikemma?",
+     "en": "Where did the boy go?"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Siagst du des aa?",
+     "en": "Do you see that too?"
+    },
+    {
+     "de": "Wer schleicht do ume?",
+     "en": "Who is sneaking about?"
+    }
+   ]
+  },
+  "argue": {
+   "calm": [
+    {
+     "de": "Du Depp, des is mei Platz!",
+     "en": "You fool, that is my seat!"
+    },
+    {
+     "de": "Gschwoabl, hoit dei Goschn!",
+     "en": "Blabber, hold your tongue!"
+    },
+    {
+     "de": "Zoin soist, du Gizkragn!",
+     "en": "You will pay, you skinflint!"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Des is alles dei Schuid!",
+     "en": "This is all your fault!"
+    },
+    {
+     "de": "Hätt i auf mei Muatta ghört!",
+     "en": "I should have listened to my mother!"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Sei staad, sunst hert ma uns!",
+     "en": "Be quiet, or they'll hear us!"
+    }
+   ]
+  },
+  "laugh": {
+   "calm": [
+    {
+     "de": "Hahaha, des is guad!",
+     "en": "Hahaha, that's good!"
+    },
+    {
+     "de": "Ha ha, du Hamml!",
+     "en": "Ha ha, you rascal!"
+    },
+    {
+     "de": "Hihi, na wirkli?",
+     "en": "Hehe, no, really?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Ha... ja, ja, freili.",
+     "en": "Ha... yes, yes, of course."
+    },
+    {
+     "de": "Hehe, sei froh, dass nix passiert is.",
+     "en": "Hehe, be glad nothing happened."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Hihi... pst.",
+     "en": "Hehe... shh."
+    }
+   ]
+  },
+  "murmur": {
+   "calm": [
+    {
+     "de": "Mhm... jo, jo, mei...",
+     "en": "Mhm... yes, yes, well..."
+    },
+    {
+     "de": "Oiso, oiso, wia ma s nimmt...",
+     "en": "Well, well, as one takes it..."
+    }
+   ],
+   "worried": [
+    {
+     "de": "Heiliger Gott, bewahr uns...",
+     "en": "Holy God, protect us..."
+    },
+    {
+     "de": "Es wird scho wieda, es wird scho...",
+     "en": "It will be all right, it will..."
+    },
+    {
+     "de": "Wenn s nur da Morgn war...",
+     "en": "If only it were morning..."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Gott schütz uns, Gott schütz uns...",
+     "en": "God shield us, God shield us..."
+    },
+    {
+     "de": "Ned umschaun... ned umschaun...",
+     "en": "Don't look round... don't look round..."
+    },
+    {
+     "de": "Es is do... i spier s...",
+     "en": "It is here... I feel it..."
+    }
+   ]
+  },
+  "greet": {
+   "calm": [
+    {
+     "de": "Servus, wia geht s da?",
+     "en": "Hello, how are you?"
+    },
+    {
+     "de": "Griaß di, Nachbar!",
+     "en": "Greetings, neighbour!"
+    },
+    {
+     "de": "Servus, na, ja, du aa do?",
+     "en": "Hello, well, you here too?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Servus... host wos gseng?",
+     "en": "Hello... have you seen anything?"
+    },
+    {
+     "de": "Griaß di, bleib liaba herinnen.",
+     "en": "Greetings, better stay inside."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Servus, pst, leise.",
+     "en": "Hello, shh, quietly."
+    }
+   ]
+  },
+  "startle": {
+   "calm": [
+    {
+     "de": "Jessas! Hob i mi derschrock!",
+     "en": "Jesus! You gave me a fright!"
+    },
+    {
+     "de": "Oha! Wos woar des?",
+     "en": "Whoa! What was that?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Jessas Maria, da is wer!",
+     "en": "Jesus Mary, someone's there!"
+    },
+    {
+     "de": "Oa! Schaug do hi!",
+     "en": "Oh! Look over there!"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Oh... nur ned schrein.",
+     "en": "Oh... just don't scream."
+    }
+   ]
+  },
+  "notice": {
+   "calm": [
+    {
+     "de": "Wer da?",
+     "en": "Who is there?"
+    },
+    {
+     "de": "Da is wer!",
+     "en": "Someone is there!"
+    },
+    {
+     "de": "Hoit! Wer geht do?",
+     "en": "Halt! Who goes there?"
+    },
+    {
+     "de": "Hob i do wos gseng?",
+     "en": "Did I just see something?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Jessas, da steht oana!",
+     "en": "Jesus, someone is standing there!"
+    },
+    {
+     "de": "Des is koa Mensch ned!",
+     "en": "That is no human!"
+    },
+    {
+     "de": "Bleib staad, wer bist du?",
+     "en": "Stay still, who are you?"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Pst... do drent...",
+     "en": "Shh... over there..."
+    },
+    {
+     "de": "I siech wen... bleib staad...",
+     "en": "I see someone... keep still..."
+    }
+   ]
+  },
+  "struggle": {
+   "calm": [
+    {
+     "de": "Mmpf! Loss mi aus!",
+     "en": "Mmph! Let me go!"
+    },
+    {
+     "de": "Hmmf... naa... bitt...",
+     "en": "Mmm... no... please..."
+    },
+    {
+     "de": "Mmmh! Hüf...!",
+     "en": "Mmh! Help...!"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Naa, naa, des ned...",
+     "en": "No, no, not that..."
+    },
+    {
+     "de": "Mmpf... Muatta Gottes...",
+     "en": "Mmph... Mother of God..."
+    },
+    {
+     "de": "Lass mi... bitt... lass mi...",
+     "en": "Let me... please... let me..."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Hmm... hmm... naa...",
+     "en": "Hmm... hmm... no..."
+    },
+    {
+     "de": "...bitt...",
+     "en": "...please..."
+    }
+   ]
+  },
+  "halt": {
+   "calm": [
+    {
+     "de": "Hoit! Wer da?",
+     "en": "Halt! Who is there?"
+    },
+    {
+     "de": "Stehnbleibn! Im Nama vom Vogt!",
+     "en": "Stand still! In the bailiff's name!"
+    },
+    {
+     "de": "Wer da? Gib Antwort!",
+     "en": "Who goes there? Answer!"
+    },
+    {
+     "de": "Alarm! Zu de Waffn!",
+     "en": "Alarm! To arms!"
+    },
+    {
+     "de": "Hoit, oder i stich zua!",
+     "en": "Halt, or I will strike!"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Hoit! Da is wer! Wer da?",
+     "en": "Halt! Someone is there! Who goes?"
+    },
+    {
+     "de": "Alarm! A Bluadsauger!",
+     "en": "Alarm! A bloodsucker!"
+    },
+    {
+     "de": "Wachn! Zu mir! Wachn!",
+     "en": "Guards! To me! Guards!"
+    },
+    {
+     "de": "Stehnbleibn, du Unhoid!",
+     "en": "Stand still, you fiend!"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Wer da? Leis...",
+     "en": "Who is there? Quietly..."
+    },
+    {
+     "de": "Hoit... i hob di ghert...",
+     "en": "Halt... I heard you..."
+    }
+   ]
+  },
+  "guardcall": {
+   "calm": [
+    {
+     "de": "Wer da? ... Olles ruhig!",
+     "en": "Who is there? ... All quiet!"
+    },
+    {
+     "de": "Olles ruhig auf da Mauer!",
+     "en": "All quiet on the wall!"
+    },
+    {
+     "de": "Ois ruhig, ois ruhig!",
+     "en": "All calm, all calm!"
+    },
+    {
+     "de": "Es hod zehne gschlogn, und olles ruhig!",
+     "en": "Ten has struck, and all is quiet!"
+    },
+    {
+     "de": "Zwöfe is s, und olles ruhig!",
+     "en": "It is twelve, and all is quiet!"
+    },
+    {
+     "de": "Oans is s, und olles ruhig!",
+     "en": "It is one, and all is quiet!"
+    },
+    {
+     "de": "Drei Uhr, und olles ruhig!",
+     "en": "Three o'clock, and all is quiet!"
+    },
+    {
+     "de": "Hoit! ... Ah, nur da Wind.",
+     "en": "Halt! ... Ah, only the wind."
+    }
+   ],
+   "worried": [
+    {
+     "de": "Wer da? Zoag di!",
+     "en": "Who is there? Show yourself!"
+    },
+    {
+     "de": "Do hod si wos grührt... Wer da?",
+     "en": "Something stirred... Who is there?"
+    },
+    {
+     "de": "Seids wachsam, es is net ruhig!",
+     "en": "Stay alert, it is not quiet!"
+    },
+    {
+     "de": "Hoit! Wer schleicht do rum?",
+     "en": "Halt! Who is sneaking about?"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Pst... olles ruhig...",
+     "en": "Shh... all quiet..."
+    },
+    {
+     "de": "Wer da...? Leis...",
+     "en": "Who is there...? Quietly..."
+    }
+   ]
+  },
+  "flee": {
+   "calm": [
+    {
+     "de": "Hüfe! Hüfe!",
+     "en": "Help! Help!"
+    },
+    {
+     "de": "Lauft! Lauft um eier Lebn!",
+     "en": "Run! Run for your lives!"
+    },
+    {
+     "de": "Da Teife! Da Teife is do!",
+     "en": "The devil! The devil is here!"
+    },
+    {
+     "de": "Zu de Wachn! Schnö!",
+     "en": "To the guards! Quick!"
+    }
+   ],
+   "worried": [
+    {
+     "de": "A Bluadsauger! Hüfe!",
+     "en": "A bloodsucker! Help!"
+    },
+    {
+     "de": "Jessas Maria, rennts!",
+     "en": "Jesus Mary, run!"
+    },
+    {
+     "de": "Rettets mi, rettets mi!",
+     "en": "Save me, save me!"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Lauf... lauf...",
+     "en": "Run... run..."
+    },
+    {
+     "de": "Hüf... wer hüft ma...",
+     "en": "Help... who will help me..."
+    }
+   ]
+  },
+  "cower": {
+   "calm": [
+    {
+     "de": "Bitte, bitte, tuats mir nix.",
+     "en": "Please, please, do not hurt me."
+    },
+    {
+     "de": "Vata unser, im Himme...",
+     "en": "Our Father, in heaven..."
+    },
+    {
+     "de": "Nur ned, nur ned...",
+     "en": "Not that, not that..."
+    }
+   ],
+   "worried": [
+    {
+     "de": "Heiliga Maria, bitt fia uns...",
+     "en": "Holy Mary, pray for us..."
+    },
+    {
+     "de": "I hob nix doa, i hob nix doa...",
+     "en": "I did nothing, I did nothing..."
+    },
+    {
+     "de": "Geh weg, geh weg, geh weg...",
+     "en": "Go away, go away, go away..."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Hhh... bitte...",
+     "en": "Hhh... please..."
+    },
+    {
+     "de": "...Gott schütz mi...",
+     "en": "...God protect me..."
+    }
+   ]
+  },
+  "relief": {
+   "calm": [
+    {
+     "de": "Gott sei Dank, weg is er.",
+     "en": "Thank God, it is gone."
+    },
+    {
+     "de": "Uff... des war knapp.",
+     "en": "Phew... that was close."
+    },
+    {
+     "de": "Mei, mei, mei Herz...",
+     "en": "Oh dear, my heart..."
+    }
+   ],
+   "worried": [
+    {
+     "de": "Is er weg? Is er wirkli weg?",
+     "en": "Is it gone? Is it really gone?"
+    },
+    {
+     "de": "Dank dir, Herrgott, dank dir.",
+     "en": "Thank you, Lord, thank you."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Huh... huh... vorbei...",
+     "en": "Huh... huh... over..."
+    },
+    {
+     "de": "Staad... jetzt is er weg...",
+     "en": "Quiet... now it is gone..."
+    }
+   ]
+  },
+  "alarm": {
+   "calm": [
+    {
+     "de": "Do liegt oana! Jessas!",
+     "en": "Someone is lying there! Jesus!"
+    },
+    {
+     "de": "Alarm! Alarm! Wachn!",
+     "en": "Alarm! Alarm! Guards!"
+    },
+    {
+     "de": "Moard! Do is a Moard gschehn!",
+     "en": "Murder! A murder has happened!"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Blutleer is er, blutleer!",
+     "en": "He is drained, drained of blood!"
+    },
+    {
+     "de": "Des waren de Bluadsauger!",
+     "en": "It was the bloodsuckers!"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Heiliger Gott... a Toter...",
+     "en": "Holy God... a dead man..."
+    },
+    {
+     "de": "Do... do liegt wer... staad...",
+     "en": "There... someone is lying there... quiet..."
+    }
+   ]
+  },
+  "hum": {
+   "calm": [
+    {
+     "de": "Mmm-mm, mmm-mm-mmm...",
+     "en": "(humming a tune)"
+    },
+    {
+     "de": "Lalala, lalala, la...",
+     "en": "(humming)"
+    },
+    {
+     "de": "Hm hm hmmm, hm hm...",
+     "en": "(humming to himself)"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Hm... hm... hmmm...",
+     "en": "(a nervous hum)"
+    },
+    {
+     "de": "Mmm... mm... mmm...",
+     "en": "(humming to keep calm)"
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Mm... mm...",
+     "en": "(a barely audible hum)"
+    },
+    {
+     "de": "Hm... hmm... hm...",
+     "en": "(a faint, shaky hum)"
+    },
+    {
+     "de": "Mmm... la... mm...",
+     "en": "(a thin little tune)"
+    }
+   ]
+  },
+  "daytalk": {
+   "calm": [
+    {
+     "de": "Ja mei, so is des Lebn.",
+     "en": "Well, such is life."
+    },
+    {
+     "de": "Wos da Tag ned olles bringt.",
+     "en": "What a day brings along."
+    },
+    {
+     "de": "Hmm, wia spaad is scho?",
+     "en": "Hmm, how late is it already?"
+    }
+   ],
+   "worried": [
+    {
+     "de": "Heid is ma net wohl... gar net wohl.",
+     "en": "I am not well tonight... not well at all."
+    },
+    {
+     "de": "S is zu staad im Dorf.",
+     "en": "The village is too quiet."
+    }
+   ],
+   "whisper": [
+    {
+     "de": "Hast s aa ghert? Pst...",
+     "en": "Did you hear it too? Shh..."
+    },
+    {
+     "de": "Red leise, d Wänd ham Ohrn.",
+     "en": "Speak softly, walls have ears."
+    },
+    {
+     "de": "Geh liaba hoam, s is ned guad heid.",
+     "en": "Better go home, it is not good tonight."
+    },
+    {
+     "de": "Pst... i hob wos gseng, bei da Kirch...",
+     "en": "Shh... I saw something, by the church..."
+    }
+   ]
+  }
+ },
+ "STRUGGLE_TIERS": [
+  [
+   {
+    "de": "Loss mi aus! Loss mi aus!",
+    "en": "Let me go! Let me go!"
+   },
+   {
+    "de": "Hüfe! Hüfe! Zu Hüf!",
+    "en": "Help! Help! Come help!"
+   },
+   {
+    "de": "Du Teifi! Du Hund!",
+    "en": "You devil! You dog!"
+   },
+   {
+    "de": "Verreck, du Viech!",
+    "en": "Drop dead, you beast!"
+   },
+   {
+    "de": "Zu de Wachn! Schnö!",
+    "en": "To the guards! Quick!"
+   },
+   {
+    "de": "Nehmt eich in Acht! A Bluadsauger!",
+    "en": "Beware! A bloodsucker!"
+   },
+   {
+    "de": "Geh weg! Geh weg vo mir!",
+    "en": "Get away! Get away from me!"
+   }
+  ],
+  [
+   {
+    "de": "Naa, bitt, bitt, ned...",
+    "en": "No, please, please, not..."
+   },
+   {
+    "de": "Heilige Muatta Gottes, hüf ma...",
+    "en": "Holy Mother of God, help me..."
+   },
+   {
+    "de": "Vata unsa, im Himme...",
+    "en": "Our Father, in heaven..."
+   },
+   {
+    "de": "I hob a Frau dahoam, bitt...",
+    "en": "I have a wife at home, please..."
+   },
+   {
+    "de": "Jessas Maria, loss mi...",
+    "en": "Jesus Mary, let me..."
+   },
+   {
+    "de": "Gnod! Hobts Gnod!",
+    "en": "Mercy! Have mercy!"
+   },
+   {
+    "de": "Is denn koaner do...? Hüfe...",
+    "en": "Is no one there...? Help..."
+   }
+  ],
+  [
+   {
+    "de": "B-bitte... nit... nit...",
+    "en": "P-please... no... no..."
+   },
+   {
+    "de": "Muatta... Mutt... hüf...",
+    "en": "Mother... Moth... help..."
+   },
+   {
+    "de": "Lass... mi... ged... hoam...",
+    "en": "Let... me... go... home..."
+   },
+   {
+    "de": "Ich... kann... ned... mea...",
+    "en": "I... can... not... more..."
+   },
+   {
+    "de": "Kalt... s is... so kalt...",
+    "en": "Cold... it is... so cold..."
+   },
+   {
+    "de": "Vata... unsa... im Hi...",
+    "en": "Father... our... in hea..."
+   },
+   {
+    "de": "Wach... wach... dahoam...",
+    "en": "Watch... watch... at home..."
+   }
+  ],
+  [
+   {
+    "de": "...mmh...",
+    "en": "...mmh..."
+   },
+   {
+    "de": "Hhh... aah...",
+    "en": "Hhh... aah..."
+   },
+   {
+    "de": "...mutta...",
+    "en": "...mother..."
+   },
+   {
+    "de": "Nnh... hh...",
+    "en": "Nnh... hh..."
+   },
+   {
+    "de": "...bitt...",
+    "en": "...please..."
+   },
+   {
+    "de": "Aah... oh...",
+    "en": "Aah... oh..."
+   }
+  ]
+ ],
+ "DAYTALK": {
+  "farmer": [
+   {
+    "de": "D Ernte werd heuer mager, i sag s da.",
+    "en": "The harvest will be lean this year, I tell you."
+   },
+   {
+    "de": "Da Weizn steht guad, wenn s net hagelt.",
+    "en": "The wheat stands well, if it does not hail."
+   },
+   {
+    "de": "Mei Ochs hod scho wieda a Hax liahm.",
+    "en": "My ox has gone lame in the leg again."
+   },
+   {
+    "de": "Morgn miass i fria raus aufs Fei.",
+    "en": "Tomorrow I must be out in the field early."
+   },
+   {
+    "de": "Dea Reng kimmt, i spia s in de Knia.",
+    "en": "Rain is coming, I feel it in my knees."
+   },
+   {
+    "de": "D Kia gebn kaum mehr Milch.",
+    "en": "The cows hardly give any milk now."
+   },
+   {
+    "de": "Des Heu muaß no drocknan.",
+    "en": "The hay still has to dry."
+   },
+   {
+    "de": "Da Zehnt drückt mi, da Zehnt.",
+    "en": "The tithe weighs on me, the tithe."
+   },
+   {
+    "de": "Hob a Wurzn ausgrobn, groß wia a Kopf.",
+    "en": "Dug up a root as big as a head."
+   },
+   {
+    "de": "Im Wirtshaus gibts heid a frisches Bier.",
+    "en": "There is fresh beer at the tavern tonight."
+   },
+   {
+    "de": "Mei Kreiz tuat weh vom Mähn.",
+    "en": "My back hurts from mowing."
+   },
+   {
+    "de": "Da Pfarrer sogt, mia sollns Feld segnen.",
+    "en": "The priest says we should bless the field."
+   }
+  ],
+  "innkeeper": [
+   {
+    "de": "Zwoa Fassl Bier no, dann is Schluss.",
+    "en": "Two more kegs of beer, then that is it."
+   },
+   {
+    "de": "Wer zoit des Gschirr, wer?",
+    "en": "Who pays for the crockery, who?"
+   },
+   {
+    "de": "D Gäst wern imma durschtiga.",
+    "en": "The guests get thirstier every day."
+   },
+   {
+    "de": "I miass da Suppn nachwürzn.",
+    "en": "I must season the soup some more."
+   },
+   {
+    "de": "Mei Kellerin hod d Schlüssel valorn.",
+    "en": "My cellar maid has lost the keys."
+   },
+   {
+    "de": "Da Wirt schaugt alles, da Wirt hert alles.",
+    "en": "The innkeeper sees all, the innkeeper hears all."
+   },
+   {
+    "de": "Heid war da Hans scho wieda ohne Geld do.",
+    "en": "Hans was here again without any money today."
+   },
+   {
+    "de": "Es Schmoiz werd a teia, wirkli.",
+    "en": "Lard is getting dear too, really."
+   },
+   {
+    "de": "Wenn s so staad bleibt, sperr i bald zua.",
+    "en": "If it stays this quiet I will close soon."
+   },
+   {
+    "de": "Da Bierdeckl is scho wieda feicht.",
+    "en": "The coaster is damp again already."
+   },
+   {
+    "de": "Aa a Wirt braucht amoi seine Ruah.",
+    "en": "Even an innkeeper needs his rest sometime."
+   },
+   {
+    "de": "Da Gockl vom Nachbarn is a Plog.",
+    "en": "The neighbour's rooster is a plague."
+   }
+  ],
+  "priest": [
+   {
+    "de": "Herr, erbarme dich unser...",
+    "en": "Lord, have mercy upon us..."
+   },
+   {
+    "de": "D Glockn miassat mal gschmiert wern.",
+    "en": "The bells really need greasing."
+   },
+   {
+    "de": "D Leit kemma kaum mehr zur Messe.",
+    "en": "The people hardly come to Mass anymore."
+   },
+   {
+    "de": "Wer d Beicht ned macht, schlaft schlecht.",
+    "en": "Whoever skips confession sleeps badly."
+   },
+   {
+    "de": "Des Opferstockl is scho wieda leer.",
+    "en": "The alms box is empty again."
+   },
+   {
+    "de": "Mir wor, i hob wos im Kirchhof gseng.",
+    "en": "I thought I saw something in the churchyard."
+   },
+   {
+    "de": "Dominus vobiscum... a so a Wetta.",
+    "en": "Dominus vobiscum... what weather."
+   },
+   {
+    "de": "Da Meßwein werd imma weniga.",
+    "en": "The Mass wine keeps getting less."
+   },
+   {
+    "de": "Gott prüft uns, gwiss prüft er uns.",
+    "en": "God tests us, surely he tests us."
+   },
+   {
+    "de": "Mei Rückn, mei Rückn vom vuin Bet.",
+    "en": "My back, my back from all the praying."
+   },
+   {
+    "de": "Es Dach vo da Kirch tropft scho wieda.",
+    "en": "The church roof is dripping again."
+   },
+   {
+    "de": "Beten wir fürs Dorf, beten wir.",
+    "en": "Let us pray for the village, let us pray."
+   }
+  ],
+  "drunk": [
+   {
+    "de": "Hicks... no a Schluckerl, no oans...",
+    "en": "Hic... just one more sip, one more..."
+   },
+   {
+    "de": "Wo is mei Kruag hikemma?",
+    "en": "Where did my mug go?"
+   },
+   {
+    "de": "I bin goar ned b-b-b-bsoffn!",
+    "en": "I am not d-d-drunk at all!"
+   },
+   {
+    "de": "Da Mond lacht mi aus, da Mond.",
+    "en": "The moon is laughing at me, the moon."
+   },
+   {
+    "de": "Wer hod do d Gassn so schief baut?",
+    "en": "Who built the street so crooked?"
+   },
+   {
+    "de": "Oans, zwoa, g'suffa!",
+    "en": "One, two, down the hatch!"
+   },
+   {
+    "de": "Mei Oide schimpft, mei Oide...",
+    "en": "My wife scolds, my wife..."
+   },
+   {
+    "de": "Hob i no a Münz? Na, koane.",
+    "en": "Have I still a coin? No, none."
+   },
+   {
+    "de": "Da Wirt schuidet ma no a Bier.",
+    "en": "The innkeeper still owes me a beer."
+   },
+   {
+    "de": "Lalala... de Nacht is no jung...",
+    "en": "Lalala... the night is still young..."
+   },
+   {
+    "de": "Mir dreht si olles, olles im Kreis.",
+    "en": "Everything is spinning around me."
+   },
+   {
+    "de": "Prost, du Hund, auf unsa Dorf!",
+    "en": "Cheers, you dog, to our village!"
+   }
+  ],
+  "guard": [
+   {
+    "de": "Olles ruhig, olles ruhig.",
+    "en": "All quiet, all quiet."
+   },
+   {
+    "de": "Mei Hellebarde werd imma schwara.",
+    "en": "My halberd gets heavier all the time."
+   },
+   {
+    "de": "Wer ko do scho um d Zeit aussi sei?",
+    "en": "Who could be out at this hour?"
+   },
+   {
+    "de": "D Wach is lang, da Wein is kurz.",
+    "en": "The watch is long, the wine is short."
+   },
+   {
+    "de": "I schau no amoi bei da Mauer noch.",
+    "en": "I will check the wall once more."
+   },
+   {
+    "de": "Mei Fuaß, mei Fuaß, de Stiefl druckn.",
+    "en": "My foot, my foot, the boots pinch."
+   },
+   {
+    "de": "Da Hauptmo vaschlaft de Wach wieda.",
+    "en": "The captain sleeps through the watch again."
+   },
+   {
+    "de": "A Nocht wia de ander, hoff i.",
+    "en": "A night like any other, I hope."
+   },
+   {
+    "de": "Stehnbleibn! Ah na, nur a Katz.",
+    "en": "Halt! Ah no, only a cat."
+   },
+   {
+    "de": "Wann wird s endli Morgn?",
+    "en": "When will it finally be morning?"
+   },
+   {
+    "de": "Koa Dieb kimmt an mia vorbei.",
+    "en": "No thief gets past me."
+   },
+   {
+    "de": "Es Tor is zua, olles bestens.",
+    "en": "The gate is shut, all is well."
+   }
+  ],
+  "gravedigger": [
+   {
+    "de": "Grobn, grobn, nix wia grobn.",
+    "en": "Dig, dig, nothing but digging."
+   },
+   {
+    "de": "D Erdn is heid wieda stoanhart.",
+    "en": "The earth is rock hard again today."
+   },
+   {
+    "de": "Mei Schaufe kennt jeden im Dorf.",
+    "en": "My shovel knows everyone in the village."
+   },
+   {
+    "de": "De Toten red'n wenigstens ned zruck.",
+    "en": "At least the dead do not talk back."
+   },
+   {
+    "de": "Oana geht, oana kimmt, so is da Lauf.",
+    "en": "One goes, one comes, such is the way."
+   },
+   {
+    "de": "Heid nacht hob i wos gscharrt ghert.",
+    "en": "I heard scratching tonight."
+   },
+   {
+    "de": "Kreiz um Kreiz in da Reih.",
+    "en": "Cross upon cross in a row."
+   },
+   {
+    "de": "A tiafs Loch, a guads Loch.",
+    "en": "A deep hole, a good hole."
+   },
+   {
+    "de": "De Friedhofserdn is fett, fett!",
+    "en": "The churchyard soil is rich, rich!"
+   },
+   {
+    "de": "Wer zoit mi fia de Nachtschicht?",
+    "en": "Who pays me for the night shift?"
+   },
+   {
+    "de": "I siech olle, aber olle siechn mi ned.",
+    "en": "I see them all, but nobody sees me."
+   },
+   {
+    "de": "D Wuazln stengan scho wieda im Weg.",
+    "en": "The roots are in the way again."
+   }
+  ],
+  "elder": [
+   {
+    "de": "Frieha, do war des anders...",
+    "en": "In the old days it was different..."
+   },
+   {
+    "de": "Mei Knia sagt, es werd a Gwitta.",
+    "en": "My knee says a storm is coming."
+   },
+   {
+    "de": "De Junga hoitn nix mehr aus.",
+    "en": "The young ones can bear nothing anymore."
+   },
+   {
+    "de": "I hob scho gsehn, wos de ned kenna.",
+    "en": "I have seen things that they cannot imagine."
+   },
+   {
+    "de": "Mei Gschicht, mei laaange Gschicht...",
+    "en": "My story, my long story..."
+   },
+   {
+    "de": "Heid is a Wedda zum Schlafn.",
+    "en": "It is weather for sleeping."
+   },
+   {
+    "de": "Wo is mei Stecka, wo is er?",
+    "en": "Where is my stick, where is it?"
+   },
+   {
+    "de": "Aa de Berg ham si veränd'rt.",
+    "en": "Even the mountains have changed."
+   },
+   {
+    "de": "Mei Oide, Gott hab sie selig...",
+    "en": "My wife, God rest her soul..."
+   },
+   {
+    "de": "A Gschwoabl is des, nix als Gschwoabl.",
+    "en": "Chatter, that is all it is, only chatter."
+   },
+   {
+    "de": "Des Dorf hod scho Schlimmers erlebt.",
+    "en": "The village has seen worse."
+   },
+   {
+    "de": "Mei Rückn is a Wetterfrosch.",
+    "en": "My back is a weather frog."
+   }
+  ],
+  "mother": [
+   {
+    "de": "Wo steckt denn da Bua scho wieda?",
+    "en": "Where is the boy hiding again?"
+   },
+   {
+    "de": "Es Essn werd kolt, kemmts eina!",
+    "en": "The food is getting cold, come in!"
+   },
+   {
+    "de": "Dea Brotteig geht heid ned auf.",
+    "en": "The bread dough will not rise today."
+   },
+   {
+    "de": "Mei Maxl hod scho wieda a Loch in da Hosn.",
+    "en": "My little Max has a hole in his trousers again."
+   },
+   {
+    "de": "Wann kimmt da Mo endli hoam?",
+    "en": "When is my husband coming home at last?"
+   },
+   {
+    "de": "Is no a Ei im Stoi, i woaß ned.",
+    "en": "Is there still an egg in the shed, I do not know."
+   },
+   {
+    "de": "D Wasch muaß no auf d Leinen.",
+    "en": "The washing still has to go on the line."
+   },
+   {
+    "de": "Schlof guad, mei Schatzl, schlof guad.",
+    "en": "Sleep well, my little treasure, sleep well."
+   },
+   {
+    "de": "De Nachbarin hod wieda gredt...",
+    "en": "The neighbour woman has been talking again..."
+   },
+   {
+    "de": "Oans fia di, oans fia mi, ois fia d Kinda.",
+    "en": "One for you, one for me, all for the children."
+   },
+   {
+    "de": "Mei Hend san ganz rau vom Spüln.",
+    "en": "My hands are quite rough from washing up."
+   },
+   {
+    "de": "Bleib ma ja ned zspat drauß, hearst?",
+    "en": "Do not stay out too late, you hear?"
+   }
+  ],
+  "child": [
+   {
+    "de": "Fangas, fangas, du kriagst mi ned!",
+    "en": "Tag, tag, you will not catch me!"
+   },
+   {
+    "de": "I hob an Fruasch gfonga, an groaßn!",
+    "en": "I caught a frog, a big one!"
+   },
+   {
+    "de": "Mama, i hob an Hunga!",
+    "en": "Mama, I am hungry!"
+   },
+   {
+    "de": "Hupf, hupf, hupf, af oam Fuaß...",
+    "en": "Hop, hop, hop, on one foot..."
+   },
+   {
+    "de": "Wer is da Bluadsauger? I ned, du!",
+    "en": "Who is the bloodsucker? Not me, you!"
+   },
+   {
+    "de": "Schau, a Stan, a ganz a schöna!",
+    "en": "Look, a stone, such a pretty one!"
+   },
+   {
+    "de": "Dea Hund hod mi gschleckt, hihi!",
+    "en": "The dog licked me, hehe!"
+   },
+   {
+    "de": "I mog ned ins Bett, i mog ned!",
+    "en": "I do not want to go to bed, I do not!"
+   },
+   {
+    "de": "Eins, zwei, drei, vier, eckstein...",
+    "en": "One, two, three, four, cornerstone..."
+   },
+   {
+    "de": "Mei Kuchl, wer hod mei Kuchl gnumma?",
+    "en": "My cake, who took my cake?"
+   },
+   {
+    "de": "Da Pfarrer hod a lustige Nosn.",
+    "en": "The priest has a funny nose."
+   },
+   {
+    "de": "Wann is Weihnachtn, wann denn?",
+    "en": "When is Christmas, when?"
+   }
+  ],
+  "villager": [
+   {
+    "de": "Da Wind is heid gscheit kolt.",
+    "en": "The wind is awfully cold today."
+   },
+   {
+    "de": "Des Brot is wieda teia wordn.",
+    "en": "Bread has got dear again."
+   },
+   {
+    "de": "Hast ghert, wos da Müller gsogt hod?",
+    "en": "Did you hear what the miller said?"
+   },
+   {
+    "de": "Da Pfarrer predigt a bissl lang.",
+    "en": "The priest preaches a bit long."
+   },
+   {
+    "de": "Heid is a guada Tag zum Ausruhn.",
+    "en": "Today is a good day for resting."
+   },
+   {
+    "de": "Mei Hax tuat weh, de Wetterlag...",
+    "en": "My leg hurts, the weather..."
+   },
+   {
+    "de": "Wirt, a Bier, bitte, a koids!",
+    "en": "Innkeeper, a beer, please, a cold one!"
+   },
+   {
+    "de": "Da Nachbar hod wieda a neis Schwein.",
+    "en": "The neighbour has a new pig again."
+   },
+   {
+    "de": "Oiso, i muaß weida, d Oawat wart.",
+    "en": "Well, I must get on, work is waiting."
+   },
+   {
+    "de": "Hast de Gschicht vom Gspenst ghert?",
+    "en": "Have you heard the ghost story?"
+   },
+   {
+    "de": "Mei, is des a Wedda, mei, mei.",
+    "en": "My, what weather, my, my."
+   },
+   {
+    "de": "Da Brunna is wieda verstopft.",
+    "en": "The well is clogged again."
+   }
+  ]
+ },
+ "DAYTALK_GROUPS": [
+  "farmer",
+  "innkeeper",
+  "priest",
+  "drunk",
+  "guard",
+  "gravedigger",
+  "elder",
+  "mother",
+  "child",
+  "villager"
+ ],
+ "FEAR_KINDS": [
+  "startle",
+  "notice",
+  "struggle",
+  "flee",
+  "cower",
+  "alarm",
+  "halt"
+ ]
+}

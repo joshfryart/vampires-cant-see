@@ -1,0 +1,152 @@
+{
+ "RAMP": 0.12,
+ "GIFT_COSTS": [
+  40,
+  60
+ ],
+ "GIFTS_PER_NIGHT": 2,
+ "GIFT_ESSENCE": 2,
+ "FEAR_MAX": 15,
+ "FEAR": {
+  "grab": 1,
+  "sleep": -5
+ },
+ "FEAR_STARTLE": [
+  0.04,
+  0.6
+ ],
+ "FEAR_FLEE": [
+  0.015,
+  0.2
+ ],
+ "FEAR_CALM": [
+  0.04,
+  0.6
+ ],
+ "powers": [
+  {
+   "id": "shriek",
+   "name": "Shriek",
+   "icon": "shriek",
+   "key": [
+    "KeyQ"
+   ],
+   "unlock": 1,
+   "cost": 15,
+   "cooldown": 6,
+   "fear": 2,
+   "desc": "A loud call that reaches twice as far",
+   "how": "A pulse that reaches twice as far; everyone within a wide radius startles and may flee, and Still does not hide it.",
+   "tip": "Use it to map a big room or street at once, or to scatter a crowd so one person is left alone."
+  },
+  {
+   "id": "mist",
+   "name": "Mist",
+   "icon": "mist",
+   "key": [
+    "ShiftLeft",
+    "ShiftRight"
+   ],
+   "unlock": 2,
+   "cost": 10,
+   "cooldown": 3,
+   "fear": 1,
+   "desc": "Dash a short way, unheard",
+   "how": "A silent dash of 2 cells in the direction you move (or face): no footsteps, nobody notices a bump during it, and it stops at walls.",
+   "tip": "Use it to slip past someone, cross open ground quickly, or escape a startled person."
+  },
+  {
+   "id": "still",
+   "name": "Still",
+   "icon": "still",
+   "key": [
+    "KeyF"
+   ],
+   "unlock": 3,
+   "cost": 10,
+   "cooldown": 12,
+   "fear": 1,
+   "desc": "Five quiet seconds, no one notices",
+   "how": "For 5 seconds your pulses, doors and steps startle no one, and bumping into people goes unnoticed.",
+   "tip": "Use it to creep up on a target, or to pulse and open doors in a crowded place."
+  }
+ ],
+ "gifts": [
+  {
+   "id": "g_far",
+   "name": "Keener Ear",
+   "icon": "ear",
+   "kind": "effect",
+   "value": 1.05,
+   "desc": "Rings reach 5% further",
+   "effect": "sonarRange",
+   "op": "mul"
+  },
+  {
+   "id": "g_fade",
+   "name": "Longer Echo",
+   "icon": "hourglass",
+   "kind": "effect",
+   "value": 1.05,
+   "desc": "Rings fade 5% slower",
+   "effect": "sonarFade",
+   "op": "mul"
+  },
+  {
+   "id": "g_quick",
+   "name": "Quicker Call",
+   "icon": "bat",
+   "kind": "effect",
+   "value": 0.95,
+   "desc": "Call again 5% sooner",
+   "effect": "sonarCooldown",
+   "op": "mul"
+  },
+  {
+   "id": "g_thirst",
+   "name": "Slower Thirst",
+   "icon": "drop",
+   "kind": "effect",
+   "value": 0.95,
+   "desc": "Blood drains 5% slower",
+   "effect": "drain",
+   "op": "mul"
+  },
+  {
+   "id": "g_draw",
+   "name": "Deeper Draw",
+   "icon": "fang",
+   "kind": "effect",
+   "value": 1.08,
+   "desc": "Drink 8% faster",
+   "effect": "drinkRate",
+   "op": "mul"
+  },
+  {
+   "id": "g_quiet",
+   "name": "Quieter",
+   "icon": "paw",
+   "kind": "effect",
+   "value": 0.95,
+   "desc": "Sounds startle 5% less far",
+   "effect": "noise",
+   "op": "mul"
+  },
+  {
+   "id": "g_calm",
+   "name": "Calm Town",
+   "icon": "eye",
+   "kind": "fear",
+   "value": -2,
+   "desc": "The town is less jumpy"
+  },
+  {
+   "id": "g_reserve",
+   "name": "Reserve",
+   "icon": "vial",
+   "kind": "nextBlood",
+   "value": 10,
+   "desc": "Start next night with 10 more blood"
+  }
+ ]
+}

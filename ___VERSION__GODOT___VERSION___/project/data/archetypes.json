@@ -1,0 +1,1514 @@
+{
+ "LOOK_KEYS": [
+  "height",
+  "build",
+  "stride",
+  "acc",
+  "body",
+  "head",
+  "hat",
+  "hair",
+  "beard",
+  "nose",
+  "coat",
+  "prop",
+  "v",
+  "archetype",
+  "outfit",
+  "roleHat",
+  "extra",
+  "stoop",
+  "shoulder",
+  "hem",
+  "skin"
+ ],
+ "LOOK_ENUMS": {
+  "acc": [
+   "tophat",
+   "nightcap",
+   "bonnet",
+   "cane",
+   "scarf",
+   "lantern",
+   "hood",
+   "umbrella",
+   "cap",
+   "basket",
+   "none"
+  ],
+  "body": [
+   "bean",
+   "pear",
+   "stick",
+   "round",
+   "box"
+  ],
+  "head": [
+   "round",
+   "egg",
+   "square",
+   "long"
+  ],
+  "hat": [
+   "none",
+   "tophat",
+   "nightcap",
+   "bonnet",
+   "cap",
+   "hood"
+  ],
+  "hair": [
+   "none",
+   "tuft",
+   "bun",
+   "spiky",
+   "curls",
+   "bob"
+  ],
+  "prop": [
+   "none",
+   "cane",
+   "lantern",
+   "umbrella",
+   "basket"
+  ],
+  "outfit": [
+   "plain",
+   "mail",
+   "robe",
+   "apron",
+   "smock",
+   "cloak"
+  ],
+  "roleHat": [
+   "none",
+   "kettle",
+   "biretta"
+  ],
+  "extra": [
+   "none",
+   "shovel",
+   "bundle",
+   "ledger",
+   "bow"
+  ]
+ },
+ "LOOK_RANGES": {
+  "height": [
+   0.5,
+   1.2
+  ],
+  "build": [
+   0.7,
+   1.4
+  ],
+  "stride": [
+   0.7,
+   1.4
+  ],
+  "nose": [
+   0.5,
+   1.6
+  ],
+  "stoop": [
+   0,
+   0.4
+  ],
+  "shoulder": [
+   0.8,
+   1.25
+  ],
+  "hem": [
+   0,
+   1
+  ],
+  "skin": [
+   0,
+   1
+  ]
+ },
+ "LEGACY_RECIPE": {
+  "height": [
+   0.9,
+   0.15
+  ],
+  "build": [
+   0.9,
+   0.25
+  ],
+  "stride": [
+   0.9,
+   0.25
+  ],
+  "bodies": [
+   "bean",
+   "pear",
+   "stick",
+   "round",
+   "box"
+  ],
+  "heads": [
+   "round",
+   "egg",
+   "square",
+   "long"
+  ],
+  "hairs": [
+   "none",
+   "tuft",
+   "bun",
+   "spiky",
+   "curls",
+   "bob"
+  ],
+  "beardP": 0.3,
+  "nose": [
+   0.7,
+   0.7
+  ],
+  "coatP": 0.45,
+  "acc": "cycle"
+ },
+ "REINFORCE": [
+  {
+   "fear": 6,
+   "archetype": "guard",
+   "card": "The watch is doubled"
+  },
+  {
+   "fear": 10,
+   "archetype": "hunter",
+   "card": "A hunter walks the lanes"
+  }
+ ],
+ "list": [
+  {
+   "id": "patron",
+   "role": "",
+   "label": "Patron",
+   "legacy": true,
+   "voice": "man",
+   "talk": "villager",
+   "schedule": null,
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "innkeeper",
+   "role": "innkeeper",
+   "label": "Innkeeper",
+   "legacy": true,
+   "voice": "woman",
+   "talk": "innkeeper",
+   "schedule": [
+    [
+     [
+      "tavern_a"
+     ],
+     0.3,
+     "work"
+    ],
+    [
+     [
+      "tavern_b"
+     ],
+     0.45,
+     "work"
+    ],
+    [
+     [
+      "tavern_c"
+     ],
+     0.52,
+     "work"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.6,
+     "cook"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "apron",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.6,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "drunk",
+   "role": "drunk",
+   "label": "Drunk",
+   "legacy": true,
+   "voice": "man",
+   "talk": "drunk",
+   "schedule": [
+    [
+     [
+      "tavern_c",
+      "tavern_b"
+     ],
+     0.26,
+     "drink"
+    ],
+    [
+     [
+      "square"
+     ],
+     0.32,
+     "sing"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "regular",
+   "role": "regular",
+   "label": "Regular",
+   "legacy": true,
+   "voice": "man",
+   "talk": "innkeeper",
+   "schedule": [
+    [
+     [
+      "tavern_t"
+     ],
+     0.16,
+     "drink"
+    ],
+    [
+     [
+      "@table"
+     ],
+     0.5,
+     "eat"
+    ],
+    [
+     [
+      "@work"
+     ],
+     0.66,
+     "mend"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "priest",
+   "role": "priest",
+   "label": "Priest",
+   "legacy": true,
+   "voice": "elder",
+   "talk": "priest",
+   "schedule": [
+    [
+     [
+      "church_a"
+     ],
+     0.25,
+     "pray"
+    ],
+    [
+     [
+      "church_c"
+     ],
+     0.45,
+     "read"
+    ],
+    [
+     [
+      "church_b"
+     ],
+     0.58,
+     "pray"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "robe",
+    "roleHat": "biretta",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     1.05,
+     0.1
+    ],
+    "hem": 1,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "elder",
+   "role": "elder",
+   "label": "Elder",
+   "legacy": true,
+   "voice": "elder",
+   "talk": "elder",
+   "schedule": [
+    [
+     [
+      "church_c"
+     ],
+     0.2,
+     "pray"
+    ],
+    [
+     [
+      "square"
+     ],
+     0.3,
+     "rest"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.54,
+     "sit"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0.25,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.5,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "farmer",
+   "role": "farmer",
+   "label": "Farmer",
+   "legacy": true,
+   "voice": "man",
+   "talk": "farmer",
+   "schedule": [
+    [
+     [
+      "barn_b"
+     ],
+     0.08,
+     "work"
+    ],
+    [
+     [
+      "barn"
+     ],
+     0.13,
+     "work"
+    ],
+    [
+     [
+      "well"
+     ],
+     0.2,
+     "draw water"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.3,
+     "cook"
+    ],
+    [
+     [
+      "@table"
+     ],
+     0.48,
+     "eat"
+    ],
+    [
+     [
+      "@work"
+     ],
+     0.62,
+     "mend"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "smock",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.3,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "mother",
+   "role": "mother",
+   "label": "Mother",
+   "legacy": true,
+   "voice": "woman",
+   "talk": "mother",
+   "schedule": [
+    [
+     [
+      "well"
+     ],
+     0.06,
+     "draw water"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.26,
+     "cook"
+    ],
+    [
+     [
+      "@table"
+     ],
+     0.48,
+     "eat"
+    ],
+    [
+     [
+      "@work"
+     ],
+     0.64,
+     "spin"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "apron",
+    "roleHat": "none",
+    "extra": "bundle",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.8,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "insomniac",
+   "role": "insomniac",
+   "label": "Insomniac",
+   "legacy": true,
+   "voice": "man",
+   "talk": "villager",
+   "schedule": [
+    [
+     [
+      "lane_s"
+     ],
+     0.22,
+     "pace"
+    ],
+    [
+     [
+      "street_mid"
+     ],
+     0.4,
+     "pace"
+    ],
+    [
+     [
+      "well"
+     ],
+     0.56,
+     "sit"
+    ],
+    [
+     [
+      "@work"
+     ],
+     0.68,
+     "whittle"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "gravedigger",
+   "role": "gravedigger",
+   "label": "Gravedigger",
+   "legacy": true,
+   "voice": "man",
+   "talk": "gravedigger",
+   "schedule": [
+    [
+     [
+      "grave"
+     ],
+     0.3,
+     "dig"
+    ],
+    [
+     [
+      "road_s"
+     ],
+     0.45,
+     "rest"
+    ],
+    [
+     [
+      "grave"
+     ],
+     0.66,
+     "dig"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.76,
+     "cook"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "smock",
+    "roleHat": "none",
+    "extra": "shovel",
+    "stoop": 0.05,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.2,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "guard",
+   "role": "guard",
+   "label": "Guard",
+   "legacy": true,
+   "voice": "man",
+   "talk": "guard",
+   "schedule": "watch",
+   "watch": true,
+   "feedable": true,
+   "gait": "mail",
+   "speed": 1.3,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "mail",
+    "roleHat": "kettle",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     1.05,
+     0.1
+    ],
+    "hem": 0.3,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "child",
+   "role": "child",
+   "label": "Child",
+   "legacy": false,
+   "voice": "child",
+   "talk": "child",
+   "schedule": [
+    [
+     [
+      "@table"
+     ],
+     0.06,
+     "eat"
+    ],
+    [
+     [
+      "@hearth"
+     ],
+     0.14,
+     "play"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": false,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.58,
+     0.08
+    ],
+    "build": [
+     0.85,
+     0.15
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "plain",
+    "roleHat": "none",
+    "extra": "none",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "merchant",
+   "role": "merchant",
+   "label": "Merchant",
+   "legacy": false,
+   "voice": "man",
+   "talk": "villager",
+   "schedule": [
+    [
+     [
+      "square"
+     ],
+     0.18,
+     "sell"
+    ],
+    [
+     [
+      "tavern_t"
+     ],
+     0.34,
+     "drink"
+    ],
+    [
+     [
+      "@bed"
+     ],
+     1,
+     "sleep"
+    ]
+   ],
+   "watch": false,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.9,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "cloak",
+    "roleHat": "none",
+    "extra": "ledger",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.7,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  },
+  {
+   "id": "hunter",
+   "role": "hunter",
+   "label": "Hunter",
+   "legacy": false,
+   "voice": "man",
+   "talk": "guard",
+   "schedule": "watch",
+   "watch": true,
+   "feedable": true,
+   "gait": "walk",
+   "speed": 1.3,
+   "recipe": {
+    "height": [
+     0.9,
+     0.15
+    ],
+    "build": [
+     0.9,
+     0.25
+    ],
+    "stride": [
+     0.9,
+     0.25
+    ],
+    "bodies": [
+     "bean",
+     "pear",
+     "stick",
+     "round",
+     "box"
+    ],
+    "heads": [
+     "round",
+     "egg",
+     "square",
+     "long"
+    ],
+    "hairs": [
+     "none",
+     "tuft",
+     "bun",
+     "spiky",
+     "curls",
+     "bob"
+    ],
+    "beardP": 0.3,
+    "nose": [
+     0.7,
+     0.7
+    ],
+    "coatP": 0.45,
+    "acc": "cycle"
+   },
+   "extras": {
+    "outfit": "cloak",
+    "roleHat": "none",
+    "extra": "bow",
+    "stoop": 0,
+    "shoulder": [
+     0.95,
+     0.1
+    ],
+    "hem": 0.4,
+    "skin": [
+     0.35,
+     0.3
+    ]
+   }
+  }
+ ]
+}
