@@ -1643,6 +1643,7 @@ func _render() -> void:
 ## Push the settings into the running game (js applyConfig): volume, sonar, feeding, motion, text and effects.
 func apply_config() -> void:
 	audio.volume = float(cfg["volume"])
+	audio.ping_bip = cfg["pingBip"] == true
 	flow.night_length_min = float(cfg["nightLengthMin"])
 	flow.autosave_sec = float(cfg["autosaveSec"])
 	reduced = cfg["reduceMotion"] == true

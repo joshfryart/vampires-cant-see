@@ -16,6 +16,8 @@ var log: Array = []
 var muted: bool = false
 var volume: float = DEFAULT_VOLUME
 var room_kind: String = "indoor"
+## The old cartoon bip ping (setting pingBip): no material voices, no floor, ceiling or prop echoes (js setPingStyle).
+var ping_bip: bool = false
 var t60: float = 1.0
 var wet: float = 1.0
 
@@ -242,7 +244,7 @@ func play(kind: String, opts: Dictionary = {}) -> bool:
 
 ## js Audio.ping: the 8 ms click (baked dry; the reverb bus supplies the room).
 func click() -> void:
-	var entry := _pick(_variants("ping:ping"))
+	var entry := _pick(_variants("ping:bip" if ping_bip else "ping:ping"))
 	if entry.is_empty():
 		return
 	_start(entry, volume / float(entry["scale"]), 0.0, 0.0)
@@ -256,7 +258,7 @@ func echo(delay: float, strength: float, pan: float, opts: Dictionary = {}) -> v
 	var s: float = clampf(strength * float(ROOM_GAIN.get(room_kind, 1.0)), 0.0, 1.0)
 	if s <= 0.0 or strength <= 0.0:
 		return
-	var voice: String = opts["voice"] if opts.get("voice") is String and opts["voice"] != "" else "plain"
+	var voice: String = opts["voice"] if (opts.get("voice") is String and opts["voice"] != "" and not ping_bip) else "plain"
 	var rough: float = float(opts.get("rough", 0.0))
 	var variants := _variants("echo:%s" % voice)
 	var want_room: String = "outdoor" if room_kind == "outdoor" else "indoor"
@@ -348,6 +350,8 @@ func _ping_echo(lp: Sonar.Pulse, player: Player, game: Node) -> void:
 
 
 func _floor_bounce(player: Player, world: World, game: Node) -> void:
+	if ping_bip:
+		return
 	var m: String = game.step_material(player.x, player.y)
 	var amp := Acoustics.floor_amp(m)
 	if amp > 0.0:
@@ -355,7 +359,7 @@ func _floor_bounce(player: Player, world: World, game: Node) -> void:
 
 
 func _ceiling_bounce(indoor: bool, zone: String) -> void:
-	if not indoor:
+	if not indoor or ping_bip:
 		return
 	var c := Acoustics.ceiling_for(zone)
 	var amp := Acoustics.ceil_amp(float(c["h"]), c["mat"])
@@ -365,6 +369,8 @@ func _ceiling_bounce(indoor: bool, zone: String) -> void:
 
 
 func _prop_echoes(lp: Sonar.Pulse, player: Player, world: World, game: Node) -> void:
+	if ping_bip:
+		return
 	var ac := Acoustics.a()
 	var rng: float = lp.range if lp.range > 0.0 else 10.0
 	var found: Array = []

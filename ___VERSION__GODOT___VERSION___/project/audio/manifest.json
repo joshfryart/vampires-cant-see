@@ -1837,6 +1837,38 @@
     "dull": true,
     "ref": 0.012599999999999998
    }
+  ],
+  "ping:bip": [
+   {
+    "file": "pingbip_lo.wav",
+    "scale": 2.591669101086375,
+    "ms": 140,
+    "peak": 0.3472665548324585,
+    "kind": "ping",
+    "name": "bip",
+    "pitch": 0.98,
+    "ref": 0.35
+   },
+   {
+    "file": "pingbip_mid.wav",
+    "scale": 2.6018657035650286,
+    "ms": 140,
+    "peak": 0.3459056317806244,
+    "kind": "ping",
+    "name": "bip",
+    "pitch": 1,
+    "ref": 0.35
+   },
+   {
+    "file": "pingbip_hi.wav",
+    "scale": 2.5974715606045673,
+    "ms": 140,
+    "peak": 0.3464908003807068,
+    "kind": "ping",
+    "name": "bip",
+    "pitch": 1.02,
+    "ref": 0.35
+   }
   ]
  }
 }

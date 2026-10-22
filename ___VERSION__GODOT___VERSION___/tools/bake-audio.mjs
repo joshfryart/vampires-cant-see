@@ -58,6 +58,7 @@ function wav16(samples, scale) {
 
 const manifest = {};
 let count = 0;
+let bakeBip = false; // the old cartoon bip ping (setting pingBip)
 
 async function bake(key, entry, seconds, fn) {
   const len = Math.ceil(seconds * RATE);
@@ -65,7 +66,7 @@ async function bake(key, entry, seconds, fn) {
   ctx.__vcsMaster = { out: ctx.destination, send: null, delays: [], fbs: [], lp: null }; // dry
   const seq = entry._rand || [0.5, 0.5, 0.5, 0.5];
   let ri = 0;
-  const a = { ok: true, ctx, volume: 1, warned: false, pingBip: false, room: 'indoor', rand: () => seq[ri++ % seq.length] };
+  const a = { ok: true, ctx, volume: 1, warned: false, pingBip: bakeBip, room: 'indoor', rand: () => seq[ri++ % seq.length] };
   Math.random = mulberry(0xC0FFEE + count * 7919);
   const ok = fn(a);
   const rendered = await ctx.startRendering();
@@ -172,6 +173,13 @@ for (const bpm of [50, 80, 120]) {
 }
 await bake('breath_soft', { kind: 'breath', name: 'soft', dull: false, ref: levelRow('breath') * mixFor('breath') || 0.05, _rand: [0.5] }, 1.8, (a) => Audio.breath(a, {}));
 await bake('breath_dull', { kind: 'breath', name: 'dull', dull: true, ref: levelRow('breath') * mixFor('breath') || 0.05, _rand: [0.5] }, 1.8, (a) => Audio.breath(a, { occluded: true }));
+
+// the old cartoon bip ping (pingBip setting); the echoes then use the plain chirp baked above
+bakeBip = true;
+for (const [pname, r] of [['lo', 0], ['mid', 0.5], ['hi', 1]]) {
+  await bake('pingbip_' + pname, { kind: 'ping', name: 'bip', pitch: 1 + (r - 0.5) * 0.04, ref: 0.35, _rand: [r, 0.5] }, 0.3, (a) => Audio.ping(a));
+}
+bakeBip = false;
 
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({ rate: RATE, playGain: PLAY_GAIN, peakTarget: PEAK_TARGET, entries: manifest }, null, 1) + '\n');
 console.log('baked ' + count + ' files into ' + WAV);

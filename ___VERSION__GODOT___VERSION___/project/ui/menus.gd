@@ -317,7 +317,7 @@ const SETTINGS_ROWS := [
 	["Ping fade (s)", "sonarFade", 1.0, 8.0, 0.25], ["Ping cooldown (s)", "sonarCooldown", 0.2, 3.0, 0.05],
 	["Feeding reach", "feedReach", 1.0, 3.0, 0.1], ["Hold to drink / toggle", "feedToggle"],
 	["Effects (0 off, 1 low, 2 high)", "effects", 0.0, 2.0, 1.0], ["Wobbly lines", "lineBoil"], ["Material detail", "materialDetail"],
-	["Reduced motion", "reduceMotion"], ["Head bob", "headBob"], ["Edge vignette", "edgeVignette"], ["Key turn speed", "keyTurnSpeed", 1.0, 6.0, 0.1], ["Large text", "largeText"], ["Subtitles", "subtitles"], ["Translation", "translation"],
+	["Reduced motion", "reduceMotion"], ["Head bob", "headBob"], ["Old bip ping", "pingBip"], ["Edge vignette", "edgeVignette"], ["Key turn speed", "keyTurnSpeed", 1.0, 6.0, 0.1], ["Large text", "largeText"], ["Subtitles", "subtitles"], ["Translation", "translation"],
 	["Villager voices", "villagerVoices"], ["Autosave every (s)", "autosaveSec", 5.0, 300.0, 5.0],
 ]
 
