@@ -41,7 +41,7 @@ func render_frame(world: World, player: Player, people: People, sonar: Sonar, t:
 	rs.fig_ms = 0.0
 	rs.fig_vol = 0
 	rs.fig_line = 0
-	rs.fig_budget = EchoLayer.FIG_BUDGET_MS
+	rs.fig_budget = Flags.tun("figure", "budgetMs", EchoLayer.FIG_BUDGET_MS)
 	rs.lights = world.lights
 	if lock.is_empty():
 		rs.lock_id = -1

@@ -6,6 +6,7 @@ extends Control
 const POWER_KEYS := {"shriek": "Q", "mist": "Sh", "still": "F"}
 
 var _debug: bool = false
+var _debug_key: bool = false
 var _text: String = ""
 var _sub_de: String = ""
 var _sub_en: String = ""
@@ -51,6 +52,7 @@ func set_state(g: Node) -> void:
 		_sub_muffled = false
 		_sub_a = Listen.sub_alpha(bs, g.clock)
 	_unsaved = g.flow != null and g.flow.save_failed
+	_debug = _debug_key or Flags.get_flag("dev.showFps")
 	_warm = _warm_halos(g)
 	if _debug:
 		_text = "t %.2f  pos %.2f,%.2f  angle %.2f  pulses %d  people %d  echoes %d  light %.2f  state %s  canvas %d us" % [g.clock, g.player.x, g.player.y, g.player.angle, g.sonar.pulses.size(), g.people.people.size(), g.people.echoes.size(), g.player_lit, g.state, g.echo_view.last_us]
@@ -94,7 +96,8 @@ static func _warm_halos(g: Node) -> Array:
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
-		_debug = not _debug
+		_debug_key = not _debug_key
+		_debug = _debug_key or Flags.get_flag("dev.showFps")
 
 
 func _draw() -> void:

@@ -168,6 +168,7 @@ var floor_mat: ShaderMaterial
 var ceil_mat: ShaderMaterial
 var cam: Camera3D
 var map_view: MapView
+var dev_panel: DevPanel
 var viewport: SubViewport
 var echo_view: EchoView
 var walls_inst: MeshInstance3D
@@ -273,6 +274,9 @@ func _build_view() -> void:
 	map_view = MapView.new()
 	map_view.attach(self)
 	add_child(map_view)
+	dev_panel = DevPanel.new()
+	add_child(dev_panel)
+	dev_panel.attach(self)
 	menus = Menus.new()
 	add_child(menus)
 

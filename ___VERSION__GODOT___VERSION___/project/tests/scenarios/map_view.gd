@@ -12,4 +12,5 @@ func step(g: Node, _delta: float) -> Dictionary:
 		g.ping_clicks += 1
 	if g.frame_no == 20:
 		g.map_view.visible = true
+		g.dev_panel.visible = true
 	return {}
