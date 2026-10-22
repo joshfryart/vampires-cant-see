@@ -19,6 +19,9 @@ uniform float z_scale = 0.7305835423471995; // world metres per JS height unit (
 uniform float focal_px = 492.7;    // 320 / tan(33 deg): px per metre at depth 1
 uniform sampler2D light_tex : filter_nearest, repeat_disable; // R = world light per cell
 uniform vec2 map_size = vec2(24.0, 16.0);
+uniform int arc_trail = 4;         // wall water-ripple arcs per pulse (render quality 3: 4, quality 2: 2, 0 = off)
+uniform float vib_on = 1.0;        // struck-surface vibration lines (render.js drawWallVibe)
+uniform float reduced_motion = 0.0;
 
 const float DOOR_GAIN = 1.35;
 const vec3 COL_WOOD_DOOR = vec3(1.0, 0.8863, 0.7686);
@@ -29,6 +32,12 @@ const vec3 COL_WIN_GLOW = vec3(1.0, 0.8118, 0.5412);
 const float WIN_GLOW_MAX = 0.25;
 const float WIN_LINGER = 1.5;
 const float MAT_B = 0.35;
+const float WOBBLE_DUR = 0.45;
+const float WOBBLE_FREQ = 34.0;
+const float VIB_DUR = 0.9;
+const float VIB_HZ = 7.0;
+const float VIB_DAMP = 2.6;
+const float RIPPLE_V = 4.0;
 
 varying vec3 wpos;
 varying vec3 wnorm;
@@ -114,6 +123,12 @@ void fragment() {
 		float jt = boil_on * boil_amp * jitter(col_i, 0.0);
 		float flash = (age >= 0.0 && age < FLASH_AGE) ? 1.0 - age / FLASH_AGE : 0.0;
 		float hp_px = 360.0 / depth;           // projected wall height in px
+		// the struck surface quivers for a moment after the front passes (render.js Ripple.wobble on both edges)
+		float wob_px = 0.0;
+		if (age >= 0.0 && age < WOBBLE_DUR) {
+			float wk = 1.0 - age / WOBBLE_DUR;
+			wob_px = sin(age * WOBBLE_FREQ + (wpos.x + wpos.z) * 5.0) * wk * wk * clamp(hp_px * 0.02, 0.8, 3.5);
+		}
 		float w_wall = (depth < 1.5 || flash > 0.0) ? line_px_near : line_px;
 
 		ivec2 cell = ivec2(floor(wpos.xz - wnorm.xz * 0.01));
@@ -131,7 +146,7 @@ void fragment() {
 			}
 			a = min(1.0, a + 0.6 * flash);
 			vec3 col = flash > 0.0 ? vec3(1.0) : (is_door ? edge_col_door : bucket_col(b0));
-			float d = (UV.y / fwy + jb) - w_wall * 0.5;
+			float d = (UV.y / fwy + jb + wob_px) - w_wall * 0.5;
 			put(outc, col, a, tent(d, w_wall), tent(d, w_wall * 3.4));
 		}
 		if (b1 > 0.01) {
@@ -141,7 +156,7 @@ void fragment() {
 			}
 			a = min(1.0, a + 0.6 * flash);
 			vec3 col = flash > 0.0 ? vec3(1.0) : (is_door ? edge_col_door : bucket_col(b1));
-			float d = ((1.0 - UV.y) / fwy + jt - tilt_px) - w_wall * 0.5;
+			float d = ((1.0 - UV.y) / fwy + jt - tilt_px + wob_px) - w_wall * 0.5;
 			put(outc, col, a, tent(d, w_wall), tent(d, w_wall * 3.4));
 		}
 
@@ -340,6 +355,151 @@ void fragment() {
 					bool in_pane = (vt >= 0.17 + sk && vt <= 0.47 + sk) || (vt >= 0.51 + sk && vt <= 0.79 + sk);
 					if (in_pane) {
 						outc = max(outc, COL_WIN_GLOW * ga);
+					}
+				}
+			}
+		}
+
+		if (vt >= 0.0 && vt <= 1.0 && b >= 0.04 && !is_door) {
+			// camera heading and the ray from the camera to this fragment (render.js h.rayAngle)
+			vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;
+			vec2 fwd2 = normalize(-INV_VIEW_MATRIX[2].xz);
+			vec2 ray = normalize(wpos.xz - cam_pos.xz);
+			float cinc = abs(x_face ? ray.x : ray.y);
+			float inc_k = max(0.25, 1.0 - cinc);
+			float sc = 640.0 / 800.0;
+
+			// ---- struck surfaces shiver: horizontal contour lines, a damped 7 Hz sine for ~0.9 s (drawWallVibe) ----
+			if (vib_on > 0.5) {
+				for (int i = 0; i < 64; i++) {
+					if (i >= pulse_count) {
+						break;
+					}
+					vec4 r0 = texelFetch(pulse_tex, ivec2(i, 0), 0);
+					vec4 r1 = texelFetch(pulse_tex, ivec2(i, 1), 0);
+					vec4 r2 = texelFetch(pulse_tex, ivec2(i, 2), 0);
+					if (r2.y < 0.5 || r2.w > 0.5) {
+						continue; // primary pings only (those have a mouth beam)
+					}
+					float el = game_time - r0.w;
+					if (el < 0.0 || el > r1.x / r1.y + VIB_DUR) {
+						continue;
+					}
+					vec2 dd = p - r0.xy;
+					float dist_p = length(dd);
+					float age_v = el - dist_p / r1.y;
+					if (age_v < 0.0 || age_v > VIB_DUR) {
+						continue;
+					}
+					float n = r2.x;
+					float aa = atan(dd.y, dd.x);
+					if (aa < 0.0) {
+						aa += TWO_PI;
+					}
+					int ri = int(min(n - 1.0, floor(aa / TWO_PI * n + 0.5)));
+					vec2 vb = texelFetch(vis_tex, ivec2(ri, i), 0).rg;
+					float gb = vb.y;
+					if (dist_p > r1.x * (0.3 + 0.7 * gb) || dist_p > vb.x + TOL) {
+						continue;
+					}
+					float env = exp(-age_v * VIB_DAMP) * (1.0 - age_v / VIB_DUR);
+					float kv = env * gb * max(0.0, 1.0 - dist_p / r1.x) * (0.5 + 0.5 * inc_k) * min(1.0, r1.w);
+					if (kv < 0.015) {
+						continue;
+					}
+					float sh = reduced_motion > 0.5 ? 0.0 : sin(TWO_PI * VIB_HZ * age_v);
+					float amp = min(14.0 * sc, 0.11 * focal_px / max(0.3, depth)) * sh;
+					float vy_px = (wnorm.x * fwd2.x + wnorm.z * fwd2.y) * 0.8 * amp;
+					float a = min(1.0, 2.2 * kv);
+					float cov = 0.0;
+					for (int j = 0; j < 5; j++) {
+						float f = float(j) * 0.25;
+						cov = max(cov, tent((UV.y - f) / fwy - vy_px, line_px_thin));
+					}
+					put(outc, vec3(0.91, 0.95, 1.0), a, cov, 0.0);
+				}
+			}
+
+			// ---- water ripples spreading over the wall face from the point nearest the sound (drawWallArcs) ----
+			if (arc_trail > 0) {
+				int pi_best = -1;
+				float b_best = 0.0;
+				for (int i = 0; i < 64; i++) {
+					if (i >= pulse_count) {
+						break;
+					}
+					vec4 r0 = texelFetch(pulse_tex, ivec2(i, 0), 0);
+					vec4 r1 = texelFetch(pulse_tex, ivec2(i, 1), 0);
+					vec4 r2 = texelFetch(pulse_tex, ivec2(i, 2), 0);
+					vec2 dd = p - r0.xy;
+					float dist_p = length(dd);
+					if (dist_p > r1.x) {
+						continue;
+					}
+					float age_p = game_time - (r0.w + dist_p / r1.y);
+					if (age_p < 0.0 || age_p >= r1.z) {
+						continue;
+					}
+					float kb = 1.0 - age_p / r1.z;
+					kb = kb * kb * (1.0 - 0.5 * dist_p / r1.x) * r1.w;
+					if (kb <= b_best) {
+						continue;
+					}
+					float aa = atan(dd.y, dd.x);
+					if (aa < 0.0) {
+						aa += TWO_PI;
+					}
+					int ri = int(min(r2.x - 1.0, floor(aa / TWO_PI * r2.x + 0.5)));
+					if (dist_p > texelFetch(vis_tex, ivec2(ri, i), 0).r + TOL) {
+						continue;
+					}
+					b_best = kb;
+					pi_best = i;
+				}
+				if (pi_best >= 0) {
+					vec4 r0 = texelFetch(pulse_tex, ivec2(pi_best, 0), 0);
+					vec4 r2 = texelFetch(pulse_tex, ivec2(pi_best, 2), 0);
+					float spd = texelFetch(pulse_tex, ivec2(pi_best, 1), 0).y;
+					float D = x_face ? abs(p.x - r0.x) : abs(p.y - r0.y);
+					float s_al = x_face ? abs(p.y - r0.y) : abs(p.x - r0.x);
+					float t0p = r0.w + D / spd;
+					if (game_time > t0p) {
+						bool bounce = r2.w > 0.5;
+						int tk = (depth < 3.0 && arc_trail > 2) ? 2 : arc_trail;
+						float ring = (game_time - t0p) * RIPPLE_V;
+						float cov6 = 0.0;
+						float a_k = 0.0;
+						for (int k = 0; k < 4; k++) {
+							if (k >= tk) {
+								break;
+							}
+							float R = ring - float(k) * 0.35;
+							if (!(R > 0.0 && R * R > s_al * s_al)) {
+								continue;
+							}
+							float dz = sqrt(R * R - s_al * s_al);
+							float zl = max(0.0, r0.z - dz);
+							float zh = min(1.0, r0.z + dz);
+							float ak = min(1.0, line_alpha(b, depth) * 0.9 * inc_k * (1.0 - float(k) / float(tk)) * (bounce ? 0.8 : 1.0));
+							if (ak <= 0.03) {
+								continue;
+							}
+							float wcls = bounce ? line_px_thin : (depth < 1.5 ? line_px_near : line_px);
+							float cv = 0.0;
+							if (zl > 0.002 && zl < 0.998) {
+								cv = max(cv, tent((UV.y - zl) / fwy, wcls));
+							}
+							if (zh > 0.002 && zh < 0.998 && zh != zl) {
+								cv = max(cv, tent((UV.y - zh) / fwy, wcls));
+							}
+							if (cv > cov6) {
+								cov6 = cv;
+								a_k = ak;
+							}
+						}
+						if (cov6 > 0.0) {
+							put(outc, bounce ? vec3(0.4980, 0.6510, 1.0) : vec3(0.8118, 0.8902, 1.0), a_k, cov6, 0.0);
+						}
 					}
 				}
 			}
