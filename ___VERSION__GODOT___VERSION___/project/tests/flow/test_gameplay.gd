@@ -165,3 +165,24 @@ func test_listen_and_barks() -> void:
 	_step(g, 30.0)
 	ok(g.barks_st != null, "bark state exists after stepping")
 	_done(g)
+
+
+func test_villager_heartbeats() -> void:
+	var g := _game()
+	g.debug_map("town")
+	_step(g, 2.0)
+	var v := _near_villager(g)
+	ok(v != null, "villager nearby")
+	if v == null:
+		return
+	var seen := 0
+	var bpm := 0.0
+	for i in 120:
+		g.step(0.05, {})
+		for e in g.people.echoes:
+			if e.kind == "vheart":
+				seen += 1
+				bpm = maxf(bpm, e.bpm)
+	ok(seen > 0, "heartbeat echoes appear within 3 cells of a villager")
+	ok(bpm > 40.0 and bpm <= 175.0, "the echo carries the pulse bpm (%s)" % str(bpm))
+	_done(g)
