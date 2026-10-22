@@ -256,6 +256,12 @@ func _build_pause() -> void:
 		_g.run_on = false
 		_g.flow.has_run = _g.flow.store.has("run")
 		_g.set_state("title"))
+	_button("Copy report", func(): DisplayServer.clipboard_set(Log.report()))
+	_button("Save log to file", func():
+		var f := FileAccess.open("user://vcs-log.txt", FileAccess.WRITE)
+		if f != null:
+			f.store_string(Log.report())
+			Log.info("menu", "log saved to " + ProjectSettings.globalize_path("user://vcs-log.txt")))
 	_label("The run is saved when you pause.", 12, Color(0.6, 0.65, 0.8))
 
 
@@ -299,11 +305,15 @@ func _build_runend() -> void:
 	_panel.visible = true
 	_place(false)
 	var r: Dictionary = _g.flow.run_result
+	var tomb := IconRect.new("tomb", 120.0)
+	tomb.custom_minimum_size = Vector2(160, 120)
+	tomb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_box.add_child(tomb)
 	_label(str(r.get("title", "Run over")), 24, Color(0.9, 0.3, 0.3) if r.get("kind") == "lost" else Color(0.5, 0.9, 0.6))
 	_label(str(r.get("message", "")), 15)
 	_label(str(r.get("essence", "")), 15, Color(0.9, 0.85, 0.5))
 	_button("New run", func(): _g.flow.begin_run())
-	_button("Menu", func(): _g.set_state("title"))
+	_button("Crypt", func(): _g.set_state("title"))
 
 
 # ---------------------------------------------------------------- settings

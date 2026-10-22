@@ -4,6 +4,7 @@ extends Control
 ## and guide cards.
 
 var icon_name: String = "bat"
+## "tomb" draws the run-end tombstone (Icons.draw_tombstone) instead of a named icon.
 var t: float = 0.0
 var _canvas := DrawCanvas.new()
 
@@ -21,6 +22,10 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	_canvas.reset()
+	if icon_name == "tomb":
+		Icons.draw_tombstone(_canvas, size.x, size.y, t)
+		_canvas.paint(self)
+		return
 	var px: float = minf(size.x, size.y)
 	_canvas.translate(size.x / 2.0, size.y / 2.0)
 	Icons.draw(_canvas, icon_name, px, t)

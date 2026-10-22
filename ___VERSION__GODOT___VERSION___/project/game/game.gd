@@ -202,6 +202,10 @@ func boot() -> void:
 	_load_worlds()
 	cfg = Config.load_file() if test_storage == null else Config.defaults_copy()
 	flow = RunFlow.new(self, test_storage)
+	var chk := {"ok": true, "notices": [], "failed": ""}
+	if test_storage == null:
+		chk = Checks.report(Checks.run())
+		flow.notices.append_array(chk["notices"])
 	tut = Tutorial.new(self, test_storage == null)
 	powers = Powers.new(self)
 	var start_name: String = want_map if want_map != "" else String(GameData.maps()["startMap"])
@@ -218,6 +222,8 @@ func boot() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	else:
 		set_state("title")
+	if not chk["ok"]:
+		fatal("E_CHECK", str(chk["failed"]))
 
 
 func _build_view() -> void:
@@ -519,7 +525,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if scenario != null:
 		return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		mouse_dx += event.relative.x
+		# A single delta over SPIKE_PX is clamped; over BOGUS_PX it is dropped as a glitch (js input.js).
+		var mx: float = event.relative.x
+		if absf(mx) > 1000.0 or absf(event.relative.y) > 1000.0:
+			Log.debug("input", "ignored mouse spike %s" % str(event.relative))
+		else:
+			mouse_dx += clampf(mx, -300.0, 300.0)
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
