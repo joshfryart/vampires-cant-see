@@ -32,7 +32,12 @@ func render_frame(world: World, player: Player, people: People, sonar: Sonar, t:
 	for e in people.echoes:
 		echoes.append(echo_to_dict(e))
 	var pl := {"x": player.x, "y": player.y, "angle": player.angle}
-	drawn = EchoLayer.draw_echoes(rs, canvas, pose, echoes, sonar.fade, t, pl, rs.tan_half())
+	var th: float = rs.tan_half()
+	drawn = 0
+	if sonar.pulses.size() > 0 or people.echoes.size() > 0:
+		drawn += Sprites.draw_markers(rs, canvas, world, pl, sonar, t, th)
+		drawn += Sprites.draw_props(rs, canvas, world, pl, sonar, t, th)
+	drawn += EchoLayer.draw_echoes(rs, canvas, pose, echoes, sonar.fade, t, pl, th)
 	queue_redraw()
 
 
