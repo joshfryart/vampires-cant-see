@@ -34,6 +34,7 @@ class Pulse:
 	## Empty when the pulse has no mouth beam.
 	var vbeam: PackedFloat32Array = PackedFloat32Array()
 	var mat: String = ""
+	var weak: float = 0.0
 
 
 var pulses: Array[Pulse] = []

@@ -392,3 +392,17 @@ func person_echo(e: People.Echo, sonar: Sonar) -> void:
 		return
 	var amp: float = clampf(Acoustics.person_amp(e.dist, e.theta), 0.1, 0.7)
 	echo(clampf(e.dist / sonar.speed, 0.0, 6.0), amp, e.pan, {"voice": "person"})
+
+
+## js Audio.stopAll: silence every voice and drop queued echoes (the fade is not modelled: baked samples stop at once).
+func stop_all(_fade: float = 0.0) -> void:
+	_pending.clear()
+	for slot in _pool:
+		slot["player"].stop()
+
+
+## js Audio.speak: villager speech. The synthesised voices land with the audio phase; until then the call is logged and
+## returns a handle whose length is 0, so callers fall back to VoiceData.speak_length for timing.
+func speak(o: Dictionary) -> Dictionary:
+	_record("speak", o)
+	return {"end": 0.0, "stop": func(): pass}

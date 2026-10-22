@@ -20,9 +20,17 @@ node tools/golden/<name>.mjs                      # rewrite project/tests/fixtur
 | `people.json` | `golden/people.mjs` | 5 scripted runs: 10 min patrol, shuffle, sound and sight reactions, hides, echoes, grab/drink/release/fed | 1e-7 |
 | `figure.json` | `golden/figure.mjs` | 482 line-figure scenes (modes x looks x ages x quality x reduced, held victim): FNV-1a hash of the canonical draw-call log | exact hash (args rounded to 1e-3) |
 | `acoustics.json` | `golden/acoustics.mjs` | beam, echo levels, bounces, reverb sizing, occlusion, step scaling | 1e-9 |
+| `people_sched.json` | `golden/people_sched.mjs` | town runs with Forge + Schedule loaded: routes, trips, conversations, fear going home, spawn/alter/despawn, forgeState | 1e-7 |
+| `schedule_forge.json` | `golden/schedule_forge.mjs` | 71k checks: schedule builds, forge generate/alter/validate/library | 1e-12 |
+| `night_hunger.json`, `meta.json`, `save.json`, `jsjson.json` | `golden/night_hunger.mjs`, `meta.mjs`, `save.mjs`, `jsjson.mjs` | night clock and drain, hunger/fear/gifts, meta and save codec (JS-exact checksums and number printing) | exact / 1e-9 |
+| `barks.json` | `golden/barks.mjs` | 1,320 syllable lines, 2,800 subtitles, 100 voices, bark decisions over 3 people runs | 1e-12 / exact ids and seeds |
+| `listen.json` | `golden/listen.mjs` | 1,440 window finds, subtitles, a 120 s listening session | 1e-9 |
+| `struggle.json` | `golden/struggle.mjs` | 4,050 held-victim poses | 1e-8 |
+| `figure_struggle.json` | `golden/figure_struggle.mjs` | 724 held-victim figure draw logs (Struggle loaded) | exact hash |
 
-Scope notes: `people.json` and `figure.json` are generated with Forge, Schedule, Struggle, Figure and Vessels **not**
-loaded (that is what Phase 1 ports); they get new fixtures when those modules land.
+Scope notes: `people.json` and `figure.json` are generated with Forge, Schedule and Struggle **not** loaded; their tests
+pass `noForge` / `Pose.use_struggle = false`. `people_sched.json` and `figure_struggle.json` cover the loaded case.
+Figure (volumetric) and Vessels are not loaded anywhere yet (Phase 7).
 
 Godot's JSON parser is not correctly rounded for doubles, so exact data is stored as integers and everything else is
 compared with an epsilon.
@@ -48,12 +56,14 @@ compared with an epsilon.
 - The arrival flash (white, brighter for 0.12 s) is part of the expected value, as in `render.js`.
 - Re-run: `Godot_v4.4.1-stable_win64.exe --path project --rendering-driver opengl3 --write-movie out/F1/f.png --fixed-fps 60 --quit-after 220 -- --scenario=f1_readback` (prints `F1_REPORT` and `F1_ROWS`).
 
-## Known gaps in the Phase 1 slice
+## Known gaps
 
-- Blood is a plain bar (Night/Hunger are Phase 5); the drink loop follows `startDrink/stepDrink/endDrink` otherwise.
-- The held victim uses the plain grapple pose; the struggle pose (`js/struggle.js`) is Phase 4.
-- Audio calls are recorded by `AudioDirector` but nothing plays yet.
-- Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings: Phase 3).
+- Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings, plus the ripple
+  rings, door wobble and the weak-ping flicker: Phase 3 polish).
+- Volumetric figures and the character creator: Phase 7. HUD icons, post effects, config, flags, dev panel, tutorial
+  hints, settings and the guide panel: Phase 8.
+- Villager speech and ambience beds are silent (`AudioDirector.speak` logs only): Phase 9. Subtitles do show.
+- Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).
 
 ## JS reference shots (F2)
 

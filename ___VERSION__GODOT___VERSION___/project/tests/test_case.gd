@@ -2,6 +2,9 @@ class_name TestCase
 extends RefCounted
 ## Base class for tests. Methods named test_* are run by run_tests.gd.
 
+## Set by run_tests.gd so tests can build nodes (the Game) in the tree.
+static var tree: SceneTree = null
+
 var failures: Array[String] = []
 var checks: int = 0
 

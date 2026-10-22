@@ -287,3 +287,25 @@ static func for_person(seed: Variant, role: Variant = null) -> Dictionary:
 		"breath": r3(minf(1.0, float(base["breath"]) * (0.7 + rng.next() * 0.6))),
 		"formantMul": r3(float(base["formantMul"]) * (0.97 + rng.next() * 0.06)),
 	}
+
+
+static func weak_of(w: Variant) -> float:
+	return clampf(float(w), 0.0, 1.0) if (w is float or w is int) and is_finite(float(w)) else 0.0
+
+
+## A voice dictionary (forPerson result) is used as is; a preset name or anything else resolves to a preset row (man default).
+static func resolve_voice(voice: Variant) -> Dictionary:
+	if voice is Dictionary and (voice.get("pitch") is float or voice.get("pitch") is int):
+		return voice
+	var presets: Dictionary = d()["PRESETS"]
+	return presets[voice] if voice is String and presets.has(voice) else presets["man"]
+
+
+## Duration in seconds speak() takes for a line, without playing (js Audio.speakLength). voice null = speed 1.
+static func speak_length(seed: Variant, kind: String, mood: Variant = null, voice: Variant = null, weak: Variant = null) -> float:
+	var mr: Dictionary = d()["MOODS"][mood] if mood is String and d()["MOODS"].has(mood) else d()["MOODS"]["calm"]
+	var v: Dictionary = {"speed": 1.0} if voice == null else resolve_voice(voice)
+	var wk: Variant = weak_of(weak) if (weak is float or weak is int) else null
+	var syls := line(seed, kind, mood, wk)
+	var sp: float = maxf(0.3, float(mr["speed"]) * (float(v["speed"]) if float(v.get("speed", 0.0)) > 0.0 else 1.0) * (1.0 - 0.4 * weak_of(weak)))
+	return line_length(syls) / sp

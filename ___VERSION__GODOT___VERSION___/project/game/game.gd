@@ -5,7 +5,8 @@ extends Node3D
 ##   clock += dt; player moves (drag speed while drinking); footsteps; door bump; lit value; feed grab / ping clicks;
 ##   sonar.prune; people.update; people events; villager steps; echo snapshots; stepDrink.
 ## Run a scripted shot with:  -- --scenario=NAME   (see tests/scenarios/). Order and what is stubbed: docs/PORT.md.
-## Stubs until their phases: Night/Hunger (blood is a plain bar without drain), Barks/Listen, powers, save, audio samples.
+## Runs, nights, blood drain, boons, gifts, powers, sleep and saves live in RunFlow and Powers (run_flow.gd, powers.gd).
+## Free play (scenarios, --map=) has no night: blood is a plain bar and nothing drains.
 
 const VIEW_W := 640
 const VIEW_H := 360
@@ -31,6 +32,12 @@ const BLOOD_START := 60.0
 const BASE_RANGE := 10.0
 const BASE_FADE := 3.0
 const BASE_BOUNCES := 2
+const CARD_LEN := 2.4
+const SLEEP_STATES := ["playing", "transition", "feeding", "sleeping"]
+
+## Tests give the Game an in-memory save store.
+static var test_storage: Object = null
+static var manual_boot: bool = false
 
 var world: World
 var player: Player
@@ -39,7 +46,14 @@ var people: People
 var audio: AudioDirector
 var clock: float = 0.0
 var state: String = "playing"        # playing | feeding
-var blood: float = BLOOD_START
+var blood_free: float = BLOOD_START
+var blood: float:
+	get: return night.blood if night != null else blood_free
+	set(v):
+		if night != null:
+			night.blood = v
+		else:
+			blood_free = v
 var drink: Variant = null            # Dictionary while drinking
 var player_lit: float = 0.0
 var map_name: String = ""
@@ -55,8 +69,34 @@ var cool: float = 0.0
 var grace: float = 0.0
 var just_arrived: Variant = null
 var room_kind: String = "indoor"
-var run_seed: int = 1
-var night_no: int = 1
+var run_seed: int:
+	get: return int(flow.run["seed"]) if flow != null and flow.run != null else 1
+var night_no: int:
+	get: return night.night if night != null else 1
+var night: Night = null
+var hunger: Hunger = null
+var flow: RunFlow
+var powers: Powers
+var run_on: bool = false
+var seed_base: int = 0
+var card_text: String = ""
+var card_sub: String = ""
+var card_age: float = 0.0
+var gift_flash: float = 0.0
+var over_acc: float = 0.0
+var pressed: Dictionary = {}
+var last_input: Dictionary = {}
+var fm: Dictionary = {"startleMul": 1.0, "fleeMul": 1.0, "calmMul": 1.0}
+var react_key: float = -1.0
+var react_dz: float = -1.0
+var barks_st: Barks = null
+var listen_st: Listen = null
+var bark_sub: Variant = null       # {de, en, muffled, speaker, dist, start, end}
+var lis_px: float = NAN
+var lis_py: float = NAN
+var lis_speed: float = 0.0
+var last_victim: Variant = null
+var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
 var step_timer: float = 0.0
@@ -84,6 +124,12 @@ var last_render_clock: float = 0.0
 
 
 func _ready() -> void:
+	if not manual_boot:
+		boot()
+
+
+## The body of _ready, callable by tests that build the Game outside the tree.
+func boot() -> void:
 	rng.seed = 1
 	var scenario_name := ""
 	var want_map := ""
@@ -96,6 +142,8 @@ func _ready() -> void:
 	add_child(audio)
 	_build_view()
 	_load_worlds()
+	flow = RunFlow.new(self, test_storage)
+	powers = Powers.new(self)
 	var start_name: String = want_map if want_map != "" else String(GameData.maps()["startMap"])
 	var sp := start_place(worlds[start_name])
 	player = Player.create(sp["x"], sp["y"], sp["angle"])
@@ -105,8 +153,10 @@ func _ready() -> void:
 		var script: GDScript = load("res://tests/scenarios/%s.gd" % scenario_name)
 		scenario = script.new()
 		scenario.setup(self)
-	else:
+	elif want_map != "":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	else:
+		set_state("title")
 
 
 func _build_view() -> void:
@@ -143,6 +193,8 @@ func _build_view() -> void:
 	floor_mat.render_priority = -1
 	hud = Hud.new()
 	add_child(hud)
+	menus = Menus.new()
+	add_child(menus)
 
 
 func _load_worlds() -> void:
@@ -176,11 +228,11 @@ static func mix_seed(seed_v: int, map_index: int, night: int) -> int:
 
 
 ## js peopleFor: the (cached) people state of a map.
-func people_for(name: String) -> People:
-	if people_by_map.has(name):
+func people_for(name: String, seed_override: Variant = null) -> People:
+	if people_by_map.has(name) and (seed_override == null or people_by_map[name].seed_value == float(seed_override)):
 		return people_by_map[name]
 	var idx: int = maxi(0, world_names.find(name))
-	var sd: float = float(mix_seed(run_seed, idx, night_no))
+	var sd: float = float(seed_override) if seed_override != null else float(mix_seed(run_seed, idx, night_no))
 	var st := People.create(worlds[name], GameData.map_def(name), {"seed": sd, "poolMin": 30.0, "poolMax": 50.0, "shuffle": true})
 	people_by_map[name] = st
 	return st
@@ -377,7 +429,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+				if state == "playing" or state == "feeding":
+					Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 			else:
 				ping_clicks += 1
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
@@ -385,11 +438,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.pressed:
 				feed_press += 1
 	elif event is InputEventKey and event.pressed and not event.echo:
+		pressed[event.physical_keycode] = true
 		match event.physical_keycode:
 			KEY_SPACE: ping_clicks += 1
 			KEY_R: feed_press += 1
 			KEY_E: interact_press = true
-			KEY_ESCAPE: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			KEY_ESCAPE:
+				if state == "playing" or state == "transition" or state == "feeding":
+					pause()
+				elif state == "paused":
+					resume()
+				else:
+					Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
 func feed_held() -> bool:
@@ -429,14 +489,53 @@ func _process(delta: float) -> void:
 
 ## One logic step (js update): input -> world -> drinking. Also called directly by scripted tests.
 func step(dt: float, inp: Dictionary) -> void:
+	last_input = inp
+	var st0: String = state
+	if st0 == "title" or st0 == "paused" or st0 == "runend" or st0 == "error":
+		pressed.clear()
+		hud.set_state(self)
+		return
+	if st0 == "boon" or st0 == "gift":
+		for i in 3:
+			if pressed.has(KEY_1 + i) or pressed.has(KEY_KP_1 + i):
+				if st0 == "gift":
+					flow.pick_gift(i)
+				else:
+					flow.pick_boon(i)
+				break
+		pressed.clear()
+		hud.set_state(self)
+		return
+	if card_text != "":
+		card_age += dt
+		if card_age > CARD_LEN:
+			card_text = ""
+			card_sub = ""
+	if st0 == "sleeping":
+		clock += dt
+		audio.tick(clock)
+		flow.step_seq(dt)
+		sonar.prune(clock)
+		pressed.clear()
+		hud.set_state(self)
+		return
 	clock += dt
 	audio.tick(clock)
+	if hunger != null:
+		hunger.tick(dt)
+	if gift_flash > 0.0:
+		gift_flash = maxf(0.0, gift_flash - dt / 0.8)
 	if state == "transition":
 		step_transition(dt)
 		sonar.prune(clock)
+		pressed.clear()
 		hud.set_state(self)
 		return
 	var was_drinking: bool = drink != null
+	if not was_drinking and state == "playing":
+		powers.power_keys()
+	if powers.mist_vis > 0.0:
+		powers.mist_vis = maxf(0.0, powers.mist_vis - dt / 0.45)
 	if was_drinking:
 		var dk: Dictionary = drink
 		var di := inp.duplicate()
@@ -452,24 +551,43 @@ func step(dt: float, inp: Dictionary) -> void:
 	else:
 		var px2: float = player.x
 		var py2: float = player.y
-		player.update(world, inp, dt)
-		var moved2: float = sqrt((player.x - px2) * (player.x - px2) + (player.y - py2) * (player.y - py2))
-		player_steps(dt, moved2)
-		bump_doors(inp)
+		if powers.mist != null:
+			var im := inp.duplicate()
+			im["forward"] = 0.0
+			im["strafe"] = 0.0
+			player.update(world, im, dt)
+			powers.step_mist(dt)
+			step_timer = 0.0
+		else:
+			var cfg2 := Player.DEFAULT_CFG
+			if listen_st != null and listen_st.active:
+				cfg2 = Player.DEFAULT_CFG.duplicate()
+				cfg2["moveSpeed"] = float(cfg2["moveSpeed"]) * Listen.MOVE_K
+			player.update(world, inp, dt, cfg2)
+			var moved2: float = sqrt((player.x - px2) * (player.x - px2) + (player.y - py2) * (player.y - py2))
+			player_steps(dt, moved2)
+			bump_doors(inp)
 	if cool > 0.0:
 		cool -= dt
+	if powers.rock_cool > 0.0:
+		powers.rock_cool -= dt
+	powers.step_rocks()
 	player_lit = world.light_at(player.x, player.y)
 	if grace > 0.0:
 		grace -= dt
+	step_listen(dt)
 	if not was_drinking:
 		if check_link_door():
 			feed_press = 0
 			ping_clicks = 0
 			interact_press = false
+			pressed.clear()
 			return
 		follow_room()
 		if interact_press:
 			interact()
+		if pressed.has(KEY_G):
+			powers.throw_rock()
 		if feed_press > 0 and state == "playing" and not start_drink(false):
 			miss_feed()
 	interact_press = false
@@ -479,9 +597,124 @@ func step(dt: float, inp: Dictionary) -> void:
 	ping_clicks = 0
 	sonar.prune(clock)
 	simulate_world(dt)
+	step_barks(dt)
+	if night != null and flow.step_night(dt):
+		pressed.clear()
+		hud.set_state(self)
+		return
 	if drink != null:
 		step_drink(dt)
+	if flow != null:
+		flow.tick_autosave(dt)
+	pressed.clear()
 	hud.set_state(self)
+
+
+func pause() -> void:
+	if drink != null:
+		end_drink("pause")
+	if state != "playing" and state != "transition":
+		return
+	set_state("paused")
+	flow.save_run("pause")
+
+
+func resume() -> void:
+	if state == "paused":
+		set_state("playing")
+
+
+## js setState: switch state, end listening and barks, and put the mouse where the state wants it.
+func set_state(next: String) -> void:
+	if state == next:
+		return
+	state = next
+	if next != "playing":
+		end_listen()
+		if next != "feeding":
+			barks_reset()
+	if scenario == null:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if (next == "playing" or next == "feeding" or next == "sleeping" or next == "transition") else Input.MOUSE_MODE_VISIBLE
+	if menus != null:
+		menus.sync(self)
+
+
+func show_card(text: String, start_age: float = 0.0, sub: String = "") -> void:
+	card_text = text
+	card_sub = sub
+	card_age = start_age
+
+
+## Re-seed the far-sound timers for the current night (ambience lands with the audio phase).
+func init_ambient() -> void:
+	pass
+
+
+# ---------------------------------------------------------------- listening and barks
+
+func end_listen() -> void:
+	if listen_st != null:
+		listen_st.stop_cur()
+		listen_st.active = false
+		listen_st.win = null
+		listen_st.count = 0
+
+
+func barks_reset() -> void:
+	if barks_st != null:
+		barks_st.reset()
+	bark_sub = null
+
+
+## js stepListen: hold E facing a window from outside to hear the room behind it.
+func step_listen(dt: float) -> void:
+	if state != "playing" or world == null:
+		return
+	if listen_st == null:
+		listen_st = Listen.new()
+	var px: float = player.x if is_nan(lis_px) else lis_px
+	var py: float = player.y if is_nan(lis_py) else lis_py
+	lis_px = player.x
+	lis_py = player.y
+	var inst: float = sqrt((player.x - px) * (player.x - px) + (player.y - py) * (player.y - py)) / dt if dt > 0.0 else 0.0
+	lis_speed += (inst - lis_speed) * (1.0 - exp(-dt / 0.15))
+	listen_st.step({
+		"now": clock, "held": key_down(KEY_E), "holding": drink != null or powers.mist != null, "speed": lis_speed,
+		"world": world, "player": {"x": player.x, "y": player.y, "angle": player.angle},
+		"people": Barks.people_snapshot(people.people), "fear": hunger.fear if hunger != null else 0.0,
+		"pan": pan_to, "speak": func(o): return audio.speak(o),
+		"speak_length": func(sd, kind, mood_s, voice): return VoiceData.speak_length(sd, kind, mood_s, voice),
+		"voice_for": func(who, sd): return VoiceData.for_person(who["id"] if who["id"] is int or who["id"] is float else sd, who["role"]),
+		"conversation_for": func(id): return people.conversation_for(int(id))})
+
+
+## js stepBarks: villager barks while playing or feeding (the grabbed victim's cries).
+func step_barks(_dt: float) -> void:
+	if (state != "playing" and state != "feeding") or world == null or people == null:
+		return
+	if barks_st == null:
+		barks_st = Barks.new(map_name.length() * 131 + 7 if map_name != "" else 1)
+	var on: bool = not (listen_st != null and listen_st.active) and powers.mist == null
+	var res := barks_st.step({
+		"now": clock, "player": {"x": player.x, "y": player.y}, "people": Barks.people_snapshot(people.people),
+		"fear": hunger.fear if hunger != null else 0.0, "enabled": on,
+		"restrained": int(drink["id"]) if drink != null and float(drink["rs"]) > 0.5 else null,
+		"length_fn": func(sd, kind, mood_s, role, weak): return VoiceData.speak_length(sd, kind, mood_s, role, weak)})
+	for b in res["barks"]:
+		play_bark(b)
+
+
+## Plays one bark: distance gain, pan, muffling, subtitle when close and in sight.
+func play_bark(b: Dictionary) -> void:
+	var occ: Variant = occlusion_to(b["x"], b["y"])
+	var d: float = b["dist"]
+	if d <= 5.0 and occ == null:
+		var cur: Variant = bark_sub
+		if cur == null or clock > float(cur["end"]) or d <= float(cur["dist"]):
+			var t := Barks.subtitle_for(b)
+			if t["de"] != "":
+				bark_sub = {"de": t["de"], "en": t["en"], "muffled": false, "speaker": b["id"], "dist": d, "start": clock, "end": clock + maxf(0.5, float(b["len"]))}
+	audio.speak({"kind": b["kind"], "seed": b["seed"], "mood": b["mood"], "gain": b["gain"], "pan": pan_to(b["x"], b["y"]), "voice": VoiceData.for_person(b["voiceSeed"], b["role"]), "weak": b["weak"] if b["kind"] == "struggle" else null})
 
 
 # ---------------------------------------------------------------- sounds
@@ -494,12 +727,15 @@ static func num_or_1(v: Variant) -> float:
 func emit_sound(kind: String, x: float, y: float, over: Dictionary = {}) -> Sonar.Pulse:
 	var lv := SoundData.level(kind)
 	var room := SoundData.room_profile(world.kind_at(x, y))
-	var base_range: float = float(over["range"]) if (over.get("range") is float or over.get("range") is int) else float(lv.get("range", 0.0) if lv.get("range") != null else 0.0)
-	var strength: float = (float(lv["strength"]) if lv.get("strength") != null else 0.0) * num_or_1(over.get("strengthMul"))
+	var weak: float = night.weakness() if night != null else 0.0
+	var wash: float = night.wash_k() if night != null and world.kind_at(x, y) == "outdoor" else 0.0
+	var wm: float = 1.0 - 0.4 * weak
+	var base_range: float = float(over["range"]) if (over.get("range") is float or over.get("range") is int) else float(lv.get("range", 0.0) if lv.get("range") != null else 0.0) * wm
+	var strength: float = (float(lv["strength"]) if lv.get("strength") != null else 0.0) * wm * num_or_1(over.get("strengthMul"))
 	var bounces_v: int = int(over["bounces"]) if (over.get("bounces") is float or over.get("bounces") is int) else int(lv.get("bounces", 0))
 	var opts := {
 		"kind": kind,
-		"range": base_range * float(room["rangeMul"]) * num_or_1(over.get("rangeMul")),
+		"range": base_range * float(room["rangeMul"]) * (1.0 - 0.5 * wash) * num_or_1(over.get("rangeMul")),
 		"strength": strength,
 		"bounces": mini(bounces_v, int(room["bounceCap"])),
 		"visRays": 180,
@@ -509,8 +745,24 @@ func emit_sound(kind: String, x: float, y: float, over: Dictionary = {}) -> Sona
 	elif lv.get("z") is float or lv.get("z") is int:
 		opts["z"] = lv["z"]
 	if lv.get("fade") is float or lv.get("fade") is int:
-		opts["fade"] = float(lv["fade"]) * float(room["fadeMul"]) * num_or_1(over.get("fadeMul"))
-	return sonar.emit_sound(world, x, y, clock, opts)
+		opts["fade"] = float(lv["fade"]) * float(room["fadeMul"]) * (1.0 - 0.3 * weak) * (1.0 - 0.6 * wash) * num_or_1(over.get("fadeMul"))
+	var pu: Sonar.Pulse = sonar.emit_sound(world, x, y, clock, opts)
+	if pu != null and weak > 0.0:
+		tag_weak(pu, weak, 1.0)
+	return pu
+
+
+## Mark the primary pulse and every pulse pushed after it (its bounce children) as weak; scale their strength by s_mul.
+func tag_weak(primary: Sonar.Pulse, weak: float, s_mul: float) -> void:
+	var ps: Array = sonar.pulses
+	var i: int = ps.find(primary)
+	if i < 0:
+		i = 0
+	while i < ps.size():
+		ps[i].weak = weak
+		if s_mul != 1.0:
+			ps[i].strength *= s_mul
+		i += 1
 
 
 func pan_to(x: float, y: float) -> float:
@@ -584,18 +836,44 @@ func occlusion_to(x: float, y: float) -> Variant:
 	return out
 
 
+## Fear-scaled react config; rebuilt only when dazedTime, fear, still or mist state changes (js reactCfgNow).
+func react_cfg_now() -> Dictionary:
+	var dz := 3.0
+	var calm: bool = hunger != null and (hunger.is_still() or powers.mist != null)
+	var key: float = (hunger.fear if hunger != null else 0.0) * 2.0 + (1.0 if calm else 0.0)
+	if react_dz != dz or react_key != key or react_cfg.is_empty():
+		react_dz = dz
+		react_key = key
+		var base: Dictionary = GameData.sounds()["react"]
+		fm = hunger.fear_mods() if hunger != null else {"startleMul": 1.0, "fleeMul": 1.0, "calmMul": 1.0}
+		var cfg: Dictionary = base.duplicate()
+		cfg["dazedTime"] = dz
+		cfg["startleDist"] = float(base.get("startleDist", 3.0)) * float(fm["startleMul"])
+		cfg["fleeMul"] = float(base.get("fleeMul", 1.6)) * float(fm["fleeMul"])
+		cfg["calmAfter"] = float(base.get("calmAfter", 10.0)) * float(fm.get("calmMul", 1.0))
+		if calm:
+			cfg["bumpDist"] = 0.0
+		react_cfg = cfg
+	return react_cfg
+
+
 func react_to(x: float, y: float, kind: String, dist: float = -1.0) -> void:
+	if hunger != null and hunger.is_still() and (kind == "ping" or kind == "door"):
+		return
 	var d: float = dist
 	if d < 0.0 and (kind == "ping" or kind == "door"):
-		d = float(react_cfg["startleDist"])
+		react_cfg_now()
+		var base: float = float(GameData.sounds()["react"].get("startleDist", 4.0))
+		d = base * flow.fxv("noise") * float(fm["startleMul"]) if flow != null else base
 	people.react(x, y, kind, people_ctx(), d if d > 0.0 else 0.0)
 	drain_people_events()
 
 
 func people_ctx() -> Dictionary:
 	return {
-		"player": {"x": player.x, "y": player.y}, "playerLit": player_lit, "react": react_cfg,
-		"grace": grace, "nightFrac": 0.0, "nightSec": 0.0, "fear": 0.0,
+		"player": {"x": player.x, "y": player.y}, "playerLit": player_lit, "react": react_cfg_now(),
+		"grace": grace, "nightFrac": float(night.clock()["frac"]) if night != null else 0.0,
+		"nightSec": night.night_sec if night != null else 0.0, "fear": hunger.fear if hunger != null else 0.0,
 	}
 
 
@@ -637,17 +915,25 @@ func player_steps(dt: float, moved: float) -> void:
 
 ## js pulse(): the click ping with room-scaled range, fade and bounces, then startle reactions and audio.
 func pulse() -> bool:
-	var room := SoundData.room_profile(player_kind())
+	var pkind := player_kind()
+	var room := SoundData.room_profile(pkind)
+	var outdoor: bool = pkind == "outdoor"
 	var keep := [sonar.range_, sonar.bounces, sonar.fade]
-	sonar.range_ = BASE_RANGE * float(room["rangeMul"])
+	var weak: float = night.weakness() if night != null else 0.0
+	var wash: float = night.wash_k() if night != null and outdoor else 0.0
+	var fr: float = flow.fxv("sonarRange") if flow != null else 1.0
+	var ff: float = flow.fxv("sonarFade") if flow != null else 1.0
+	sonar.range_ = BASE_RANGE * float(room["rangeMul"]) * fr * (1.0 - 0.4 * weak) * (1.0 - 0.5 * wash)
 	sonar.bounces = mini(BASE_BOUNCES, int(room["bounceCap"]))
-	sonar.fade = BASE_FADE * float(room["fadeMul"])
+	sonar.fade = BASE_FADE * float(room["fadeMul"]) * ff * (1.0 - 0.3 * weak) * (1.0 - 0.6 * wash)
 	var fired: bool = sonar.emit(world, player.x, player.y, clock, {"z": SoundData.level("ping")["z"], "facing": player.angle})
 	sonar.range_ = keep[0]
 	sonar.bounces = keep[1]
 	sonar.fade = keep[2]
 	if not fired:
 		return false
+	if weak > 0.0 and sonar.last_pulse != null:
+		tag_weak(sonar.last_pulse, weak, 1.0 - 0.4 * weak)
 	react_to(player.x, player.y, "ping")
 	audio.ping(sonar.last_pulse, player, world, self)
 	return true
@@ -721,6 +1007,15 @@ func interact() -> String:
 		var cx: int = int(floor(best.x))
 		var cy: int = int(floor(best.y))
 		return "door" if toggle_door(cx, cy, not world.is_door_open(cx, cy)) else "blocked"
+	if night != null:
+		if flow.try_sleep():
+			return "sleep"
+		var sp_list: Array = world.spots.get("crypt", []) + world.spots.get("safe", []).filter(func(sp): return not flow.is_sealed(sp))
+		for sp in sp_list:
+			if sqrt((sp.x - player.x) * (sp.x - player.x) + (sp.y - player.y) * (sp.y - player.y)) <= reach:
+				emit_sound("interact", sp.x, sp.y)
+				audio.play("interact", spatial(sp.x, sp.y, float(SoundData.level("interact")["gain"])))
+				return "interact"
 	return "none"
 
 
@@ -729,6 +1024,8 @@ func interact() -> String:
 func simulate_world(dt: float) -> void:
 	var t_prev: float = clock - dt
 	people.update(world, dt, people_ctx())
+	if flow != null:
+		flow.step_forge(dt)
 	drain_people_events()
 	people_sounds(t_prev)
 	var made := people.update_echoes(sonar, t_prev, clock)
@@ -806,7 +1103,11 @@ func start_drink(forced: bool) -> bool:
 		"beatAt": 0.1, "t": 0.0, "forced": forced, "interrupt": false, "struggleAt": STRUGGLE_START, "lastStruggle": -99.0,
 		"rs": 0.0, "scuffAcc": 0.0, "pullEcho": 0.0,
 	}
-	state = "feeding"
+	last_victim = {"id": target.id, "people": people}
+	if hunger != null:
+		hunger.on_grab("%s:%d" % [map_name, target.id])
+	over_acc = 0.0
+	set_state("feeding")
 	push_victim_echo(target)
 	if front:
 		emit_sound("gasp", target.x, target.y)
@@ -867,15 +1168,38 @@ func step_drink(dt: float) -> void:
 	d["rs"] = float(d["rs"]) + (want_rs - float(d["rs"])) * (1.0 - exp(-dt / 0.12))
 	if float(d["t"]) >= float(d["struggleAt"]) and struggle(d):
 		return
-	if blood >= BLOOD_MAX:
+	var ov_open: bool = hunger != null and hunger.is_open()
+	var blood_cap: float = night.blood_max if night != null else BLOOD_MAX
+	if blood >= blood_cap and not ov_open:
 		end_drink("cap")
 		return
-	var rate: float = (2.5 + 4.5 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0)) * DRINK_BOOST * (1.0 - (1.0 - RESTRAIN_DRINK) * float(d["rs"]))
-	var gain: float = minf(BLOOD_MAX, blood + rate * dt) - blood
-	blood += gain
+	var drink_fx: float = flow.fxv("drinkRate") if flow != null else 1.0
+	var rate: float = (2.5 + 4.5 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0)) * drink_fx * DRINK_BOOST * (1.0 - (1.0 - RESTRAIN_DRINK) * float(d["rs"]))
+	var gain := 0.0
+	var over := 0.0
+	var ready := false
+	if night != null:
+		gain = night.add_blood(rate * dt)
+		if ov_open and night.blood >= night.blood_max and rate * dt - gain > 1e-9:
+			var r: Dictionary = hunger.add_overflow(rate * dt - gain)
+			over = float(r["taken"])
+			ready = r["ready"]
+	else:
+		gain = minf(BLOOD_MAX, blood_free + rate * dt) - blood_free
+		blood_free += gain
+	if over > 0.0:
+		over_acc += over
+		while over_acc >= 10.0:
+			over_acc -= 10.0
+			audio.play("overflow", {"gain": SoundData.level("overflow")["gain"], "pan": 0.0})
+	gain += over
 	d["drunk"] = float(d["drunk"]) + gain
 	var left: float = people.drink(int(d["id"]), gain)
 	d["left"] = left if left >= 0.0 else 0.0
+	if ready:
+		end_drink("gift")
+		flow.enter_gift()
+		return
 	if float(d["left"]) <= 0.5:
 		end_drink("empty")
 		return
@@ -886,7 +1210,7 @@ func step_drink(dt: float) -> void:
 			return
 		var bpm: float = 50.0 + 70.0 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0)
 		d["beatAt"] = float(d["beatAt"]) + 60.0 / bpm
-	if blood >= BLOOD_MAX:
+	if blood >= blood_cap and not (hunger != null and hunger.is_open()):
 		end_drink("cap")
 
 
@@ -917,7 +1241,8 @@ func struggle(d: Dictionary) -> bool:
 ## One heartbeat: sonar pulse from the victim, startle radius, audio, echo refresh.
 func drink_beat(d: Dictionary) -> void:
 	var v: People.Person = d["person"]
-	var r: float = 1.5 + 2.5 * clampf(float(d["drunk"]) / float(d["pool"]), 0.0, 1.0)
+	var weak: float = night.weakness() if night != null else 0.0
+	var r: float = (1.5 + 2.5 * clampf(float(d["drunk"]) / float(d["pool"]), 0.0, 1.0)) * (1.0 - 0.4 * weak)
 	emit_sound("heartbeat", v.x, v.y, {"range": r, "z": 0.55, "bounces": 0})
 	react_to(v.x, v.y, "heartbeat", r)
 	audio.play("heartbeat", spatial(v.x, v.y, float(SoundData.level("heartbeat")["gain"]) * (0.6 + 0.4 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0))))
@@ -933,10 +1258,12 @@ func end_drink(_reason: String) -> void:
 	var p: People.Person = d["person"]
 	if p.left <= 0.5:
 		people.mark_fed(int(d["id"]))
+		if night != null:
+			night.fed_count += 1
 	else:
 		people.release(int(d["id"]), player.x, player.y)
 	if state == "feeding":
-		state = "playing"
+		set_state("playing")
 
 
 # ---------------------------------------------------------------- render

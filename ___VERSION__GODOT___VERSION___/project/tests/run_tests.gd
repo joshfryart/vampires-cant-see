@@ -6,6 +6,7 @@ extends SceneTree
 
 
 func _init() -> void:
+	TestCase.tree = self
 	var filter := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--filter="):
