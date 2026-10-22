@@ -92,6 +92,12 @@ class Person:
 	var sched: Variant = null
 	var chat: Variant = null
 	var chat_cool: float = 0.0
+	## Circulatory state at the last heartbeat (set by Game.step_heartbeats), copied onto vheart echoes.
+	var heart_t: Variant = null
+	var heart_bpm: float = 0.0
+	var heart_state_k: float = 1.0
+	var heart_periph_k: float = 1.0
+	var heart_head_k: float = 1.0
 
 
 class Echo:
@@ -119,7 +125,17 @@ class Echo:
 	var chat: bool = false
 	var mode_age: float = 0.0
 	var phase_rate: float = 0.0
+	## vheart echoes: circulatory state at that beat; held victim echo: the pulse snapshot ({bpm, stateK, periphK, headK} or null).
+	var bpm: float = 0.0
+	var state_k: float = 1.0
+	var periph_k: float = 1.0
+	var head_k: float = 1.0
+	var vessel: Variant = null
 
+
+## Whole-body vessel pulse on (js flag vis.vessels): keeps heartbeat echoes alive until their wave has faded. Game turns it on;
+## the pre-vessel parity fixtures run with it off.
+static var vessels_on: bool = false
 
 var people: Array[Person] = []
 var echoes: Array[Echo] = []
@@ -1413,7 +1429,9 @@ func update_echoes(sonar: Sonar, t_prev: float, t: float) -> Array[Echo]:
 			if ex * ex + ey * ey > pu.range * pu.range:
 				continue
 			var la: float = Sonar.lit_at(pu, p.x, p.y)
-			var lo: bool = la > t_prev
+			# A heartbeat is emitted after this pass, so for a body that has not moved its own beat lands exactly on the next
+			# t_prev; with vessels on, count that edge too (the dedupe below keeps one).
+			var lo: bool = (la >= t_prev) if (vessels_on and pu.kind == "vheart") else (la > t_prev)
 			if not (lo and la <= t):
 				continue
 			var dist: float = (la - pu.t0) * pu.speed
@@ -1462,6 +1480,11 @@ func update_echoes(sonar: Sonar, t_prev: float, t: float) -> Array[Echo]:
 			e.chat = p.chat != null
 			e.mode_age = p.mode_age
 			e.phase_rate = p.phase_rate
+			if e.kind == "vheart":
+				e.bpm = p.heart_bpm
+				e.state_k = p.heart_state_k
+				e.periph_k = p.heart_periph_k
+				e.head_k = p.heart_head_k
 			if dup >= 0:
 				echoes.remove_at(dup)
 			echoes.append(e)
@@ -1470,6 +1493,11 @@ func update_echoes(sonar: Sonar, t_prev: float, t: float) -> Array[Echo]:
 	var keep: Array[Echo] = []
 	for e in echoes:
 		var life: float = e.fade if e.fade > 0.0 else fade
+		# Vessels on: keep a heartbeat until its vessel wave (feet, dub, venous swell) has faded.
+		if vessels_on and e.kind == "vheart":
+			var vl: float = Vessels.timing(e.bpm)["life"]
+			if vl > life:
+				life = vl
 		if t - e.t < life:
 			keep.append(e)
 	echoes = keep

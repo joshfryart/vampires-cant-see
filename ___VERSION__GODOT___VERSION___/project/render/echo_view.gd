@@ -36,9 +36,13 @@ func render_frame(world: World, player: Player, people: People, sonar: Sonar, t:
 	var t0 := Time.get_ticks_usec()
 	rs.set_fov(rs_fov)
 	canvas.reset()
-	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf)
+	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf, rs.tch)
+	rs.world = world
 	rs.update_boil(t)
 	rs.fig_ms = 0.0
+	rs.vessel_nodes = 0
+	rs.vessel_heart = 0.0
+	rs.vessel_feet = 0.0
 	rs.fig_vol = 0
 	rs.fig_line = 0
 	rs.fig_budget = Flags.tun("figure", "budgetMs", EchoLayer.FIG_BUDGET_MS)
@@ -100,6 +104,7 @@ static func echo_to_dict(e: People.Echo) -> Dictionary:
 		"personId": e.person_id, "kind": e.kind, "x": e.x, "y": e.y, "angle": e.angle, "lookAngle": e.look_angle,
 		"phase": e.phase, "phaseRate": e.phase_rate, "t": e.t, "strength": e.strength, "zMin": e.z_min, "zMax": e.z_max,
 		"fade": e.fade, "look": e.look, "mode": e.mode, "sit": e.sit, "wary": e.wary, "chat": e.chat, "modeAge": e.mode_age,
+		"bpm": e.bpm, "stateK": e.state_k, "periphK": e.periph_k, "headK": e.head_k, "vessel": e.vessel,
 	}
 
 

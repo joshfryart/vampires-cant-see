@@ -131,7 +131,9 @@ static func column_offsets(fov: float, columns: int) -> Array:
 
 ## Allocation-free depth buffer: out[i] = distance along the view axis to the wall in column i (max_dist when no hit),
 ## the same value cast() stores in Hit.dist, within float rounding. Used for occlusion (js r.zbuf), not for parity data.
-static func depth_columns(world, x: float, y: float, angle: float, col_cos: PackedFloat64Array, col_sin: PackedFloat64Array, max_dist: float, out: PackedFloat32Array) -> void:
+## tch (optional): out_tch[i] = char code of the tile the column hit (0 when nothing was hit), like js r.tch.
+static func depth_columns(world, x: float, y: float, angle: float, col_cos: PackedFloat64Array, col_sin: PackedFloat64Array, max_dist: float, out: PackedFloat32Array, out_tch: PackedByteArray = PackedByteArray()) -> void:
+	var want_tch: bool = out_tch.size() >= col_cos.size()
 	var ca: float = cos(angle)
 	var sa: float = sin(angle)
 	var cx0: int = int(floor(x))
@@ -144,6 +146,8 @@ static func depth_columns(world, x: float, y: float, angle: float, col_cos: Pack
 		var dy: float = sa * c + ca * s
 		if world.cell_solid(cx0, cy0):
 			out[i] = 0.0
+			if want_tch:
+				out_tch[i] = 0
 			continue
 		var ddx: float = INF if dx == 0.0 else absf(1.0 / dx)
 		var ddy: float = INF if dy == 0.0 else absf(1.0 / dy)
@@ -154,6 +158,7 @@ static func depth_columns(world, x: float, y: float, angle: float, col_cos: Pack
 		var cx: int = cx0
 		var cy: int = cy0
 		var res: float = max_dist
+		var hit_ch := 0
 		for n in cap:
 			var d: float
 			if sdx < sdy:
@@ -168,5 +173,10 @@ static func depth_columns(world, x: float, y: float, angle: float, col_cos: Pack
 				break
 			if world.cell_solid(cx, cy):
 				res = d * c
+				if want_tch:
+					var tc: String = world.tile_at(cx + 0.5, cy + 0.5)
+					hit_ch = tc.unicode_at(0) if tc != "" else 0
 				break
 		out[i] = res
+		if want_tch:
+			out_tch[i] = hit_ch

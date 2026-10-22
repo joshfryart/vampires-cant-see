@@ -1199,3 +1199,64 @@ static func draw_grab_arms_vol(c: Canvas, w: float, h: float, ws: float, X: Pack
 		c.stroke()
 	c.restore()
 	return true
+
+
+# ---------------------------------------------------------------- flush
+
+## Soft coral flush fitted to the anatomy: the face (0, toward the facing side), along the neck (1) and over the wrists (6/7,
+## along the forearm). flush = [temporal, carotid, radialL, radialR]. a = min(cap, flush[i] * skin * 0.25 * sa).
+static func draw_flush(c: Canvas, p: Pose, look: Dictionary, flush: PackedFloat32Array, o: Opts) -> bool:
+	FigureVol._init_tables()
+	var X := p.X
+	var Y := p.Y
+	if X.size() < 24 or Y.size() < 24:
+		return false
+	var skin: float = clampf(FigureVol.num(look.get("skin"), 1.0), 0.0, 1.0)
+	var sa: float = clampf(FigureVol.num(o.alpha, 1.0) * FigureVol.num(o.sa, 1.0), 0.0, 1.0)
+	var cap: float = 0.08 if o.reduced else 0.18
+	var n: int = FigureVol.parts(X, Y, p.Z, p, look, FigureVol.HPOOL)
+	FigureVol.span_sig = NAN
+	var m: FigureVol.Meas = FigureVol.M
+	var neck: FigureVol.Part = null
+	var arm_l: FigureVol.Part = null
+	var arm_r: FigureVol.Part = null
+	for i in n:
+		var q: FigureVol.Part = FigureVol.HPOOL[i]
+		if q.kind == "neck":
+			neck = q
+		elif q.kind == "arm":
+			if q.b == 6:
+				arm_l = q
+			else:
+				arm_r = q
+	c.save()
+	c.fill_style = FigureVol.COL_FLUSH
+	for i in 4:
+		var a: float = minf(cap, maxf(0.0, FigureVol.num(flush[i], 0.0)) * skin * 0.25 * sa)
+		if not (a > 0.002):
+			continue
+		c.global_alpha = a
+		c.begin_path()
+		if i == 0:
+			var nx: float = clampf(FigureVol.num(p.nose_x, 0.0), -1.0, 1.0)
+			FigureVol.ell(c, X[0] + nx * m.hr * 0.16, Y[0] + m.hry * 0.12, m.hr * 0.6, m.hry * 0.62, FigureVol.num(p.tilt, 0.0) * 0.6)
+		elif i == 1:
+			if neck != null:
+				var ang: float = atan2(neck.by - neck.ay, neck.bx - neck.ax)
+				var ln: float = sqrt((neck.bx - neck.ax) * (neck.bx - neck.ax) + (neck.by - neck.ay) * (neck.by - neck.ay))
+				FigureVol.ell(c, lerp_(neck.ax, neck.bx, 0.3), lerp_(neck.ay, neck.by, 0.3), maxf(1.0, ln * 0.32), maxf(1.0, minf(neck.r0, neck.r1) * 0.8), ang)
+			else:
+				FigureVol.ell(c, X[1], Y[1], maxf(1.5, m.hs * 0.025), maxf(1.5, m.vs * 0.02), 0.0)
+		else:
+			var f: FigureVol.Part = arm_l if i == 2 else arm_r
+			var s: int = 6 if i == 2 else 7
+			if f != null:
+				FigureVol.tangent(X[s - 4], Y[s - 4], X[s + 4], Y[s + 4], X[s], Y[s], 1.0)
+				var ang2: float = atan2(FigureVol.TAN_Y, FigureVol.TAN_X)
+				var r: float = maxf(1.0, f.r1)
+				FigureVol.ell(c, X[s] - FigureVol.TAN_X * r * 0.9, Y[s] - FigureVol.TAN_Y * r * 0.9, r * 1.6, r * 0.85, ang2)
+			else:
+				FigureVol.ell(c, X[s], Y[s], maxf(1.5, m.hs * 0.02), maxf(1.5, m.hs * 0.02), 0.0)
+		c.fill()
+	c.restore()
+	return true

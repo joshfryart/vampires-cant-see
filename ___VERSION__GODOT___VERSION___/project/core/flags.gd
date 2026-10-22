@@ -1,7 +1,7 @@
 class_name Flags
 extends RefCounted
 ## Ports the useful part of js/flags.js: named boolean feature flags and numeric tunables (with ranges) that the F9 panel
-## edits and that persist in user://flags.json. Vessels are not ported, so only the flags below exist.
+## edits and that persist in user://flags.json. Vessel flag and tunables are registered below.
 
 const PATH := "user://flags.json"
 
@@ -10,6 +10,8 @@ static var flag_info: Dictionary = {}
 static var tuns: Dictionary = {}
 static var tun_info: Dictionary = {}
 static var loaded := false
+## Tests turn this off so a developer's flags file never changes a parity result.
+static var persist := true
 
 
 static func _init_defaults() -> void:
@@ -17,8 +19,21 @@ static func _init_defaults() -> void:
 		return
 	loaded = true
 	register("dev.showFps", false, "Show the FPS/debug overlay (F3)")
+	register("vis.vessels", true, "Circulatory pulse on villagers")
+	register_tun("vessels", "alpha", 0.75, 0.0, 1.0, 0.05, "Vessel node base alpha")
+	register_tun("vessels", "size", 0.9, 0.3, 3.0, 0.1, "Vessel dot size")
+	register_tun("vessels", "hot", 1.0, 0.0, 2.0, 0.1, "Hotspot bloom scale (carotid, femoral, radial)")
+	register_tun("vessels", "veins", 0.6, 0.0, 1.0, 0.05, "Vein alpha vs arteries")
+	register_tun("vessels", "halo", 0.2, 0.0, 1.0, 0.05, "Soft halo alpha at quality 2+")
+	register_tun("vessels", "pwvScale", 1.75, 1.0, 3.0, 0.05, "Pulse wave slow-down (travel delay x this)")
+	register_tun("vessels", "minQuality", 1.0, 1.0, 3.0, 1.0, "Lowest render quality that draws vessels")
+	register_tun("vessels", "edges", 0.45, 0.0, 1.0, 0.05, "Vessel edge line alpha (quality 2+)")
+	register_tun("vessels", "window", 0.35, 0.0, 1.0, 0.05, "Vessel alpha seen through a window (x distance falloff)")
+	register_tun("vessels", "windowRange", 2.5, 0.5, 5.0, 0.25, "Cells within which vessels show through glass")
+	register_tun("vessels", "lowGamma", 0.5, 0.2, 1.0, 0.05, "Ease weak hearts (stateK < 1) so the core still shows when nearly drained")
+	register_tun("vessels", "highlight", 1.0, 0.0, 2.0, 0.1, "Travelling highlight alpha along the edges")
 	register_tun("figure", "budgetMs", 2.5, 0.5, 8.0, 0.25, "Volumetric figure draw budget per frame (ms); the rest draw as lines")
-	var f := FileAccess.open(PATH, FileAccess.READ)
+	var f := FileAccess.open(PATH, FileAccess.READ) if persist else null
 	if f != null:
 		var v: Variant = JSON.parse_string(f.get_as_text())
 		if v is Dictionary:
@@ -83,6 +98,7 @@ static func reset_all() -> void:
 
 
 static func _save() -> void:
-	var f := FileAccess.open(PATH, FileAccess.WRITE)
+	var f := FileAccess.open(PATH, FileAccess.WRITE) if persist else null
 	if f != null:
 		f.store_string(JSON.stringify({"flags": flags, "tuns": tuns}))
+	People.vessels_on = flags.get("vis.vessels", true) == true

@@ -23,6 +23,13 @@ var boil_cfg: bool = true
 var horizon: float = 180.0
 ## Per-column wall distance (js r.zbuf), larger than any figure depth when no wall.
 var zbuf: PackedFloat32Array = PackedFloat32Array()
+## Tile char code each column hit (js r.tch; 119 = window) and the world, for the vessel overlay seen through glass.
+var tch: PackedByteArray = PackedByteArray()
+var world: World = null
+## Per-frame vessel stats (js r.vesselNodes / vesselHeart / vesselFeet).
+var vessel_nodes: int = 0
+var vessel_heart: float = 0.0
+var vessel_feet: float = 0.0
 var boil_on: bool = false
 var bf: int = 0
 var lock_id: int = -1
@@ -51,6 +58,7 @@ func _init(width: int = BASE_W, height: int = BASE_H) -> void:
 	horizon = oh / 2.0
 	zbuf.resize(cols)
 	zbuf.fill(1e9)
+	tch.resize(cols)
 	var offs := Raycast.column_offsets(FOV_DEG * PI / 180.0, cols)
 	col_cos = offs[0]
 	col_sin = offs[1]

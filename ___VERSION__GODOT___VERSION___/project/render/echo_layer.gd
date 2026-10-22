@@ -194,6 +194,11 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 		if strip_a[s] > hi:
 			hi = strip_a[s]
 	if hi < 0.02:
+		# Outline gone, but the circulatory wave may still be travelling to the hands and feet (vessels on only).
+		if e.get("kind") == "vheart" and not locked and VesselDraw.on() and age >= 0.0 and age < VesselDraw.life(float(e.get("bpm", 0.0)), rs.reduced):
+			var nv: int = VesselDraw.draw_seen(rs, c, p, e, age, p.min_x - lw, p.max_x + lw, depth, player)
+			c.global_alpha = 1.0
+			return nv > 0
 		return false
 	var uniform: bool = hi - lo < 0.03 and front_strip < 0
 	var lh: float = p.lh
@@ -281,6 +286,17 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 	clipped_draw(rs, c, p.min_x - lw, p.max_x + lw, depth, wrapped)
 	if vol:
 		rs.fig_ms += (Time.get_ticks_usec() - vol_t0) / 1000.0
+	# Circulatory overlay: after the outline, not limited to the chest strip (the outline stays chest-only).
+	if e.get("kind") == "vheart" and not locked and VesselDraw.on():
+		VesselDraw.draw_seen(rs, c, p, e, age, p.min_x - lw, p.max_x + lw, depth, player)
+	# Held victim: the vessels beat with the drink pulse (the echo is rebuilt each beat, so its age is the beat age).
+	if locked and e.get("vessel") is Dictionary and VesselDraw.on():
+		var ve: Dictionary = (e["vessel"] as Dictionary).duplicate()
+		ve["kind"] = "vheart"
+		ve["x"] = e["x"]
+		ve["y"] = e["y"]
+		ve["strength"] = 1.0
+		VesselDraw.draw_seen(rs, c, p, ve, maxf(0.0, now - float(e["t"])), p.min_x - lw, p.max_x + lw, depth, player)
 	if locked:
 		if rs.fx >= 1:
 			FigureVolDraw.draw_grab_arms_vol(c, rs.ow, rs.oh, rs.wscale, p.X, p.Y, p.hs, lw, alpha, p.g_jolt, p.t_n, p.pid, base_style, rs.lock_rs)
@@ -339,6 +355,10 @@ static func draw_solo(rs: RenderState, c: Canvas, e: Dictionary, o: Dictionary) 
 	rs.horizon = rs.oh / 2.0
 	rs.zbuf.fill(1e9)
 	rs.lights = o.get("lights", [])
+	rs.tch.fill(0)
+	rs.vessel_nodes = 0
+	rs.vessel_heart = 0.0
+	rs.vessel_feet = 0.0
 	rs.fx = int(clampi(int(round(float(o["fx"]))), 0, 2)) if o.has("fx") else rs.fx
 	rs.fig_ms = 0.0
 	rs.fig_vol = 0

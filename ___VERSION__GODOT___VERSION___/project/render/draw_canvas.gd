@@ -12,8 +12,9 @@ class Stroke:
 	var color: Color
 	var width: float
 
-var strokes: Array[Stroke] = []
-var fills: Array = []          # [Rect2, Color] filled dots
+## Everything drawn this frame in call order, so later fills hide earlier lines the way a canvas does:
+## ["s", Stroke] | ["r", Rect2, Color] | ["p", PackedVector2Array, Color] | ["t", text item].
+var ops: Array = []
 
 var _path: Array = []          # subpaths: Array of PackedVector2Array
 var _cur: PackedVector2Array = PackedVector2Array()
@@ -22,20 +23,17 @@ var _clip: Rect2 = Rect2()
 var _clip_on: bool = false
 var _stack: Array = []
 var _xf: Transform2D = Transform2D.IDENTITY
-var texts: Array = []          # text items: {text, xf, color, size, bold, align, outline, max_w}
 var text_baseline_middle: bool = true
 
 
 func reset() -> void:
-	strokes.clear()
-	fills.clear()
+	ops.clear()
 	_path.clear()
 	_cur = PackedVector2Array()
 	_path_rects.clear()
 	_clip_on = false
 	_stack.clear()
 	_xf = Transform2D.IDENTITY
-	texts.clear()
 	global_alpha = 1.0
 	stroke_style = "#000"
 	fill_style = "#000"
@@ -91,11 +89,11 @@ func fill_rect(x: float, y: float, w: float, h: float) -> void:
 		r = r.intersection(_clip)
 		if r.size.x <= 0.0 or r.size.y <= 0.0:
 			return
-	fills.append([r, col])
+	ops.append(["r", r, col])
 
 
 func _text_item(text: String, x: float, y: float, outline: bool, max_w: float) -> void:
-	texts.append({"text": text, "xf": _xf * Transform2D(0.0, Vector2(x, y)), "color": _fill_color() if not outline else _color(), "size": font_px, "bold": font_bold, "align": text_align, "outline": outline, "max_w": max_w, "width": line_width})
+	ops.append(["t", {"text": text, "xf": _xf * Transform2D(0.0, Vector2(x, y)), "color": _fill_color() if not outline else _color(), "size": font_px, "bold": font_bold, "align": text_align, "outline": outline, "max_w": max_w, "width": line_width}])
 
 
 func fill_text(text: String, x: float, y: float, max_w: float = -1.0) -> void:
@@ -272,10 +270,11 @@ func _emit(points: PackedVector2Array, col: Color) -> void:
 	s.points = points
 	s.color = col
 	s.width = line_width
-	strokes.append(s)
+	ops.append(["s", s])
 
 
-## Fill the rect() subpaths (dots), clipped to the active clip rect.
+## Fill the current path: rect() subpaths (dots) and every moveTo/lineTo/arc subpath as a closed polygon (nonzero winding is
+## approximated by merging self-overlaps), clipped to the active clip rect.
 func fill() -> void:
 	var col := _fill_color()
 	if col.a <= 0.0:
@@ -286,36 +285,69 @@ func fill() -> void:
 			rr = rr.intersection(_clip)
 			if rr.size.x <= 0.0 or rr.size.y <= 0.0:
 				continue
-		fills.append([rr, col])
+		ops.append(["r", rr, col])
+	_flush_cur()
+	for sub in _path:
+		var pts: PackedVector2Array = sub
+		if pts.size() > 1 and pts[0].distance_to(pts[pts.size() - 1]) < 1e-6:
+			pts = pts.slice(0, pts.size() - 1)
+		if pts.size() < 3:
+			continue
+		var polys: Array = [pts]
+		if _clip_on:
+			var box := PackedVector2Array([_clip.position, Vector2(_clip.end.x, _clip.position.y), _clip.end, Vector2(_clip.position.x, _clip.end.y)])
+			polys = Geometry2D.intersect_polygons(pts, box)
+		for pl in polys:
+			_add_poly(pl, col)
+
+
+func _add_poly(pts: PackedVector2Array, col: Color) -> void:
+	if pts.size() < 3:
+		return
+	if not Geometry2D.triangulate_polygon(pts).is_empty():
+		ops.append(["p", pts, col])
+		return
+	# self-overlapping outline: merge it with nothing to get simple pieces
+	for q in Geometry2D.merge_polygons(pts, PackedVector2Array()):
+		if not Geometry2D.is_polygon_clockwise(q) and Geometry2D.triangulate_polygon(q).size() > 0:
+			ops.append(["p", q, col])
 
 
 ## Draw everything collected so far onto a CanvasItem (call from its _draw()).
 func paint(item: CanvasItem) -> void:
-	for f in fills:
-		item.draw_rect(f[0], f[1], true)
-	for s in strokes:
-		item.draw_polyline(s.points, s.color, maxf(1.0, s.width), true)
-	if not texts.is_empty():
-		var font: Font = _font()
-		for t in texts:
-			var xf: Transform2D = t["xf"]
-			item.draw_set_transform_matrix(xf)
-			var size: int = maxi(1, int(round(t["size"])))
-			var dy: float = (font.get_ascent(size) - font.get_descent(size)) * 0.5
-			var al := HORIZONTAL_ALIGNMENT_LEFT
-			var w := -1.0
-			if t["align"] == "center":
-				al = HORIZONTAL_ALIGNMENT_CENTER
-				w = 600.0
-			elif t["align"] == "right":
-				al = HORIZONTAL_ALIGNMENT_RIGHT
-				w = 600.0
-			var ox: float = -w * 0.5 if t["align"] == "center" else (-w if t["align"] == "right" else 0.0)
-			if t["outline"]:
-				item.draw_string_outline(font, Vector2(ox, dy), t["text"], al, w, size, maxi(1, int(round(t["width"]))), t["color"])
-			else:
-				item.draw_string(font, Vector2(ox, dy), t["text"], al, w if t["max_w"] < 0.0 else t["max_w"], size, t["color"])
-		item.draw_set_transform_matrix(Transform2D.IDENTITY)
+	for op in ops:
+		match op[0]:
+			"r":
+				item.draw_rect(op[1], op[2], true)
+			"p":
+				item.draw_colored_polygon(op[1], op[2])
+			"s":
+				var st: Stroke = op[1]
+				item.draw_polyline(st.points, st.color, maxf(1.0, st.width), true)
+			"t":
+				_paint_text(item, op[1])
+
+
+func _paint_text(item: CanvasItem, t: Dictionary) -> void:
+	var font: Font = _font()
+	var xf: Transform2D = t["xf"]
+	item.draw_set_transform_matrix(xf)
+	var size: int = maxi(1, int(round(t["size"])))
+	var dy: float = (font.get_ascent(size) - font.get_descent(size)) * 0.5
+	var al := HORIZONTAL_ALIGNMENT_LEFT
+	var w := -1.0
+	if t["align"] == "center":
+		al = HORIZONTAL_ALIGNMENT_CENTER
+		w = 600.0
+	elif t["align"] == "right":
+		al = HORIZONTAL_ALIGNMENT_RIGHT
+		w = 600.0
+	var ox: float = -w * 0.5 if t["align"] == "center" else (-w if t["align"] == "right" else 0.0)
+	if t["outline"]:
+		item.draw_string_outline(font, Vector2(ox, dy), t["text"], al, w, size, maxi(1, int(round(t["width"]))), t["color"])
+	else:
+		item.draw_string(font, Vector2(ox, dy), t["text"], al, w if t["max_w"] < 0.0 else t["max_w"], size, t["color"])
+	item.draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 static var _mono: Font = null

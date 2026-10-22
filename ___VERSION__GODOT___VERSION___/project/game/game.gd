@@ -188,6 +188,7 @@ func _ready() -> void:
 ## The body of _ready, callable by tests that build the Game outside the tree.
 func boot() -> void:
 	rng.seed = 1
+	People.vessels_on = Flags.get_flag("vis.vessels")
 	var scenario_name := ""
 	var want_map := ""
 	for a in OS.get_cmdline_user_args():
@@ -873,6 +874,83 @@ func step_ambient(dt: float) -> void:
 			continue
 		q.breath_t = 2.0 + frng()
 		audio.breath({"pan": pan_to(q.x, q.y), "dist": sqrt(dx * dx + dy * dy), "behind": cos(atan2(dy, dx) - player.angle) < 0.0, "occluded": first_solid(player.x, player.y, q.x, q.y) != null})
+	step_heartbeats(dt)
+
+
+## Vessel mode name for a villager: flee/cower 130, startle (or bumping) 100, wary 90, otherwise calm 65 (js heartMode).
+static func heart_mode(q: People.Person) -> String:
+	if q.mode == "flee" or q.mode == "cower":
+		return q.mode
+	if q.mode == "startle" or q.bumping:
+		return "startle"
+	if q.wary > 0.0:
+		return "wary"
+	return "calm"
+
+
+## Villager pulse state (single source of truth for the audio heartbeat and the vheart echo): Vessels.state with blood = left/pool.
+static func heart_state(q: People.Person) -> Dictionary:
+	var blood: float = clampf(q.left / q.pool, 0.0, 1.0) if q.pool > 0.0 else 1.0
+	return Vessels.state("villager", heart_mode(q), blood)
+
+
+## Pulse snapshot of a held victim for the vessel overlay (drawn on the locked figure, which has no vheart echo).
+static func victim_vessel(p: People.Person) -> Variant:
+	var blood: float = clampf(p.left / p.pool, 0.0, 1.0) if p.pool > 0.0 else 1.0
+	var st := Vessels.state("villager", "drinking", blood)
+	if not st["pulse"]:
+		return null
+	return {"bpm": st["bpm"], "stateK": st["stateK"], "periphK": st["periphK"], "headK": st["headK"]}
+
+
+## Heartbeat of the nearest two villagers within hearDist (3 cells, also through a wall): sound plus a chest pulse. The drink
+## victim is skipped: the drink beat owns it while the player drinks (js stepHeartbeats).
+func step_heartbeats(dt: float) -> void:
+	var hear: float = float(SoundData.level("vheart").get("hearDist", 3.0))
+	var victim: Variant = drink["person"] if drink != null else null
+	var n1: People.Person = null
+	var d1: float = hear * hear
+	var n2: People.Person = null
+	var d2: float = hear * hear
+	for q in people.people:
+		if q.mode == "fed" or q == victim:
+			continue
+		var dx: float = q.x - player.x
+		var dy: float = q.y - player.y
+		var d: float = dx * dx + dy * dy
+		if d >= d2:
+			continue
+		if d < d1:
+			n2 = n1
+			d2 = d1
+			n1 = q
+			d1 = d
+		else:
+			n2 = q
+			d2 = d
+	for k in 2:
+		var q: People.Person = n1 if k == 0 else n2
+		if q == null:
+			continue
+		if q.heart_t == null:
+			q.heart_t = 0.2 + frng() * 0.6
+		q.heart_t = float(q.heart_t) - dt
+		if float(q.heart_t) > 0.0:
+			continue
+		var hs := heart_state(q)
+		if not hs["pulse"] or not (hs["bpm"] > 0.0):
+			q.heart_t = 0.5
+			continue
+		var bpm: float = hs["bpm"]
+		q.heart_t = 60.0 / bpm
+		# Snapshot fields for the vheart echo (People.update_echoes copies them onto the echo).
+		q.heart_bpm = bpm
+		q.heart_state_k = hs["stateK"]
+		q.heart_periph_k = hs["periphK"]
+		q.heart_head_k = hs["headK"]
+		# Each beat also sends a small chest-high pulse (like a footstep does for the feet) that shows the chest.
+		emit_sound("vheart", q.x, q.y, {"z": 0.65})
+		audio.heartbeat({"pan": pan_to(q.x, q.y), "dist": sqrt(d1 if k == 0 else d2), "behind": cos(atan2(q.y - player.y, q.x - player.x) - player.angle) < 0.0, "occluded": first_solid(player.x, player.y, q.x, q.y) != null, "bpm": bpm})
 
 
 # ---------------------------------------------------------------- listening and barks
@@ -1345,6 +1423,7 @@ func push_victim_echo(p: People.Person) -> void:
 	e.z_min = 0.0
 	e.z_max = 1.2
 	e.fade = 2.2
+	e.vessel = victim_vessel(p)
 	people.echoes.append(e)
 	while people.echoes.size() > people.max_echoes:
 		people.echoes.pop_front()
