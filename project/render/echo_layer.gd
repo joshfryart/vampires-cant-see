@@ -12,6 +12,18 @@ const C_HI := [242, 248, 255]
 const COL_LOCK := "#ff8a78"
 ## Per-frame time allowed for volumetric figures (ms); past it the rest of the frame's villagers are line figures.
 const FIG_BUDGET_MS := 2.5
+## Stroke colour the swept-figure recording is drawn in; replay swaps it for the strip's colour (see DrawCanvas.replay_rec).
+const REC_SENTINEL := "#fe01fd"
+static var _rec: DrawCanvas = null
+static var no_fast: bool = false   # tests: draw swept figures strip by strip instead of replaying a recording
+
+
+static func _rec_canvas() -> DrawCanvas:
+	if _rec == null:
+		_rec = DrawCanvas.new()
+	_rec.reset()
+	_rec.rec_mode = true
+	return _rec
 
 
 static func _round_js(x: float) -> int:
@@ -229,11 +241,43 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 			FigureLine.draw(cv, p, sa, style)
 	var span := PackedFloat64Array([0.0, 0.0])
 	var to_y := func(z: float) -> float: return p.f_floor_y - z * Pose.FIG_H * lh * p.f_sy * p.vs
+	var rec_box: Array = [null]
 	var wrapped := func(cv: Canvas) -> void:
 		if uniform:
 			draw_fig.call(cv, hi, base_style)
 			return
-		for s in n_strips:
+		var dcv: DrawCanvas = cv as DrawCanvas
+		var fast: bool = dcv != null and vol and not no_fast
+		if fast:
+			# Build the figure's geometry once (strip alpha sa_ref, sentinel stroke colour), then replay it per height strip.
+			var rec: DrawCanvas = rec_box[0]
+			var sa_ref: float = 1.0 / maxf(1.0, alpha)
+			if rec == null:
+				rec = _rec_canvas()
+				rec._xf = dcv._xf
+				fo.rec = true
+				eo.rec = true
+				draw_fig.call(rec, sa_ref, REC_SENTINEL)
+				fo.rec = false
+				eo.rec = false
+				rec_box[0] = rec
+			var sent := Color.html(REC_SENTINEL)
+			for s in n_strips:
+				var sa: float = strip_a[s]
+				if sa < 0.02:
+					continue
+				var za: float = Pose.STRIP_Z[s]
+				var zb: float = Pose.STRIP_Z[s + 1]
+				var y_top: float = -50.0 if zb >= Pose.FIG_ZTOP - 1e-3 else to_y.call(zb)
+				var y_bot: float = p.f_floor_y + 30.0 * rs.wscale if za <= 1e-3 else to_y.call(za)
+				var clip_r: Rect2 = dcv._xf * Rect2(p.min_x, y_top, p.max_x - p.min_x, y_bot - y_top)
+				if dcv._clip_on:
+					clip_r = clip_r.intersection(dcv._clip)
+				if clip_r.size.x <= 0.0 or clip_r.size.y <= 0.0:
+					continue
+				var st: String = "#ffffff" if s == front_strip and not locked else base_style
+				dcv.replay_rec(rec, clip_r, sa, sa_ref, sent, dcv.style_color(st))
+		for s in (0 if fast else n_strips):
 			var sa: float = strip_a[s]
 			if sa < 0.02:
 				continue
@@ -344,6 +388,19 @@ static func draw_echoes(rs: RenderState, c: Canvas, p: Pose, echoes: Array, sona
 		if draw_person(rs, c, p, player, tan_half, e, b, age, age < FLASH_AGE, t, false):
 			n += 1
 	return n
+
+
+## Pay the first-use costs (static tables, script and shader-free warm paths) of the volumetric figure at boot: draws one swept and one
+## lit effects-2 villager into a throwaway DrawCanvas. Call once, e.g. from Game.boot. Does not touch any game state.
+static func warm_up() -> void:
+	var e := {"x": 7.0, "y": 5.5, "angle": PI, "lookAngle": 0.0, "phase": 0.0, "phaseRate": 0.0, "personId": 3, "t": 0.0, "strength": 1.0, "zMin": 0.0, "zMax": 2.0, "mode": "path", "sit": false, "modeAge": 0.1, "fade": 3.0,
+		"look": {"height": 1.0, "build": 1.0, "stride": 1.0, "acc": "none", "body": "round", "head": "square", "hat": "cap", "hair": "curls", "beard": true, "nose": 1.0, "coat": true, "prop": "cane"}}
+	var cv := DrawCanvas.new()
+	for age in [0.1, -1.0]:
+		var rs := RenderState.new()
+		cv.reset()
+		draw_solo(rs, cv, e, {"quality": 3, "t": 1.0, "age": age, "b": 0.9, "fx": 2, "lights": [{"x": 6.3, "y": 4.0, "radius": 3.0}], "player": {"x": 5.5, "y": 5.5, "angle": 0.0}})
+	cv.reset()
 
 
 ## Tool/test hook (js drawSolo, effects 0): draw one echo with no world, nothing occludes it.

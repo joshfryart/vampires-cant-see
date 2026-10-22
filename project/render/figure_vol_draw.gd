@@ -19,6 +19,7 @@ class Opts:
 	var depth: float = 0.0
 	var reduced: bool = false
 	var sa: float = 1.0
+	var rec: bool = false   # recording for strip replay: alpha ops that are linear in sa carry a +2.0 marker (DrawCanvas.rec_mode)
 	var style: String = "#ffffff"
 
 
@@ -285,6 +286,7 @@ static func draw(c: Canvas, sa_in: float, style: String, p: Pose, look: Dictiona
 	var rim_k: float = o.rim_k
 	var rim_side: float = -1.0 if o.rim_side < 0.0 else 1.0
 	var lod: int = p.lod
+	var lin: float = 2.0 if o.rec else 0.0
 	var cut: float = p.min_x
 	var cut_w: float = p.max_x - cut
 
@@ -307,12 +309,12 @@ static func draw(c: Canvas, sa_in: float, style: String, p: Pose, look: Dictiona
 	var srx: float = maxf(1.0, 0.12 * m.hs * m.bw)
 	var sry: float = maxf(0.4, srx * 0.18)
 	if fx >= 2 and near:
-		c.global_alpha = 0.4 * sa
+		c.global_alpha = lin + 0.4 * sa
 		c.fill_style = FigureVol.BLACK
 		c.begin_path()
 		FigureVol.ell(c, fxm, fym, srx, sry, 0.0)
 		c.fill()
-	c.global_alpha = clampf(0.2 * sa, 0.0, 1.0)
+	c.global_alpha = lin + clampf(0.2 * sa, 0.0, 1.0)
 	c.line_width = lw
 	c.begin_path()
 	c.move_to(fxm - srx, fym)
@@ -357,7 +359,7 @@ static func draw(c: Canvas, sa_in: float, style: String, p: Pose, look: Dictiona
 		c.begin_path()
 		emit_poly(c, q)
 		if fx >= 2 and near and q.kind != "extra":
-			c.global_alpha = minf(1.0, 0.55 * sa)
+			c.global_alpha = lin + minf(1.0, 0.55 * sa)
 			c.fill_style = FigureVol.BLACK
 			c.fill()
 		if masked:
@@ -397,7 +399,7 @@ static func draw(c: Canvas, sa_in: float, style: String, p: Pose, look: Dictiona
 			elif q.kind == "torso" and lod >= 2 and m.belt != 0.0 and outfit != "robe" and outfit != "cloak":
 				torso_folds(c, q, m, lw, alpha)
 		if rim_k > 0.02 and near:
-			c.global_alpha = clampf(0.5 * rim_k * sa, 0.0, 1.0)
+			c.global_alpha = lin + clampf(0.5 * rim_k * sa, 0.0, 1.0)
 			c.stroke_style = FigureVol.COL_RIM
 			c.line_width = lw * 0.8
 			c.begin_path()

@@ -15,6 +15,9 @@ func _init() -> void:
 		if sc["in"]["echo"].get("mode") == "path" and not sc["in"]["echo"]["look"].get("coat", false):
 			base = (sc["in"]["echo"] as Dictionary).duplicate()
 			break
+	var tw := Time.get_ticks_usec()
+	EchoLayer.warm_up()
+	print("FIGBENCH warm_up ms=%.1f" % [(Time.get_ticks_usec() - tw) / 1000.0])
 	var lights := [{"x": 6.3, "y": 4, "radius": 3}]
 	for fxl in [0, 1, 2]:
 		for age in [-1.0, 0.1, 0.3]:

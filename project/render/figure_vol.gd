@@ -766,13 +766,15 @@ static func contains(p: Part, x: float, y: float) -> bool:
 	if p == null or not (p.n >= 3):
 		return false
 	var n: int = p.n
+	var px := p.px
+	var py := p.py
 	var wn := 0
-	var jx: float = (p.px[n - 1] + p.px[0]) * 0.5
-	var jy: float = (p.py[n - 1] + p.py[0]) * 0.5
+	var jx: float = (px[n - 1] + px[0]) * 0.5
+	var jy: float = (py[n - 1] + py[0]) * 0.5
 	for i in n:
 		var k: int = 0 if i == n - 1 else i + 1
-		var ix: float = (p.px[i] + p.px[k]) * 0.5
-		var iy: float = (p.py[i] + p.py[k]) * 0.5
+		var ix: float = (px[i] + px[k]) * 0.5
+		var iy: float = (py[i] + py[k]) * 0.5
 		var cr: float = (ix - jx) * (y - jy) - (x - jx) * (iy - jy)
 		if jy <= y:
 			if iy > y and cr > 0.0:
