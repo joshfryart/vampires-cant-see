@@ -22,6 +22,9 @@ uniform vec2 map_size = vec2(24.0, 16.0);
 uniform int arc_trail = 4;         // wall water-ripple arcs per pulse (render quality 3: 4, quality 2: 2, 0 = off)
 uniform float vib_on = 1.0;        // struck-surface vibration lines (render.js drawWallVibe)
 uniform float reduced_motion = 0.0;
+uniform float fx = 2.0;            // effects level after the governor cap (0..2)
+uniform float fx_taper = 1.0;      // fx == 2 and quality >= 3: vertical lines thin out toward their ends
+uniform float quality = 3.0;       // render quality 0..3
 
 const float DOOR_GAIN = 1.35;
 const vec3 COL_WOOD_DOOR = vec3(1.0, 0.8863, 0.7686);
@@ -168,8 +171,12 @@ void fragment() {
 			float a = line_alpha(bv, depth) * strength;
 			a = min(1.0, a + 0.5 * flash * strength);
 			vec3 col = flash > 0.0 ? vec3(1.0) : bucket_col(bv);
-			float d = side_u / fwx - w_wall * 0.5;
-			put(outc, col, a, tent(d, w_wall), tent(d, w_wall * 3.4));
+			float wv = w_wall;
+			if (fx_taper > 0.5 && (vt < 0.15 || vt > 0.85)) {
+				wv = line_px_thin; // JS vert(): outer 30% of each half goes to the thin width class
+			}
+			float d = side_u / fwx - wv * 0.5;
+			put(outc, col, a, tent(d, wv), tent(d, wv * 3.4));
 		}
 
 		if (vt >= 0.0 && vt <= 1.0) {
@@ -190,6 +197,16 @@ void fragment() {
 						float l1 = mix(v1 + w1, v1 + 0.015 * (cell_hash(cell.x, cell.y, 5) - 0.5) - w1, u);
 						float l2 = mix(v2, v2 + 0.02 * (cell_hash(cell.x, cell.y, 6) - 0.5) + w1, u);
 						cov = max(tent((vt - l1) / fwy, wd), tent((vt - l2) / fwy, wd));
+						if (fx >= 0.5) {
+							// texture: two short slanted hatch strokes per block, low in the block (render.js drawMat, fx >= 1)
+							for (int hk = 0; hk < 2; hk++) {
+								float hu = 0.1 + 0.7 * cell_hash(cell.x, cell.y, 9 + hk);
+								if (u >= hu && u <= hu + 0.1) {
+									float hv = 0.7 + 0.12 * float(hk) + 0.08 * cell_hash(cell.x, cell.y, 11 + hk);
+									cov = max(cov, tent((vt - (hv + 0.5 * (u - hu))) / fwy, wd));
+								}
+							}
+						}
 						float j0 = 0.2 + 0.6 * cell_hash(cell.x, cell.y, 3);
 						float j1 = 0.2 + 0.6 * cell_hash(cell.x, cell.y, 4);
 						float j2 = 0.2 + 0.6 * cell_hash(cell.x, cell.y, 7);
@@ -213,7 +230,12 @@ void fragment() {
 						}
 					} else if (code == 87) { // wood: grain squiggles
 						float ph = cell_hash(cell.x, cell.y, 8) * 6.0;
+						// texture: grain drawn as dashes, skipped on every other column pair (render.js drawMat)
+						bool dash_gap = fx >= 0.5 && (int(floor((col_i + 1.0) * 0.5)) & 1) != 0;
 						for (int k = 0; k < 3; k++) {
+							if (dash_gap) {
+								break;
+							}
 							float lv = 0.2 + float(k) * 0.3 + 0.03 * sin(along * 11.0 + ph + float(k) * 2.1);
 							cov = max(cov, tent((vt - lv) / fwy, wd));
 						}
@@ -233,7 +255,7 @@ void fragment() {
 
 			// ---- doors and gates ----
 			if (is_door && b > 0.12 && bd >= 0.08) {
-				float pm = (age >= 0.0 && age < 0.4) ? 1.0 + 0.5 * sin(PI * age / 0.4) : 1.0;
+				float pm = (reduced_motion < 0.5 && age >= 0.0 && age < 0.4) ? 1.0 + 0.5 * sin(PI * age / 0.4) : 1.0;
 				vec3 col = is_gate ? COL_GATE : COL_WOOD_DOOR;
 				float f = pm * DOOR_GAIN;
 				float d_ = DOOR_GAIN;
@@ -316,7 +338,7 @@ void fragment() {
 				bool lit = lit_v > 0.0;
 				if (b > 0.12 && bd >= 0.08) {
 					vec3 col = lit ? COL_WIN_LIT : COL_WIN_DARK;
-					float pm = (age >= 0.0 && age < 0.4) ? 1.0 + 0.4 * sin(PI * age / 0.4) : 1.0;
+					float pm = (reduced_motion < 0.5 && age >= 0.0 && age < 0.4) ? 1.0 + 0.4 * sin(PI * age / 0.4) : 1.0;
 					float G = 1.25 * pm;
 					float bow = (u - 0.5) * 0.05;
 					float a_line = line_alpha(bd, depth);
@@ -344,6 +366,20 @@ void fragment() {
 						if (u >= 0.22 && u <= 0.32) {
 							float dl2 = (vt - (0.32 + (u - 0.22) * 1.3)) / fwy / sqrt(1.0 + 1.69);
 							put(outc, col, min(1.0, a_line * G), tent(dl2, line_px_thin), 0.0);
+						}
+					}
+				}
+				// one seeded glint per window: two crossed strokes that fade once with the afterglow (fx 2, quality >= 2; render.js drawWindow)
+				if (fx > 1.5 && quality >= 1.5 && age >= 0.0) {
+					float ga = 0.3 * glow(age, glow_dur(L.w)) * min(1.0, line_alpha(b, depth) * 2.0);
+					if (ga >= 0.04) {
+						float gu = 0.2 + 0.6 * cell_hash(cell.x, cell.y, 11);
+						float gv = 0.2 + 0.5 * cell_hash(cell.x, cell.y, 12);
+						float gx = (u - gu) / fwx;
+						float gy = (vt - gv) / fwy;
+						if (abs(gx) <= 1.5 && abs(gy) <= 1.5) {
+							float gd = min(abs(gx - gy), abs(gx + gy)) * 0.7071;
+							put(outc, (lit ? COL_WIN_LIT : COL_WIN_DARK), min(0.25, ga), tent(gd, line_px_thin), 0.0);
 						}
 					}
 				}

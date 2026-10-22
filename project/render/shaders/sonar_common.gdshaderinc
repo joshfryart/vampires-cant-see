@@ -124,7 +124,7 @@ vec4 sonar_sample2(vec2 p, float t) {
 	return vec4(b0, b1, lit ? (use_lo ? a0 : a1) : -1.0, lit ? (use_lo ? f0 : f1) : 0.0);
 }
 
-// Same, with the afterglow applied (render.js drawWalls): returns (b0, b1, age, 0); zeroed when dark.
+// Same, with the afterglow applied (render.js drawWalls): returns (b0, b1, age, fade used); zeroed when dark.
 vec4 sonar_wall_light(vec2 p, float t, float fade_scale) {
 	vec4 s = sonar_sample2(p, t);
 	float b = max(s.x, s.y);
@@ -137,7 +137,7 @@ vec4 sonar_wall_light(vec2 p, float t, float fade_scale) {
 	if (max(c0, c1) <= 0.01) {
 		return vec4(0.0, 0.0, -1.0, 0.0);
 	}
-	return vec4(c0, c1, s.z, 0.0);
+	return vec4(c0, c1, s.z, s.w * fade_scale);
 }
 
 float hash11(float x) {

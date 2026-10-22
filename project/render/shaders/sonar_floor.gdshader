@@ -14,6 +14,11 @@ uniform int ring_count = 0;
 uniform bool is_ceiling = false;
 uniform bool player_indoor = true;
 uniform float wscale = 1.0;
+uniform float reduced_motion = 0.0; // 1 = reduce motion: weak-ping flicker becomes a static dim
+uniform float boil_on = 1.0;        // line boil (config on, not reduced, quality >= 2): dot jitter
+uniform float quality = 3.0;        // render quality 0..3 (js r.quality)
+uniform float fx = 2.0;             // effects level after the governor cap (0..2)
+uniform float mat_detail = 1.0;     // js airOn: material-shaped stipple behind the front arc
 
 varying vec3 wpos;
 
@@ -82,11 +87,12 @@ void fragment() {
 
 		// ---- footstep rings (kind 1 step, 2 personStep) ----
 		if (kind > 0.5 && kind < 2.5) {
-			if (is_ceiling || age < 0.0 || age >= fade) {
+			if (is_ceiling || age < 0.0 || age >= fade || quality < 0.5) {
 				continue;
 			}
 			bool own = kind > 1.5;
-			int nrk = own ? 2 : 3;
+			int nr = quality >= 1.5 ? 3 : 2;
+			int nrk = own ? min(nr, 2) : nr;
 			vec2 q = d;
 			float rho = dh;
 			float th = a;
@@ -136,13 +142,16 @@ void fragment() {
 			continue;
 		}
 		bool bounce = gen > 0.5;
+		if (gen > 1.5 && quality < 2.5) {
+			continue; // second-generation bounces only at quality 3
+		}
 		int ai = ray_idx(a, n);
 		vec2 vb = texelFetch(vis_tex, ivec2(ai, i), 0).rg;
-		float wkw = 1.0 - 0.3 * min(1.0, weak) * (0.5 + 0.5 * sin(t * 15.0 + float(i)));
+		float wkw = reduced_motion > 0.5 ? 0.7 : 1.0 - 0.3 * min(1.0, weak) * (0.5 + 0.5 * sin(t * 15.0 + float(i)));
 
 		// ---- dotted pulse ring (floor; ceiling gets the 0.4 pass indoors) ----
 		bool ceil_ok = r0.z >= 0.3;
-		bool ring_here = !is_ceiling || (player_indoor && !bounce && ceil_ok);
+		bool ring_here = !is_ceiling || (quality >= 1.5 && player_indoor && !bounce && ceil_ok);
 		if (ring_here && abs(dh - rr) < rr * 0.06 + 4.0 * wpp) {
 			float alpha = 0.85 * (1.0 - rr / rng) * min(1.0, str * 1.3);
 			float dotk = bounce ? 0.7 : 1.0;
@@ -176,7 +185,7 @@ void fragment() {
 				}
 				if (ok) {
 					float jit = hash01(int(s) + i * 17, int(t * 10.0) % 4) - 0.5;
-					vec2 cp = to_px(VIEW_MATRIX, PROJECTION_MATRIX, vec3(c.x, wpos.y, c.y), vps) + vec2(jit, -jit) * wscale;
+					vec2 cp = to_px(VIEW_MATRIX, PROJECTION_MATRIX, vec3(c.x, wpos.y, c.y), vps) + vec2(jit, -jit) * wscale * boil_on;
 					float hd = 1.1 * wscale * dk;
 					vec2 dd = abs(cp - fp);
 					if (dd.x <= hd + 0.5 && dd.y <= hd + 0.5) {
@@ -188,7 +197,7 @@ void fragment() {
 		}
 
 		// ---- thin floor front arc and the stipple behind it (floor only, primary pulses only) ----
-		if (!is_ceiling && !bounce && r0.z <= 0.7 && rr >= 0.3) {
+		if (!is_ceiling && quality >= 1.5 && !bounce && r0.z <= 0.7 && rr >= 0.3) {
 			float fa = 0.5 * (1.0 - rr / rng) * min(1.0, str * 1.3) * (fade > 0.0 ? max(0.0, 1.0 - age / (fade * 2.0)) : 1.0);
 			if (weak > 0.0) {
 				fa *= wkw;
@@ -199,14 +208,27 @@ void fragment() {
 				if (cov > 0.0) {
 					outc += vec3(0.91, 0.95, 1.0) * fa * cov;
 				}
+				// soft gradient front (fx >= 1): two fainter arcs trailing behind, static offsets (render.js drawFloorFront)
+				if (fx >= 0.5) {
+					for (int sq = 0; sq < 2; sq++) {
+						float Rq = rr - 0.06 * float(sq + 1);
+						if (Rq < 0.3) {
+							break;
+						}
+						float covq = clamp(1.5 * 0.5 + 0.5 - abs(dh - Rq) / wpp, 0.0, 1.0);
+						outc += vec3(0.91, 0.95, 1.0) * fa * (sq == 0 ? 0.45 : 0.2) * covq;
+					}
+				}
+				bool air = mat_detail > 0.5 && quality >= 1.5;
 				float rough = clamp(r4.x, 0.0, 1.0);
-				float span = 0.25 + 0.5 * rough;
+				float span = air ? 0.25 + 0.5 * rough : 0.5;
 				float back_f = (rr - dh) / rr;
 				if (back_f > 0.04 && back_f < 0.07 + span) {
 					int seed = int(floor(r0.w * 1000.0 + 0.5)) + i * 7919;
-					int nd = int(min(80.0, floor(40.0 * (0.5 + 1.5 * rough) + 0.5)));
-					float dw = r4.y > 1.5 ? 2.0 : 1.0;
-					float dhh = r4.y > 0.5 && r4.y < 1.5 ? 2.0 : 1.0;
+					float nd_base = quality >= 2.5 ? 40.0 : 20.0;
+					int nd = air ? int(min(80.0, floor(nd_base * (0.5 + 1.5 * rough) + 0.5))) : int(nd_base);
+					float dw = air && r4.y > 1.5 ? 2.0 : 1.0;
+					float dhh = air && r4.y > 0.5 && r4.y < 1.5 ? 2.0 : 1.0;
 					for (int di = 0; di < 80; di++) {
 						if (di >= nd) {
 							break;
@@ -235,7 +257,7 @@ void fragment() {
 	}
 
 	// ---- secondary echo rings (floor only): wavy dotted circles ----
-	if (!is_ceiling) {
+	if (!is_ceiling && quality >= 1.5) {
 		for (int k = 0; k < 16; k++) {
 			if (k >= ring_count) {
 				break;
@@ -257,6 +279,10 @@ void fragment() {
 			float rw = R * (1.0 + 0.05 * sin(6.0 * ths + t * 1.6 + g1.y));
 			vec2 c = g0.xy + vec2(cos(ths), sin(ths)) * rw;
 			vec2 cp = to_px(VIEW_MATRIX, PROJECTION_MATRIX, vec3(c.x, wpos.y, c.y), vps);
+			if (boil_on > 0.5) {
+				int bf = int(t * 10.0) % 4;
+				cp += vec2(hash01(int(s) + k * 11, bf) - 0.5, hash01(int(s) + k * 11 + 4096, bf) - 0.5) * wscale;
+			}
 			vec2 dd = abs(cp - fp);
 			float hd = 1.0 * wscale;
 			if (dd.x <= hd + 0.5 && dd.y <= hd + 0.5) {

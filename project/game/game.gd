@@ -216,6 +216,7 @@ func boot() -> void:
 	sonar = Sonar.create()
 	apply_config()
 	enter_map(start_name, sp["x"], sp["y"], sp["angle"], "")
+	EchoLayer.warm_up()  # builds the volumetric figure caches now instead of on the first villager frame
 	if scenario_name != "":
 		var script: GDScript = load("res://tests/scenarios/%s.gd" % scenario_name)
 		scenario = script.new()
@@ -1744,6 +1745,43 @@ func _render() -> void:
 	hud_view.render_frame(self)
 	_sync_postfx()
 	wall_mat.set_shader_parameter("focal_px", 320.0 / tan(fov_now() / 2.0))
+	_sync_quality_uniforms()
+
+
+## Quality / effects / motion settings for the wall and floor shaders (render.js r.quality, airOn, boilOn, fx). Cached: only changes are pushed.
+var _shader_cache: Dictionary = {}
+
+
+func _sync_quality_uniforms() -> void:
+	var st: Dictionary = echo_view.shader_state()
+	var q: int = int(st["quality"])
+	var rm: float = 1.0 if reduced else 0.0
+	var boil: float = 1.0 if (cfg["lineBoil"] == true and not reduced and q >= 2) else 0.0
+	var air: float = 1.0 if st["mat_detail"] else 0.0
+	var fxv: float = float(st["fx"])
+	_push_uniform(wall_mat, "boil_on", boil)
+	_push_uniform(wall_mat, "mat_detail", air)
+	_push_uniform(wall_mat, "vib_on", 1.0 if st["vib_on"] else 0.0)
+	_push_uniform(wall_mat, "arc_trail", int(st["arc_trail"]))
+	_push_uniform(wall_mat, "halo", 1.0 if st["halo"] else 0.0)
+	_push_uniform(wall_mat, "reduced_motion", rm)
+	_push_uniform(wall_mat, "fx", fxv)
+	_push_uniform(wall_mat, "fx_taper", 1.0 if st["fx_taper"] else 0.0)
+	_push_uniform(wall_mat, "quality", float(q))
+	for m in [floor_mat, ceil_mat]:
+		_push_uniform(m, "reduced_motion", rm)
+		_push_uniform(m, "boil_on", boil)
+		_push_uniform(m, "quality", float(q))
+		_push_uniform(m, "fx", fxv)
+		_push_uniform(m, "mat_detail", air)
+
+
+func _push_uniform(m: ShaderMaterial, key: String, v: Variant) -> void:
+	var ck: String = "%d/%s" % [m.get_instance_id(), key]
+	if _shader_cache.has(ck) and _shader_cache[ck] == v:
+		return
+	_shader_cache[ck] = v
+	m.set_shader_parameter(key, v)
 
 
 ## Push the settings into the running game (js applyConfig): volume, sonar, feeding, motion, text and effects.
