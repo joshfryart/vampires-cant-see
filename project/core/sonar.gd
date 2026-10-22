@@ -39,6 +39,9 @@ class Pulse:
 	var rough: float = NAN
 	var aim_cache: float = NAN
 	var hd: float = NAN
+	## PulseTextures cache: this pulse's vis_tex row as a MAX_RAYS x 1 RGF image ((vis, beam), zero padded) and floor material code (-1 = not computed).
+	var tex_img: Image = null
+	var tex_fm: int = -1
 
 
 var pulses: Array[Pulse] = []
@@ -89,6 +92,9 @@ func cooldown_left(t: float) -> float:
 
 ## Ports fillRays (js/sonar.js:56): n rays out of (x, y), per-ray distance, material index and normal code.
 static func fill_rays(pulse: Pulse, world, x: float, y: float, rng_range: float, n: int) -> void:
+	if "mat_grid" in world and "solid_grid" in world:
+		_fill_rays_fast(pulse, world, x, y, rng_range, n)
+		return
 	pulse.vis.resize(n)
 	pulse.vmat.resize(n)
 	pulse.vnorm.resize(n)
@@ -102,6 +108,106 @@ static func fill_rays(pulse: Pulse, world, x: float, y: float, rng_range: float,
 		else:
 			pulse.vmat[i] = 0
 			pulse.vnorm[i] = NO_HIT
+
+
+static var _trig: Dictionary = {}
+
+
+## cos/sin of (i / n) * 2 pi for i in 0..n-1 (same doubles the per-ray cos()/sin() calls produce), cached per n.
+static func _trig_for(n: int) -> Array:
+	var t: Variant = _trig.get(n)
+	if t == null:
+		var cs := PackedFloat64Array()
+		var sn := PackedFloat64Array()
+		cs.resize(n)
+		sn.resize(n)
+		for i in n:
+			var a: float = (float(i) / n) * TWO_PI
+			cs[i] = cos(a)
+			sn[i] = sin(a)
+		t = [cs, sn]
+		_trig[n] = t
+	return t
+
+
+## fill_rays for World-like grids (solid_grid, mat_grid, width, height): the DDA of Raycast.trace inlined, no Hit allocation.
+## Results are bit identical to the generic path.
+static func _fill_rays_fast(pulse: Pulse, world, x: float, y: float, max_dist: float, n: int) -> void:
+	var grid: PackedByteArray = world.solid_grid
+	var mats: PackedByteArray = world.mat_grid
+	var w: int = world.width
+	var h: int = world.height
+	var cap: int = 4 * ((w if w > 0 else 64) + (h if h > 0 else 64))
+	var tr: Array = _trig_for(n)
+	var cs: PackedFloat64Array = tr[0]
+	var sn: PackedFloat64Array = tr[1]
+	var vis := PackedFloat32Array()
+	var vmat := PackedByteArray()
+	var vnorm := PackedByteArray()
+	vis.resize(n)
+	vmat.resize(n)
+	vnorm.resize(n)
+	var cx0: int = int(floor(x))
+	var cy0: int = int(floor(y))
+	var start_in: bool = cx0 >= 0 and cy0 >= 0 and cx0 < w and cy0 < h
+	var start_solid: bool = (not start_in) or grid[cy0 * w + cx0] == 1
+	for i in n:
+		var dx: float = cs[i]
+		var dy: float = sn[i]
+		if start_solid:
+			vis[i] = 0.0
+			vmat[i] = mats[cy0 * w + cx0] if start_in else 0
+			var snx: float = -dx
+			var sny: float = -dy
+			vnorm[i] = 0 if snx > 0.0 else (1 if snx < 0.0 else (2 if sny > 0.0 else 3))
+			continue
+		var ddx: float = INF if dx == 0.0 else absf(1.0 / dx)
+		var ddy: float = INF if dy == 0.0 else absf(1.0 / dy)
+		var step_x: int = -1 if dx < 0.0 else 1
+		var step_y: int = -1 if dy < 0.0 else 1
+		var sdx: float = INF if dx == 0.0 else ((x - cx0) if dx < 0.0 else (cx0 + 1 - x)) * ddx
+		var sdy: float = INF if dy == 0.0 else ((y - cy0) if dy < 0.0 else (cy0 + 1 - y)) * ddy
+		var cx: int = cx0
+		var cy: int = cy0
+		var side: int = 0
+		var found: bool = false
+		var d: float = 0.0
+		var m: int = 0
+		for _s in cap:
+			if sdx < sdy:
+				d = sdx
+				sdx += ddx
+				cx += step_x
+				side = 0
+			else:
+				d = sdy
+				sdy += ddy
+				cy += step_y
+				side = 1
+			if d > max_dist:
+				break
+			if cx < 0 or cy < 0 or cx >= w or cy >= h:
+				found = true
+				break
+			var k: int = cy * w + cx
+			if grid[k] == 1:
+				found = true
+				m = mats[k]
+				break
+		if found:
+			vis[i] = d
+			vmat[i] = m
+			if side == 0:
+				vnorm[i] = 1 if dx > 0.0 else 0
+			else:
+				vnorm[i] = 3 if dy > 0.0 else 2
+		else:
+			vis[i] = max_dist
+			vmat[i] = 0
+			vnorm[i] = NO_HIT
+	pulse.vis = vis
+	pulse.vmat = vmat
+	pulse.vnorm = vnorm
 
 
 ## Ports makePulse (js/sonar.js:79). facing = NAN for no mouth beam.
@@ -122,8 +228,10 @@ static func make_pulse(world, x: float, y: float, t0: float, rng_range: float, s
 		p.has_facing = true
 		p.facing = facing
 		p.vbeam.resize(n)
-		for i in n:
-			p.vbeam[i] = Acoustics.vis_factor(Acoustics.beam((float(i) / n) * TWO_PI - facing))
+		var vb := PackedFloat32Array()
+		vb.resize(n)
+		Acoustics.fill_beam_vis(vb, n, facing)
+		p.vbeam = vb
 	return p
 
 
@@ -132,12 +240,13 @@ static func pick_reflectors(pulse: Pulse, max_n: int) -> Array:
 	var v: PackedFloat32Array = pulse.vis
 	var n: int = v.size()
 	var cand: Array = []
+	var lim: float = pulse.range - 1e-4
 	for i in n:
 		var d: float = v[i]
-		if d >= pulse.range - 1e-4:
+		if d >= lim:
 			continue
-		var prev: float = v[(i + n - 1) % n]
-		var nxt: float = v[(i + 1) % n]
+		var prev: float = v[i - 1 if i > 0 else n - 1]
+		var nxt: float = v[i + 1 if i + 1 < n else 0]
 		if d <= prev and d < nxt:
 			cand.append({"a": (float(i) / n) * TWO_PI, "d": d})
 	# JS Array.sort is stable; GDScript sort_custom is not, so break ties by candidate order.
@@ -451,20 +560,44 @@ static func strongest_echo(pulse: Pulse, facing: float = NAN) -> Dictionary:
 		return {}
 	var f: float = facing if not is_nan(facing) else (pulse.facing if pulse.has_facing else 0.0)
 	var n: int = pulse.vis.size()
-	var best: Dictionary = {}
+	Acoustics.wall_echo_init()
+	var vis: PackedFloat32Array = pulse.vis
+	var vnorm: PackedByteArray = pulse.vnorm
+	var vmat: PackedByteArray = pulse.vmat
+	var tr: Array = _trig_for(n)
+	var cs: PackedFloat64Array = tr[0]
+	var sn: PackedFloat64Array = tr[1]
+	var lim: float = pulse.range - 1e-4
+	var have: bool = false
+	var best_level: float = 0.0
+	var best_i: int = 0
+	var best_cos: float = 0.0
+	var best_theta: float = 0.0
+	var ln10: float = log(10.0)
 	for i in n:
-		var d: float = pulse.vis[i]
-		if not (d > 0.0) or d >= pulse.range - 1e-4:
+		var d: float = vis[i]
+		if not (d > 0.0) or d >= lim:
 			continue
+		# hit_info(pulse, angle) with ray_index(angle) == i: code, material and incidence cosine of ray i.
+		var code: int = vnorm[i] if vnorm.size() > 0 else NO_HIT
+		if code == NO_HIT:
+			continue
+		var nx: float = 1.0 if code == 0 else (-1.0 if code == 1 else 0.0)
+		var ny: float = 1.0 if code == 2 else (-1.0 if code == 3 else 0.0)
+		var cos_inc: float = maxf(0.0, -(cs[i] * nx + sn[i] * ny))
 		var angle: float = (float(i) / n) * TWO_PI
-		var h := hit_info(pulse, angle)
-		if not h["hit"]:
-			continue
 		var theta: float = angle - f
-		var level: float = Acoustics.echo_level("wall", d, theta, h["mat"]) + 20.0 * log(maxf(h["cosInc"], 0.25)) / log(10.0)
-		if best.is_empty() or level > best["level"]:
-			best = {"dist": d, "angle": angle, "theta": theta, "mat": h["mat"], "rough": h["rough"], "level": level, "cosInc": h["cosInc"]}
-	return best
+		var level: float = Acoustics.wall_echo_level(d, theta, vmat[i]) + 20.0 * log(maxf(cos_inc, 0.25)) / ln10
+		if not have or level > best_level:
+			have = true
+			best_level = level
+			best_i = i
+			best_cos = cos_inc
+			best_theta = theta
+	if not have:
+		return {}
+	var mat: String = MATS[vmat[best_i]]
+	return {"dist": vis[best_i], "angle": (float(best_i) / n) * TWO_PI, "theta": best_theta, "mat": mat, "rough": Acoustics.rough_of(mat), "level": best_level, "cosInc": best_cos}
 
 
 ## Enclosure of a pulse as heard from its origin (js enclosure): {hitFrac, meanAlpha}.

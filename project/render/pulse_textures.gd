@@ -25,12 +25,16 @@ var _pulse_img: Image
 var _vis_img: Image
 var _ring_img: Image
 var _uploaded: Array[Sonar.Pulse] = []
+var _slot: Array = []
+var _zero_row: Image
 
 
 func _init() -> void:
 	_pulse_img = Image.create(MAX_PULSES, ROWS, false, Image.FORMAT_RGBAF)
 	_vis_img = Image.create(MAX_RAYS, MAX_PULSES, false, Image.FORMAT_RGF)
 	_ring_img = Image.create(MAX_RINGS, 2, false, Image.FORMAT_RGBAF)
+	_zero_row = Image.create(MAX_RAYS, 1, false, Image.FORMAT_RGF)
+	_slot.resize(MAX_PULSES)
 	pulse_tex = ImageTexture.create_from_image(_pulse_img)
 	vis_tex = ImageTexture.create_from_image(_vis_img)
 	ring_tex = ImageTexture.create_from_image(_ring_img)
@@ -61,24 +65,55 @@ func sync_from(sonar: Sonar, world: World = null) -> int:
 		return count
 	_uploaded = pulses.duplicate()
 	count = mini(pulses.size(), MAX_PULSES)
-	_pulse_img.fill(Color(0, 0, 0, 0))
-	_vis_img.fill(Color(0, 0, 0, 0))
+	# meta rows live in a flat float array (small); vis rows are per-pulse cached 720x1 images blitted (memcpy) into the slot the
+	# pulse now occupies, only for slots whose pulse changed. One update per change (sync_from runs once per frame).
+	var meta := PackedFloat32Array()
+	meta.resize(MAX_PULSES * ROWS * 4)
 	for i in count:
 		var p: Sonar.Pulse = pulses[i]
 		var n: int = mini(p.vis.size(), MAX_RAYS)
 		var has_beam: bool = p.vbeam.size() > 0
-		_pulse_img.set_pixel(i, 0, Color(p.x, p.y, p.z, p.t0))
-		_pulse_img.set_pixel(i, 1, Color(p.range, p.speed, p.fade, p.strength))
-		_pulse_img.set_pixel(i, 2, Color(n, 1.0 if has_beam else 0.0, kind_code(p.kind), p.gen))
-		_pulse_img.set_pixel(i, 3, Color(p.facing if p.has_facing else 0.0, p.weak, 1e9 if is_nan(p.hd) else p.hd, 0.0))
+		var o: int = i * 4
+		var rs: int = MAX_PULSES * 4
+		meta[o] = p.x
+		meta[o + 1] = p.y
+		meta[o + 2] = p.z
+		meta[o + 3] = p.t0
+		meta[rs + o] = p.range
+		meta[rs + o + 1] = p.speed
+		meta[rs + o + 2] = p.fade
+		meta[rs + o + 3] = p.strength
+		meta[2 * rs + o] = n
+		meta[2 * rs + o + 1] = 1.0 if has_beam else 0.0
+		meta[2 * rs + o + 2] = kind_code(p.kind)
+		meta[2 * rs + o + 3] = p.gen
+		meta[3 * rs + o] = p.facing if p.has_facing else 0.0
+		meta[3 * rs + o + 1] = p.weak
+		meta[3 * rs + o + 2] = 1e9 if is_nan(p.hd) else p.hd
 		var rough: float = FloorFx.pulse_rough(world, p) if world != null else 0.2
 		var fm := 0
 		if world != null:
-			var mat := world.material_at(p.x, p.y)
-			fm = 1 if mat == "grass" else (2 if mat == "wood" else 0)
-		_pulse_img.set_pixel(i, 4, Color(rough, fm, 0.0, 0.0))
-		for j in n:
-			_vis_img.set_pixel(j, i, Color(p.vis[j], p.vbeam[j] if has_beam else 1.0, 0.0, 0.0))
+			if p.tex_fm < 0:
+				var mat := world.material_at(p.x, p.y)
+				p.tex_fm = 1 if mat == "grass" else (2 if mat == "wood" else 0)
+			fm = p.tex_fm
+		meta[4 * rs + o] = rough
+		meta[4 * rs + o + 1] = fm
+		if _slot[i] != p:
+			_slot[i] = p
+			if p.tex_img == null:
+				var row := PackedFloat32Array()
+				row.resize(MAX_RAYS * 2)
+				for j in n:
+					row[j * 2] = p.vis[j]
+					row[j * 2 + 1] = p.vbeam[j] if has_beam else 1.0
+				p.tex_img = Image.create_from_data(MAX_RAYS, 1, false, Image.FORMAT_RGF, row.to_byte_array())
+			_vis_img.blit_rect(p.tex_img, Rect2i(0, 0, MAX_RAYS, 1), Vector2i(0, i))
+	for i in range(count, MAX_PULSES):
+		if _slot[i] != null:
+			_slot[i] = null
+			_vis_img.blit_rect(_zero_row, Rect2i(0, 0, MAX_RAYS, 1), Vector2i(0, i))
+	_pulse_img.set_data(MAX_PULSES, ROWS, false, Image.FORMAT_RGBAF, meta.to_byte_array())
 	pulse_tex.update(_pulse_img)
 	vis_tex.update(_vis_img)
 	return count

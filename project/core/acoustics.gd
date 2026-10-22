@@ -37,6 +37,93 @@ static func vis_factor(db: float) -> float:
 	return clampf(1.0 + db / float(ac["visDb"]), float(ac["visMin"]), 1.0)
 
 
+static var _bv_ready: bool = false
+static var _bv_db: PackedFloat64Array = PackedFloat64Array()
+static var _bv_step: float = 1.0
+static var _bv_vis_db: float = 1.0
+static var _bv_vis_min: float = 0.0
+
+
+## vis_factor(beam(theta)) with the constants cached (no Dictionary lookups per call): the per-ray beam factor of Sonar.make_pulse.
+static func beam_vis(theta: float) -> float:
+	if not _bv_ready:
+		var ac := a()
+		_bv_db = PackedFloat64Array(ac["beamDb"])
+		_bv_step = float(ac["beamStepDeg"])
+		_bv_vis_db = float(ac["visDb"])
+		_bv_vis_min = float(ac["visMin"])
+		_bv_ready = true
+	var ang: float = fmod(absf(theta), JsMath.TWO_PI)
+	if ang > PI:
+		ang = JsMath.TWO_PI - ang
+	var k: float = ((ang * 180.0) / PI) / _bv_step
+	var i: int = mini(_bv_db.size() - 2, int(floor(k + EPS)))
+	var db: float = _bv_db[i] + (_bv_db[i + 1] - _bv_db[i]) * (k - i)
+	return clampf(1.0 + db / _bv_vis_db, _bv_vis_min, 1.0)
+
+
+static var _we_terms: PackedFloat64Array = PackedFloat64Array()
+static var _we_cell_m: float = 1.0
+static var _we_rmin: float = 0.0
+static var _we_air: float = 0.0
+static var _we_spread: float = 0.0
+
+
+## beam(theta) with cached constants (bit identical to beam()).
+static func beam_db(theta: float) -> float:
+	if not _bv_ready:
+		beam_vis(0.0)
+	var ang: float = fmod(absf(theta), JsMath.TWO_PI)
+	if ang > PI:
+		ang = JsMath.TWO_PI - ang
+	var k: float = ((ang * 180.0) / PI) / _bv_step
+	var i: int = mini(_bv_db.size() - 2, int(floor(k + EPS)))
+	return _bv_db[i] + (_bv_db[i + 1] - _bv_db[i]) * (k - i)
+
+
+## echo_level("wall", r_cells, theta, MATS[mat_idx]) with cached constants, same arithmetic order. Call wall_echo_init() first.
+static func wall_echo_init() -> void:
+	if _we_terms.size() > 0:
+		return
+	var ac := a()
+	_we_cell_m = float(ac["cellM"])
+	_we_rmin = float(ac["rMin"])
+	_we_air = float(ac["airDbPerM"])
+	_we_spread = float(ac["spread"]["wall"])
+	var t := PackedFloat64Array()
+	for name in ["stone", "brick", "wood", "iron", "glass", "cobble", "roughStone", "grass"]:
+		var m := mat_of(name)
+		t.append(10.0 * _log10((1.0 - float(m["alpha"])) * (1.0 - float(m["s"]))))
+	_we_terms = t
+
+
+static func wall_echo_level(r_cells: float, theta: float, mat_idx: int) -> float:
+	var r: float = maxf(r_cells * _we_cell_m, _we_rmin)
+	var air: float = 2.0 * r * _we_air
+	var l: float = beam_db(theta)
+	l += -_we_spread * _log10(2.0 * r) + _we_terms[mat_idx] - air
+	return l
+
+
+## out[i] = beam_vis((i / n) * 2 pi - facing) for i in 0..n-1, the loop inlined.
+static func fill_beam_vis(out: PackedFloat32Array, n: int, facing: float) -> void:
+	beam_vis(0.0)
+	var tbl: PackedFloat64Array = _bv_db
+	var step: float = _bv_step
+	var vdb: float = _bv_vis_db
+	var vmin: float = _bv_vis_min
+	var last: int = tbl.size() - 2
+	var two_pi: float = JsMath.TWO_PI
+	for j in n:
+		var ang: float = fmod(absf((float(j) / n) * two_pi - facing), two_pi)
+		if ang > PI:
+			ang = two_pi - ang
+		var k: float = ((ang * 180.0) / PI) / step
+		var i: int = mini(last, int(floor(k + EPS)))
+		var db: float = tbl[i] + (tbl[i + 1] - tbl[i]) * (k - i)
+		out[j] = clampf(1.0 + db / vdb, vmin, 1.0)
+
+
 static func mat_of(name: String) -> Dictionary:
 	var m: Dictionary = a()["mat"]
 	return m[name] if m.has(name) else m["stone"]

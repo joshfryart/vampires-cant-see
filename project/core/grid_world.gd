@@ -5,7 +5,7 @@ extends RefCounted
 
 var width: int = 0
 var height: int = 0
-var solid: PackedByteArray = PackedByteArray()
+var solid_grid: PackedByteArray = PackedByteArray()
 
 
 ## flags is w*h characters, row-major, "1" = solid.
@@ -13,9 +13,9 @@ static func from_flags(w: int, h: int, flags: String) -> GridWorld:
 	var g := GridWorld.new()
 	g.width = w
 	g.height = h
-	g.solid.resize(w * h)
+	g.solid_grid.resize(w * h)
 	for i in w * h:
-		g.solid[i] = 1 if flags[i] == "1" else 0
+		g.solid_grid[i] = 1 if flags[i] == "1" else 0
 	return g
 
 
@@ -25,10 +25,10 @@ func is_solid(x: float, y: float) -> bool:
 	var cy: int = int(floor(y))
 	if cx < 0 or cy < 0 or cx >= width or cy >= height:
 		return true
-	return solid[cy * width + cx] == 1
+	return solid_grid[cy * width + cx] == 1
 
 
 func cell_solid(cx: int, cy: int) -> bool:
 	if cx < 0 or cy < 0 or cx >= width or cy >= height:
 		return true
-	return solid[cy * width + cx] == 1
+	return solid_grid[cy * width + cx] == 1

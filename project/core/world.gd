@@ -32,6 +32,11 @@ var open_doors: Dictionary = {}
 ## Per-cell flags for fast queries: 0 floor, 1 wall, 2 door. A door is solid until its cell is in open_doors.
 var cell_kind: PackedByteArray = PackedByteArray()
 var cell_open: PackedByteArray = PackedByteArray()
+## Ray-cast caches: solid_grid = cell_solid() as 0/1 (follows door state); mat_grid = hit material index into Sonar.MATS (same order as RAY_MATS).
+var solid_grid: PackedByteArray = PackedByteArray()
+var mat_grid: PackedByteArray = PackedByteArray()
+var tile_grid: PackedInt32Array = PackedInt32Array()
+const RAY_MATS := ["stone", "brick", "wood", "iron", "glass", "cobble", "roughStone", "grass"]
 var doors_by_id: Dictionary = {}
 var door_grid: Dictionary = {}
 var props: Array[Dictionary] = []
@@ -88,6 +93,18 @@ static func from_def(def: Dictionary) -> World:
 	for ch in over:
 		if MATERIAL.has(ch) and MATERIALS.has(over[ch]):
 			w.mat_table[ch] = over[ch]
+	w.solid_grid.resize(w.width * w.height)
+	w.mat_grid.resize(w.width * w.height)
+	w.tile_grid.resize(w.width * w.height)
+	for r in w.height:
+		var row2: String = w.rows[r]
+		for c in w.width:
+			var k2: int = r * w.width + c
+			w.solid_grid[k2] = 1 if w.cell_kind[k2] != 0 else 0
+			var mname: String = w.mat_table.get(row2[c], w.floor_mat)
+			var mi: int = RAY_MATS.find(mname)
+			w.mat_grid[k2] = 0 if mi < 0 else mi
+			w.tile_grid[k2] = row2.unicode_at(c)
 	for d in def.get("props", []):
 		var solid := not NON_SOLID.has(d["type"])
 		var light: float = float(d["light"]) if d.get("light") is float or d.get("light") is int else float(DEFAULT_LIGHT.get(d["type"], 0.0))
@@ -153,9 +170,11 @@ func set_door(cx: float, cy: float, is_open: bool) -> bool:
 	if is_open:
 		open_doors[_key(ix, iy)] = true
 		cell_open[_key(ix, iy)] = 1
+		solid_grid[_key(ix, iy)] = 0
 	else:
 		open_doors.erase(_key(ix, iy))
 		cell_open[_key(ix, iy)] = 0
+		solid_grid[_key(ix, iy)] = 1
 	if was != is_open and lights.size() > 0:
 		recompute_lights()
 	return true
@@ -231,7 +250,10 @@ func line_blocked(x0: float, y0: float, x1: float, y1: float) -> bool:
 			cy += step_y
 		if cx == ex and cy == ey:
 			return false
-		if is_solid(cx, cy) and tile_at(cx, cy) != "w":
+		if cx < 0 or cy < 0 or cx >= width or cy >= height:
+			return true
+		var k: int = cy * width + cx
+		if solid_grid[k] == 1 and tile_grid[k] != 119:
 			return true
 	return true
 

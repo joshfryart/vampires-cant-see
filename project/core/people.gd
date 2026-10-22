@@ -205,9 +205,16 @@ static func _blocked(w: World, x: float, y: float, r: float) -> bool:
 static func segment_clear(w: World, ax: float, ay: float, bx: float, by: float) -> bool:
 	var length: float = sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay))
 	var n: int = maxi(1, int(ceil(length / 0.1)))
+	var grid: PackedByteArray = w.solid_grid
+	var gw: int = w.width
+	var gh: int = w.height
+	var dx: float = bx - ax
+	var dy: float = by - ay
 	for i in n + 1:
 		var f: float = float(i) / n
-		if w.is_solid(ax + (bx - ax) * f, ay + (by - ay) * f):
+		var cx: int = int(floor(ax + dx * f))
+		var cy: int = int(floor(ay + dy * f))
+		if cx < 0 or cy < 0 or cx >= gw or cy >= gh or grid[cy * gw + cx] == 1:
 			return false
 	return true
 

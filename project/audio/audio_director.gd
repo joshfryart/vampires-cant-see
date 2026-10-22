@@ -23,6 +23,7 @@ var wet: float = 1.0
 
 var _manifest: Dictionary = {}
 var _streams: Dictionary = {}
+var _requested: Dictionary = {}
 var _pool: Array = []          # [{player, bus, pan_fx, lp_fx}]
 var _next_slot: int = 0
 var _pending: Array = []       # [{due, run: Callable}]
@@ -46,6 +47,8 @@ var _speech_cache: Dictionary = {}
 func _ready() -> void:
 	_rng.seed = 7
 	_load_manifest()
+	if DisplayServer.get_name() != "headless":
+		preload_streams()
 	_build_buses()
 
 
@@ -114,9 +117,31 @@ func _record(kind: String, opts: Dictionary) -> void:
 		log.pop_front()
 
 
+## Queue every manifest sample for background loading (ResourceLoader threaded requests); _stream picks them up. Called from _ready
+## (skipped headless); calling it again is harmless. Returns the number of files requested.
+func preload_streams() -> int:
+	var n := 0
+	var entries: Dictionary = _manifest.get("entries", {})
+	for key in entries:
+		for v in entries[key]:
+			var file: String = v.get("file", "")
+			if file == "" or _streams.has(file) or _requested.has(file):
+				continue
+			if ResourceLoader.load_threaded_request("res://audio/wav/%s" % file) == OK:
+				_requested[file] = true
+				n += 1
+	return n
+
+
 func _stream(file: String) -> AudioStream:
 	if not _streams.has(file):
-		_streams[file] = load("res://audio/wav/%s" % file)
+		var path := "res://audio/wav/%s" % file
+		var st: Resource = null
+		if _requested.has(file):
+			st = ResourceLoader.load_threaded_get(path)
+		if st == null:
+			st = load(path)
+		_streams[file] = st
 	return _streams[file]
 
 
@@ -306,7 +331,7 @@ func _echo_pan(lp: Sonar.Pulse, player: Player) -> float:
 		if not (d > 0.0) or is_inf(d):
 			continue
 		var a: float = (float(i) / n) * TAU - player.angle
-		var rel: float = atan2(sin(a), cos(a))
+		var rel: float = fposmod(a + PI, TAU) - PI  # == atan2(sin(a), cos(a)) up to rounding, without the trig on the 2/3 of rays outside the cone
 		if absf(rel) > lim:
 			continue
 		var w: float = 1.0 / d
@@ -315,6 +340,28 @@ func _echo_pan(lp: Sonar.Pulse, player: Player) -> float:
 	if ss == 0.0 and sc == 0.0:
 		return 0.0
 	return clampf(sin(atan2(ss, sc)), -1.0, 1.0)
+
+
+## Same samples as Game.first_solid(...) != null (every 0.25 cells along the segment) against the solid grid, no allocation.
+func _blocked(world: World, x0: float, y0: float, x1: float, y1: float) -> bool:
+	var dx: float = x1 - x0
+	var dy: float = y1 - y0
+	var d: float = sqrt(dx * dx + dy * dy)
+	if not (d > 0.5):
+		return false
+	var grid: PackedByteArray = world.solid_grid
+	var w: int = world.width
+	var h: int = world.height
+	var n: float = minf(d, 25.0) / 0.25
+	var i := 1
+	while i < n:
+		var k: float = (i * 0.25) / d
+		var cx: int = int(floor(x0 + dx * k))
+		var cy: int = int(floor(y0 + dy * k))
+		if cx < 0 or cy < 0 or cx >= w or cy >= h or grid[cy * w + cx] == 1:
+			return true
+		i += 1
+	return false
 
 
 func _ping_enclosure(lp: Sonar.Pulse, indoor: bool, player: Player, world: World, game: Node) -> void:
@@ -326,12 +373,12 @@ func _ping_enclosure(lp: Sonar.Pulse, indoor: bool, player: Player, world: World
 			continue
 		var dx: float = p["x"] - player.x
 		var dy: float = p["y"] - player.y
-		if dx * dx + dy * dy <= rng * rng and game.first_solid(player.x, player.y, p["x"], p["y"]) == null:
+		if dx * dx + dy * dy <= rng * rng and not _blocked(world, player.x, player.y, p["x"], p["y"]):
 			n += 1
 	for pe in game.people.people:
 		var dx2: float = pe.x - player.x
 		var dy2: float = pe.y - player.y
-		if sqrt(dx2 * dx2 + dy2 * dy2) <= rng and game.first_solid(player.x, player.y, pe.x, pe.y) == null:
+		if sqrt(dx2 * dx2 + dy2 * dy2) <= rng and not _blocked(world, player.x, player.y, pe.x, pe.y):
 			n += 1
 	set_wet(Acoustics.wet_for(e["hitFrac"], e["meanAlpha"], n, indoor))
 
@@ -386,7 +433,7 @@ func _prop_echoes(lp: Sonar.Pulse, player: Player, world: World, game: Node) -> 
 		if amp <= 0.0:
 			continue
 		var delay: float = Sonar.echo_delay(d, game.sonar.speed)
-		if delay > 2.0 or game.first_solid(player.x, player.y, pr["x"], pr["y"]) != null:
+		if delay > 2.0 or _blocked(world, player.x, player.y, pr["x"], pr["y"]):
 			continue
 		var mat: String = ac["propMat"].get(pr["type"], "wood")
 		found.append({"amp": amp, "delay": delay, "x": pr["x"], "y": pr["y"], "mat": mat})
