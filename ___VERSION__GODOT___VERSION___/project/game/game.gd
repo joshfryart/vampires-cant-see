@@ -169,6 +169,7 @@ var ceil_mat: ShaderMaterial
 var cam: Camera3D
 var map_view: MapView
 var dev_panel: DevPanel
+var creator: CreatorScreen
 var viewport: SubViewport
 var echo_view: EchoView
 var walls_inst: MeshInstance3D
@@ -279,6 +280,9 @@ func _build_view() -> void:
 	dev_panel.attach(self)
 	menus = Menus.new()
 	add_child(menus)
+	creator = CreatorScreen.new()
+	add_child(creator)
+	creator.attach(self)
 
 
 func _load_worlds() -> void:

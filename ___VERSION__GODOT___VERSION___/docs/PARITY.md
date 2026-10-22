@@ -28,6 +28,7 @@ node tools/golden/<name>.mjs                      # rewrite project/tests/fixtur
 | `struggle.json` | `golden/struggle.mjs` | 4,050 held-victim poses | 1e-8 |
 | `figure_struggle.json` | `golden/figure_struggle.mjs` | 724 held-victim figure draw logs (Struggle loaded) | exact hash |
 | `figure_vol.json` | `golden/figure_vol.mjs` | 555 volumetric-figure draw logs (Figure loaded, fx 1 and 2): modes, looks, gaits, outfits, role hats and items, archetype faces, rim light, silhouette rings, held victim (1.9M calls) | exact hash |
+| `creator.json` | `golden/creator.mjs` | character creator logic: sanitize, set_field, field table, Forge presets, seeded randomize, pose echoes, views, JSON export/import, list helpers | 1e-9 |
 | `sprites.json`, `floor_fx.json`, `hud.json`, `ripple.json` | `golden/sprites.mjs`, `floor_fx.mjs`, `hud.mjs`, `ripple.mjs` | markers and props, floor and ceiling canvas effects, the HUD and icons (515 entries), ring helpers | exact hash |
 
 Scope notes: `people.json` and `figure.json` are generated with Forge, Schedule and Struggle **not** loaded; their tests
@@ -62,8 +63,8 @@ compared with an epsilon.
 
 - Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings, plus the ripple
   rings, door wobble and the weak-ping flicker: Phase 3 polish).
-- Not ported: vessels (whole-body heartbeat, flag off by default), the character creator, the F9 dev panel, flags,
-  system checks, the top-down map view, head bob and the guide panel (Phase 7/8 leftovers).
+- Not ported: vessels (whole-body heartbeat, flag off by default, so `drawFlush`, `data/vessels.js` and the `vis.vessels` flag
+  are absent), boot checks (`checks.js`), the ping-bip sound option and the Forge editor in the dev panel.
 - Audio is in but unheard by me: ambience loops, fire, breath, heartbeat, far dog/bell and live villager speech (`audio/speech_synth.gd`,
   50-120 ms per line on a worker thread) all play; nothing has been listened to (F5 needs your ears).
 - Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).

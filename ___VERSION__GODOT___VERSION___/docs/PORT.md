@@ -36,7 +36,11 @@ Update this as modules land. Plan: `../PLAN.md`. Driving Godot: `../HOWTO-CLI-AN
 | `config.js` | `core/config.gd` (schema, sanitize, `user://` file), settings panel in `ui/menus.gd` | done |
 | tutorial hints | `game/tutorial.gd` | done |
 | `drawWarm` (Warm Sense halos) | `ui/hud.gd` `_warm_halos` | done (window-resolution radial gradients) |
-| menus (title, shop, stats, pause, boon/gift, run end, settings) | `ui/menus.gd` | functional, plain Godot controls |
+| menus (title, shop, stats, pause, boon/gift, run end, settings, guide, export/import) | `ui/menus.gd`, `ui/icon_rect.gd` (hand-drawn icons on cards) | done, plain Godot controls over the crypt title (`render/title_draw.gd`) |
+| `log.js` | `core/log.gd` | done (ring buffer, report); fatal error screen in `ui/menus.gd` |
+| `flags.js`, `devpanel.js` (trimmed) | `core/flags.gd`, `ui/dev_panel.gd` (F9, debug builds) | done for the flags the port has; vessels and the Forge editor are not ported |
+| `Render.drawTopDown` (M) | `ui/map_view.gd` (debug builds) | done, no parity test |
+| `tools/character-creator-core.js` + page | `core/creator.gd` (logic), `ui/creator.gd` (screen, title menu button) | logic parity: `creator.json` (8k checks) |
 | `audio.js` samples, one-shots, ambience beds, fire, breath, heartbeat, live speech | `audio/audio_director.gd`, `audio/speech_synth.gd`, `tools/bake-audio.mjs` | done; unheard by me (F5) |
 
 ## Tools

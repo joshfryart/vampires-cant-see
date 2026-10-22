@@ -177,6 +177,7 @@ func _build_title() -> void:
 	_button("How to play", func():
 		_view = "guide"
 		sync(_g))
+	_button("Character creator", func(): _g.creator.open())
 	_button("Export save", _export_save)
 	_button("Import save", _import_save)
 	_button("Settings", func():
