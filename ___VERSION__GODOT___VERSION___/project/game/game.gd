@@ -96,6 +96,8 @@ var lis_px: float = NAN
 var lis_py: float = NAN
 var lis_speed: float = 0.0
 var last_victim: Variant = null
+var reduced: bool = false           # reduced motion (config comes in Phase 8)
+var ripple := RippleFx.Rings.new()   # secondary echo rings (js S.ripple)
 var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
@@ -112,6 +114,7 @@ var room_zone: String = ""
 var textures: PulseTextures
 var wall_mat: ShaderMaterial
 var floor_mat: ShaderMaterial
+var ceil_mat: ShaderMaterial
 var cam: Camera3D
 var viewport: SubViewport
 var echo_view: EchoView
@@ -191,6 +194,9 @@ func _build_view() -> void:
 	floor_mat = ShaderMaterial.new()
 	floor_mat.shader = load("res://render/shaders/sonar_floor.gdshader")
 	floor_mat.render_priority = -1
+	ceil_mat = ShaderMaterial.new()
+	ceil_mat.shader = floor_mat.shader
+	ceil_mat.set_shader_parameter("is_ceiling", true)
 	hud = Hud.new()
 	add_child(hud)
 	menus = Menus.new()
@@ -245,6 +251,7 @@ func enter_map(name: String, x: float, y: float, angle: float, door_id: String) 
 		people.clear_echoes()
 	if sonar != null:
 		sonar.reset()
+	ripple.rings.clear()
 	map_name = name
 	world = worlds[name]
 	people = people_for(name)
@@ -278,7 +285,11 @@ func _show_map_mesh(name: String) -> void:
 		fl.mesh = WorldMeshBuilder.build_floor(worlds[name])
 		fl.material_override = floor_mat
 		viewport.add_child(fl)
-		meshes[name] = [walls, fl]
+		var ce := MeshInstance3D.new()
+		ce.mesh = WorldMeshBuilder.build_ceiling(worlds[name])
+		ce.material_override = ceil_mat
+		viewport.add_child(ce)
+		meshes[name] = [walls, fl, ce]
 	for n in meshes:
 		for inst in meshes[n]:
 			inst.visible = n == name
@@ -1030,8 +1041,30 @@ func simulate_world(dt: float) -> void:
 	people_sounds(t_prev)
 	var made := people.update_echoes(sonar, t_prev, clock)
 	for e in made:
+		# floor rings under the person: a heartbeat is a small ring, a footstep a modest one, a ping the full size
+		var small: float = 0.4 if e.kind == "vheart" else (0.45 if e.kind == "personStep" or e.kind == "step" else 1.0)
+		ripple.spawn(e.x, e.y, clock, {"kind": "person", "maxR": 1.6 * small, "life": 0.9 * (0.7 if small < 1.0 else 1.0), "strength": e.strength})
+		if small == 1.0:
+			ripple.spawn(e.x, e.y, clock, {"kind": "person", "maxR": 1.2, "life": 0.8, "strength": e.strength * 0.6, "delay": 0.18})
 		e.pan = clampf(sin(atan2(e.y - player.y, e.x - player.x) - player.angle), -1.0, 1.0)
 		audio.person_echo(e, sonar)
+	marker_ripples(t_prev, clock)
+	ripple.prune(clock)
+
+
+## Spawn one small ring on each crypt/safe/door spot a wavefront crossed this frame (js markerRipples).
+func marker_ripples(t_prev: float, t: float) -> void:
+	for pu in sonar.pulses:
+		for kind in ["crypt", "safe", "doors"]:
+			for sp in world.spots.get(kind, []):
+				var la: float = Sonar.lit_at(pu, sp.x, sp.y)
+				if not (la > t_prev and la <= t):
+					continue
+				if (la - pu.t0) * pu.speed > pu.range:
+					continue
+				if not Sonar.visible_from(pu, sp.x, sp.y):
+					continue
+				ripple.spawn(sp.x, sp.y, la, {"kind": "marker", "maxR": 0.8, "life": 0.6, "strength": 0.7})
 
 
 func people_sounds(_t_prev: float) -> void:
@@ -1043,7 +1076,9 @@ func people_sounds(_t_prev: float) -> void:
 		var side: float = (1.0 if e["foot"] != 0 else -1.0) * 0.12
 		var fx: float = e["x"] - sin(e["angle"]) * side
 		var fy: float = e["y"] + cos(e["angle"]) * side
-		emit_sound("personStep", fx, fy, {"rangeMul": sc["range"], "strengthMul": sc["strength"], "fadeMul": sc["fade"]})
+		var spu := emit_sound("personStep", fx, fy, {"rangeMul": sc["range"], "strengthMul": sc["strength"], "fadeMul": sc["fade"]})
+		if spu != null:
+			spu.hd = e["angle"]
 		var g: float = float(SoundData.level("guardStep")["gain"]) if guard_step else float(lv["gain"])
 		audio.play("guardStep" if guard_step else "personStep", spatial(e["x"], e["y"], minf(1.0, g * sc["gain"]), {"material": mat}))
 	# Choice: people open any closed door they come within 1 cell of; it stays open.
@@ -1224,6 +1259,7 @@ func struggle(d: Dictionary) -> bool:
 	var rs: float = 1.0 if float(d["rs"]) > 0.5 else 0.0
 	var k: float = (0.35 + 0.65 * maxf(strong, 0.3)) * (1.0 - (1.0 - RESTRAIN_NOISE) * rs)
 	emit_sound("struggle", v.x, v.y, {"rangeMul": k, "strengthMul": k})
+	ripple.spawn(v.x, v.y, clock, {"kind": "person", "maxR": 0.9 + 0.6 * k, "life": 0.45, "strength": 0.7})
 	react_to(v.x, v.y, "struggle", float(SoundData.level("struggle")["range"]) * k + 0.5)
 	audio.play("struggle", spatial(v.x, v.y, float(SoundData.level("struggle")["gain"]) * k))
 	push_victim_echo(v)
@@ -1246,6 +1282,11 @@ func drink_beat(d: Dictionary) -> void:
 	emit_sound("heartbeat", v.x, v.y, {"range": r, "z": 0.55, "bounces": 0})
 	react_to(v.x, v.y, "heartbeat", r)
 	audio.play("heartbeat", spatial(v.x, v.y, float(SoundData.level("heartbeat")["gain"]) * (0.6 + 0.4 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0))))
+	ripple.spawn(v.x, v.y, clock, {"kind": "person", "maxR": 1.0, "life": 0.5, "strength": 0.9})
+	if reduced:
+		ripple.spawn(v.x, v.y, clock, {"kind": "person", "maxR": 0.8, "minR": 0.8, "inward": true, "life": 0.4, "strength": 0.6})
+	else:
+		ripple.spawn(player.x, player.y, clock, {"kind": "person", "maxR": 1.4, "minR": 0.15, "inward": true, "life": 0.4, "strength": 0.8})
 	push_victim_echo(v)
 
 
@@ -1278,12 +1319,14 @@ func lock_info() -> Dictionary:
 func _render() -> void:
 	last_render_clock = clock
 	_sync_camera()
-	textures.sync_from(sonar)
-	for m in [wall_mat, floor_mat]:
+	textures.sync_from(sonar, world)
+	textures.sync_rings(ripple.rings, clock)
+	ceil_mat.set_shader_parameter("player_indoor", player_kind() != "outdoor")
+	for m in [wall_mat, floor_mat, ceil_mat]:
 		textures.apply_to(m)
 		m.set_shader_parameter("game_time", clock)
 	wall_mat.set_shader_parameter("boil_frame", int(floor(clock * 10.0)) % 4)
-	echo_view.render_frame(world, player, people, sonar, clock, lock_info())
+	echo_view.render_frame(world, player, people, sonar, clock, lock_info(), ripple.rings)
 
 
 func _sync_camera() -> void:

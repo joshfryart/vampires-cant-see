@@ -70,6 +70,10 @@ func stroke() -> void:
 	_log("stroke", [])
 
 
+func fill() -> void:
+	_log("fill", [])
+
+
 # ---- canonical text and hash (tools/golden/figure.mjs) ----
 
 ## JS String(Math.round(x * 1000) / 1000) for finite x: integer thousandths with trailing zeros trimmed.

@@ -181,3 +181,4 @@ func step_rocks() -> void:
 		var lv := SoundData.level("clatter")
 		g.react_to(r["x"], r["y"], "clatter", float(lv["range"]) * 0.7)
 		g.audio.play("clatter", g.spatial(r["x"], r["y"], float(lv["gain"]), {"material": g.step_material(r["x"], r["y"])}))
+		g.ripple.spawn(r["x"], r["y"], g.clock, {"kind": "person", "maxR": 1.1, "life": 0.5, "strength": 0.7})

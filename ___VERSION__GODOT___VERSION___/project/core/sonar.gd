@@ -35,6 +35,10 @@ class Pulse:
 	var vbeam: PackedFloat32Array = PackedFloat32Array()
 	var mat: String = ""
 	var weak: float = 0.0
+	## Render caches and hints: mean roughness (js pu.rough), fixed aim (pu._aim), walking heading of a person step ring (pu.hd).
+	var rough: float = NAN
+	var aim_cache: float = NAN
+	var hd: float = NAN
 
 
 var pulses: Array[Pulse] = []

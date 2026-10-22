@@ -14,6 +14,9 @@ var col_w: float = 2.0
 var wscale: float = 1.0
 var quality: int = 3
 var reduced: bool = false
+## Effects level 0..2 (js r.fx) and the material-detail switch (r.matDetail).
+var fx: int = 0
+var mat_detail: bool = true
 var horizon: float = 180.0
 ## Per-column wall distance (js r.zbuf), larger than any figure depth when no wall.
 var zbuf: PackedFloat32Array = PackedFloat32Array()

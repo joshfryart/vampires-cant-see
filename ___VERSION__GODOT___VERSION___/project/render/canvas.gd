@@ -7,6 +7,7 @@ extends RefCounted
 
 var global_alpha: float = 1.0
 var stroke_style: String = "#000"
+var fill_style: String = "#000"
 var line_width: float = 1.0
 
 
@@ -59,4 +60,9 @@ func ellipse(_x: float, _y: float, _rx: float, _ry: float, _rot: float, _a0: flo
 
 
 func stroke() -> void:
+	pass
+
+
+## Fill the rect() subpaths of the current path (the only filled shapes the renderer uses are dots).
+func fill() -> void:
 	pass

@@ -8,6 +8,13 @@ var canvas := DrawCanvas.new()
 var pose := Pose.new()
 var drawn: int = 0
 var debug_marks: bool = false
+## The dotted pulse ring is drawn by the floor shader; set true to draw it on the canvas as well (parity-tested port).
+var cpu_ripple: bool = false
+## The ground effects (dotted ring, front arc, footstep rings, secondary rings) are drawn by sonar_floor.gdshader; set false to
+## draw them on the canvas instead (the parity-tested port in floor_fx.gd).
+var gpu_floor: bool = true
+var tex_budget: int = FloorFx.TEX_MAX_CELLS
+var last_us: int = 0
 
 
 func _init() -> void:
@@ -16,7 +23,8 @@ func _init() -> void:
 
 
 ## Build this frame's strokes. echoes: Array of echo dictionaries (see echo_to_dict). lock_id < 0 = nobody held.
-func render_frame(world: World, player: Player, people: People, sonar: Sonar, t: float, lock: Dictionary) -> void:
+func render_frame(world: World, player: Player, people: People, sonar: Sonar, t: float, lock: Dictionary, rings: Array = []) -> void:
+	var t0 := Time.get_ticks_usec()
 	canvas.reset()
 	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf)
 	rs.update_boil(t)
@@ -34,11 +42,42 @@ func render_frame(world: World, player: Player, people: People, sonar: Sonar, t:
 	var pl := {"x": player.x, "y": player.y, "angle": player.angle}
 	var th: float = rs.tan_half()
 	drawn = 0
-	if sonar.pulses.size() > 0 or people.echoes.size() > 0:
+	var any_pulse: bool = sonar.pulses.size() > 0 or people.echoes.size() > 0 or rings.size() > 0
+	var tp := Time.get_ticks_usec()
+	if sonar.pulses.size() > 0:
+		if cpu_ripple or not gpu_floor:
+			FloorFx.draw_ripple(rs, canvas, world, sonar, t, pl, th)
+		tp = _lap("ripple", tp)
+		FloorFx.draw_air_rings(rs, canvas, world, sonar, t, pl, th)
+		tp = _lap("air", tp)
+		FloorFx.draw_floor_texture(rs, canvas, world, sonar, t, pl, th, tex_budget)
+		tp = _lap("texture", tp)
+		if not gpu_floor:
+			FloorFx.draw_floor_front(rs, canvas, world, sonar, t, pl, th)
+			tp = _lap("front", tp)
+			FloorFx.draw_foot_rings(rs, canvas, sonar, t, pl, th)
+			tp = _lap("foot", tp)
+	if not gpu_floor:
+		FloorFx.draw_rings(rs, canvas, rings, t, pl, th)
+		tp = _lap("rings", tp)
+	if any_pulse:
 		drawn += Sprites.draw_markers(rs, canvas, world, pl, sonar, t, th)
 		drawn += Sprites.draw_props(rs, canvas, world, pl, sonar, t, th)
+	tp = _lap("sprites", tp)
 	drawn += EchoLayer.draw_echoes(rs, canvas, pose, echoes, sonar.fade, t, pl, th)
+	_lap("echoes", tp)
+	last_us = Time.get_ticks_usec() - t0
 	queue_redraw()
+
+
+## Per-section cost accounting (microseconds, summed): read by the perf scenario.
+var prof: Dictionary = {}
+
+
+func _lap(key: String, since: int) -> int:
+	var now := Time.get_ticks_usec()
+	prof[key] = int(prof.get(key, 0)) + (now - since)
+	return now
 
 
 static func echo_to_dict(e: People.Echo) -> Dictionary:

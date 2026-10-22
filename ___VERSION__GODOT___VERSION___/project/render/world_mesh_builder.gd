@@ -82,3 +82,17 @@ static func build_floor(world: World) -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+## The ceiling plane (wall height 1) over the whole map, for the ceiling pass of sonar_floor.gdshader (is_ceiling).
+static func build_ceiling(world: World) -> ArrayMesh:
+	var w: float = world.width
+	var h: float = world.height
+	var y: float = Coords.Z_SCALE
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0, y, 0), Vector3(w, y, 0), Vector3(w, y, h), Vector3(0, y, h)])
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh

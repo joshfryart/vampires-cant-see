@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JS reference shots (any map)</title>
+<style>
+  body { margin: 0; background: #000; color: #9ab; font: 12px monospace; }
+  canvas { display: block; width: 1280px; height: 720px; image-rendering: auto; }
+  #log { position: fixed; left: 8px; bottom: 8px; background: #000a; padding: 4px 8px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="640" height="360"></canvas>
+<div id="log">loading</div>
+<!--
+  Renders any map with the ORIGINAL js/render.js (read only) for side-by-side comparison with the Godot port.
+  Query: ?map=town &x=16.5 &y=9.5 &a=0 (player pose) &ping=30,120 (frames that ping) &frames=40,60 (frames to capture)
+         &street=1 (town_street scenario pose) &save=1 (POST each shot to /save, PNGs land in out/jsref/) &name=prefix
+  Sound pings use the same room-scaled sonar settings as game.js pulse().
+-->
+<script src="/js/log.js"></script>
+<script src="/js/flags.js"></script>
+<script src="/js/data/maps.js"></script>
+<script src="/js/data/sounds.js"></script>
+<script src="/js/world.js"></script>
+<script src="/js/raycast.js"></script>
+<script src="/js/sonar.js"></script>
+<script src="/js/ripple.js"></script>
+<script src="/js/people.js"></script>
+<script src="/js/render.js"></script>
+<script>
+(function () {
+  const VCS = window.VCS;
+  const q = new URLSearchParams(location.search);
+  const mapName = q.get('map') || 'town';
+  const frames = (q.get('frames') || '40,60,90').split(',').map(Number);
+  const pings = (q.get('ping') || '30').split(',').map(Number);
+  const save = q.get('save') === '1';
+  const prefix = q.get('name') || mapName;
+  const logEl = document.getElementById('log');
+  const say = (s) => { logEl.textContent = s; };
+  VCS.Log.setConsole(false);
+  VCS.Flags.register('vis.vessels', false, 'Circulatory pulse on villagers');
+  const canvas = document.getElementById('c');
+  const r = VCS.Render.create(canvas, { effects: 0 });
+  r.reduced = false;
+  const def = VCS.MapData.maps[mapName];
+  const world = VCS.World.load(def, { requireStart: false });
+  const sonar = VCS.Sonar.create();
+  const people = VCS.People.create(world, def, { seed: 1 });
+  const sp = world.start || { x: 3.5, y: 3.5 };
+  const player = { x: q.get('x') ? Number(q.get('x')) : sp.x, y: q.get('y') ? Number(q.get('y')) : sp.y, angle: q.get('a') ? Number(q.get('a')) : 0 };
+  if (q.get('street')) {
+    // same search as tests/scenarios/town_street.gd: first grass cell with grass to its east, outdoors
+    outer: for (let y = 0; y < world.height; y++) for (let x = 0; x < world.width; x++) {
+      if (world.tileAt(x + 0.5, y + 0.5) === 'g' && world.tileAt(x + 1.5, y + 0.5) === 'g' && world.kindAt(x + 0.5, y + 0.5) === 'outdoor') { player.x = x + 0.5; player.y = y + 0.5; player.angle = 0; break outer; }
+    }
+  }
+  const DT = 1 / 60;
+  let clock = 0;
+  const last = Math.max.apply(null, frames);
+  const shots = {};
+  function post(name, url) { return fetch('/save?name=' + encodeURIComponent(name), { method: 'POST', body: url }); }
+  async function run() {
+    for (let f = 1; f <= last; f++) {
+      clock += DT;
+      if (pings.indexOf(f) >= 0) {
+        const kind = world.kindAt(player.x, player.y);
+        const room = VCS.SoundData.rooms[kind] || VCS.SoundData.rooms[world.kind];
+        const keep = { range: sonar.range, bounces: sonar.bounces, fade: sonar.fade };
+        sonar.range = 10 * room.rangeMul; sonar.bounces = Math.min(2, room.bounceCap); sonar.fade = 3 * room.fadeMul;
+        VCS.Sonar.emit(sonar, world, player.x, player.y, clock, { z: 0.62, facing: player.angle });
+        sonar.range = keep.range; sonar.bounces = keep.bounces; sonar.fade = keep.fade;
+      }
+      VCS.Sonar.prune(sonar, clock);
+      if (frames.indexOf(f) >= 0) {
+        VCS.Render.drawFirstPerson(r, world, player, sonar, clock, { people: people, lit: 0 });
+        const url = canvas.toDataURL('image/png');
+        shots[f] = url.length;
+        if (save) await post(prefix + '_f' + String(f).padStart(4, '0'), url);
+        say('frame ' + f + ' captured (' + url.length + ' bytes)');
+      }
+    }
+    window.__done = { mapName, frames, shots };
+    say('done: ' + JSON.stringify(window.__done));
+  }
+  run().catch((e) => { say('error: ' + e.message); window.__error = String(e && e.stack || e); });
+})();
+</script>
+</body>
+</html>

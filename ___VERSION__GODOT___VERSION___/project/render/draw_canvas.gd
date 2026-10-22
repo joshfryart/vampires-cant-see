@@ -13,6 +13,7 @@ class Stroke:
 	var width: float
 
 var strokes: Array[Stroke] = []
+var fills: Array = []          # [Rect2, Color] filled dots
 
 var _path: Array = []          # subpaths: Array of PackedVector2Array
 var _cur: PackedVector2Array = PackedVector2Array()
@@ -24,6 +25,7 @@ var _stack: Array = []
 
 func reset() -> void:
 	strokes.clear()
+	fills.clear()
 	_path.clear()
 	_cur = PackedVector2Array()
 	_path_rects.clear()
@@ -131,7 +133,14 @@ func arc(x: float, y: float, r: float, a0: float, a1: float, ccw: bool = false) 
 
 
 func _color() -> Color:
-	var s := stroke_style
+	return _parse_color(stroke_style)
+
+
+func _fill_color() -> Color:
+	return _parse_color(fill_style)
+
+
+func _parse_color(s: String) -> Color:
 	var c := Color.BLACK
 	if s.begins_with("#"):
 		c = Color.html(s)
@@ -206,7 +215,23 @@ func _emit(points: PackedVector2Array, col: Color) -> void:
 	strokes.append(s)
 
 
+## Fill the rect() subpaths (dots), clipped to the active clip rect.
+func fill() -> void:
+	var col := _fill_color()
+	if col.a <= 0.0:
+		return
+	for r in _path_rects:
+		var rr: Rect2 = r
+		if _clip_on:
+			rr = rr.intersection(_clip)
+			if rr.size.x <= 0.0 or rr.size.y <= 0.0:
+				continue
+		fills.append([rr, col])
+
+
 ## Draw everything collected so far onto a CanvasItem (call from its _draw()).
 func paint(item: CanvasItem) -> void:
+	for f in fills:
+		item.draw_rect(f[0], f[1], true)
 	for s in strokes:
 		item.draw_polyline(s.points, s.color, maxf(1.0, s.width), true)
