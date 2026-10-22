@@ -14,8 +14,8 @@ window to listen, Esc pauses. F3 shows the debug text. Debug builds also have M 
 Menus: New run / Continue, Shop, Stats, How to play, Export / Import save, Character creator, Settings (volume, FOV, effects 0-2,
 wobbly lines, reduced motion, large text, subtitles, old bip ping, and more).
 
-Saves, settings and logs live in the Godot user folder (`%APPDATA%\Godot\app_userdata\Vampires Can't See\`): `vcs.run.json`,
-`vcs.meta.json`, `config.json`, `flags.json`, `creator.json`, `vcs-log.txt` (from the pause or error screen).
+Saves, settings and logs live in the Godot user folder (`%APPDATA%\Godot\app_userdata\Vampires Cant See\`): `vcs_run.json`,
+`vcs_meta.json`, `settings.json`, `flags.json`, `creator.json`, `seen.json`, `vcs-log.txt` (from the pause or error screen).
 
 ## What is in it
 
