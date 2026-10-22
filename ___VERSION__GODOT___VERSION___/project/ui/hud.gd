@@ -52,10 +52,17 @@ func set_state(g: Node) -> void:
 		_sub_muffled = false
 		_sub_a = Listen.sub_alpha(bs, g.clock)
 	_unsaved = g.flow != null and g.flow.save_failed
-	_debug = _debug_key or Flags.get_flag("dev.showFps")
+	_debug = _debug_key or Flags.get_flag("dev.showFps") or g.cfg.get("showFps", false) == true
 	_warm = _warm_halos(g)
 	if _debug:
-		_text = "t %.2f  pos %.2f,%.2f  angle %.2f  pulses %d  people %d  echoes %d  light %.2f  state %s  canvas %d us" % [g.clock, g.player.x, g.player.y, g.player.angle, g.sonar.pulses.size(), g.people.people.size(), g.people.echoes.size(), g.player_lit, g.state, g.echo_view.last_us]
+		var last := ""
+		if not Log.lines.is_empty():
+			var l: Dictionary = Log.lines[Log.lines.size() - 1]
+			last = "
+%s %s: %s" % [l["level"], l["tag"], str(l["msg"]).left(80)]
+		_text = "FPS %d  canvas %d us  figures %d vol / %d line  vessels %d
+x %.2f y %.2f a %.2f  state %s  t %.2f
+pulses %d cd %.2f  people %d echoes %d rings %d  light %.2f%s" % [Engine.get_frames_per_second(), g.echo_view.last_us, g.echo_view.rs.fig_vol, g.echo_view.rs.fig_line, g.echo_view.rs.vessel_nodes, g.player.x, g.player.y, g.player.angle, g.state, g.clock, g.sonar.pulses.size(), g.sonar.cooldown_left(g.clock), g.people.people.size(), g.people.echoes.size(), g.ripple.rings.size(), g.player_lit, last]
 	queue_redraw()
 
 

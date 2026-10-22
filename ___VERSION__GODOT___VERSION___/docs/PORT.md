@@ -30,6 +30,9 @@ Update this as modules land. Plan: `../PLAN.md`. Driving Godot: `../HOWTO-CLI-AN
 | `game.js` update order, drink loop, sound emission, transitions | `game/game.gd` | done (see below) |
 | `game.js` runs: beginRun, endRun, boons, gifts, sleep, nextNight, stepNight, stepForge, snapshot, saves | `game/run_flow.gd` | done; `tests/flow/test_run_flow.gd` plays 5 nights to a win, the sun loss and a pause/continue round trip |
 | `game.js` powers (shriek, mist, still), rocks | `game/powers.gd` | done |
+| `data/vessels.js`, render.js vessel overlay, game.js `stepHeartbeats` / `victimVessel`, people.js vessel branches | `core/vessels.gd`, `render/vessel_draw.gd` (+ `FigureVolDraw.draw_flush`), `game.gd` `step_heartbeats`, `core/people.gd` (`vessels_on`, echo snapshot fields), `core/flags.gd` (`vis.vessels` + tunables) | done: `vessels.json`, `people_vessels.json`, `vessels_draw.json` (281 draw-log scenes incl. window mute and the held victim) |
+| `Audio.setPingStyle` (old bip ping) | `audio/audio_director.gd` `ping_bip`, baked `pingbip_*` | done |
+| `checks.js` | `core/checks.gd` (Godot equivalents), shown as notices or the error screen | done |
 | `figure.js` (volumetric figure), render.js vol pose branch and drawPerson vol path | `render/figure_vol.gd` (geometry, queries), `render/figure_vol_draw.gd` (draw, details, extras, grab arms), `render/pose.gd` (vol tweaks, slots 24/25), `render/echo_layer.gd` (rim light, 2.5 ms budget, silhouette rings) | done, 555 draw-log scenes match (`figure_vol.json`). `drawFlush` and `data/vessels.js` (flag `vis.vessels`, off by default) are not ported |
 | `hud.js`, `icons.js` | `render/hud_draw.gd`, `render/icons.gd`, `ui/hud_view.gd` (inside the 640x360 viewport), `ui/hud.gd` (window overlay: subtitles, debug, warm halos) | done, 515 draw-log entries match |
 | `postfx.js` | `render/shaders/postfx_grade.gdshader`, `postfx_overlay.gdshader` | done (bloom, dusk/dawn grade, vignette, grain) |

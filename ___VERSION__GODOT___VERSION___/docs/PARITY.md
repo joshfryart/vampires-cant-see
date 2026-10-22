@@ -28,6 +28,7 @@ node tools/golden/<name>.mjs                      # rewrite project/tests/fixtur
 | `struggle.json` | `golden/struggle.mjs` | 4,050 held-victim poses | 1e-8 |
 | `figure_struggle.json` | `golden/figure_struggle.mjs` | 724 held-victim figure draw logs (Struggle loaded) | exact hash |
 | `figure_vol.json` | `golden/figure_vol.mjs` | 555 volumetric-figure draw logs (Figure loaded, fx 1 and 2): modes, looks, gaits, outfits, role hats and items, archetype faces, rim light, silhouette rings, held victim (1.9M calls) | exact hash |
+| `vessels.json`, `people_vessels.json`, `vessels_draw.json` | `golden/vessels.mjs`, `people_vessels.mjs`, `vessels_draw.mjs` | vessel data, pulse state and timing, beat envelopes, limb geometry; people with the vessel flag on (echo snapshots and lifetimes); 281 overlay draw logs through the real ray-cast depth buffer and tile codes | 1e-9 / 1e-6 / exact hash |
 | `creator.json` | `golden/creator.mjs` | character creator logic: sanitize, set_field, field table, Forge presets, seeded randomize, pose echoes, views, JSON export/import, list helpers | 1e-9 |
 | `sprites.json`, `floor_fx.json`, `hud.json`, `ripple.json` | `golden/sprites.mjs`, `floor_fx.mjs`, `hud.mjs`, `ripple.mjs` | markers and props, floor and ceiling canvas effects, the HUD and icons (515 entries), ring helpers | exact hash |
 
@@ -63,8 +64,8 @@ compared with an epsilon.
 
 - Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings, plus the ripple
   rings, door wobble and the weak-ping flicker: Phase 3 polish).
-- Not ported: vessels (whole-body heartbeat, flag off by default, so `drawFlush`, `data/vessels.js` and the `vis.vessels` flag
-  are absent), boot checks (`checks.js`), the ping-bip sound option and the Forge editor in the dev panel.
+- Not ported: the Forge editor in the dev panel (no JS equivalent of spawn overrides exists either), the `renderScale` and `dragLook` settings
+  (the Godot frame is a fixed 640x360 and the mouse is always captured while playing), and Windows export (needs export templates).
 - Audio is in but unheard by me: ambience loops, fire, breath, heartbeat, far dog/bell and live villager speech (`audio/speech_synth.gd`,
   50-120 ms per line on a worker thread) all play; nothing has been listened to (F5 needs your ears).
 - Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).
