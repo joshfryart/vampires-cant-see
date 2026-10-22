@@ -310,6 +310,14 @@ func outer_at(x: float, y: float) -> float:
 	return outer_grid[cy * width + cx]
 
 
+## Read-only copy of the light sources {x, y, radius} (js lightSources).
+func light_sources() -> Array:
+	var out: Array = []
+	for l in lights:
+		out.append({"x": l["x"], "y": l["y"], "radius": l["radius"]})
+	return out
+
+
 ## Indoor/outdoor kind at (x, y); outside the map it is the map kind (js kindAt).
 func kind_at(x: float, y: float) -> String:
 	var cx: int = int(floor(x))

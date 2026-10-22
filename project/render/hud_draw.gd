@@ -636,3 +636,60 @@ static func draw_hint(c: Canvas, text: String, age_in: float, dur_in: float = HI
 	c.fill_text(str_, W / 2.0, cy, W - 40.0)
 	c.global_alpha = 1.0
 	c.restore()
+
+
+## Transition wipe (js drawWipe): black outside a closing wobbly ring, four pale trailing rings. k 0 = nothing, 1 = black.
+## t is wall-clock seconds (the boil frame). The even-odd hole is drawn as 64 trapezoids between the ring and a far circle.
+static func draw_wipe(c: Canvas, k: float, t: float, w: float, h: float) -> void:
+	if k <= 0.0 or is_nan(k):
+		return
+	c.global_alpha = 1.0
+	c.fill_style = "#000"
+	if k >= 1.0:
+		c.fill_rect(0.0, 0.0, w, h)
+		return
+	var cx: float = w / 2.0
+	var cy: float = h / 2.0
+	var max_r: float = sqrt(w * w + h * h) / 2.0 * 1.05
+	var base: float = max_r * pow(1.0 - k, 1.25)
+	var fr: int = Ripple.boil_frame(t)
+	var n: int = 64
+	var sc: float = maxf(1.0, h / 360.0)
+	var far: float = max_r * 2.2
+	var ring := PackedVector2Array()
+	ring.resize(n + 1)
+	for s in n + 1:
+		var th: float = float(s) / n * TAU
+		var wob: float = 1.0 + 0.035 * sin(th * 6.0 + k * 9.0) + Ripple.jitter(fr, s, 0) * 0.008
+		ring[s] = Vector2(cx + cos(th) * base * wob, cy + sin(th) * base * wob)
+	c.begin_path()
+	for s in n:
+		var a0: float = float(s) / n * TAU
+		var a1: float = float(s + 1) / n * TAU
+		c.move_to(ring[s].x, ring[s].y)
+		c.line_to(cx + cos(a0) * far, cy + sin(a0) * far)
+		c.line_to(cx + cos(a1) * far, cy + sin(a1) * far)
+		c.line_to(ring[s + 1].x, ring[s + 1].y)
+		c.close_path()
+	c.fill()
+	c.line_join = "round"
+	c.line_cap = "round"
+	c.stroke_style = COL_LINE
+	for ring_i in 4:
+		var r: float = base * (1.0 - 0.13 * ring_i) - ring_i * 2.0 * sc
+		if r < 2.0:
+			continue
+		c.global_alpha = minf(1.0, (0.9 - ring_i * 0.2) * minf(1.0, (1.0 - k) * 4.0 + 0.25))
+		c.line_width = (2.2 - ring_i * 0.4) * sc
+		c.begin_path()
+		for s in n + 1:
+			var th2: float = float(s) / n * TAU
+			var wob2: float = 1.0 + 0.035 * sin(th2 * (6.0 + ring_i) + k * 9.0 + ring_i) + Ripple.jitter(fr, s + ring_i * 64, 1) * 0.008
+			var x: float = cx + cos(th2) * r * wob2
+			var y: float = cy + sin(th2) * r * wob2
+			if s == 0:
+				c.move_to(x, y)
+			else:
+				c.line_to(x, y)
+		c.stroke()
+	c.global_alpha = 1.0

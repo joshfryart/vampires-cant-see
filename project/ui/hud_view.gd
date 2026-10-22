@@ -10,6 +10,10 @@ var _vignette: float = 0.0
 var _dawn: float = 0.0
 var _fade: float = 0.0
 var _plain: bool = false
+const EdgeGlowC := preload("res://render/edge_glow.gd")
+var edge := EdgeGlowC.new()
+var _glow: ColorRect
+var _glow_mat: ShaderMaterial
 
 
 func _init() -> void:
@@ -49,8 +53,40 @@ static func _q(v: float, steps: float) -> float:
 	return roundf(v * steps) / steps
 
 
+## Warm edge glow (js drawAtmosphere): a sibling ColorRect placed just below this view, so it sits above the sonar and the grade and
+## under the HUD lines. Only while playing a night map.
+func _update_glow(g: Game, active: bool) -> void:
+	if _glow == null:
+		if not active:
+			return
+		_glow = ColorRect.new()
+		_glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_glow_mat = ShaderMaterial.new()
+		_glow_mat.shader = load("res://render/shaders/edge_glow.gdshader")
+		_glow.material = _glow_mat
+		var par: Node = get_parent()
+		if par != null:
+			par.add_child(_glow)
+			par.move_child(_glow, get_index())
+	if active and g.world != null and g.player != null:
+		edge.compute(g.world, g.player, g.reduced)
+	else:
+		edge.left = 0.0
+		edge.right = 0.0
+		edge.top = 0.0
+		edge.init = false
+	var vis: bool = edge.left > 0.002 or edge.right > 0.002 or edge.top > 0.002
+	_glow.visible = vis
+	if vis:
+		_glow_mat.set_shader_parameter("left_a", edge.left)
+		_glow_mat.set_shader_parameter("right_a", edge.right)
+		_glow_mat.set_shader_parameter("top_a", edge.top)
+
+
 func render_frame(g: Game) -> void:
 	var n: Night = g.night
+	_update_glow(g, g.world != null and g.state != "title" and g.state != "runend" and g.state != "boon" and g.state != "gift")
 	var vignette: float = g.fov_ease() if g.drink != null or g.fov_k > 0.0 else 0.0
 	if g.reduced:
 		vignette = 0.3 if g.drink != null else 0.0
@@ -89,12 +125,15 @@ func render_frame(g: Game) -> void:
 		return
 	var wiping: bool = g.transition != null and g.wipe_k > 0.0
 	if wiping or n == null:
-		var sig2: int = ["plain", wiping, _q(g.hud_a, 24.0), _q(g.hud_frac, 24.0)].hash()
+		var wt: float = Time.get_ticks_msec() / 1000.0
+		var sig2: int = ["plain", wiping, _q(g.wipe_k, 400.0) if wiping else 0.0, Ripple.boil_frame(wt) if wiping else 0, _q(g.hud_a, 24.0), _q(g.hud_frac, 24.0)].hash()
 		if not _sig_valid or sig2 != _sig:
 			_sig = sig2
 			_sig_valid = true
 			canvas.reset()
-			if not wiping:
+			if wiping:
+				HudDraw.draw_wipe(canvas, g.wipe_k, wt, 640.0, 360.0)
+			else:
 				_plain_hud(g)
 			redraw = true
 			stat_built += 1
