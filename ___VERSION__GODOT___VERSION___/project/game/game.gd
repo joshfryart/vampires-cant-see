@@ -142,6 +142,10 @@ var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
 var step_timer: float = 0.0
+## Head bob (js updateBob): amplitude ramp, walk cycle phase and the resulting vertical offset in 640x360 pixels.
+var bob_amp: float = 0.0
+var walk_phase: float = 0.0
+var bob: float = 0.0
 var foot_right: bool = false
 var feed_press: int = 0
 var ping_clicks: int = 0
@@ -1068,7 +1072,16 @@ func drain_people_events() -> void:
 		audio.play(kind, spatial(e["x"], e["y"], float(SoundData.level(kind)["gain"])))
 
 
+func update_bob(dt: float, moved: float) -> void:
+	var walking: bool = dt > 0.0 and moved / dt > 0.3
+	bob_amp = clampf(bob_amp + (dt if walking else -dt) * 8.0, 0.0, 1.0)
+	if walking:
+		walk_phase += (moved / dt) * dt * 7.0
+	bob = sin(walk_phase) * 2.5 * bob_amp if bool(cfg.get("headBob", true)) and not reduced else 0.0
+
+
 func player_steps(dt: float, moved: float) -> void:
+	update_bob(dt, moved)
 	var moving: bool = dt > 0.0 and moved / dt > 0.3
 	if not moving:
 		step_timer = 0.0
@@ -1599,4 +1612,7 @@ func fade_amount() -> float:
 func _sync_camera() -> void:
 	cam.fov = rad_to_deg(fov_now())
 	cam.position = Coords.to_view(player.x, player.y, 0.5)
-	cam.rotation = Vector3(0.0, -player.angle - PI / 2.0, 0.0)
+	# A horizon shift of bob px (of 360) is a small pitch: positive bob moves the horizon down, i.e. looks up.
+	var focal: float = 320.0 / tan(fov_now() * 0.5)
+	cam.rotation = Vector3(atan(bob / focal), -player.angle - PI / 2.0, 0.0)
+	echo_view.rs.horizon = echo_view.rs.oh / 2.0 + bob * (echo_view.rs.oh / 360.0)

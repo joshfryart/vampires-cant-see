@@ -8,6 +8,7 @@ var _view: String = "main"
 var _panel: PanelContainer
 var _box: VBoxContainer
 var _last_key: String = ""
+var _abandon_ask: bool = false
 
 
 func _init() -> void:
@@ -54,8 +55,9 @@ func _label(text: String, size: int = 16, color: Color = Color(0.85, 0.9, 1.0), 
 func _button(text: String, cb: Callable, parent: Control = null) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(cb)
+	b.focus_mode = Control.FOCUS_ALL
+	if cb.is_valid():
+		b.pressed.connect(cb)
 	(parent if parent != null else _box).add_child(b)
 	return b
 
@@ -75,7 +77,17 @@ func sync(g: Game) -> void:
 		"gift": _build_choice("Blood gift", g.flow.run["pendingGifts"], false)
 		"runend": _build_runend()
 		_: _panel.visible = false
+	if _panel.visible and key != _last_key:
+		_focus_first.call_deferred()
 	_last_key = key
+
+
+## Keyboard focus on the first button of a freshly built panel (arrow keys and Enter then work).
+func _focus_first() -> void:
+	for c in _box.find_children("*", "Button", true, false):
+		if c is Button and not c.disabled and c.is_inside_tree():
+			(c as Button).grab_focus()
+			return
 
 
 func _build_title() -> void:
@@ -98,9 +110,18 @@ func _build_title() -> void:
 	_g.flow.notices.clear()
 	if _g.flow.has_run:
 		_button("Continue", func(): _g.flow.continue_run())
-		_button("New run (abandons the saved run)", func():
-			_g.flow.store.remove("run")
-			_g.flow.has_run = false
+		var nb := _button("Abandon run? Click again" if _abandon_ask else "New run", Callable())
+		nb.pressed.connect(func():
+			if not _abandon_ask:
+				_abandon_ask = true
+				nb.text = "Abandon run? Click again"
+				_g.get_tree().create_timer(3.0).timeout.connect(func():
+					_abandon_ask = false
+					if is_instance_valid(nb):
+						nb.text = "New run")
+				return
+			_abandon_ask = false
+			_g.flow.abandon_stored()
 			_g.flow.begin_run())
 	else:
 		_button("New run", func(): _g.flow.begin_run())
@@ -148,7 +169,7 @@ func _build_stats() -> void:
 	_label("Stats", 22, Color(0.9, 0.85, 0.5))
 	var st: Dictionary = _g.flow.meta["stats"]
 	for k in Meta.STAT_KEYS:
-		_label("%s: %d" % [k, int(st[k])], 14)
+		_label("%s: %d" % [STAT_LABELS.get(k, k), int(st[k])], 14)
 	_button("Back", func():
 		_view = "main"
 		sync(_g))
@@ -217,6 +238,7 @@ func _build_runend() -> void:
 
 # ---------------------------------------------------------------- settings
 
+const STAT_LABELS := {"runs": "Runs", "wins": "Wins", "nightsSurvived": "Nights survived", "peopleFed": "People fed", "bestNights": "Best nights in a run", "essenceEarned": "Essence earned"}
 const SETTINGS_ROWS := [
 	["Volume", "volume", 0.0, 1.0, 0.05], ["Ambience", "ambienceGain", 0.0, 1.0, 0.05],
 	["Mouse sensitivity", "mouseSensitivity", 0.0005, 0.01, 0.0005], ["Invert mouse", "invertMouse"],
@@ -225,7 +247,7 @@ const SETTINGS_ROWS := [
 	["Ping fade (s)", "sonarFade", 1.0, 8.0, 0.25], ["Ping cooldown (s)", "sonarCooldown", 0.2, 3.0, 0.05],
 	["Feeding reach", "feedReach", 1.0, 3.0, 0.1], ["Hold to drink / toggle", "feedToggle"],
 	["Effects (0 off, 1 low, 2 high)", "effects", 0.0, 2.0, 1.0], ["Wobbly lines", "lineBoil"], ["Material detail", "materialDetail"],
-	["Reduced motion", "reduceMotion"], ["Large text", "largeText"], ["Subtitles", "subtitles"], ["Translation", "translation"],
+	["Reduced motion", "reduceMotion"], ["Head bob", "headBob"], ["Edge vignette", "edgeVignette"], ["Key turn speed", "keyTurnSpeed", 1.0, 6.0, 0.1], ["Large text", "largeText"], ["Subtitles", "subtitles"], ["Translation", "translation"],
 	["Villager voices", "villagerVoices"], ["Autosave every (s)", "autosaveSec", 5.0, 300.0, 5.0],
 ]
 

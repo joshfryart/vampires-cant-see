@@ -745,6 +745,27 @@ func continue_run() -> bool:
 	return true
 
 
+## Abandon the stored run: record it as a loss with the nights survived so far, then remove it (js abandonStored).
+func abandon_stored() -> void:
+	var r := store.read("run")
+	if r["ok"]:
+		var mg := SaveCodec.migrate_run(r["v"], r["data"])
+		var san: Variant = SaveCodec.sanitize_run(mg["data"]) if mg["ok"] else null
+		var nt: Variant = san.get("night") if san is Dictionary else null
+		var nights := 0
+		var fed := 0
+		var bonus := 0
+		if nt is Dictionary:
+			nights = maxi(0, int(nt.get("night", 1)) - 1)
+			fed = maxi(0, int(nt.get("fedCount", 0)))
+		if san is Dictionary and san["run"].get("hunger") is Dictionary:
+			bonus = maxi(0, int(floor(float(san["run"]["hunger"].get("essenceBonus", 0)))))
+		Meta.record_run(meta, {"nights": nights, "fed": fed, "won": false, "bonus": bonus})
+		save_meta()
+	store.remove("run")
+	has_run = false
+
+
 ## Autosave tick (js update: every autosaveSec while playing).
 func tick_autosave(dt: float) -> void:
 	if g.state == "playing" and g.run_on:
