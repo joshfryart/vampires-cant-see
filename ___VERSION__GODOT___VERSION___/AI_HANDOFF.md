@@ -86,6 +86,13 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 
 ## TODO (suggested order)
 
+0. **PERFORMANCE (reported by the user after the alpha build): the game is very laggy in play.** Top priority. Not reproduced or profiled yet. Suspects, roughly in order:
+   (a) the volumetric figures plus the vessel overlay since they went in (`echo_layer.gd`, `figure_vol_draw.gd`, `vessel_draw.gd`; each figure issues thousands of canvas calls and `DrawCanvas.fill` now triangulates polygons every frame);
+   (b) `DrawCanvas` itself: ordered ops, `Geometry2D.intersect_polygons` / `triangulate_polygon` per fill, `draw_polyline` per stroke, all redrawn every frame by `EchoView` and `HudView`;
+   (c) no adaptive-quality governor (see NOT included): quality stays 3 and effects 2 on weak GPUs; (d) `MapView`, `DevPanel`, `IconRect` run `_process` redraws only when visible, check anyway;
+   (e) `step_heartbeats` and vessel echoes keep more echoes alive (`People.vessels_on`), and the title/menu screens redraw the crypt every frame.
+   Start by measuring: F3 overlay shows fps, canvas us and figure counts; `tests/scenarios/perf_town.gd` prints per-section cost; try Effects 0/1 and `vis.vessels` off in F9 to bisect.
+   Likely fixes: cache polygon triangulation or skip fills at distance, lower the vol-figure budget and depth, cap vessels to the nearest figure, drop `halo`/edges at quality 2, and port the adaptive quality governor.
 1. User playtest and a bug list. Fix what they find; add a scenario or test per bug.
 2. Listen pass over every baked sound against `../tools/sound-lab.html`; rebake with `tools/bake-audio.mjs` where it differs.
 3. Adaptive quality / effects cap (see NOT included), then measure F4.
