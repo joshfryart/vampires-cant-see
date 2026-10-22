@@ -11,6 +11,9 @@ const COL_DOOR_OPEN := [255, 226, 196]
 const COL_PROP := [200, 214, 236]
 const COL_FLAME := "rgb(255,176,64)"
 const PROP_MAX_DIST := 12.0
+static var _pc_world: int = 0
+static var _pc_n: int = -1
+static var _pc_xy: PackedFloat64Array = PackedFloat64Array()
 const FIRE_Z := [0.3, 0.95, 0.5]
 const PROP_DEF := {
 	"gravestone": {"zc": 0.2, "top": 0.4, "fire": false},
@@ -499,6 +502,37 @@ static func prop_band(sonar: Sonar, t: float, x: float, y: float) -> Array:
 	return [lo, hi]
 
 
+## Per pulse, the annulus (squared horizontal radii) where a point can be lit right now: scan() only lights a point whose
+## wavefront passed it less than glow_dur ago (glow_mul is 0 after that), within range; |dz| <= 1.5 widens the inner edge.
+## Flat [x, y, lo2, hi2, ...]. A point outside every annulus has lit_at3 brightness 0, so it can be skipped before the scan.
+static func lit_bands(sonar: Sonar, t: float) -> PackedFloat64Array:
+	var out := PackedFloat64Array()
+	for p in sonar.pulses:
+		var rr: float = (t - p.t0) * p.speed
+		if rr < 0.0:
+			continue
+		var hi: float = minf(rr, p.range) + 1e-6
+		var lo: float = rr - Pose.glow_dur(p.fade) * p.speed - 1.5
+		out.append(p.x)
+		out.append(p.y)
+		out.append(lo * lo if lo > 0.0 else 0.0)
+		out.append(hi * hi)
+	return out
+
+
+static func in_lit_band(bands: PackedFloat64Array, x: float, y: float) -> bool:
+	var i := 0
+	var n: int = bands.size()
+	while i < n:
+		var dx: float = x - bands[i]
+		var dy: float = y - bands[i + 1]
+		var d2: float = dx * dx + dy * dy
+		if d2 >= bands[i + 2] and d2 <= bands[i + 3]:
+			return true
+		i += 4
+	return false
+
+
 ## Draw all props lit by the current pulses; returns the count drawn.
 static func draw_props(rs: RenderState, c: Canvas, world: World, player: Dictionary, sonar: Sonar, t: float, tan_half: float) -> int:
 	var props: Array = world.props
@@ -509,14 +543,29 @@ static func draw_props(rs: RenderState, c: Canvas, world: World, player: Diction
 	var ca: float = cos(player["angle"])
 	var sa: float = sin(player["angle"])
 	var drawn := 0
-	for pr in props:
-		var type: String = pr["type"]
-		if not PROP_DEF.has(type):
-			continue
-		var def: Dictionary = PROP_DEF[type]
-		var dx: float = pr["x"] - player["x"]
-		var dy: float = pr["y"] - player["y"]
-		if dx * dx + dy * dy > PROP_MAX_DIST * PROP_MAX_DIST:
+	var bands := lit_bands(sonar, t)
+	if bands.is_empty():
+		c.global_alpha = 1.0
+		return 0
+	# prop positions are static: scan them from a packed array and only touch the dictionaries of the few that pass the culls
+	var np: int = props.size()
+	var wid: int = world.get_instance_id()
+	if wid != _pc_world or np != _pc_n:
+		_pc_world = wid
+		_pc_n = np
+		_pc_xy.resize(np * 2)
+		for k in np:
+			_pc_xy[k * 2] = float(props[k]["x"])
+			_pc_xy[k * 2 + 1] = float(props[k]["y"])
+	var ppx: float = player["x"]
+	var ppy: float = player["y"]
+	var max2: float = PROP_MAX_DIST * PROP_MAX_DIST
+	for pi in np:
+		var qx: float = _pc_xy[pi * 2]
+		var qy: float = _pc_xy[pi * 2 + 1]
+		var dx: float = qx - ppx
+		var dy: float = qy - ppy
+		if dx * dx + dy * dy > max2:
 			continue
 		var fwd0: float = dx * ca + dy * sa
 		if fwd0 <= 0.1:
@@ -524,6 +573,13 @@ static func draw_props(rs: RenderState, c: Canvas, world: World, player: Diction
 		var right0: float = -dx * sa + dy * ca
 		if absf(right0) > fwd0 * tan_half * 1.2 + 1.0:
 			continue
+		if not in_lit_band(bands, qx, qy):
+			continue
+		var pr: Dictionary = props[pi]
+		var type: String = pr["type"]
+		if not PROP_DEF.has(type):
+			continue
+		var def: Dictionary = PROP_DEF[type]
 		var lit := lit_at3(sonar, pr["x"], pr["y"], def["zc"], t)
 		var b: float = lit[0]
 		if def["fire"] and b <= 0.01:
@@ -615,8 +671,18 @@ static func draw_props(rs: RenderState, c: Canvas, world: World, player: Diction
 ## All three marker kinds (crypt, safe, open doors) lit this frame; returns the count drawn.
 static func draw_markers(rs: RenderState, c: Canvas, world: World, player: Dictionary, sonar: Sonar, t: float, tan_half: float) -> int:
 	var n := 0
+	# draw_sprite returns false for anything behind the camera (project() fwd <= 0.1): skip those before the dictionary and lights.
+	var ca: float = cos(player["angle"])
+	var sa: float = sin(player["angle"])
+	var px: float = player["x"]
+	var py: float = player["y"]
+	var bands := lit_bands(sonar, t)
 	for kind in ["crypt", "safe", "doors"]:
 		for spot in world.spots.get(kind, []):
+			if (spot.x - px) * ca + (spot.y - py) * sa <= 0.1:
+				continue
+			if not in_lit_band(bands, spot.x, spot.y):
+				continue
 			if draw_sprite(rs, c, world, player, sonar, t, kind, {"x": spot.x, "y": spot.y}, tan_half):
 				n += 1
 	return n

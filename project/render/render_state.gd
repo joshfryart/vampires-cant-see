@@ -16,6 +16,11 @@ var quality: int = 3
 var reduced: bool = false
 ## Effects level 0..2 (js r.fx) and the material-detail switch (r.matDetail).
 var fx: int = 0
+## The configured Effects level (the HUD keeps using it), and the governor's taper flag (fx == 2 and quality 3, js r.fxTaper).
+var fx_cfg: int = 0
+var fx_taper: bool = false
+## The user's materialDetail setting; mat_detail below is that AND the governor's automatic switch.
+var mat_cfg: bool = true
 ## Horizontal field of view in radians (js fov); set_fov rebuilds the per-column ray offsets when it changes.
 var fov: float = FOV_DEG * PI / 180.0
 var mat_detail: bool = true
@@ -47,6 +52,9 @@ var lights: Array = []
 ## cos/sin of each column's view-angle offset (fixed fov), for Raycast.depth_columns.
 var col_cos: PackedFloat64Array = PackedFloat64Array()
 var col_sin: PackedFloat64Array = PackedFloat64Array()
+## The same for half as many columns (quality <= 1 casts every second column; EchoView widens the result).
+var col_cos_h: PackedFloat64Array = PackedFloat64Array()
+var col_sin_h: PackedFloat64Array = PackedFloat64Array()
 
 
 func _init(width: int = BASE_W, height: int = BASE_H) -> void:
@@ -62,6 +70,9 @@ func _init(width: int = BASE_W, height: int = BASE_H) -> void:
 	var offs := Raycast.column_offsets(FOV_DEG * PI / 180.0, cols)
 	col_cos = offs[0]
 	col_sin = offs[1]
+	var offh := Raycast.column_offsets(FOV_DEG * PI / 180.0, maxi(1, cols >> 1))
+	col_cos_h = offh[0]
+	col_sin_h = offh[1]
 
 
 func tan_half() -> float:
@@ -75,6 +86,9 @@ func set_fov(f: float) -> void:
 	var offs := Raycast.column_offsets(fov, cols)
 	col_cos = offs[0]
 	col_sin = offs[1]
+	var offh := Raycast.column_offsets(fov, maxi(1, cols >> 1))
+	col_cos_h = offh[0]
+	col_sin_h = offh[1]
 
 
 ## Line boil is on at quality >= 2 unless reduced motion (js drawFirstPerson / drawSolo).

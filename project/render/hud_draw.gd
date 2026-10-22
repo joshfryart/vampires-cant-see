@@ -79,6 +79,25 @@ func time_text_for(hour: int, minute: int) -> String:
 	return time_text
 
 
+## Op-list memo for the parts of the HUD that change rarely (DrawCanvas only: the parity tests record calls instead). The ops
+## drawn by `draw` are kept per slot under `key`; the same key again re-appends them instead of tracing the shapes. Callers set
+## every style they use, so the canvas state a skipped draw would leave behind does not matter.
+var _memo_key: Array = [0, 0]
+var _memo_ok: Array = [false, false]
+var _memo_ops: Array = [[], []]
+
+
+func _memo(dc: DrawCanvas, slot: int, key: int, draw: Callable) -> void:
+	if _memo_ok[slot] and _memo_key[slot] == key:
+		dc.ops.append_array(_memo_ops[slot])
+		return
+	var n0: int = dc.ops.size()
+	draw.call()
+	_memo_ops[slot] = dc.ops.slice(n0)
+	_memo_key[slot] = key
+	_memo_ok[slot] = true
+
+
 # ---------------------------------------------------------------- blood vial
 
 func draw_vial(c: Canvas, blood: float, weak: float, t: float, reduced: bool, pulse: float) -> void:
@@ -215,7 +234,15 @@ func draw_veil(c: Canvas, k: float, t: float, reduced: bool) -> void:
 
 # ---------------------------------------------------------------- moon -> sun dial
 
-func draw_dial(c: Canvas, frac: float, hour: int, minute: int, _t: float) -> void:
+func draw_dial(c: Canvas, frac: float, hour: int, minute: int, t: float) -> void:
+	if c is DrawCanvas:
+		var key: int = [frac, hour, minute, fx, lg, feed_dim, fr if boil else -1].hash()
+		_memo(c, 0, key, _draw_dial.bind(c, frac, hour, minute, t))
+		return
+	_draw_dial(c, frac, hour, minute, t)
+
+
+func _draw_dial(c: Canvas, frac: float, hour: int, minute: int, _t: float) -> void:
 	var sun_k: float = 0.0 if frac <= 0.9 else (1.0 if frac >= 1.0 else (frac - 0.9) / 0.1)
 	c.stroke_style = COL_LINE
 	c.line_width = 1.3
@@ -298,6 +325,15 @@ func draw_over(c: Canvas, o: Dictionary, t: float, reduced: bool) -> void:
 func draw_powers(c: Canvas, list: Variant, t: float, reduced: bool) -> void:
 	if not (list is Array):
 		return
+	if c is DrawCanvas:
+		var ifr: int = 0 if reduced else int(floor((t if is_finite(t) else 0.0) / 0.34))
+		var key: int = [list, lg, fx, reduced, ifr].hash()
+		_memo(c, 1, key, _draw_powers.bind(c, list, t, reduced))
+		return
+	_draw_powers(c, list, t, reduced)
+
+
+func _draw_powers(c: Canvas, list: Array, t: float, reduced: bool) -> void:
 	var slot := 0
 	var i := 0
 	while i < list.size() and slot < POWER_MAX:

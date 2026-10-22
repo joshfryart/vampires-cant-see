@@ -192,6 +192,25 @@ static func draw_ripple(rs: RenderState, c: Canvas, world: World, sonar: Sonar, 
 
 # ---------------------------------------------------------------- drawAirRings
 
+static var _trig: Dictionary = {}
+
+
+## cos then sin of the n sample angles phi = i / n * 2 pi + ri * pi / 4 of an air ring (cached: n and ri repeat every frame).
+static func _ring_trig(n: int, ri: int) -> PackedFloat64Array:
+	var key: int = n * 4 + ri
+	var a: Variant = _trig.get(key)
+	if a != null:
+		return a
+	var out := PackedFloat64Array()
+	out.resize(n * 2)
+	for i in n:
+		var phi: float = float(i) / n * TWO_PI + ri * 0.25 * PI
+		out[i] = cos(phi)
+		out[n + i] = sin(phi)
+	_trig[key] = out
+	return out
+
+
 ## Air rings: a ping shows as 3 hollow circles leaving the mouth and opening outward.
 static func draw_air_rings(rs: RenderState, c: Canvas, world: World, sonar: Sonar, t: float, player: Dictionary, tan_half: float) -> void:
 	var pulses: Array = sonar.pulses
@@ -424,50 +443,71 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 		for b in TEX_BUCKETS:
 			sets.append([])
 		var lo: float = maxf(0.0, rr - band)
+		# Only the annulus lo <= d <= r_max can pass the exact distance test below, so each row scans just the cell columns that
+		# can fall inside it (bounds widened by EPS; the exact test stays). Cell order is unchanged: left to right.
+		var px_: float = player["x"]
+		var py_: float = player["y"]
+		var r_max2: float = r_max * r_max
+		var lo2: float = lo * lo
 		var cy := y0
 		while cy <= y1:
-			var cx := x0
-			while cx <= x1:
-				var mx: float = cx + 0.5
-				var my: float = cy + 0.5
-				var d: float = sqrt((mx - pu.x) * (mx - pu.x) + (my - pu.y) * (my - pu.y))
-				if d > r_max or d < lo:
-					cx += 1
-					continue
-				var fwd: float = (mx - player["x"]) * ca + (my - player["y"]) * sa
-				if fwd < 0.3:
-					cx += 1
-					continue
-				var g: float = Pose.glow((rr - d) / pu.speed, dur) * base * (1.0 - d / pu.range)
-				if g < 0.05:
-					cx += 1
-					continue
-				var sx: float = half_w + ((-(mx - player["x"]) * sa + (my - player["y"]) * ca) / fwd) * focal
-				if sx < -40.0 or sx > rs.ow + 40.0:
-					cx += 1
-					continue
-				var col: int = maxi(0, mini(rs.cols - 1, int(floor(sx / rs.col_w))))
-				if fwd > rs.zbuf[col] + 0.05 or not Sonar.visible_from(pu, mx, my):
-					cx += 1
-					continue
-				if world.is_solid(mx, my):
-					cx += 1
-					continue
-				var kind: String = floor_tex_kind(world.material_at(mx, my))
-				if kind == "":
-					cx += 1
-					continue
-				if up:
-					if world.kind_at(mx, my) == "outdoor":
-						cx += 1
+			var my: float = cy + 0.5
+			var ddy: float = my - pu.y
+			var rem: float = r_max2 - ddy * ddy
+			if rem < -1e-6:
+				cy += 1
+				continue
+			var w_hi: float = sqrt(maxf(rem, 0.0)) + 1e-4
+			var w_lo: float = 0.0
+			var rem_lo: float = lo2 - ddy * ddy
+			if rem_lo > 1e-4:
+				w_lo = sqrt(rem_lo) - 1e-4
+			var a0: int = maxi(x0, int(ceil(pu.x - w_hi - 0.5)))
+			var b0: int = mini(x1, int(floor(pu.x + w_hi - 0.5)))
+			var a1: int = 1
+			var b1: int = 0
+			if w_lo > 0.01:
+				b0 = mini(b0, int(floor(pu.x - w_lo - 0.5)))
+				a1 = maxi(x0, int(ceil(pu.x + w_lo - 0.5)))
+				b1 = mini(x1, int(floor(pu.x + w_hi - 0.5)))
+			for seg in 2:
+				var ca_: int = a0 if seg == 0 else a1
+				var cb_: int = b0 if seg == 0 else b1
+				for cx in range(ca_, cb_ + 1):
+					var mx: float = cx + 0.5
+					var d: float = sqrt((mx - pu.x) * (mx - pu.x) + ddy * ddy)
+					if d > r_max or d < lo:
 						continue
-					kind = ceil_tex_kind(world, mx, my)
-				var bk: int = mini(TEX_BUCKETS - 1, int(floor(g * TEX_BUCKETS * 1.2)))
-				sets[bk].append([cx, cy, kind])
-				budget -= 1
+					var dxp: float = mx - px_
+					var dyp: float = my - py_
+					var fwd: float = dxp * ca + dyp * sa
+					if fwd < 0.3:
+						continue
+					var g: float = Pose.glow((rr - d) / pu.speed, dur) * base * (1.0 - d / pu.range)
+					if g < 0.05:
+						continue
+					var sx: float = half_w + ((-dxp * sa + dyp * ca) / fwd) * focal
+					if sx < -40.0 or sx > rs.ow + 40.0:
+						continue
+					var col: int = maxi(0, mini(rs.cols - 1, int(floor(sx / rs.col_w))))
+					if fwd > rs.zbuf[col] + 0.05 or not Sonar.visible_from(pu, mx, my):
+						continue
+					if world.is_solid(mx, my):
+						continue
+					var kind: String = floor_tex_kind(world.material_at(mx, my))
+					if kind == "":
+						continue
+					if up:
+						if world.kind_at(mx, my) == "outdoor":
+							continue
+						kind = ceil_tex_kind(world, mx, my)
+					var bk: int = mini(TEX_BUCKETS - 1, int(floor(g * TEX_BUCKETS * 1.2)))
+					sets[bk].append([cx, cy, kind])
+					budget -= 1
+					if budget <= 0:
+						break
 				if budget <= 0:
 					break
-				cx += 1
 			if budget <= 0:
 				break
 			cy += 1
