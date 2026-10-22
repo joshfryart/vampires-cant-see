@@ -30,6 +30,8 @@ func test_world_queries() -> void:
 			eq(w.material_at(x, y), q[4], lbl + " material")
 			eq(1 if w.blocks(x, y, 0.2) else 0, int(q[5]), lbl + " blocks0.2")
 			eq(1 if w.blocks(x, y, 0.45) else 0, int(q[6]), lbl + " blocks0.45")
+			near(w.light_at(x, y), float(q[7]), 1e-6, lbl + " light")
+			near(w.outer_at(x, y), float(q[8]), 1e-6, lbl + " outer")
 		for d in wd["doorsClosed"]:
 			var c := int(d[0])
 			var r := int(d[1])
@@ -37,6 +39,12 @@ func test_world_queries() -> void:
 			eq(1 if w.set_door(c, r, true) else 0, int(d[3]), "set_door")
 			eq(1 if w.is_solid(c + 0.5, r + 0.5) else 0, int(d[4]), "open solid")
 			eq(1 if w.is_door_open(c, r) else 0, int(d[5]), "is_door_open")
+		eq(w.lights.size(), int(wd["lightCount"]), "%s light count" % wd["name"])
+		var k := 0
+		for y in range(0, w.height, 2):
+			for x in range(0, w.width, 2):
+				near(w.light_at(x + 0.5, y + 0.5), float(wd["lightAfter"][k]), 1e-6, "%s light after doors (%d,%d)" % [wd["name"], x, y])
+				k += 1
 		for a in wd["arrivals"]:
 			var got: Variant = w.arrival(a["id"])
 			near(got["x"], float(a["a"]["x"]), 1e-12, "arrival x")

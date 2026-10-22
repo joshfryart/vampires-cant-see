@@ -27,18 +27,20 @@ for (const name of Object.keys(MapData.maps)) {
   const step = w.width * w.height > 1000 ? 1.7 : 0.53; // thin the big town map
   for (let y = -0.6; y < w.height + 0.6; y += step) {
     for (let x = -0.6; x < w.width + 0.6; x += step) {
-      pts.push([x, y, w.tileAt(x, y), w.isSolid(x, y) ? 1 : 0, w.materialAt(x, y), w.blocks(x, y, 0.2) ? 1 : 0, w.blocks(x, y, 0.45) ? 1 : 0]);
+      pts.push([x, y, w.tileAt(x, y), w.isSolid(x, y) ? 1 : 0, w.materialAt(x, y), w.blocks(x, y, 0.2) ? 1 : 0, w.blocks(x, y, 0.45) ? 1 : 0, w.lightAt(x, y), w.outerAt(x, y)]);
     }
   }
   // Open every door, then re-query the door cells' neighbourhood.
   const doorCells = [];
   for (let r = 0; r < w.height; r++) for (let c = 0; c < w.width; c++) if (w.doorAt(c, r) || 'DG'.includes(w.tileAt(c + 0.5, r + 0.5))) doorCells.push([c, r]);
+  const lightsBefore = w.lightSources().length;
   const doorsClosed = doorCells.map(([c, r]) => [c, r, w.isSolid(c + 0.5, r + 0.5) ? 1 : 0, w.setDoor(c, r, true) ? 1 : 0, w.isSolid(c + 0.5, r + 0.5) ? 1 : 0, w.isDoorOpen(c, r) ? 1 : 0]);
   const arrivals = Object.keys(w.doorsById).map((id) => ({ id, a: w.arrival(id) }));
   worlds.push({
     name, width: w.width, height: w.height, kind: w.kind, floor: w.floor, start: w.start, spots: w.spots,
     propCount: w.props.length, props: w.props.map((p) => [p.type, p.x, p.y, p.solid ? 1 : 0]),
-    pts, doorsClosed, arrivals
+    lightCount: lightsBefore, pts, doorsClosed, arrivals,
+    lightAfter: (function () { const out = []; for (let y = 0; y < w.height; y += 2) for (let x = 0; x < w.width; x += 2) out.push(w.lightAt(x + 0.5, y + 0.5)); return out; })()
   });
 }
 
