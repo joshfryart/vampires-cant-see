@@ -70,6 +70,8 @@ func render_frame(g: Game) -> void:
 		HudDraw.draw_card(canvas, g.card_text, g.card_age, g.clock, boil, g.card_sub, g.large_text)
 	elif g.hint_text != "":
 		HudDraw.draw_hint(canvas, g.hint_text, g.hint_age, g.hint_dur, g.large_text)
+	elif g.unlock_hint_t > 0.0:
+		HudDraw.draw_hint(canvas, "Esc → Abilities for details", 3.0 - g.unlock_hint_t, 3.0, g.large_text)
 	queue_redraw()
 
 

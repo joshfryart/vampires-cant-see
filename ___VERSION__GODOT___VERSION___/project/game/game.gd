@@ -112,6 +112,9 @@ var hint_text: String = ""
 var hint_age: float = 0.0
 var hint_dur: float = 4.0
 var hint_t: float = 0.0
+## One-line "Esc -> Abilities" hint after a power-unlock card (js hintPending / hintT).
+var unlock_hint_pending: bool = false
+var unlock_hint_t: float = 0.0
 var cfg: Dictionary = Config.defaults_copy()
 var player_cfg: Dictionary = Player.DEFAULT_CFG.duplicate()
 var base_range: float = BASE_RANGE
@@ -585,6 +588,11 @@ func step(dt: float, inp: Dictionary) -> void:
 		if card_age > CARD_LEN:
 			card_text = ""
 			card_sub = ""
+			if unlock_hint_pending:
+				unlock_hint_pending = false
+				unlock_hint_t = 3.0
+	elif unlock_hint_t > 0.0:
+		unlock_hint_t = maxf(0.0, unlock_hint_t - dt)
 	if st0 == "sleeping":
 		clock += dt
 		audio.tick(clock)
@@ -693,6 +701,14 @@ func step(dt: float, inp: Dictionary) -> void:
 		flow.tick_autosave(dt)
 	pressed.clear()
 	hud.set_state(self)
+
+
+## Losing the window focus pauses (and saves) a run in play, as losing pointer lock does in the browser.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and scenario == null and not manual_boot:
+		pressed.clear()
+		if run_on and (state == "playing" or state == "transition"):
+			pause()
 
 
 func pause() -> void:

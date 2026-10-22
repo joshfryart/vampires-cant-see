@@ -88,3 +88,29 @@ func test_pause_and_continue() -> void:
 	near(g.player.x, pos.x, 1e-9, "player x")
 	eq(g.flow.run["seed"], 99, "seed kept")
 	g.free()
+
+
+func test_export_import_and_abandon() -> void:
+	var g := _game()
+	g.flow.seed_param = 7
+	g.flow.begin_run()
+	_step(g, 5.0)
+	g.pause()
+	ok(g.flow.save_run("test"), "run saved")
+	g.flow.meta["essence"] = 33
+	g.flow.save_meta()
+	var path := "user://test_export.json"
+	ok(g.flow.export_save_to(path), "exported")
+	var text := FileAccess.get_file_as_string(path)
+	var g2 := _game()
+	ok(g2.flow.import_text(text), "imported")
+	eq(int(g2.flow.meta["essence"]), 33, "meta essence imported")
+	ok(g2.flow.has_run, "run imported")
+	var runs0: int = int(g2.flow.meta["stats"]["runs"])
+	g2.flow.abandon_stored()
+	ok(not g2.flow.has_run, "run removed on abandon")
+	eq(int(g2.flow.meta["stats"]["runs"]), runs0 + 1, "abandoned run counted")
+	ok(not g2.flow.import_text("{not json"), "bad import rejected")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	g.free()
+	g2.free()

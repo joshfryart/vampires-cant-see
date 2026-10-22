@@ -103,6 +103,9 @@ func _build_title() -> void:
 		"stats":
 			_build_stats()
 			return
+		"guide":
+			_build_guide()
+			return
 	_label("VAMPIRES CAN'T SEE", 26, Color(0.9, 0.2, 0.2))
 	_label("You are a vampire and you are blind. Ping the dark, drink the town, sleep before dawn.", 13, Color(0.7, 0.75, 0.9))
 	for n in _g.flow.notices:
@@ -131,6 +134,11 @@ func _build_title() -> void:
 	_button("Stats", func():
 		_view = "stats"
 		sync(_g))
+	_button("How to play", func():
+		_view = "guide"
+		sync(_g))
+	_button("Export save", _export_save)
+	_button("Import save", _import_save)
 	_button("Settings", func():
 		_view = "settings"
 		sync(_g))
@@ -181,8 +189,14 @@ func _build_pause() -> void:
 	if _view == "settings":
 		_build_settings()
 		return
+	if _view == "guide":
+		_build_guide()
+		return
 	_label("Paused", 24)
 	_button("Resume", func(): _g.resume())
+	_button("Abilities", func():
+		_view = "guide"
+		sync(_g))
 	_button("Settings", func():
 		_view = "settings"
 		sync(_g))
@@ -304,3 +318,107 @@ func _build_settings() -> void:
 
 static func _fmt(v: float) -> String:
 	return str(snappedf(v, 0.0001))
+
+
+# ---------------------------------------------------------------- guide
+
+## The How to play / Abilities panel (js buildGuide): basics, goal, blood, power cards, gifts and fear from the data files.
+func _build_guide() -> void:
+	var hd: Dictionary = GameData.get_json("hunger")
+	var nights: int = _g.night.nights if _g.night != null and _g.state == "paused" else 5
+	_label("How to play", 22, Color(0.9, 0.85, 0.5))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(460, 380)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6)
+	list.custom_minimum_size = Vector2(440, 0)
+	scroll.add_child(list)
+	var sec := func(title: String, lines: Array) -> void:
+		_guide_text(list, title, 16, Color(0.9, 0.85, 0.5))
+		for ln in lines:
+			_guide_text(list, ln, 13, Color(0.8, 0.85, 0.95))
+	sec.call("Basics", [
+		"Move with W A S D or the arrow keys (Left and Right arrows turn); look with the mouse.",
+		"Ping: click or Space sends out a sonar pulse that draws walls and doors for a moment. It is loud, so people nearby may hear it.",
+		"Echoes that move are people. Walk up close and hold right-click (or R) to drink. Drink in the dark; lit people see you.",
+		"Sleep: press E at your crypt bed or a dark safe spot before 06:00. Powers: Q shriek, C or Shift mist, F still. Esc pauses.",
+	])
+	sec.call("Goal", [
+		"Feed on the townsfolk, then get home or into a dark safe spot before 06:00. Survive %d nights." % nights,
+		"The farthest open safe spot in town pays +5 Essence when you sleep there.",
+	])
+	sec.call("Blood", [
+		"Your blood drains all night, and faster each night (+%d%% per night)." % int(round(float(hd["RAMP"]) * 100.0)),
+		"Below 25 your pulses weaken. Hold right click near someone to drink.",
+	])
+	_guide_text(list, "Powers", 16, Color(0.9, 0.85, 0.5))
+	var cur: int = _g.night.night if _g.state == "paused" and _g.night != null else 0
+	for p in hd["powers"]:
+		var locked: bool = cur > 0 and cur < int(p["unlock"])
+		var key: String = "Shift or C" if str(p["key"][0]).begins_with("Shift") else str(p["key"][0]).trim_prefix("Key")
+		_guide_text(list, str(p["name"]), 15, Color(0.55, 0.6, 0.7) if locked else Color(1.0, 0.9, 0.7))
+		if locked:
+			_guide_text(list, "Unlocks night %d" % int(p["unlock"]), 12, Color(0.6, 0.65, 0.8))
+		else:
+			_guide_text(list, "Key %s · Night %d · Cost %d blood · Cooldown %s s · Fear +%d" % [key, int(p["unlock"]), int(p["cost"]), str(p["cooldown"]), int(p["fear"])], 12, Color(0.7, 0.75, 0.9))
+		_guide_text(list, str(p.get("how", p.get("desc", ""))), 13, Color(0.8, 0.85, 0.95))
+		_guide_text(list, str(p.get("tip", "")), 12, Color(0.6, 0.7, 0.6))
+	var gc: Array = hd["GIFT_COSTS"]
+	sec.call("Blood gifts", [
+		"Keep drinking when your blood is full and the coral bar fills. At %d (then %d) you pick 1 of 3 gifts." % [int(gc[0]), int(gc[1])],
+		"Up to %d per night. Each gift gives +%d Essence." % [int(hd["GIFTS_PER_NIGHT"]), int(hd["GIFT_ESSENCE"])],
+	])
+	sec.call("Fear", [
+		"The eyes by the clock show how jumpy the town is.",
+		"Feeding on someone new and using powers raise it; sleeping and the Calm Town gift lower it.",
+		"Higher fear makes people startle from further away (up to +%d%%) and flee faster (up to +%d%%)." % [int(round(float(hd["FEAR_STARTLE"][1]) * 100.0)), int(round(float(hd["FEAR_FLEE"][1]) * 100.0))],
+	])
+	_button("Back", func():
+		_view = "main"
+		sync(_g))
+
+
+func _guide_text(parent: Control, text: String, size: int, color: Color) -> void:
+	if text == "":
+		return
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(430, 0)
+	parent.add_child(l)
+
+
+# ---------------------------------------------------------------- save export / import
+
+func _export_save() -> void:
+	var name := "vcs-save-%s.json" % Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "-")
+	if DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		DisplayServer.file_dialog_show("Export save", OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS), name, false, DisplayServer.FILE_DIALOG_MODE_SAVE_FILE, ["*.json ; JSON"], func(ok: bool, paths: PackedStringArray, _f: int):
+			if ok and paths.size() > 0:
+				_g.flow.export_save_to(paths[0])
+				sync(_g))
+	else:
+		_g.flow.export_save_to("user://" + name)
+		sync(_g)
+
+
+func _import_save() -> void:
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_DIALOG_FILE):
+		_g.flow.notices.append("Import needs a file dialog; put the file at user://import.json and try again.")
+		var f0 := FileAccess.open("user://import.json", FileAccess.READ)
+		if f0 != null:
+			_g.flow.import_text(f0.get_as_text())
+		sync(_g)
+		return
+	DisplayServer.file_dialog_show("Import save", OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS), "", false, DisplayServer.FILE_DIALOG_MODE_OPEN_FILE, ["*.json ; JSON"], func(ok: bool, paths: PackedStringArray, _f: int):
+		if ok and paths.size() > 0:
+			var f := FileAccess.open(paths[0], FileAccess.READ)
+			if f == null or f.get_length() > SaveCodec.MAX_IMPORT:
+				_g.flow.notices.append("Import failed (%s)." % ("E_SAVE_TOO_BIG" if f != null else "E_SAVE_PARSE"))
+			else:
+				_g.flow.import_text(f.get_as_text())
+			sync(_g))

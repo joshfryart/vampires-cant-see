@@ -473,6 +473,11 @@ func next_night() -> void:
 	g.show_card("Night %d%s" % [n, unlock_text(n)], 0.0, str(up["how"]).strip_edges() if up != null and str(up["how"]).strip_edges() != "" else "")
 	g.init_ambient()
 	g.tut.clear()
+	g.unlock_hint_pending = false
+	g.unlock_hint_t = 0.0
+	if up != null and not g.tut.seen.has("pw_" + str(up["id"])):
+		g.tut.mark("pw_" + str(up["id"]))
+		g.unlock_hint_pending = true
 
 
 ## The power that unlocks on night n (n > 1), or null.
@@ -742,6 +747,54 @@ func continue_run() -> bool:
 	else:
 		g.set_state("playing")
 		g.show_card("Night %d" % g.night.night)
+	return true
+
+
+## Export meta + run as JSON text to a file; returns the path ("" and a notice on failure).
+func export_save_to(path: String) -> bool:
+	if not store.has("meta"):
+		save_meta()
+	var text := SaveCodec.export_text(store)
+	if text == "":
+		notices.append("Export failed (E_SAVE_EXPORT).")
+		return false
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		notices.append("Export failed (E_SAVE_WRITE).")
+		return false
+	f.store_string(text)
+	notices.append("Save exported to %s." % path.get_file())
+	return true
+
+
+## Import exported save text: meta replaces meta, a good run replaces the run (a bad run is dropped).
+func import_text(text: String) -> bool:
+	var pi := SaveCodec.parse_import(text)
+	if not pi["ok"]:
+		notices.append("Import failed (%s)." % pi["code"])
+		return false
+	var mm := Meta.migrate(pi["meta"]["v"], pi["meta"]["data"])
+	var msan: Variant = Meta.sanitize(mm["data"]) if mm["ok"] else null
+	if msan == null:
+		notices.append("Import failed (%s)." % (mm["code"] if not mm["ok"] else "E_SAVE_SCHEMA"))
+		return false
+	var run_san: Variant = null
+	if pi["run"] != null:
+		var rm := SaveCodec.migrate_run(pi["run"]["v"], pi["run"]["data"])
+		var rs: Variant = SaveCodec.sanitize_run(rm["data"]) if rm["ok"] else null
+		if rs != null and g.worlds.has(rs["map"]):
+			run_san = rs
+	meta = msan
+	fx = compute_fx()
+	save_meta()
+	if run_san != null:
+		var w := store.write("run", SaveCodec.RUN_SCHEMA, run_san)
+		if not w["ok"]:
+			save_failed = true
+	else:
+		store.remove("run")
+	has_run = store.has("run")
+	notices.append("Save imported.")
 	return true
 
 

@@ -8,6 +8,6 @@ func setup(g: Node) -> void:
 
 func step(g: Node, _delta: float) -> Dictionary:
 	if g.frame_no == 25:
-		g.menus._view = "settings"
+		g.menus._view = "guide"
 		g.menus.sync(g)
 	return {}
