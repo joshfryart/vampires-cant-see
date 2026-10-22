@@ -27,10 +27,12 @@ node tools/golden/<name>.mjs                      # rewrite project/tests/fixtur
 | `listen.json` | `golden/listen.mjs` | 1,440 window finds, subtitles, a 120 s listening session | 1e-9 |
 | `struggle.json` | `golden/struggle.mjs` | 4,050 held-victim poses | 1e-8 |
 | `figure_struggle.json` | `golden/figure_struggle.mjs` | 724 held-victim figure draw logs (Struggle loaded) | exact hash |
+| `figure_vol.json` | `golden/figure_vol.mjs` | 555 volumetric-figure draw logs (Figure loaded, fx 1 and 2): modes, looks, gaits, outfits, role hats and items, archetype faces, rim light, silhouette rings, held victim (1.9M calls) | exact hash |
+| `sprites.json`, `floor_fx.json`, `hud.json`, `ripple.json` | `golden/sprites.mjs`, `floor_fx.mjs`, `hud.mjs`, `ripple.mjs` | markers and props, floor and ceiling canvas effects, the HUD and icons (515 entries), ring helpers | exact hash |
 
 Scope notes: `people.json` and `figure.json` are generated with Forge, Schedule and Struggle **not** loaded; their tests
 pass `noForge` / `Pose.use_struggle = false`. `people_sched.json` and `figure_struggle.json` cover the loaded case.
-Figure (volumetric) and Vessels are not loaded anywhere yet (Phase 7).
+`figure_vol.json` loads `figure.js` (no Struggle, no Flags). Vessels (`vis.vessels`, off by default) are not ported.
 
 Godot's JSON parser is not correctly rounded for doubles, so exact data is stored as integers and everything else is
 compared with an epsilon.
@@ -60,8 +62,8 @@ compared with an epsilon.
 
 - Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings, plus the ripple
   rings, door wobble and the weak-ping flicker: Phase 3 polish).
-- Volumetric figures and the character creator: Phase 7. HUD icons, post effects, config, flags, dev panel, tutorial
-  hints, settings and the guide panel: Phase 8.
+- Not ported: vessels (whole-body heartbeat, flag off by default), the character creator, the F9 dev panel, flags,
+  system checks, the top-down map view, head bob and the guide panel (Phase 7/8 leftovers).
 - Audio is in but unheard by me: ambience loops, fire, breath, heartbeat, far dog/bell and live villager speech (`audio/speech_synth.gd`,
   50-120 ms per line on a worker thread) all play; nothing has been listened to (F5 needs your ears).
 - Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).

@@ -25,13 +25,19 @@ Update this as modules land. Plan: `../PLAN.md`. Driving Godot: `../HOWTO-CLI-AN
 | `meta.js`, `save.js`, `js_json` printing | `core/meta.gd`, `core/save_codec.gd`, `core/js_json.gd` | done, parity (JS-exact checksums) |
 | `ripple.js` boil table and mask | `core/ripple.gd` | done; ring spawning is Phase 3 |
 | `render.js` pose/figure line | `render/pose.gd`, `figure_line.gd`, `echo_layer.gd`, `draw_canvas.gd`, `recording_canvas.gd` | done, 482 + 724 scenes match |
+| `render.js` sprites, markers, props, floor and ceiling canvas effects | `render/sprites.gd`, `render/floor_fx.gd` (+ GPU rings in `shaders/sonar_floor.gdshader`) | done, hash parity |
 | `render.js` walls, floor, doors, windows, materials | `render/world_mesh_builder.gd`, `shaders/sonar_*.gdshader` | done for slice (see PARITY.md F1/F2) |
 | `game.js` update order, drink loop, sound emission, transitions | `game/game.gd` | done (see below) |
 | `game.js` runs: beginRun, endRun, boons, gifts, sleep, nextNight, stepNight, stepForge, snapshot, saves | `game/run_flow.gd` | done; `tests/flow/test_run_flow.gd` plays 5 nights to a win, the sun loss and a pause/continue round trip |
 | `game.js` powers (shriek, mist, still), rocks | `game/powers.gd` | done |
-| menus (title, shop, stats, pause, boon/gift, run end) | `ui/menus.gd` | functional, restyled in Phase 8 |
-| HUD (blood, overflow, clock, powers, fear, cards, subtitles) | `ui/hud.gd` | functional; icons and polish Phase 8 |
-| `audio.js` samples and one-shots | `audio/audio_director.gd`, `tools/bake-audio.mjs` | baked samples; speech (`speak`) and ambience beds are Phase 9 |
+| `figure.js` (volumetric figure), render.js vol pose branch and drawPerson vol path | `render/figure_vol.gd` (geometry, queries), `render/figure_vol_draw.gd` (draw, details, extras, grab arms), `render/pose.gd` (vol tweaks, slots 24/25), `render/echo_layer.gd` (rim light, 2.5 ms budget, silhouette rings) | done, 555 draw-log scenes match (`figure_vol.json`). `drawFlush` and `data/vessels.js` (flag `vis.vessels`, off by default) are not ported |
+| `hud.js`, `icons.js` | `render/hud_draw.gd`, `render/icons.gd`, `ui/hud_view.gd` (inside the 640x360 viewport), `ui/hud.gd` (window overlay: subtitles, debug, warm halos) | done, 515 draw-log entries match |
+| `postfx.js` | `render/shaders/postfx_grade.gdshader`, `postfx_overlay.gdshader` | done (bloom, dusk/dawn grade, vignette, grain) |
+| `config.js` | `core/config.gd` (schema, sanitize, `user://` file), settings panel in `ui/menus.gd` | done |
+| tutorial hints | `game/tutorial.gd` | done |
+| `drawWarm` (Warm Sense halos) | `ui/hud.gd` `_warm_halos` | done (window-resolution radial gradients) |
+| menus (title, shop, stats, pause, boon/gift, run end, settings) | `ui/menus.gd` | functional, plain Godot controls |
+| `audio.js` samples, one-shots, ambience beds, fire, breath, heartbeat, live speech | `audio/audio_director.gd`, `audio/speech_synth.gd`, `tools/bake-audio.mjs` | done; unheard by me (F5) |
 
 ## Tools
 
