@@ -1,0 +1,52 @@
+class_name RenderState
+extends RefCounted
+## The slice of js/render.js renderer state (`r`) that the line figures read. One instance per frame buffer.
+## Internal frame is 640x360 (BASE_W x BASE_H); `quality` 0..3 and `reduced` (reduced motion) as in the JS.
+
+const BASE_W := 640
+const BASE_H := 360
+const FOV_DEG := 66.0
+
+var ow: int = BASE_W
+var oh: int = BASE_H
+var cols: int = 320
+var col_w: float = 2.0
+var wscale: float = 1.0
+var quality: int = 3
+var reduced: bool = false
+var horizon: float = 180.0
+## Per-column wall distance (js r.zbuf), larger than any figure depth when no wall.
+var zbuf: PackedFloat32Array = PackedFloat32Array()
+var boil_on: bool = false
+var bf: int = 0
+var lock_id: int = -1
+var lock_k: float = 0.0
+var lock_age: float = 1.0
+var lock_sp: float = 9.0
+var lock_rs: float = 0.0
+
+
+func _init(width: int = BASE_W, height: int = BASE_H) -> void:
+	ow = width
+	oh = height
+	cols = maxi(80, ow >> 1)
+	col_w = float(ow) / cols
+	wscale = float(ow) / BASE_W
+	horizon = oh / 2.0
+	zbuf.resize(cols)
+	zbuf.fill(1e9)
+
+
+func tan_half() -> float:
+	return tan(FOV_DEG * PI / 180.0 / 2.0)
+
+
+## Line boil is on at quality >= 2 unless reduced motion (js drawFirstPerson / drawSolo).
+func update_boil(t: float) -> void:
+	boil_on = not reduced and quality >= 2
+	bf = Ripple.boil_frame(t) if boil_on else 0
+
+
+## js J(r, id, axis).
+func j(id: int, axis: int) -> float:
+	return Ripple.jitter(bf, id, axis) if boil_on else 0.0
