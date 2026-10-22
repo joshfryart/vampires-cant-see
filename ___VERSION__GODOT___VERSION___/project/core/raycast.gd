@@ -16,10 +16,11 @@ class Hit:
 	var wall_x: float = 0.0
 	var nx: float = 0.0
 	var ny: float = 0.0
+	var mat: String = "stone"
 
 
-## Ports trace (js/raycast.js:8).
-static func trace(world: GridWorld, x: float, y: float, ray_angle: float, max_dist: float) -> Hit:
+## Ports trace (js/raycast.js:8). `world` is any object with is_solid(x, y), width and height (World or GridWorld).
+static func trace(world, x: float, y: float, ray_angle: float, max_dist: float) -> Hit:
 	var out := Hit.new()
 	var dx: float = cos(ray_angle)
 	var dy: float = sin(ray_angle)
@@ -86,13 +87,23 @@ static func trace(world: GridWorld, x: float, y: float, ray_angle: float, max_di
 	return out
 
 
+## Ports hitOne (js/raycast.js:58): trace plus the hit surface material (world.material_at).
+static func hit_one(world, x: float, y: float, ray_angle: float, max_dist: float) -> Hit:
+	var h: Hit = trace(world, x, y, ray_angle, max_dist)
+	h.mat = "stone"
+	if h.hit and world.has_method("material_at"):
+		var m: String = world.material_at(float(h.cell_x), float(h.cell_y))
+		h.mat = m if m != "" else "stone"
+	return h
+
+
 ## Ports castOne (js/raycast.js:66).
-static func cast_one(world: GridWorld, x: float, y: float, ray_angle: float, max_dist: float) -> Hit:
+static func cast_one(world, x: float, y: float, ray_angle: float, max_dist: float) -> Hit:
 	return trace(world, x, y, ray_angle, max_dist)
 
 
 ## Ports cast (js/raycast.js:76): one ray per screen column.
-static func cast(world: GridWorld, x: float, y: float, angle: float, fov: float, columns: int, max_dist: float) -> Array[Hit]:
+static func cast(world, x: float, y: float, angle: float, fov: float, columns: int, max_dist: float) -> Array[Hit]:
 	var res: Array[Hit] = []
 	var tan_half: float = tan(fov / 2.0)
 	for i in columns:
