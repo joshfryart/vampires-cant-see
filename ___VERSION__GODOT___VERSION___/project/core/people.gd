@@ -88,6 +88,7 @@ class Person:
 	var ph0: float = 0.0
 	var phase_rate: float = 0.0
 	var seated: bool = false
+	var breath_t: float = NAN
 	var sched: Variant = null
 	var chat: Variant = null
 	var chat_cool: float = 0.0

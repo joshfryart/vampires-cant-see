@@ -98,6 +98,13 @@ var lis_speed: float = 0.0
 var last_victim: Variant = null
 var reduced: bool = false           # reduced motion (config comes in Phase 8)
 var ripple := RippleFx.Rings.new()   # secondary echo rings (js S.ripple)
+const FIRE_NEAR := 1.5
+const AMBIENCE_GAIN := 0.6
+var far_rng: Rng = null
+var dog_t: float = 25.0
+var bell_t: float = 30.0
+var amb_key: String = ""
+var amb_lvl: float = -1.0
 var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
@@ -609,6 +616,10 @@ func step(dt: float, inp: Dictionary) -> void:
 	sonar.prune(clock)
 	simulate_world(dt)
 	step_barks(dt)
+	if run_on:
+		step_ambient(dt)
+		crackle_torches()
+	update_ambience()
 	if night != null and flow.step_night(dt):
 		pressed.clear()
 		hud.set_state(self)
@@ -656,9 +667,104 @@ func show_card(text: String, start_age: float = 0.0, sub: String = "") -> void:
 	card_age = start_age
 
 
-## Re-seed the far-sound timers for the current night (ambience lands with the audio phase).
+## Re-seed the far-sound timers for the current night (js initAmbient).
 func init_ambient() -> void:
-	pass
+	far_rng = Rng.new(float(mix_seed(run_seed, 77, night_no)))
+	dog_t = 20.0 + frng() * 20.0
+	bell_t = 20.0 + frng() * 20.0
+
+
+func frng() -> float:
+	return far_rng.next() if far_rng != null else randf()
+
+
+## The ambience bed follows the room kind; silent on the menus, pause and run end (js updateAmbience).
+func update_ambience() -> void:
+	var live: bool = run_on and (state == "playing" or state == "feeding" or state == "sleeping" or state == "transition")
+	var kind: String = ("outdoor" if room_kind == "outdoor" else "indoor") if live else "none"
+	if not live:
+		audio.fire_bed(0, 0.0, 0.0)
+		audio.fire_bed(1, 0.0, 0.0)
+	if kind == amb_key and AMBIENCE_GAIN == amb_lvl:
+		return
+	var ok := audio.ambience(kind, AMBIENCE_GAIN)
+	if ok or kind == "none":
+		amb_key = kind
+		amb_lvl = AMBIENCE_GAIN
+
+
+## Steady fire noise: the 2 nearest torches within FIRE_NEAR cells, fading to 0 at that distance, panned to the torch.
+func crackle_torches() -> void:
+	var live: bool = world != null and not world.lights.is_empty() and run_on and (state == "playing" or state == "feeding")
+	var idx := [-1, -1]
+	var dist := [INF, INF]
+	if live:
+		for i in world.lights.size():
+			var l: Dictionary = world.lights[i]
+			var dx: float = l["x"] - player.x
+			var dy: float = l["y"] - player.y
+			if absf(dx) > FIRE_NEAR or absf(dy) > FIRE_NEAR:
+				continue
+			var d: float = sqrt(dx * dx + dy * dy)
+			if d >= FIRE_NEAR:
+				continue
+			if d < dist[0]:
+				dist[1] = dist[0]
+				idx[1] = idx[0]
+				dist[0] = d
+				idx[0] = i
+			elif d < dist[1]:
+				dist[1] = d
+				idx[1] = i
+	for k in 2:
+		if idx[k] < 0:
+			audio.fire_bed(k, 0.0, 0.0)
+			continue
+		var l0: Dictionary = world.lights[idx[k]]
+		audio.fire_bed(k, 1.0 - dist[k] / FIRE_NEAR, pan_to(l0["x"], l0["y"]))
+
+
+## Position of the door that leads toward the crypt from the current map, or null (also null inside the crypt).
+func crypt_door_pos() -> Variant:
+	if world.doors_by_id.is_empty() or world.spots.get("crypt", []).size() > 0:
+		return null
+	for id in world.doors_by_id:
+		var d: Dictionary = world.doors_by_id[id]
+		var tw: World = worlds.get(d["toMap"])
+		if tw != null and tw.spots.get("crypt", []).size() > 0:
+			return {"x": d["col"] + 0.5, "y": d["row"] + 0.5}
+	return null
+
+
+## Far dogs and the church bell on their timers, and the breath of villagers within 6 cells (js stepAmbient).
+func step_ambient(dt: float) -> void:
+	dog_t -= dt
+	bell_t -= dt
+	if dog_t <= 0.0:
+		dog_t = 20.0 + frng() * 20.0
+		if room_kind == "outdoor":
+			var pan := frng() * 2.0 - 1.0
+			var dist := 6.0 + frng() * 6.0
+			audio.one_shot_far("dog", {"pan": pan, "dist": dist})
+	if bell_t <= 0.0:
+		bell_t = 20.0 + frng() * 20.0
+		var cd: Variant = crypt_door_pos()
+		if cd != null:
+			audio.play("bell", spatial(cd["x"], cd["y"], minf(1.0, float(SoundData.level("bell")["gain"]) * 2.0)))
+	for q in people.people:
+		if q.mode == "fed":
+			continue
+		var dx: float = q.x - player.x
+		var dy: float = q.y - player.y
+		if dx * dx + dy * dy >= 36.0:
+			continue
+		if is_nan(q.breath_t):
+			q.breath_t = 0.3 + frng() * 2.0
+		q.breath_t -= dt
+		if q.breath_t > 0.0:
+			continue
+		q.breath_t = 2.0 + frng()
+		audio.breath({"pan": pan_to(q.x, q.y), "dist": sqrt(dx * dx + dy * dy), "behind": cos(atan2(dy, dx) - player.angle) < 0.0, "occluded": first_solid(player.x, player.y, q.x, q.y) != null})
 
 
 # ---------------------------------------------------------------- listening and barks

@@ -62,7 +62,8 @@ compared with an epsilon.
   rings, door wobble and the weak-ping flicker: Phase 3 polish).
 - Volumetric figures and the character creator: Phase 7. HUD icons, post effects, config, flags, dev panel, tutorial
   hints, settings and the guide panel: Phase 8.
-- Villager speech and ambience beds are silent (`AudioDirector.speak` logs only): Phase 9. Subtitles do show.
+- Audio is in but unheard by me: ambience loops, fire, breath, heartbeat, far dog/bell and live villager speech (`audio/speech_synth.gd`,
+  50-120 ms per line on a worker thread) all play; nothing has been listened to (F5 needs your ears).
 - Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).
 
 ## JS reference shots (F2)

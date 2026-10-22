@@ -133,5 +133,45 @@ for (const room of ['indoor', 'outdoor']) {
   await bake('echo_plain_' + room, { kind: 'echo', name: 'plain', voice: 'plain', room, rough: 0, ref: 0.35, _rand: [0.5] }, 0.3, (a) => { a.room = room; return Audio.echo(a, 0, 1, undefined, undefined); });
 }
 
+// ---- beds and body sounds (v2 bake): ambience loops, fire noise, the felt heartbeat and the breath swell ----
+// A loop is rendered a second longer than needed and the tail is cross-faded onto the head so it repeats without a click.
+async function bakeLoop(key, entry, seconds, fade, skip, fn) {
+  const len = Math.ceil((seconds + fade + skip) * RATE);
+  const ctx = new OfflineAudioContext(1, len, RATE);
+  ctx.__vcsMaster = { out: ctx.destination, send: null, delays: [], fbs: [], lp: null };
+  const a = { ok: true, ctx, volume: 1, warned: false, pingBip: false, room: 'indoor', rand: () => 0.5 };
+  Math.random = mulberry(0xC0FFEE + count * 7919);
+  fn(a);
+  const rendered = await ctx.startRendering();
+  const data = rendered.getChannelData(0);
+  const n = Math.ceil(seconds * RATE);
+  const f = Math.ceil(fade * RATE);
+  const off = Math.ceil(skip * RATE);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = data[off + i];
+  // cross-fade: out[i] (i < f) blends toward the audio that would have followed the end
+  for (let i = 0; i < f; i++) {
+    const k = i / f;
+    out[i] = out[i] * k + data[off + n + i] * (1 - k);
+  }
+  let peak = 0;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
+  const scale = PEAK_TARGET / peak;
+  const file = key + '.wav';
+  writeFileSync(join(WAV, file), wav16(out, scale));
+  (manifest[entry.kind + ':' + entry.name] = manifest[entry.kind + ':' + entry.name] || []).push(Object.assign({ file, scale, ms: Math.round(seconds * 1000), peak, loop: true }, entry));
+  count++;
+}
+const levelRow = (k) => (SD.levels && SD.levels[k] && SD.levels[k].gain) || 0;
+const mixFor = (k) => (typeof SD.mixFor === 'function' ? SD.mixFor(k) : 1);
+await bakeLoop('amb_outdoor', { kind: 'amb', name: 'outdoor', ref: levelRow('wind') * mixFor('wind') || 0.025 }, 30, 1.0, 0.5, (a) => Audio.ambience(a, { kind: 'outdoor', level01: 1 }));
+await bakeLoop('amb_indoor', { kind: 'amb', name: 'indoor', ref: levelRow('room') * mixFor('room') || 0.02 }, 10, 0.0, 0.5, (a) => Audio.ambience(a, { kind: 'indoor', level01: 1 }));
+await bakeLoop('fire_bed', { kind: 'fire', name: 'bed', ref: 0.035 * mixFor('fire') }, 3, 0.4, 1.5, (a) => Audio.fireBed(a, 0, 1, 0));
+for (const bpm of [50, 80, 120]) {
+  await bake('vheart_' + bpm, { kind: 'vheart', name: 'beat', bpm, ref: levelRow('vheart') * mixFor('vheart') || 0.06, _rand: [0.5] }, 0.7, (a) => Audio.heartbeat(a, { bpm }));
+}
+await bake('breath_soft', { kind: 'breath', name: 'soft', dull: false, ref: levelRow('breath') * mixFor('breath') || 0.05, _rand: [0.5] }, 1.8, (a) => Audio.breath(a, {}));
+await bake('breath_dull', { kind: 'breath', name: 'dull', dull: true, ref: levelRow('breath') * mixFor('breath') || 0.05, _rand: [0.5] }, 1.8, (a) => Audio.breath(a, { occluded: true }));
+
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify({ rate: RATE, playGain: PLAY_GAIN, peakTarget: PEAK_TARGET, entries: manifest }, null, 1) + '\n');
 console.log('baked ' + count + ' files into ' + WAV);

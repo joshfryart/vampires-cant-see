@@ -29,6 +29,17 @@ var _reverb: AudioEffectReverb
 var _rng := RandomNumberGenerator.new()
 var _foot_toggle: bool = false
 
+# ---- beds: ambience loops, fire noise, speech ----
+const AMB_FADE := 1.5
+const MAX_SPEAKERS := 4
+var _amb: Dictionary = {}                 # kind -> {player, cur, tgt}
+var _amb_kind: String = "none"
+var _amb_level: float = 1.0
+var _fire: Array = []                     # [{player, pan, cur, tgt, ref_scale}]
+var _last_tick: float = 0.0
+var _speakers: Array = []                 # [{player, handle, end}]
+var _speech_cache: Dictionary = {}
+
 
 func _ready() -> void:
 	_rng.seed = 7
@@ -74,9 +85,19 @@ func _build_buses() -> void:
 			var lp := AudioEffectLowPassFilter.new()
 			lp.cutoff_hz = 20500.0
 			AudioServer.add_bus_effect(idx, lp)
+		AudioServer.add_bus()
+		AudioServer.set_bus_name(AudioServer.bus_count - 1, "Beds")
+		AudioServer.set_bus_send(AudioServer.bus_count - 1, "Master")
+		for k in 2:
+			AudioServer.add_bus()
+			var fi := AudioServer.bus_count - 1
+			AudioServer.set_bus_name(fi, "Fire%d" % k)
+			AudioServer.set_bus_send(fi, "Master")
+			AudioServer.add_bus_effect(fi, AudioEffectPanner.new())
 	else:
 		var wi := _bus_index("World")
 		_reverb = AudioServer.get_bus_effect(wi, 0)
+	_build_beds()
 	for i in VOICES:
 		var bidx := _bus_index("V%d" % i)
 		var player := AudioStreamPlayer.new()
@@ -143,8 +164,11 @@ func _schedule(delay: float, fn: Callable) -> void:
 		_pending.append({"due": _now + delay, "run": fn})
 
 
-## Advance the audio clock (game clock seconds); starts queued sounds that are due.
+## Advance the audio clock (game clock seconds); starts queued sounds that are due and moves the bed levels.
 func tick(now: float) -> void:
+	var dt: float = clampf(now - _last_tick, 0.0, 0.25) if _last_tick > 0.0 else 0.0
+	_last_tick = now
+	_step_beds(dt)
 	_now = now
 	var keep: Array = []
 	for p in _pending:
@@ -401,8 +425,235 @@ func stop_all(_fade: float = 0.0) -> void:
 		slot["player"].stop()
 
 
-## js Audio.speak: villager speech. The synthesised voices land with the audio phase; until then the call is logged and
-## returns a handle whose length is 0, so callers fall back to VoiceData.speak_length for timing.
+# ---------------------------------------------------------------- beds, fire, heartbeat, breath, far sounds
+
+func _loop_stream(entry: Dictionary) -> AudioStream:
+	var st: AudioStreamWAV = (_stream(entry["file"]) as AudioStreamWAV).duplicate()
+	st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	st.loop_begin = 0
+	st.loop_end = st.data.size() / 2
+	return st
+
+
+func _build_beds() -> void:
+	for kind in ["outdoor", "indoor"]:
+		var vs := _variants("amb:%s" % kind)
+		if vs.is_empty():
+			continue
+		var pl := AudioStreamPlayer.new()
+		pl.bus = "Beds"
+		pl.stream = _loop_stream(vs[0])
+		pl.volume_db = -80.0
+		add_child(pl)
+		_amb[kind] = {"player": pl, "cur": 0.0, "tgt": 0.0, "entry": vs[0]}
+	var fv := _variants("fire:bed")
+	for k in 2:
+		if fv.is_empty():
+			break
+		var pl2 := AudioStreamPlayer.new()
+		pl2.bus = "Fire%d" % k
+		pl2.stream = _loop_stream(fv[0])
+		pl2.volume_db = -80.0
+		add_child(pl2)
+		_fire.append({"player": pl2, "pan": AudioServer.get_bus_effect(_bus_index("Fire%d" % k), 0), "cur": 0.0, "tgt": 0.0, "entry": fv[0], "started": false, "lv": 0.0})
+
+
+func _apply_level(pl: AudioStreamPlayer, lin: float) -> void:
+	if muted or lin <= 0.0005:
+		if pl.playing:
+			pl.stream_paused = true
+		pl.volume_db = -80.0
+		return
+	pl.stream_paused = false
+	if not pl.playing:
+		pl.play()
+	pl.volume_db = linear_to_db(lin)
+
+
+func _step_beds(dt: float) -> void:
+	if dt <= 0.0:
+		return
+	for kind in _amb:
+		var b: Dictionary = _amb[kind]
+		var tgt: float = b["tgt"]
+		var cur: float = b["cur"]
+		if tgt > 0.0:
+			b["peak"] = tgt
+		# linear ramp over AMB_FADE seconds from silence to the full level (and back)
+		var step: float = float(b.get("peak", tgt)) / AMB_FADE * dt
+		cur = move_toward(cur, tgt, step)
+		b["cur"] = cur
+		_apply_level(b["player"], cur)
+	for f in _fire:
+		var tgt2: float = f["tgt"]
+		var cur2: float = f["cur"]
+		# setTargetAtTime(tgt, now, 0.12): exponential approach
+		cur2 += (tgt2 - cur2) * (1.0 - exp(-dt / 0.12))
+		f["cur"] = cur2
+		_apply_level(f["player"], cur2)
+
+
+## js Audio.ambience: kind outdoor | indoor | none, level01 0..1; changing kind crossfades over 1.5 s. Returns true when a bed plays.
+func ambience(kind: String, level01: float = 1.0) -> bool:
+	_record("ambience", {"kind": kind, "level01": level01})
+	var k := kind if kind == "outdoor" or kind == "indoor" else "none"
+	var lvl: float = clampf(level01, 0.0, 1.0) if is_finite(level01) else 1.0
+	_amb_kind = k
+	_amb_level = lvl
+	for name in _amb:
+		var b: Dictionary = _amb[name]
+		var e: Dictionary = b["entry"]
+		var lin: float = volume * lvl / float(e["scale"]) if name == k else 0.0
+		b["tgt"] = lin
+	return k != "none" and _amb.has(k)
+
+
+## js Audio.fireBed: quiet steady fire noise on one of two slots; level01 0..1 and pan -1..1.
+func fire_bed(slot: int, level01: float, pan: float) -> bool:
+	if slot < 0 or slot >= _fire.size():
+		return false
+	var lv: float = clampf(level01, 0.0, 1.0) if is_finite(level01) else 0.0
+	var f: Dictionary = _fire[slot]
+	f["lv"] = lv
+	f["tgt"] = volume * lv / float(f["entry"]["scale"])
+	(f["pan"] as AudioEffectPanner).pan = clampf(pan, -1.0, 1.0)
+	return lv > 0.0
+
+
+## js Audio.heartbeat (the felt lub-dub of a body): opts {pan, dist, behind, occluded, bpm}.
+func heartbeat(o: Dictionary = {}) -> bool:
+	_record("heartbeat", o)
+	var lv := SoundData.level("vheart")
+	var hear: float = float(lv["hearDist"]) if lv.get("hearDist") != null else 3.0
+	var gain := 1.0
+	if o.get("dist") is float or o.get("dist") is int:
+		var dist := float(o["dist"])
+		if dist >= 0.0:
+			if dist >= hear:
+				return false
+			var near: float = hear * 0.4
+			gain *= (0.1 + 1.05 * (1.0 - dist / near)) if dist < near else 0.1 * (1.0 - (dist - near) / (hear - near))
+	if o.get("behind", false):
+		gain *= 0.8
+	if o.get("occluded", false):
+		gain *= 0.6
+	gain *= volume
+	if not (gain > 0.0):
+		return false
+	var bpm: float = clampf(float(o.get("bpm", 70.0)), 30.0, 180.0)
+	var best: Dictionary = {}
+	for v in _variants("vheart:beat"):
+		if best.is_empty() or absf(float(v["bpm"]) - bpm) < absf(float(best["bpm"]) - bpm):
+			best = v
+	if best.is_empty():
+		return false
+	var pan: float = clampf(float(o.get("pan", 0.0)), -1.0, 1.0) * 0.5
+	_start(best, gain / float(best["scale"]), pan, 0.0)
+	return true
+
+
+## js Audio.breath: one soft breath swell. opts {pan, dist, behind, occluded, occ {mat, diff}}.
+func breath(o: Dictionary = {}) -> bool:
+	_record("breath", o)
+	var lv := SoundData.level("breath")
+	var hear: float = float(lv["hearDist"]) if lv.get("hearDist") != null else 6.0
+	var gain := 1.0
+	if o.get("dist") is float or o.get("dist") is int:
+		var dist := float(o["dist"])
+		if dist >= 0.0:
+			if dist >= hear:
+				return false
+			gain *= 1.0 - dist / hear
+	if o.get("behind", false):
+		gain *= 0.7
+	var occ: Variant = o.get("occ")
+	if occ is Dictionary and occ.get("mat") is String:
+		gain *= float(Acoustics.occlusion(occ["mat"], float(occ["diff"]) if occ.get("diff") != null else NAN)["gain"])
+	elif o.get("occluded", false):
+		gain *= 0.5
+	var dull_it: bool = o.get("occluded", false) or o.get("behind", false) or (occ is Dictionary and occ.get("mat") is String)
+	gain *= volume
+	if not (gain > 0.0):
+		return false
+	var vs := _variants("breath:dull" if dull_it else "breath:soft")
+	if vs.is_empty():
+		return false
+	_start(vs[0], gain / float(vs[0]["scale"]), clampf(float(o.get("pan", 0.0)), -1.0, 1.0), 0.0)
+	return true
+
+
+## js Audio.oneShotFar: a scheduled distant dog or church bell.
+func one_shot_far(kind: String, o: Dictionary = {}) -> bool:
+	if kind != "dog" and kind != "bell":
+		return false
+	return play(kind, {"pan": o.get("pan", 0.0), "dist": o.get("dist", -1.0)})
+
+
+# ---------------------------------------------------------------- speech
+
+## js Audio.speak: villager speech synthesised on a worker thread (SpeechSynth), then played on a voice slot with pan and low-pass.
+## Returns {end: seconds the line lasts, stop: Callable}; at most MAX_SPEAKERS at once (the oldest is silenced).
 func speak(o: Dictionary) -> Dictionary:
 	_record("speak", o)
-	return {"end": 0.0, "stop": func(): pass}
+	var dd := VoiceData.d()
+	var mood_name: Variant = o.get("mood")
+	var mr: Dictionary = dd["MOODS"][mood_name] if mood_name is String and dd["MOODS"].has(mood_name) else dd["MOODS"]["calm"]
+	var voice: Dictionary = VoiceData.resolve_voice(o.get("voice"))
+	var og: float = clampf(float(o["gain"]), 0.0, 1.0) if o.get("gain") is float or o.get("gain") is int else 1.0
+	var weak_in: Variant = o.get("weak")
+	var weak: float = VoiceData.weak_of(weak_in)
+	var lv := SoundData.level("voice")
+	var peak: float = volume * float(lv.get("gain", 0.06)) * float(mr["gain"]) * og * (1.0 - 0.6 * weak)
+	var length: float = VoiceData.speak_length(o.get("seed", 0), String(o.get("kind", "chat")), mood_name, voice, weak_in)
+	var handle := {"dead": false, "player": null}
+	var stop_fn := func() -> void:
+		handle["dead"] = true
+		var pl: Variant = handle["player"]
+		if pl != null and is_instance_valid(pl):
+			(pl as AudioStreamPlayer).stop()
+	if muted or _pool.is_empty() or not (peak > 0.0):
+		return {"end": length, "stop": stop_fn}
+	var syls := VoiceData.line(o.get("seed", 0), String(o.get("kind", "chat")), mood_name, weak if weak_in != null else null)
+	if syls.is_empty():
+		return {"end": length, "stop": stop_fn}
+	# concurrency cap: drop the oldest live speaker
+	_speakers = _speakers.filter(func(s): return not s["handle"]["dead"] and s["end"] > _now)
+	while _speakers.size() >= MAX_SPEAKERS:
+		var old: Dictionary = _speakers.pop_front()
+		(old["stop"] as Callable).call()
+	_speakers.append({"handle": handle, "end": _now + length + 0.5, "stop": stop_fn})
+	var params := {
+		"syls": syls, "voice": voice, "mood": mr, "weak": weak, "vowels": dd["VOWELS"], "consonants": dd["CONSONANTS"],
+		"seed": VoiceData.hash_seed(o.get("seed", 0)),
+	}
+	var pan: float = clampf(float(o.get("pan", 0.0)), -1.0, 1.0)
+	var lp: float = float(o["lpHz"]) if o.get("lpHz") is float and float(o["lpHz"]) > 0.0 else 1800.0
+	WorkerThreadPool.add_task(func() -> void:
+		var r: Dictionary = SpeechSynth.render(params)
+		var pcm: Dictionary = SpeechSynth.to_pcm16(r["pcm"])
+		_speech_ready.call_deferred(handle, pcm["bytes"], pcm["scale"], peak, pan, lp))
+	return {"end": length, "stop": stop_fn}
+
+
+func _speech_ready(handle: Dictionary, bytes: PackedByteArray, scale: float, peak: float, pan: float, lp: float) -> void:
+	if handle["dead"] or muted or _pool.is_empty():
+		return
+	var st := AudioStreamWAV.new()
+	st.format = AudioStreamWAV.FORMAT_16_BITS
+	st.mix_rate = SpeechSynth.RATE
+	st.stereo = false
+	st.data = bytes
+	var slot: Dictionary = _pool[_next_slot]
+	for k in VOICES:
+		var cand: Dictionary = _pool[(_next_slot + k) % VOICES]
+		if not cand["player"].playing:
+			slot = cand
+			_next_slot = (_next_slot + k + 1) % VOICES
+			break
+	var player: AudioStreamPlayer = slot["player"]
+	(slot["pan"] as AudioEffectPanner).pan = pan
+	(slot["lp"] as AudioEffectLowPassFilter).cutoff_hz = lp
+	player.stream = st
+	player.volume_db = linear_to_db(maxf(peak / scale, 1e-6))
+	handle["player"] = player
+	player.play()

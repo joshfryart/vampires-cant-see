@@ -1745,6 +1745,98 @@
     "rough": 0,
     "ref": 0.35
    }
+  ],
+  "amb:outdoor": [
+   {
+    "file": "amb_outdoor.wav",
+    "scale": 78.672971265982,
+    "ms": 30000,
+    "peak": 0.011439761146903038,
+    "loop": true,
+    "kind": "amb",
+    "name": "outdoor",
+    "ref": 0.017499999999999998
+   }
+  ],
+  "amb:indoor": [
+   {
+    "file": "amb_indoor.wav",
+    "scale": 67.05094874302321,
+    "ms": 10000,
+    "peak": 0.013422628864645958,
+    "loop": true,
+    "kind": "amb",
+    "name": "indoor",
+    "ref": 0.013999999999999999
+   }
+  ],
+  "fire:bed": [
+   {
+    "file": "fire_bed.wav",
+    "scale": 53.64830347658643,
+    "ms": 3000,
+    "peak": 0.01677592657506466,
+    "loop": true,
+    "kind": "fire",
+    "name": "bed",
+    "ref": 0.0245
+   }
+  ],
+  "vheart:beat": [
+   {
+    "file": "vheart_50.wav",
+    "scale": 18.535989173269503,
+    "ms": 530,
+    "peak": 0.0485541932284832,
+    "kind": "vheart",
+    "name": "beat",
+    "bpm": 50,
+    "ref": 0.0483
+   },
+   {
+    "file": "vheart_80.wav",
+    "scale": 18.535989173269503,
+    "ms": 420,
+    "peak": 0.0485541932284832,
+    "kind": "vheart",
+    "name": "beat",
+    "bpm": 80,
+    "ref": 0.0483
+   },
+   {
+    "file": "vheart_120.wav",
+    "scale": 18.535989173269503,
+    "ms": 340,
+    "peak": 0.0485541932284832,
+    "kind": "vheart",
+    "name": "beat",
+    "bpm": 120,
+    "ref": 0.0483
+   }
+  ],
+  "breath:soft": [
+   {
+    "file": "breath_soft.wav",
+    "scale": 48.59324002354518,
+    "ms": 1613,
+    "peak": 0.01852109469473362,
+    "kind": "breath",
+    "name": "soft",
+    "dull": false,
+    "ref": 0.012599999999999998
+   }
+  ],
+  "breath:dull": [
+   {
+    "file": "breath_dull.wav",
+    "scale": 156.60511422597835,
+    "ms": 1603,
+    "peak": 0.00574693875387311,
+    "kind": "breath",
+    "name": "dull",
+    "dull": true,
+    "ref": 0.012599999999999998
+   }
   ]
  }
 }
