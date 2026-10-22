@@ -9,6 +9,10 @@ var _panel: PanelContainer
 var _box: VBoxContainer
 var _last_key: String = ""
 var _abandon_ask: bool = false
+var _k: float = 1.0
+var _version: Label
+var _notice
+const Notice = preload("res://ui/notice.gd")
 
 
 func _init() -> void:
@@ -31,6 +35,21 @@ func _init() -> void:
 	_box.add_theme_constant_override("separation", 10)
 	_panel.add_child(_box)
 	_panel.visible = false
+	_version = Label.new()
+	var ver := str(ProjectSettings.get_setting("application/config/version", ""))
+	_version.text = "v" + ver if ver != "" else ""
+	_version.add_theme_font_size_override("font_size", 11)
+	_version.add_theme_color_override("font_color", Color(0.55, 0.6, 0.75, 0.7))
+	_version.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_version.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_version.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_version.offset_right = -10.0
+	_version.offset_bottom = -6.0
+	_version.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_version.visible = false
+	add_child(_version)
+	_notice = Notice.new()
+	add_child(_notice)
 
 
 ## Main title menu sits below the drawn title; every other panel is centred.
@@ -79,10 +98,15 @@ func _clear() -> void:
 		c.queue_free()
 
 
+## Menu font size with the large-text factor (js adds a CSS class that enlarges every menu).
+func _fs(size: int) -> int:
+	return int(round(float(size) * _k))
+
+
 func _label(text: String, size: int = 16, color: Color = Color(0.85, 0.9, 1.0), center: bool = true) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", _fs(size))
 	l.add_theme_color_override("font_color", color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(380, 0)
@@ -105,6 +129,12 @@ func _button(text: String, cb: Callable, parent: Control = null) -> Button:
 ## Show the panel that belongs to the game's current state.
 func sync(g: Game) -> void:
 	_g = g
+	_notice.attach(g)
+	_k = 1.3 if g.cfg.get("largeText", false) == true else 1.0
+	var th := Theme.new()
+	th.default_font_size = _fs(16)
+	_panel.theme = th
+	_version.visible = g.state == "title" and _version.text != ""
 	var st: String = g.state
 	var key := "%s/%s" % [st, _view]
 	if st != "title" and st != "paused":
@@ -121,6 +151,16 @@ func sync(g: Game) -> void:
 	if _panel.visible and key != _last_key:
 		_focus_first.call_deferred()
 	_last_key = key
+
+
+## Esc inside a sub-view of the title or pause menu goes back to that menu's main view. Returns true when it did.
+## game.gd calls this first in its Esc handler: `if menus != null and menus.consume_escape(): return`.
+func consume_escape() -> bool:
+	if _g == null or _view == "main" or (_g.state != "title" and _g.state != "paused"):
+		return false
+	_view = "main"
+	sync(_g)
+	return true
 
 
 ## Keyboard focus on the first button of a freshly built panel (arrow keys and Enter then work).
@@ -148,11 +188,11 @@ func _build_title() -> void:
 		"guide":
 			_build_guide()
 			return
-	for n in _g.flow.notices:
-		_label(n, 12, Color(1.0, 0.8, 0.4))
-	_g.flow.notices.clear()
+	# Notices are shown by the Notice overlay (it drains g.flow.notices in any state).
 	if _g.flow.has_run:
-		_button("Continue", func(): _g.flow.continue_run())
+		_button("Continue", func():
+			if not _g.flow.continue_run():
+				sync(_g))
 		var nb := _button("Abandon run? Click again" if _abandon_ask else "New run", Callable())
 		nb.pressed.connect(func():
 			if not _abandon_ask:
@@ -228,6 +268,7 @@ func _build_stats() -> void:
 	var st: Dictionary = _g.flow.meta["stats"]
 	for k in Meta.STAT_KEYS:
 		_label("%s: %d" % [STAT_LABELS.get(k, k), int(st[k])], 14)
+	_label("Essence now: %d" % int(_g.flow.meta["essence"]), 14)
 	_button("Back", func():
 		_view = "main"
 		sync(_g))
@@ -283,7 +324,7 @@ func _build_choice(title: String, ids: Variant, boon: bool) -> void:
 		card.add_child(ic)
 		var name_l := Label.new()
 		name_l.text = str(info["name"]) if info != null else str(id)
-		name_l.add_theme_font_size_override("font_size", 17)
+		name_l.add_theme_font_size_override("font_size", _fs(17))
 		name_l.add_theme_color_override("font_color", Color(1.0, 0.9, 0.7))
 		card.add_child(name_l)
 		var d := Label.new()
@@ -353,7 +394,7 @@ func _build_settings() -> void:
 		if row.size() == 2:
 			var cb := CheckBox.new()
 			cb.button_pressed = _g.cfg[key] == true
-			cb.focus_mode = Control.FOCUS_NONE
+			cb.focus_mode = Control.FOCUS_ALL
 			cb.toggled.connect(func(on): _g.set_config(key, on))
 			hb.add_child(cb)
 		else:
@@ -363,7 +404,7 @@ func _build_settings() -> void:
 			sl.step = row[4]
 			sl.value = float(_g.cfg[key])
 			sl.custom_minimum_size = Vector2(140, 0)
-			sl.focus_mode = Control.FOCUS_NONE
+			sl.focus_mode = Control.FOCUS_ALL
 			hb.add_child(sl)
 			var val := Label.new()
 			val.text = _fmt(float(_g.cfg[key]))
@@ -454,7 +495,7 @@ func _guide_text(parent: Control, text: String, size: int, color: Color) -> void
 		return
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", _fs(size))
 	l.add_theme_color_override("font_color", color)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(430, 0)

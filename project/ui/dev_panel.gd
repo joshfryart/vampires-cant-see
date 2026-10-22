@@ -9,6 +9,16 @@ var _log: Label
 var _arch: OptionButton
 var _map: OptionButton
 var _t_log: float = 0.0
+var _fps: Label
+var _status: Label
+var _search: LineEdit
+var _json: TextEdit
+var _patch: LineEdit
+## [{q: lowercase search text, nodes: [Control]}] for the search filter.
+var _rows: Array = []
+## id -> control, so Reset and Apply can move them.
+var _sliders: Dictionary = {}
+var _checks: Dictionary = {}
 
 
 func _init() -> void:
@@ -43,6 +53,16 @@ func attach(g: Game) -> void:
 	box.add_theme_constant_override("separation", 5)
 	scroll.add_child(box)
 	_head(box, "Developer panel (F9)")
+	_fps = Label.new()
+	box.add_child(_fps)
+	_status = Label.new()
+	_status.add_theme_font_size_override("font_size", 11)
+	box.add_child(_status)
+	_search = LineEdit.new()
+	_search.placeholder_text = "Search flags and tunables"
+	_search.clear_button_enabled = true
+	_search.text_changed.connect(func(_t): _apply_filter())
+	box.add_child(_search)
 	_head(box, "Flags")
 	Flags.get_flag("dev.showFps")
 	for id in Flags.flag_info:
@@ -54,6 +74,8 @@ func attach(g: Game) -> void:
 		var fid: String = id
 		cb.toggled.connect(func(on): Flags.set_flag(fid, on))
 		box.add_child(cb)
+		_checks[id] = cb
+		_rows.append({"q": ("%s %s" % [id, Flags.flag_info[id]["desc"]]).to_lower(), "nodes": [cb]})
 	_head(box, "Tunables")
 	for id in Flags.tun_info:
 		var info: Dictionary = Flags.tun_info[id]
@@ -68,7 +90,7 @@ func attach(g: Game) -> void:
 		sl.max_value = info["max"]
 		sl.step = info["step"]
 		sl.value = Flags.tuns[id]
-		sl.custom_minimum_size = Vector2(200, 0)
+		sl.custom_minimum_size = Vector2(150, 0)
 		sl.focus_mode = Control.FOCUS_NONE
 		row.add_child(sl)
 		var val := Label.new()
@@ -78,7 +100,33 @@ func attach(g: Game) -> void:
 		sl.value_changed.connect(func(v):
 			val.text = str(snappedf(v, 0.001))
 			Flags.set_tun(tid, v))
-	_btn(box, "Reset flags and tunables", func(): Flags.reset_all())
+		var rb := Button.new()
+		rb.text = "reset"
+		rb.focus_mode = Control.FOCUS_NONE
+		rb.pressed.connect(func():
+			Flags.reset_tun(tid)
+			sl.value = Flags.tuns[tid])
+		row.add_child(rb)
+		_sliders[id] = sl
+		_rows.append({"q": ("%s %s" % [id, info["desc"]]).to_lower(), "nodes": [l, row]})
+	_btn(box, "Reset all flags and tunables", func():
+		Flags.reset_all()
+		_refresh_controls()
+		_say("Everything reset"))
+	_head(box, "Settings JSON")
+	_json = TextEdit.new()
+	_json.custom_minimum_size = Vector2(290, 70)
+	_json.placeholder_text = "Paste settings JSON here, then Apply"
+	box.add_child(_json)
+	_btn(box, "Copy settings", func():
+		var txt := JSON.stringify(Flags.to_json(), " ")
+		_json.text = txt
+		DisplayServer.clipboard_set(txt)
+		_say("Copied settings"))
+	_btn(box, "Apply settings", func():
+		var n := Flags.from_json(_json.text)
+		_refresh_controls()
+		_say("Applied %d setting(s)" % n))
 	_head(box, "Villagers")
 	_arch = OptionButton.new()
 	for id in Forge.list_ids():
@@ -86,6 +134,10 @@ func attach(g: Game) -> void:
 	box.add_child(_arch)
 	_btn(box, "Spawn ahead", _spawn)
 	_btn(box, "Despawn nearest", _despawn)
+	_patch = LineEdit.new()
+	_patch.placeholder_text = "Look patch JSON, e.g. {\"hat\":\"tall\"}"
+	box.add_child(_patch)
+	_btn(box, "Alter nearest", _alter)
 	_head(box, "Night")
 	for hm in [[20, 0], [23, 0], [2, 0], [4, 30], [5, 30]]:
 		var h: int = hm[0]
@@ -113,7 +165,52 @@ func attach(g: Game) -> void:
 	_log.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
 	_log.add_theme_font_size_override("font_size", 10)
 	box.add_child(_log)
-	_btn(box, "Copy report", func(): DisplayServer.clipboard_set(Log.report()))
+	_btn(box, "Copy error report", func():
+		DisplayServer.clipboard_set(Log.report())
+		_say("Report copied"))
+
+
+func _say(t: String) -> void:
+	if _status != null:
+		_status.text = t
+
+
+func _apply_filter() -> void:
+	var q := _search.text.strip_edges().to_lower()
+	for r in _rows:
+		var show: bool = q == "" or str(r["q"]).contains(q)
+		for n in r["nodes"]:
+			(n as Control).visible = show
+
+
+## Move every control to the current Flags values (after Reset all or Apply).
+func _refresh_controls() -> void:
+	for id in _checks:
+		(_checks[id] as CheckBox).set_pressed_no_signal(Flags.get_flag(id))
+	for id in _sliders:
+		(_sliders[id] as HSlider).value = Flags.tuns[id]
+
+
+## Patch the nearest villager's look (Forge.alter via People.alter) from the JSON in the patch box.
+func _alter() -> void:
+	if _g.people == null or _g.player == null:
+		return
+	var j := JSON.new()
+	if j.parse(_patch.text) != OK or not (j.data is Dictionary):
+		_say("Alter: patch must be a JSON object")
+		return
+	var best: Variant = null
+	var bd := INF
+	for q in _g.people.people:
+		var d: float = Vector2(q.x - _g.player.x, q.y - _g.player.y).length()
+		if d < bd:
+			bd = d
+			best = q
+	if best == null:
+		_say("Alter: nobody nearby")
+		return
+	var r: Dictionary = _g.people.alter(best.id, j.data)
+	_say("Alter %s: %s" % [str(best.id), str(r.get("code"))])
 
 
 func _head(box: VBoxContainer, text: String) -> void:
@@ -167,6 +264,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if not visible or _log == null:
 		return
+	_fps.text = "FPS %d" % Engine.get_frames_per_second()
 	_t_log += delta
 	if _t_log < 0.5:
 		return

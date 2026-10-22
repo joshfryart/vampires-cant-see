@@ -12,12 +12,19 @@ static var tun_info: Dictionary = {}
 static var loaded := false
 ## Tests turn this off so a developer's flags file never changes a parity result.
 static var persist := true
+## Command-line overrides (js URL flags): `--sys=a.b:on,c:off` and `--tun=sys.key:0.5` after `--` on the Godot command line.
+## Precedence: command line > saved file > default (same as js).
+static var cmd_flags: Dictionary = {}
+static var cmd_tuns: Dictionary = {}
 
 
 static func _init_defaults() -> void:
 	if loaded:
 		return
 	loaded = true
+	var cmd := parse_args(OS.get_cmdline_user_args())
+	cmd_flags = cmd["sys"]
+	cmd_tuns = cmd["tun"]
 	register("dev.showFps", false, "Show the FPS/debug overlay (F3)")
 	register("vis.vessels", true, "Circulatory pulse on villagers")
 	register_tun("vessels", "alpha", 0.75, 0.0, 1.0, 0.05, "Vessel node base alpha")
@@ -53,6 +60,8 @@ static func register(id: String, default: bool, desc: String) -> void:
 	flag_info[id] = {"default": default, "desc": desc}
 	if not flags.has(id):
 		flags[id] = default
+	if cmd_flags.has(id):
+		flags[id] = cmd_flags[id]
 
 
 static func register_tun(sys: String, key: String, default: float, mn: float, mx: float, step: float, desc: String) -> void:
@@ -60,6 +69,8 @@ static func register_tun(sys: String, key: String, default: float, mn: float, mx
 	tun_info[id] = {"default": default, "min": mn, "max": mx, "step": step, "desc": desc}
 	if not tuns.has(id):
 		tuns[id] = default
+	if cmd_tuns.has(id):
+		tuns[id] = clampf(float(cmd_tuns[id]), mn, mx)
 
 
 static func get_flag(id: String) -> bool:
@@ -88,6 +99,18 @@ static func set_tun(id: String, v: float) -> void:
 	_save()
 
 
+static func reset_tun(id: String) -> void:
+	_init_defaults()
+	if tun_info.has(id):
+		set_tun(id, tun_info[id]["default"])
+
+
+static func reset_flag(id: String) -> void:
+	_init_defaults()
+	if flag_info.has(id):
+		set_flag(id, flag_info[id]["default"])
+
+
 static func reset_all() -> void:
 	_init_defaults()
 	for k in flag_info:
@@ -102,3 +125,131 @@ static func _save() -> void:
 	if f != null:
 		f.store_string(JSON.stringify({"flags": flags, "tuns": tuns}))
 	People.vessels_on = flags.get("vis.vessels", true) == true
+
+
+static func _apply_cmd() -> void:
+	for k in cmd_flags:
+		if flag_info.has(k):
+			flags[k] = cmd_flags[k]
+	for k in cmd_tuns:
+		if tun_info.has(k):
+			tuns[k] = clampf(float(cmd_tuns[k]), tun_info[k]["min"], tun_info[k]["max"])
+
+
+# ---------------------------------------------------------------- js-compatible parsing and json (flags.js parseSys/parseTun/toJSON/fromJSON)
+
+const _BAD := ["__proto__", "constructor", "prototype"]
+
+
+static func safe_name(s: String) -> bool:
+	if s.length() == 0 or s.length() >= 80:
+		return false
+	for i in s.length():
+		var c := s.unicode_at(i)
+		var ok := (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or c == 46 or c == 45
+		if not ok:
+			return false
+	for part in s.split("."):
+		if part in _BAD:
+			return false
+	return true
+
+
+static func parse_bool(s: String) -> Variant:
+	var t := s.to_lower()
+	if t == "on" or t == "1" or t == "true":
+		return true
+	if t == "off" or t == "0" or t == "false":
+		return false
+	return null
+
+
+## "a.b:on,c.d:off" -> {id: bool}. Bad entries are skipped.
+static func parse_sys(text: String) -> Dictionary:
+	var out := {}
+	for part in text.split(","):
+		var i := part.rfind(":")
+		if i < 1:
+			continue
+		var id := part.substr(0, i).strip_edges()
+		var b: Variant = parse_bool(part.substr(i + 1).strip_edges())
+		if safe_name(id) and b != null:
+			out[id] = b
+	return out
+
+
+## "sys.key:0.5,..." -> {"sys.key": float} (last dot splits system from key).
+static func parse_tun(text: String) -> Dictionary:
+	var out := {}
+	for part in text.split(","):
+		var i := part.rfind(":")
+		if i < 1:
+			continue
+		var path := part.substr(0, i).strip_edges()
+		var raw := part.substr(i + 1).strip_edges()
+		if path.rfind(".") < 1 or not safe_name(path) or raw == "" or not raw.is_valid_float():
+			continue
+		out[path] = raw.to_float()
+	return out
+
+
+## User args (after `--`): {sys: {...}, tun: {...}}; later args override earlier ones.
+static func parse_args(args: PackedStringArray) -> Dictionary:
+	var sys := {}
+	var tun := {}
+	for a in args:
+		if a.begins_with("--sys="):
+			sys.merge(parse_sys(a.substr(6)), true)
+		elif a.begins_with("--tun="):
+			tun.merge(parse_tun(a.substr(6)), true)
+	return {"sys": sys, "tun": tun}
+
+
+## js shape {flags: {id: bool}, tun: {sys: {key: n}}} with only the values that differ from the default.
+static func to_json() -> Dictionary:
+	_init_defaults()
+	var o := {"flags": {}, "tun": {}}
+	for id in flag_info:
+		if flags[id] != flag_info[id]["default"]:
+			o["flags"][id] = flags[id]
+	for id in tun_info:
+		if not is_equal_approx(float(tuns[id]), float(tun_info[id]["default"])):
+			var d := (id as String).rfind(".")
+			var s := (id as String).substr(0, d)
+			if not o["tun"].has(s):
+				o["tun"][s] = {}
+			o["tun"][s][(id as String).substr(d + 1)] = tuns[id]
+	return o
+
+
+## Apply a to_json shape (Dictionary or JSON text). Unknown or unsafe entries are ignored. Returns the count applied.
+static func from_json(input: Variant) -> int:
+	_init_defaults()
+	var o: Variant = input
+	if o is String:
+		var j := JSON.new()
+		if j.parse(o) != OK:
+			return 0
+		o = j.data
+	if not (o is Dictionary):
+		return 0
+	var n := 0
+	var fo: Variant = o.get("flags", {})
+	if fo is Dictionary:
+		for id in fo:
+			if id is String and safe_name(id) and fo[id] is bool and flag_info.has(id):
+				flags[id] = fo[id]
+				n += 1
+	var to: Variant = o.get("tun", {})
+	if to is Dictionary:
+		for s in to:
+			if not (s is String) or not safe_name(s) or not (to[s] is Dictionary):
+				continue
+			for k in to[s]:
+				var id := "%s.%s" % [s, k]
+				if k is String and safe_name(k) and tun_info.has(id) and (to[s][k] is float or to[s][k] is int):
+					tuns[id] = clampf(float(to[s][k]), tun_info[id]["min"], tun_info[id]["max"])
+					n += 1
+	if n > 0:
+		_save()
+	return n
