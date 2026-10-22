@@ -42,7 +42,19 @@ var state: String = "playing"        # playing | feeding
 var blood: float = BLOOD_START
 var drink: Variant = null            # Dictionary while drinking
 var player_lit: float = 0.0
-var map_name: String = "test"
+var map_name: String = ""
+var worlds: Dictionary = {}
+var world_names: Array = []
+var people_by_map: Dictionary = {}
+var meshes: Dictionary = {}
+var transition: Variant = null   # {to_map, to_door, t, dur, swapped}
+var wipe_k: float = 0.0
+var cool: float = 0.0
+var grace: float = 0.0
+var just_arrived: Variant = null
+var room_kind: String = "indoor"
+var run_seed: int = 1
+var night_no: int = 1
 var frame_no: int = 0
 var mouse_dx: float = 0.0
 var step_timer: float = 0.0
@@ -72,15 +84,21 @@ var last_render_clock: float = 0.0
 func _ready() -> void:
 	rng.seed = 1
 	var scenario_name := ""
+	var want_map := ""
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--scenario="):
 			scenario_name = a.substr(11)
 		elif a.begins_with("--map="):
-			map_name = a.substr(6)
+			want_map = a.substr(6)
 	audio = AudioDirector.new()
 	add_child(audio)
 	_build_view()
-	load_map(map_name)
+	_load_worlds()
+	var start_name: String = want_map if want_map != "" else String(GameData.maps()["startMap"])
+	var sp := start_place(worlds[start_name])
+	player = Player.create(sp["x"], sp["y"], sp["angle"])
+	sonar = Sonar.create()
+	enter_map(start_name, sp["x"], sp["y"], sp["angle"], "")
 	if scenario_name != "":
 		var script: GDScript = load("res://tests/scenarios/%s.gd" % scenario_name)
 		scenario = script.new()
@@ -125,36 +143,204 @@ func _build_view() -> void:
 	add_child(hud)
 
 
-func load_map(name: String) -> void:
+func _load_worlds() -> void:
+	var md: Dictionary = GameData.maps()
+	var res := WorldValidate.validate_all(md)
+	if not res["ok"]:
+		for e in res["errors"]:
+			push_warning("map data: %s (%s)" % [e["message"], e["code"]])
+	world_names = md["maps"].keys()
+	for n in world_names:
+		worlds[n] = World.from_def(md["maps"][n])
+
+
+## js startPlace: the start tile, else the first door's arrival, else the first free cell.
+func start_place(w: World) -> Dictionary:
+	if w.start != null:
+		return {"x": w.start.x, "y": w.start.y, "angle": 0.0}
+	for id in w.doors_by_id:
+		var a: Variant = w.arrival(id)
+		if a != null:
+			return a
+	for y in w.height:
+		for x in w.width:
+			if not w.blocks(x + 0.5, y + 0.5, 0.2):
+				return {"x": x + 0.5, "y": y + 0.5, "angle": 0.0}
+	return {"x": 1.5, "y": 1.5, "angle": 0.0}
+
+
+static func mix_seed(seed_v: int, map_index: int, night: int) -> int:
+	return (seed_v ^ JsMath.u32(float(map_index) * 2654435761.0) ^ JsMath.u32(float(night) * 40503.0)) & JsMath.M32
+
+
+## js peopleFor: the (cached) people state of a map.
+func people_for(name: String) -> People:
+	if people_by_map.has(name):
+		return people_by_map[name]
+	var idx: int = maxi(0, world_names.find(name))
+	var sd: float = float(mix_seed(run_seed, idx, night_no))
+	var st := People.create(worlds[name], GameData.map_def(name), {"seed": sd, "poolMin": 30.0, "poolMax": 50.0, "shuffle": true})
+	people_by_map[name] = st
+	return st
+
+
+## js enterMap: switch to a map and place the player.
+func enter_map(name: String, x: float, y: float, angle: float, door_id: String) -> void:
+	end_drink("map")
+	if people != null:
+		people.clear_echoes()
+	if sonar != null:
+		sonar.reset()
 	map_name = name
-	var def: Dictionary = GameData.map_def(name)
-	world = World.from_def(def)
-	var start: Vector2 = world.start if world.start != null else Vector2(1.5, 1.5)
-	player = Player.create(start.x, start.y, 0.0)
-	sonar = Sonar.create()
-	people = People.create(world, def, {"seed": 1})
-	clock = 0.0
-	drink = null
-	state = "playing"
+	world = worlds[name]
+	people = people_for(name)
+	player.place(x, y, angle)
+	_show_map_mesh(name)
+	apply_room()
+	just_arrived = null
+	if door_id != "":
+		var d: Variant = world.doors_by_id.get(door_id)
+		if d != null:
+			world.set_door(d["col"], d["row"], true)
+			just_arrived = {"map": name, "cx": d["col"], "cy": d["row"]}
+		push_off_people()
+	grace = float(GameData.sounds()["react"]["arriveGrace"])
+	player_lit = world.light_at(player.x, player.y)
+	step_timer = 0.0
+	cool = 0.3
 	react_cfg = GameData.sounds()["react"].duplicate()
 	react_cfg["dazedTime"] = 3.0
-	room_zone = world.name
-	audio.set_room(world.kind, Acoustics.t60_for(room_zone, world.kind))
-	for child in viewport.get_children():
-		if child.has_meta("map_mesh"):
-			child.queue_free()
-	var walls := MeshInstance3D.new()
-	walls_inst = walls
-	walls.mesh = WorldMeshBuilder.build(world)
-	walls.material_override = wall_mat
-	walls.set_meta("map_mesh", true)
-	viewport.add_child(walls)
-	floor_inst = MeshInstance3D.new()
-	floor_inst.mesh = WorldMeshBuilder.build_floor(world)
-	floor_inst.material_override = floor_mat
-	floor_inst.set_meta("map_mesh", true)
-	viewport.add_child(floor_inst)
 	_sync_camera()
+
+
+func _show_map_mesh(name: String) -> void:
+	if not meshes.has(name):
+		var walls := MeshInstance3D.new()
+		walls.mesh = WorldMeshBuilder.build(worlds[name])
+		walls.material_override = wall_mat
+		viewport.add_child(walls)
+		var fl := MeshInstance3D.new()
+		fl.mesh = WorldMeshBuilder.build_floor(worlds[name])
+		fl.material_override = floor_mat
+		viewport.add_child(fl)
+		meshes[name] = [walls, fl]
+	for n in meshes:
+		for inst in meshes[n]:
+			inst.visible = n == name
+	walls_inst = meshes[name][0]
+	floor_inst = meshes[name][1]
+
+
+## Nudge the player forward when the arrival point overlaps a villager (js pushOffPeople).
+func push_off_people() -> void:
+	var hit := false
+	for p in people.people:
+		if sqrt((p.x - player.x) * (p.x - player.x) + (p.y - player.y) * (p.y - player.y)) < 0.5:
+			hit = true
+	if not hit:
+		return
+	var d := 0.6
+	while d >= 0.1:
+		var nx: float = player.x + cos(player.angle) * d
+		var ny: float = player.y + sin(player.angle) * d
+		if not world.blocks(nx, ny, player.radius):
+			player.x = nx
+			player.y = ny
+			return
+		d -= 0.1
+
+
+func player_kind() -> String:
+	return world.kind_at(player.x, player.y)
+
+
+## js applyRoom / applyReverb / followRoom: the room kind and zone at the player set the reverb.
+func apply_room() -> void:
+	room_kind = player_kind()
+	apply_reverb(room_kind)
+
+
+func apply_reverb(kind: String) -> void:
+	var zone := world.zone_at(player.x, player.y)
+	room_zone = zone if zone != "" else world.name
+	audio.set_room(kind, Acoustics.t60_for(room_zone, kind))
+
+
+func follow_room() -> void:
+	var k := player_kind()
+	if k != room_kind:
+		apply_room()
+	else:
+		var z := world.zone_at(player.x, player.y)
+		if (z if z != "" else world.name) != room_zone:
+			apply_reverb(k)
+
+
+## js changeMap: begin the wipe through a link door.
+func change_map(to_map: String, to_door: String) -> bool:
+	if transition != null or state != "playing":
+		return false
+	if not worlds.has(to_map) or worlds[to_map].arrival(to_door) == null:
+		push_warning("E_MAP_LINK: no such map/door %s/%s" % [to_map, to_door])
+		return false
+	transition = {"to_map": to_map, "to_door": to_door, "t": 0.0, "dur": 0.7, "swapped": false}
+	wipe_k = 0.0
+	state = "transition"
+	audio.play("creak", {"gain": SoundData.level("creak")["gain"], "pan": 0.0})
+	return true
+
+
+func step_transition(dt: float) -> void:
+	var tr: Variant = transition
+	if tr == null:
+		state = "playing"
+		return
+	tr["t"] = float(tr["t"]) + dt
+	var half: float = float(tr["dur"]) / 2.0
+	if not tr["swapped"]:
+		wipe_k = minf(1.0, float(tr["t"]) / half)
+		if float(tr["t"]) >= half:
+			wipe_k = 1.0
+			tr["swapped"] = true
+			var a: Dictionary = worlds[tr["to_map"]].arrival(tr["to_door"])
+			enter_map(tr["to_map"], a["x"], a["y"], a["angle"], tr["to_door"])
+	else:
+		wipe_k = maxf(0.0, 1.0 - (float(tr["t"]) - half) / half)
+		if float(tr["t"]) >= float(tr["dur"]):
+			wipe_k = 0.0
+			transition = null
+			state = "playing"
+			cool = 0.3
+
+
+## js checkLinkDoor: standing in an open link door starts the transition.
+func check_link_door() -> bool:
+	var cx: int = int(floor(player.x))
+	var cy: int = int(floor(player.y))
+	var ja: Variant = just_arrived
+	if ja != null and (ja["map"] != map_name or ja["cx"] != cx or ja["cy"] != cy):
+		just_arrived = null
+	if cool > 0.0 or just_arrived != null:
+		return false
+	var d: Variant = world.door_at(cx, cy)
+	if d == null or not world.is_door_open(cx, cy):
+		return false
+	return change_map(str(d["toMap"]), str(d["toDoor"]))
+
+
+## Test hook: jump to a map instantly (js debugMap).
+func debug_map(name: String, door_id: String = "") -> bool:
+	if not worlds.has(name):
+		return false
+	var a: Variant = start_place(worlds[name]) if door_id == "" else worlds[name].arrival(door_id)
+	if a == null:
+		return false
+	transition = null
+	wipe_k = 0.0
+	if state == "transition":
+		state = "playing"
+	enter_map(name, a["x"], a["y"], a["angle"], door_id)
+	return true
 
 
 # ---------------------------------------------------------------- input
@@ -221,6 +407,11 @@ func _process(delta: float) -> void:
 func step(dt: float, inp: Dictionary) -> void:
 	clock += dt
 	audio.tick(clock)
+	if state == "transition":
+		step_transition(dt)
+		sonar.prune(clock)
+		hud.set_state(self)
+		return
 	var was_drinking: bool = drink != null
 	if was_drinking:
 		var dk: Dictionary = drink
@@ -241,8 +432,18 @@ func step(dt: float, inp: Dictionary) -> void:
 		var moved2: float = sqrt((player.x - px2) * (player.x - px2) + (player.y - py2) * (player.y - py2))
 		player_steps(dt, moved2)
 		bump_doors(inp)
+	if cool > 0.0:
+		cool -= dt
 	player_lit = world.light_at(player.x, player.y)
+	if grace > 0.0:
+		grace -= dt
 	if not was_drinking:
+		if check_link_door():
+			feed_press = 0
+			ping_clicks = 0
+			interact_press = false
+			return
+		follow_room()
 		if interact_press:
 			interact()
 		if feed_press > 0 and state == "playing" and not start_drink(false):
@@ -268,7 +469,7 @@ static func num_or_1(v: Variant) -> float:
 ## js emitSound: emit a sound pulse at (x, y); over {range, z, bounces, rangeMul, strengthMul, fadeMul} overrides the level row.
 func emit_sound(kind: String, x: float, y: float, over: Dictionary = {}) -> Sonar.Pulse:
 	var lv := SoundData.level(kind)
-	var room := SoundData.room_profile(world.kind)
+	var room := SoundData.room_profile(world.kind_at(x, y))
 	var base_range: float = float(over["range"]) if (over.get("range") is float or over.get("range") is int) else float(lv.get("range", 0.0) if lv.get("range") != null else 0.0)
 	var strength: float = (float(lv["strength"]) if lv.get("strength") != null else 0.0) * num_or_1(over.get("strengthMul"))
 	var bounces_v: int = int(over["bounces"]) if (over.get("bounces") is float or over.get("bounces") is int) else int(lv.get("bounces", 0))
@@ -370,7 +571,7 @@ func react_to(x: float, y: float, kind: String, dist: float = -1.0) -> void:
 func people_ctx() -> Dictionary:
 	return {
 		"player": {"x": player.x, "y": player.y}, "playerLit": player_lit, "react": react_cfg,
-		"grace": 0.0, "nightFrac": 0.0, "nightSec": 0.0, "fear": 0.0,
+		"grace": grace, "nightFrac": 0.0, "nightSec": 0.0, "fear": 0.0,
 	}
 
 
@@ -412,7 +613,7 @@ func player_steps(dt: float, moved: float) -> void:
 
 ## js pulse(): the click ping with room-scaled range, fade and bounces, then startle reactions and audio.
 func pulse() -> bool:
-	var room := SoundData.room_profile(world.kind)
+	var room := SoundData.room_profile(player_kind())
 	var keep := [sonar.range_, sonar.bounces, sonar.fade]
 	sonar.range_ = BASE_RANGE * float(room["rangeMul"])
 	sonar.bounces = mini(BASE_BOUNCES, int(room["bounceCap"]))

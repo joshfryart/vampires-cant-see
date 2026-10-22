@@ -16,6 +16,7 @@ var frame := 0
 
 
 func setup(g: Node) -> void:
+	g.debug_map("test")
 	g.floor_inst.visible = false  # the floor wavefront ring is a separate effect; measure the wall alone
 	g.player.place(pose["x"], pose["y"], pose["angle"])
 	var hits := Raycast.cast(g.world, g.player.x, g.player.y, g.player.angle, RenderState.FOV_DEG * PI / 180.0, 320, 16.0)

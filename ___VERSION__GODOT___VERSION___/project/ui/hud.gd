@@ -8,6 +8,7 @@ var _cool: float = 0.0
 var _drinking: bool = false
 var _debug: bool = false
 var _text: String = ""
+var _wipe: float = 0.0
 
 
 func _init() -> void:
@@ -18,6 +19,7 @@ func _init() -> void:
 func set_state(g: Node) -> void:
 	_blood = g.blood
 	_drinking = g.drink != null
+	_wipe = g.wipe_k
 	var cd: float = g.sonar.cooldown_left(g.clock)
 	_cool = clampf(cd / g.sonar.cooldown, 0.0, 1.0) if cd > 0.0 else 0.0
 	if _debug:
@@ -33,6 +35,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _draw() -> void:
 	var w: float = size.x
 	var h: float = size.y
+	if _wipe > 0.0:
+		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, _wipe))
 	var bw: float = minf(220.0, w * 0.25)
 	var bx: float = 24.0
 	var by: float = h - 36.0

@@ -5,6 +5,7 @@ extends RefCounted
 
 
 func setup(g: Node) -> void:
+	g.debug_map("test")
 	g.player.place(11.5, 4.5, 0.0)
 
 

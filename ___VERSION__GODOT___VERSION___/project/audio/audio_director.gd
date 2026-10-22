@@ -258,7 +258,7 @@ func ping(lp: Sonar.Pulse, player: Player, world: World, game: Node) -> void:
 	_record("ping", {"gen": lp.gen if lp != null else 0})
 	if lp == null:
 		return
-	var indoor: bool = world.kind != "outdoor"
+	var indoor: bool = world.kind_at(player.x, player.y) != "outdoor"
 	_ping_enclosure(lp, indoor, player, world, game)
 	click()
 	_ping_echo(lp, player, game)

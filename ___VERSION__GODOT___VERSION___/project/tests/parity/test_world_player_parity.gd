@@ -32,6 +32,9 @@ func test_world_queries() -> void:
 			eq(1 if w.blocks(x, y, 0.45) else 0, int(q[6]), lbl + " blocks0.45")
 			near(w.light_at(x, y), float(q[7]), 1e-6, lbl + " light")
 			near(w.outer_at(x, y), float(q[8]), 1e-6, lbl + " outer")
+			eq(w.kind_at(x, y), q[9], lbl + " kind")
+			eq(w.zone_at(x, y), q[10], lbl + " zone")
+			eq(1 if w.is_link_door(x, y) else 0, int(q[11]), lbl + " linkDoor")
 		for d in wd["doorsClosed"]:
 			var c := int(d[0])
 			var r := int(d[1])

@@ -1,7 +1,7 @@
 class_name World
 extends RefCounted
 ## Ports js/world.js `load` (Phase 1 subset: walls, floors, doors, props, materials, spots, start).
-## Not yet ported: validate/validateAll (Phase 2) and zones.
+## Validation lives in world_validate.gd. Zones (kind_at / zone_at) are here.
 ## Logic uses plain floats; cells are (col, row), a point (x, y) is in cell (floor(x), floor(y)).
 
 const WALLS := "#BWIw"
@@ -39,6 +39,9 @@ var prop_cells: Dictionary = {}
 var lights: Array[Dictionary] = []
 var light_grid: PackedFloat32Array = PackedFloat32Array()
 var outer_grid: PackedFloat32Array = PackedFloat32Array()
+var zones: Array = []
+var kind_grid: PackedStringArray = PackedStringArray()
+var zone_grid: PackedStringArray = PackedStringArray()
 var start: Variant = null
 var spots: Dictionary = {"crypt": [], "safe": [], "people": [], "doors": []}
 
@@ -52,6 +55,16 @@ static func from_def(def: Dictionary) -> World:
 	w.height = w.rows.size()
 	w.width = String(w.rows[0]).length()
 	w.floor_mat = def["floor"] if FLOOR_MATS.has(def.get("floor", "")) else "stone"
+	w.kind_grid.resize(w.width * w.height)
+	w.zone_grid.resize(w.width * w.height)
+	for i in w.kind_grid.size():
+		w.kind_grid[i] = w.kind
+	w.zones = def.get("zones", []) if def.get("zones") is Array else []
+	for z in w.zones:
+		for zy in range(int(z["y0"]), int(z["y1"]) + 1):
+			for zx in range(int(z["x0"]), int(z["x1"]) + 1):
+				w.kind_grid[zy * w.width + zx] = z["kind"]
+				w.zone_grid[zy * w.width + zx] = z["name"]
 	w.cell_kind.resize(w.width * w.height)
 	w.cell_open.resize(w.width * w.height)
 	for r in w.height:
@@ -273,3 +286,26 @@ func outer_at(x: float, y: float) -> float:
 	if not (cx >= 0 and cy >= 0 and cx < width and cy < height):
 		return 0.0
 	return outer_grid[cy * width + cx]
+
+
+## Indoor/outdoor kind at (x, y); outside the map it is the map kind (js kindAt).
+func kind_at(x: float, y: float) -> String:
+	var cx: int = int(floor(x))
+	var cy: int = int(floor(y))
+	if not (cx >= 0 and cy >= 0 and cx < width and cy < height):
+		return kind
+	return kind_grid[cy * width + cx]
+
+
+## Name of the zone at (x, y), or "" (js zoneAt returns null).
+func zone_at(x: float, y: float) -> String:
+	var cx: int = int(floor(x))
+	var cy: int = int(floor(y))
+	if not (cx >= 0 and cy >= 0 and cx < width and cy < height):
+		return ""
+	return zone_grid[cy * width + cx]
+
+
+## True when the door in cell (cx, cy) leads to another map (js isLinkDoor).
+func is_link_door(cx: float, cy: float) -> bool:
+	return door_at(cx, cy) != null

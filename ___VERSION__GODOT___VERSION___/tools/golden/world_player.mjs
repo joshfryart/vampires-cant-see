@@ -27,7 +27,7 @@ for (const name of Object.keys(MapData.maps)) {
   const step = w.width * w.height > 1000 ? 1.7 : 0.53; // thin the big town map
   for (let y = -0.6; y < w.height + 0.6; y += step) {
     for (let x = -0.6; x < w.width + 0.6; x += step) {
-      pts.push([x, y, w.tileAt(x, y), w.isSolid(x, y) ? 1 : 0, w.materialAt(x, y), w.blocks(x, y, 0.2) ? 1 : 0, w.blocks(x, y, 0.45) ? 1 : 0, w.lightAt(x, y), w.outerAt(x, y)]);
+      pts.push([x, y, w.tileAt(x, y), w.isSolid(x, y) ? 1 : 0, w.materialAt(x, y), w.blocks(x, y, 0.2) ? 1 : 0, w.blocks(x, y, 0.45) ? 1 : 0, w.lightAt(x, y), w.outerAt(x, y), w.kindAt(x, y), w.zoneAt(x, y) || '', w.isLinkDoor(x, y) ? 1 : 0]);
     }
   }
   // Open every door, then re-query the door cells' neighbourhood.
