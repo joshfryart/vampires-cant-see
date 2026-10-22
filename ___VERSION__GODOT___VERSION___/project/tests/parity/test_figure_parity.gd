@@ -4,6 +4,7 @@ extends TestCase
 
 
 func test_scenes() -> void:
+	Pose.use_struggle = false
 	var fx: Dictionary = load_fixture("figure")
 	var bad := 0
 	for sc in fx["scenes"]:

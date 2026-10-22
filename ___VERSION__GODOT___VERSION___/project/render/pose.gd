@@ -15,6 +15,10 @@ const STRIP_Z := [0.0, 0.25, 0.45, 0.65, 0.85, 1.05, 1.7]
 const FLASH_AGE := 0.12
 const DEFAULT_LOOK := {"height": 1.0, "build": 1.0, "stride": 1.0, "acc": "scarf", "body": "bean", "head": "round", "hat": "none", "hair": "none", "beard": false, "nose": 1.0, "coat": false, "prop": "none"}
 
+## True once core/struggle.gd drives the held victim (js: STRUGGLE_POSE exists). figure.json was recorded without it.
+static var use_struggle: bool = true
+var _sp: Dictionary = Struggle.create()
+
 var X: PackedFloat32Array = PackedFloat32Array()
 var Y: PackedFloat32Array = PackedFloat32Array()
 var Z: PackedFloat32Array = PackedFloat32Array()
@@ -241,7 +245,38 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	var eyes_x_ := false
 	var hands_over := false
 	var mode_age: float = float(e["modeAge"]) if e.get("modeAge") is float or e.get("modeAge") is int else 9.0
-	if mode_ == "grapple":
+	if mode_ == "grapple" and use_struggle:
+		# Held by the vampire: panic flailing, then pushing away, then slack as the blood goes (core/struggle.gd).
+		var spz := Struggle.pose(_sp, {"t": tn, "g": rs.lock_age, "bl": 1.0 - rs.lock_k, "sp": rs.lock_sp, "pid": pid_, "lh": lh_, "bw": bw, "shS": sh_s, "hipS": hip_s_, "anim": anim_, "rs": rs.lock_rs})
+		hip_u_ = spz["hipU"]
+		sh_u_ = spz["shU"]
+		head_u_ = spz["headU"]
+		lean_ = spz["lean"]
+		head_f = spz["headF"]
+		head_s = spz["headS"]
+		tilt_ = spz["tilt"]
+		sq = spz["sq"]
+		f_sway = spz["sway"]
+		var yaw_b: float = (1.0 if (pid_ & 1) != 0 else -1.0) * 0.18
+		yaw_u = spz["yawU"] + yaw_b
+		yaw_l = spz["yawL"] + yaw_b
+		g_jolt_ = spz["jolt"]
+		for sd in 2:
+			var sg: float = 1.0 if sd == 0 else -1.0
+			hand_f[sd] = spz["hf"][sd]
+			hand_s[sd] = spz["hs"][sd]
+			hand_u[sd] = spz["hu"][sd]
+			var bo: float = 0.22 * lh_ * spz["hb"][sd]
+			elb_f[sd] = (lean_ + hand_f[sd]) * 0.5
+			elb_s[sd] = (sg * sh_s + hand_s[sd]) * 0.5 + sg * bo * 0.8
+			elb_u[sd] = (sh_u_ + hand_u[sd]) * 0.5 - bo * 0.5
+			foot_f[sd] = spz["ff"][sd]
+			foot_s[sd] = spz["fs"][sd]
+			foot_u[sd] = spz["fu"][sd]
+			knee_f[sd] = spz["ff"][sd] * 0.5 + spz["kb"][sd]
+			knee_s[sd] = (sg * hip_s_ + spz["fs"][sd]) * 0.5 + sg * spz["kb"][sd] * 0.5
+			knee_u[sd] = 0.0
+	elif mode_ == "grapple":
 		hip_u_ = 0.3 * lh_
 		sh_u_ = 0.5 * lh_
 		head_u_ = 0.6 * lh_
