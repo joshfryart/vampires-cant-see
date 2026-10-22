@@ -1,54 +1,22 @@
 # Vampires Can't See
 
-A first-person browser game. You are a vampire, and you cannot see. You echolocate
-like a bat: every click sends a sonar pulse through a medieval village at night,
-and the walls light up for a moment and fade. People are never drawn directly.
-A pulse that reaches someone leaves a fading echo of their outline where they
-stood. Ping again to see where they went.
+You are a vampire, and you cannot see. You echolocate like a bat: every click sends a sonar pulse through a medieval village at night,
+and the walls light up for a moment and fade. People are never drawn directly. A pulse that reaches someone leaves a fading echo of their
+outline where they stood. Ping again to see where they went.
 
-Find a villager, drink in the dark, and get back to your crypt (or a safe, dark
-spot) before dawn. Survive five nights to win the run.
+Find a villager, drink in the dark, and get back to your crypt (or a safe, dark spot) before dawn. Survive five nights to win the run.
 
-This repository holds two versions of the same game:
+**This repository is now the Godot version (alpha).** The original browser game lives in [`html-version/`](html-version/) and is kept as the
+reference the port is checked against (do not edit it from port work).
 
-| Version | Where | How to run | Status |
-|---|---|---|---|
-| **Browser game** (reference) | `index.html`, `js/`, `css/` | double-click `index.html` | v0.20.1, complete |
-| **Godot 4.4 port** | `___VERSION__GODOT___VERSION___/` | double-click `___VERSION__GODOT___VERSION___/play.bat` | **alpha**, feature-complete apart from the items listed in its handoff |
-
-## Godot port (alpha): what changed
-
-A full GDScript port of the browser game for Godot 4.4.1 (Compatibility renderer), built so the JS game stays the single source of truth:
-the JS code is untouched, and the port is checked against it with Node-generated golden fixtures (about 1.1 million checks across 84 tests,
-including exact draw-call hashes for every figure, sprite, floor effect, HUD element and the vessel overlay).
-
-- **Same game:** sonar view with GPU wall/floor/ceiling shaders, echo people drawn on a canvas layer, the village routines (Forge and Schedule), conversations, barks and voices,
-  listening at windows, feeding with struggle and restraint, powers, fear, blood gifts, the Essence shop and boons, 5-night runs, JS-compatible saves with export and import.
-- **Look:** line and volumetric villagers (outfits, faces, hats, role items, rim light), the whole-body vessel pulse, hand-drawn HUD and icons, post effects (bloom, dusk/dawn grade,
-  vignette, grain), the crypt title screen, warm-sense halos, head bob.
-- **Audio:** the original synth voices re-baked to WAV (`tools/bake-audio.mjs`), ambience beds, heartbeats, breath, live villager speech.
-- **Tools:** character creator, F9 developer panel with flags and tunables, M top-down map (debug builds), log buffer and error screen, boot checks.
-- **Differences:** fixed 640x360 internal frame scaled to the window, no browser tab lock, file dialogs for save export/import, no adaptive-quality governor yet, no Windows export yet.
-
-Read `___VERSION__GODOT___VERSION___/README.md` to play and test it, and `___VERSION__GODOT___VERSION___/AI_HANDOFF.md` for the architecture, the TODO list
-and an honest list of what is **not** included or not yet verified (audio and look have not been judged by a person).
-
-## The browser game
-
-Current build (v0.20.1)
-
-No install, no server, no build step, no network. Plain HTML and JavaScript.
+> **Known problem:** the alpha is very laggy in play. It is the top item in [AI_HANDOFF.md](AI_HANDOFF.md). Try Effects 0 or 1 in Settings.
 
 ## Play
 
-1. Clone or download the repo.
-2. Double-click `index.html` (Chrome, Edge or Firefox).
-3. Click the title screen once: this turns on sound and locks the mouse.
+1. Install nothing: the Godot 4.4.1 binary is expected at the repo root as `Godot_v4.4.1-stable_win64.exe` (not committed: `*.exe` is git-ignored, download it from godotengine.org).
+2. Double-click `play.bat` (or run `Godot_v4.4.1-stable_win64.exe --path project`). The first launch imports the audio, which takes a minute or two.
 
-Headphones are strongly recommended. Sound comes from where it happens, and it
-is half the game.
-
-## Controls
+Headphones are strongly recommended: sound comes from where it happens, and it is half the game.
 
 | Input | Action |
 |---|---|
@@ -58,57 +26,54 @@ is half the game.
 | Hold E while drinking | Restrain your victim (muffled, but half drink speed) |
 | E | Open or close a door; sleep at your crypt or a safe spot |
 | Hold E at a lit window | Listen to the people inside |
-| G | Throw a rock (3 per run): a loud clatter that lures villagers |
+| G | Throw a rock (3 per run) |
 | Q / Shift or C / F | Shriek / Mist / Still (unlock on nights 1, 2, 3) |
 | Esc | Pause |
+| F3 | Debug text (debug builds also: M top-down map, F9 developer panel) |
 
-## What's in it
+Menus: New run / Continue, Shop, Stats, How to play, Export / Import save, Character creator, Settings.
+Saves, settings and logs live in `%APPDATA%\Godot\app_userdata\Vampires Cant See\` (`vcs_run.json`, `vcs_meta.json`, `settings.json`, `flags.json`, `creator.json`, `seen.json`, `vcs-log.txt`).
+Full rules and numbers: [html-version/docs/MANUAL.md](html-version/docs/MANUAL.md) (the rules are identical).
 
-- **Echolocation.** Pulses travel at a fixed speed, so far walls answer late.
-  Echoes depend on material, distance, occlusion and room size: ceiling and
-  floor bounces, enclosure-driven reverb, textured ground under the wavefront.
-- **A living village.** Villagers keep a night routine: fetch water, drink at
-  the tavern, pray, cook and eat at home, then go to bed by 01:00. Two guards
-  patrol all night. A gravedigger, a drunk and an insomniac keep odd hours.
-- **Voices and eavesdropping.** Villagers talk to each other, eat at tables by
-  the windows, bark when startled and struggle when grabbed. Listen at windows
-  for their conversations, with optional subtitles and translation.
-- **Feeding.** Drink in the dark. Struggle, restraint, blood pools, fear and a
-  whole-body heartbeat pulse you can see and hear up close.
-- **Runs.** Five nights per run, powers, overflow blood gifts, night boons, an
-  Essence shop with three tiers per upgrade, randomised paths and sealed safe
-  spots, autosave, and save export and import.
-- **Quirky look.** Hand-drawn wobbling lines, a crooked title, tilted menus.
-  Turn off **Wobbly lines** in Settings if you prefer. Reduced motion and large
-  text options are included.
+## What changed from the browser version
 
-## Documentation
+A full GDScript port for Godot 4.4.1 (Compatibility renderer). The JS game is the single source of truth: it is untouched, and the port is checked against it
+with Node-generated golden fixtures (about 1.1 million checks in 84 tests, including exact draw-call hashes for every figure, sprite, floor effect, HUD element
+and the vessel overlay).
 
-- [docs/MANUAL.md](docs/MANUAL.md): full rules, numbers, tables for gifts, powers, shop and boons
-- [docs/DESIGN.md](docs/DESIGN.md): design notes for every module
-- [docs/SPEC-echoes.md](docs/SPEC-echoes.md): the echo and acoustics spec
-- [docs/MODULAR.md](docs/MODULAR.md): how the code is split
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md): saves, audio and browser problems
+- **Same game:** sonar view with GPU wall, floor and ceiling shaders; echo people on a canvas layer; Forge and Schedule villagers with routines, conversations, barks and voices;
+  listening at windows; feeding with struggle and restraint; powers, fear, blood gifts, the Essence shop, boons; 5-night runs; JS-compatible saves with export and import.
+- **Look:** line and volumetric villagers (outfits, faces, hats, role items, rim light), the whole-body vessel pulse, hand-drawn HUD and icons, post effects (bloom,
+  dusk/dawn grade, vignette, grain), the crypt title screen, warm-sense halos, head bob.
+- **Audio:** the original synth voices re-baked to WAV (`tools/bake-audio.mjs`), ambience beds, heartbeats, breath, live villager speech.
+- **Tools:** character creator, F9 developer panel with flags and tunables, M top-down map, log buffer and error screen, boot checks.
+- **Differences:** fixed 640x360 internal frame scaled to the window; no browser tab lock; system file dialogs for save export and import;
+  no adaptive-quality governor yet; no Windows export yet. The full list of what is not included is in [AI_HANDOFF.md](AI_HANDOFF.md).
 
-## Development
-
-Requires Node 22.
+## Repository layout
 
 ```
-node --test tests/*.test.js
-node tests/smoke.mjs
-node tools/sim.mjs
+project/            the Godot project (project.godot): core/ game/ render/ ui/ audio/ data/ tests/
+tools/              Node tools: golden fixture generators (tools/golden), audio baker, data exporter, JS reference-shot server
+docs/               PORT.md (JS -> GDScript map), PARITY.md (fixtures, tolerances, go/no-go, known gaps)
+PLAN.md             the original porting plan and phase list
+AI_HANDOFF.md       start here if you are an AI or a new developer: rules, commands, architecture, NOT included, TODO
+HOWTO-CLI-ANYTHING-GODOT.md, godot/, skills/, CLI-ANYTHING-HOWTO.md    the command-line harness used to drive Godot
+html-version/       the original browser game (index.html, js/, css/, tests/, docs/, tools/, dist/): reference, do not edit
+play.bat            launches the game
 ```
 
-`tests/smoke.mjs` drives the game in Chromium through Playwright (install it
-outside the repo and set `NODE_PATH`). `tools/sound-lab.html` lets you audition
-every sound. `tools/character-creator.html` lets you build villagers with every
-look option and see them live through the game's own renderer (also linked from
-the F9 dev panel).
+## Develop and test
 
-Add `?debug=1` to the page address for logs, the F3 overlay, a top-down map
-(M) and test hooks. F9 opens the dev panel, which has a "Copy error report"
-button for bug reports. `?safe=1` ignores saved settings.
+```
+Godot_v4.4.1-stable_win64.exe --headless --path project -s res://tests/run_tests.gd                      # everything (about 9 minutes)
+Godot_v4.4.1-stable_win64.exe --headless --path project -s res://tests/run_tests.gd -- --filter=vessels  # one file
+node tools/golden/<name>.mjs                                                                              # regenerate a fixture from html-version/js
+```
 
-The code is classic scripts under `js/` with pure-logic modules kept separate
-from the DOM and audio, so most of it is unit tested.
+Windowed scenarios (screenshots): `Godot_v4.4.1-stable_win64.exe --path project --rendering-driver opengl3 --write-movie <absolute dir>\f.png --fixed-fps 60 --quit-after 120 -- --scenario=<name>`
+(scripts in `project/tests/scenarios/`). Parity details: [docs/PARITY.md](docs/PARITY.md). Module map: [docs/PORT.md](docs/PORT.md).
+
+## Not yet judged by a person
+
+Audio, the hand-drawn look against the browser version, and performance on other machines. Everything else is covered by the parity tests.

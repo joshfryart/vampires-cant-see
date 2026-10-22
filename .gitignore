@@ -1,3 +1,14 @@
+# Godot
+.godot/
+.cli-anything/
+out/
+# Node tooling
+tools/node_modules/
+# local screenshots and test output
 shots/
 tests/out/
 tests/shots/
+# assistant working folder
+.claude/
+# Godot editor binary (download from godotengine.org)
+Godot_*.exe
