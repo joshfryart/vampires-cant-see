@@ -545,8 +545,7 @@ static func _clamp_num(n: float, lo: float, hi: float) -> float:
 	return lo if n < lo else (hi if n > hi else n)
 
 
-## Validate the optional run.forge block; null when invalid. Needs core/forge.gd for look validation; without it the
-## block is dropped (the JS drops it when Forge is missing too).
+## Validate the optional run.forge block; null when invalid (looks are validated by Forge.validate_look).
 static func sanitize_forge(f: Variant) -> Variant:
 	if not (f is Dictionary) or f.size() != 2 or not f.has("v") or not f.has("maps"):
 		return null
@@ -585,10 +584,7 @@ static func sanitize_forge(f: Variant) -> Variant:
 			for e in m["altered"]:
 				if not (e is Dictionary) or not _is_int(e.get("id")) or float(e["id"]) < 0.0 or float(e["id"]) > 255.0:
 					return null
-				if not FileAccess.file_exists("res://core/forge.gd"):
-					return null
-				var forge_script: GDScript = load("res://core/forge.gd")
-				var r: Variant = forge_script.call("validate_look", e.get("look"), true)
+				var r: Variant = Forge.validate_look(e.get("look"), true)
 				if not (r is Dictionary) or not r.get("ok") or not (r.get("value") is Dictionary):
 					return null
 				altered.append({"id": e["id"], "look": r["value"].duplicate()})
