@@ -130,6 +130,10 @@ var fov_base_deg: float = FOV_DEG
 var ambience_gain: float = AMBIENCE_GAIN
 var tut: Tutorial
 var hud_view: HudView
+var fx_grade: ColorRect
+var fx_grade_mat: ShaderMaterial
+var fx_overlay: ColorRect
+var fx_overlay_mat: ShaderMaterial
 var dog_t: float = 25.0
 var bell_t: float = 30.0
 var amb_key: String = ""
@@ -236,8 +240,22 @@ func _build_view() -> void:
 	ceil_mat = ShaderMaterial.new()
 	ceil_mat.shader = floor_mat.shader
 	ceil_mat.set_shader_parameter("is_ceiling", true)
+	fx_grade = ColorRect.new()
+	fx_grade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fx_grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_grade_mat = ShaderMaterial.new()
+	fx_grade_mat.shader = load("res://render/shaders/postfx_grade.gdshader")
+	fx_grade.material = fx_grade_mat
+	viewport.add_child(fx_grade)
 	hud_view = HudView.new()
 	viewport.add_child(hud_view)
+	fx_overlay = ColorRect.new()
+	fx_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fx_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_overlay_mat = ShaderMaterial.new()
+	fx_overlay_mat.shader = load("res://render/shaders/postfx_overlay.gdshader")
+	fx_overlay.material = fx_overlay_mat
+	viewport.add_child(fx_overlay)
 	hud = Hud.new()
 	add_child(hud)
 	menus = Menus.new()
@@ -1481,6 +1499,7 @@ func _render() -> void:
 	echo_view.rs_fov = fov_now()
 	echo_view.render_frame(world, player, people, sonar, clock, lock_info(), ripple.rings)
 	hud_view.render_frame(self)
+	_sync_postfx()
 	wall_mat.set_shader_parameter("focal_px", 320.0 / tan(fov_now() / 2.0))
 
 
@@ -1529,6 +1548,27 @@ func step_feed_fx(dt: float) -> void:
 		landings.pop_front()
 		vial_pulse = 1.0
 		audio.play("gulp", {"gain": SoundData.level("gulp")["gain"], "pan": 0.0})
+
+
+## Post effects from the effects level (js PostFx): bloom and the dusk/dawn grade at level >= 1, the grain and vignette levels.
+func _sync_postfx() -> void:
+	var fx: int = echo_view.rs.fx
+	var menu: bool = state == "title" or state == "error"
+	var bloom: float = 0.55 if fx >= 2 and not menu else 0.0
+	var dusk := 0.0
+	var dawn := 0.0
+	if night != null and fx >= 1:
+		dusk = 1.0 - night.min / 30.0 if night.min < 30.0 else 0.0
+		dawn = night.dawn_k()
+	fx_grade_mat.set_shader_parameter("bloom_alpha", bloom)
+	fx_grade_mat.set_shader_parameter("dusk", dusk)
+	fx_grade_mat.set_shader_parameter("dawn", dawn)
+	var grain: float = [0.04, 0.035, 0.05][clampi(fx, 0, 2)]
+	var vig: float = 1.0 if fx == 0 else (0.7 if fx == 1 else 1.0)
+	var vignette_on: bool = cfg["edgeVignette"] == true and not menu
+	fx_overlay_mat.set_shader_parameter("vig_opacity", vig if vignette_on else 0.0)
+	fx_overlay_mat.set_shader_parameter("grain_opacity", 0.0 if menu else grain)
+	fx_overlay_mat.set_shader_parameter("grain_time", clock)
 
 
 func fov_ease() -> float:
