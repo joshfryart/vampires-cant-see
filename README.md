@@ -9,6 +9,32 @@ stood. Ping again to see where they went.
 Find a villager, drink in the dark, and get back to your crypt (or a safe, dark
 spot) before dawn. Survive five nights to win the run.
 
+This repository holds two versions of the same game:
+
+| Version | Where | How to run | Status |
+|---|---|---|---|
+| **Browser game** (reference) | `index.html`, `js/`, `css/` | double-click `index.html` | v0.20.1, complete |
+| **Godot 4.4 port** | `___VERSION__GODOT___VERSION___/` | double-click `___VERSION__GODOT___VERSION___/play.bat` | **alpha**, feature-complete apart from the items listed in its handoff |
+
+## Godot port (alpha): what changed
+
+A full GDScript port of the browser game for Godot 4.4.1 (Compatibility renderer), built so the JS game stays the single source of truth:
+the JS code is untouched, and the port is checked against it with Node-generated golden fixtures (about 1.1 million checks across 84 tests,
+including exact draw-call hashes for every figure, sprite, floor effect, HUD element and the vessel overlay).
+
+- **Same game:** sonar view with GPU wall/floor/ceiling shaders, echo people drawn on a canvas layer, the village routines (Forge and Schedule), conversations, barks and voices,
+  listening at windows, feeding with struggle and restraint, powers, fear, blood gifts, the Essence shop and boons, 5-night runs, JS-compatible saves with export and import.
+- **Look:** line and volumetric villagers (outfits, faces, hats, role items, rim light), the whole-body vessel pulse, hand-drawn HUD and icons, post effects (bloom, dusk/dawn grade,
+  vignette, grain), the crypt title screen, warm-sense halos, head bob.
+- **Audio:** the original synth voices re-baked to WAV (`tools/bake-audio.mjs`), ambience beds, heartbeats, breath, live villager speech.
+- **Tools:** character creator, F9 developer panel with flags and tunables, M top-down map (debug builds), log buffer and error screen, boot checks.
+- **Differences:** fixed 640x360 internal frame scaled to the window, no browser tab lock, file dialogs for save export/import, no adaptive-quality governor yet, no Windows export yet.
+
+Read `___VERSION__GODOT___VERSION___/README.md` to play and test it, and `___VERSION__GODOT___VERSION___/AI_HANDOFF.md` for the architecture, the TODO list
+and an honest list of what is **not** included or not yet verified (audio and look have not been judged by a person).
+
+## The browser game
+
 Current build (v0.20.1)
 
 No install, no server, no build step, no network. Plain HTML and JavaScript.
