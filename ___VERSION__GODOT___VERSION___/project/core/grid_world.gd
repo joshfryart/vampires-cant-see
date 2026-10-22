@@ -26,3 +26,9 @@ func is_solid(x: float, y: float) -> bool:
 	if cx < 0 or cy < 0 or cx >= width or cy >= height:
 		return true
 	return solid[cy * width + cx] == 1
+
+
+func cell_solid(cx: int, cy: int) -> bool:
+	if cx < 0 or cy < 0 or cx >= width or cy >= height:
+		return true
+	return solid[cy * width + cx] == 1

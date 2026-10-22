@@ -18,10 +18,7 @@ func _init() -> void:
 ## Build this frame's strokes. echoes: Array of echo dictionaries (see echo_to_dict). lock_id < 0 = nobody held.
 func render_frame(world: World, player: Player, people: People, sonar: Sonar, t: float, lock: Dictionary) -> void:
 	canvas.reset()
-	var fov: float = RenderState.FOV_DEG * PI / 180.0
-	var hits := Raycast.cast(world, player.x, player.y, player.angle, fov, rs.cols, 16.0)
-	for i in rs.cols:
-		rs.zbuf[i] = hits[i].dist
+	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf)
 	rs.update_boil(t)
 	if lock.is_empty():
 		rs.lock_id = -1

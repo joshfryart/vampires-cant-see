@@ -24,6 +24,9 @@ var lock_k: float = 0.0
 var lock_age: float = 1.0
 var lock_sp: float = 9.0
 var lock_rs: float = 0.0
+## cos/sin of each column's view-angle offset (fixed fov), for Raycast.depth_columns.
+var col_cos: PackedFloat64Array = PackedFloat64Array()
+var col_sin: PackedFloat64Array = PackedFloat64Array()
 
 
 func _init(width: int = BASE_W, height: int = BASE_H) -> void:
@@ -35,6 +38,9 @@ func _init(width: int = BASE_W, height: int = BASE_H) -> void:
 	horizon = oh / 2.0
 	zbuf.resize(cols)
 	zbuf.fill(1e9)
+	var offs := Raycast.column_offsets(FOV_DEG * PI / 180.0, cols)
+	col_cos = offs[0]
+	col_sin = offs[1]
 
 
 func tan_half() -> float:

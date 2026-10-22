@@ -41,3 +41,18 @@ func test_column_casts() -> void:
 			for i in hits.size():
 				_check(hits[i], c["hits"][i], fields, "%s cast #%d col %d" % [m["name"], n, i])
 			n += 1
+
+
+func test_depth_columns_match_cast() -> void:
+	var fx: Dictionary = load_fixture("raycast")
+	for m in fx["maps"]:
+		var w := GridWorld.from_flags(int(m["w"]), int(m["h"]), m["flags"])
+		for c in m["casts"]:
+			var cols: int = int(c["columns"])
+			var offs := Raycast.column_offsets(float(c["fov"]), cols)
+			var out := PackedFloat32Array()
+			out.resize(cols)
+			Raycast.depth_columns(w, float(c["x"]), float(c["y"]), float(c["angle"]), offs[0], offs[1], float(c["maxDist"]), out)
+			for i in cols:
+				var want: float = float(c["hits"][i][1])  # dist (perpendicular), index 1 of the field list
+				near(out[i], want, 1e-4, "%s depth col %d" % [m["name"], i])

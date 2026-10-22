@@ -29,6 +29,9 @@ var height: int = 0
 var rows: Array = []
 var mat_table: Dictionary = {}
 var open_doors: Dictionary = {}
+## Per-cell flags for fast queries: 0 floor, 1 wall, 2 door. A door is solid until its cell is in open_doors.
+var cell_kind: PackedByteArray = PackedByteArray()
+var cell_open: PackedByteArray = PackedByteArray()
 var doors_by_id: Dictionary = {}
 var door_grid: Dictionary = {}
 var props: Array[Dictionary] = []
@@ -49,9 +52,13 @@ static func from_def(def: Dictionary) -> World:
 	w.height = w.rows.size()
 	w.width = String(w.rows[0]).length()
 	w.floor_mat = def["floor"] if FLOOR_MATS.has(def.get("floor", "")) else "stone"
+	w.cell_kind.resize(w.width * w.height)
+	w.cell_open.resize(w.width * w.height)
 	for r in w.height:
 		var row: String = w.rows[r]
 		for c in w.width:
+			var ch: String = row[c]
+			w.cell_kind[r * w.width + c] = 1 if WALLS.contains(ch) else (2 if DOORS.contains(ch) else 0)
 			var p := Vector2(c + 0.5, r + 0.5)
 			match row[c]:
 				"@": w.start = p
@@ -101,11 +108,17 @@ func tile_at(x: float, y: float) -> String:
 	return String(rows[cy])[cx]
 
 
-func is_solid(x: float, y: float) -> bool:
-	var t := tile_at(x, y)
-	if WALLS.contains(t):
+## Solid test on integer cell coordinates (out of bounds is solid): the hot path of the ray cast.
+func cell_solid(cx: int, cy: int) -> bool:
+	if cx < 0 or cy < 0 or cx >= width or cy >= height:
 		return true
-	return DOORS.contains(t) and not open_doors.has(_key(int(floor(x)), int(floor(y))))
+	var k: int = cy * width + cx
+	var kind: int = cell_kind[k]
+	return kind == 1 or (kind == 2 and cell_open[k] == 0)
+
+
+func is_solid(x: float, y: float) -> bool:
+	return cell_solid(int(floor(x)), int(floor(y)))
 
 
 func material_at(x: float, y: float) -> String:
@@ -126,8 +139,10 @@ func set_door(cx: float, cy: float, is_open: bool) -> bool:
 	var was: bool = open_doors.has(_key(ix, iy))
 	if is_open:
 		open_doors[_key(ix, iy)] = true
+		cell_open[_key(ix, iy)] = 1
 	else:
 		open_doors.erase(_key(ix, iy))
+		cell_open[_key(ix, iy)] = 0
 	if was != is_open and lights.size() > 0:
 		recompute_lights()
 	return true

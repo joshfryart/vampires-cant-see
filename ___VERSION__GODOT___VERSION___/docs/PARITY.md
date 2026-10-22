@@ -32,8 +32,8 @@ compared with an epsilon.
 | Check | Status | Notes |
 |---|---|---|
 | F1. Reveal maths on screen | **pass** (Phase 1) | `tests/scenarios/f1_readback.gd`, windowed. Per column, the CPU `sample2` + afterglow + lineAlpha is compared with pixels read back from the 640x360 render. Onset is identical to the frame on 9 of 10 columns; fade-curve error 1.3 to 7.4 % of the peak (limit 10 %). Column 216 reads 124 %: a vertical wall-corner line crosses that column, so it is not a shader error. |
-| F2. Hand-drawn feel | pending (user approval) | Line boil, taper, arrival flash and the sweep are in; the crooked door tilt and post-front wobble are not (Phase 2/3). Needs a side-by-side review. |
-| F3. CPU budget | pending | Not measured yet. |
+| F2. Hand-drawn feel | **needs your review** | Side-by-side shots (Godot left, original `js/render.js` right, same scene, pose and time) are in `docs/shots/phase1/`. The villager outline is identical in pose, position and boil; the wall edge lines match. Not in yet (Phase 2/3): floor and ceiling grid texture, wall material detail, crooked door tilt, post-front wobble. Line weight in the Godot shots is slightly heavier (anti-aliased 1 px line scaled 2x in the window). Regenerate with `tools/ref-server.mjs` + `tools/js-ref.html` (see below). |
+| F3. CPU budget | **average pass, tail borderline** | `tests/tools/bench.gd` (headless, town map, 14 villagers, 25 live pulses, figures drawn): average 2.7 ms per frame, p95 8.0 ms, max 12 ms against the 6 ms target. Parts: ray cast / depth buffer 1.4 ms avg (was 5.4 ms before the grid fast path), villagers + echoes 0.4 ms, pulse texture 0.1 ms, figure drawing 0.9 ms avg but 5.3 ms p95 when many echoes are alive. Figure drawing is the thing to optimise if the p95 matters; volumetric figures (Phase 7) will need caching. |
 | F4. GPU | pending | 64 pulses at 1280x720 not measured yet. |
 | F5. Audio | pending | Baked samples not built yet. |
 | F6. Numeric parity | **pass** for ray cast, sonar, RNG, world, player, people (10 min), figures | See table above. |
@@ -54,3 +54,12 @@ compared with an epsilon.
 - The held victim uses the plain grapple pose; the struggle pose (`js/struggle.js`) is Phase 4.
 - Audio calls are recorded by `AudioDirector` but nothing plays yet.
 - Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings: Phase 3).
+
+## JS reference shots (F2)
+
+```
+node tools/ref-server.mjs 8766          # serves the repo root and POST /save
+# open  http://localhost:8766/___VERSION__GODOT___VERSION___/tools/js-ref.html?scene=villager&frames=42,60,120,192&save=1  in a browser
+# PNGs land in out/jsref/. Godot side: ... --write-movie out/villager_test/f.png ... -- --scenario=villager_test
+# compose: godot --headless --path project -s res://tests/tools/side_by_side.gd -- <outDir> "<godot.png>|<js.png>" ...
+```
