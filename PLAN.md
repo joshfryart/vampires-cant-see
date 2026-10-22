@@ -1,6 +1,6 @@
 # Plan: porting Vampires Can't See to Godot 4.4.1
 
-Status: plan only. Nothing is built or measured yet. Written by an Opus planning pass over the JS game.
+Status: historical plan. The port is built (alpha, version 0.20.2); current state is in `AI_HANDOFF.md`, `docs/PORT.md` and `docs/PARITY.md`. Written by an Opus planning pass over the JS game.
 Read `HOWTO-CLI-ANYTHING-GODOT.md` first for how to drive Godot from the CLI.
 
 All work lives in this folder. The JS game in the repo root is the reference and is not edited.

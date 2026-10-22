@@ -9,7 +9,8 @@ Find a villager, drink in the dark, and get back to your crypt (or a safe, dark 
 **This repository is now the Godot version (alpha).** The original browser game lives in [`html-version/`](html-version/) and is kept as the
 reference the port is checked against (do not edit it from port work).
 
-> **Known problem:** the alpha is very laggy in play. It is the top item in [AI_HANDOFF.md](AI_HANDOFF.md). Try Effects 0 or 1 in Settings.
+> **Version 0.20.2** (the JS game is 0.20.1). The in-play lag reported on the alpha is fixed: on a GT 1030 at 1280x720 a typical walk went from 10.3 to 5.2 ms per frame uncapped, and a crowd of six villagers close went from 25.1 ms
+> average (p99 139 ms, 112 frames over 33 ms) to 18.0 ms (p99 32 ms, 4 frames over 33 ms) with vsync on. Numbers and what changed: [AI_HANDOFF.md](AI_HANDOFF.md) ("Changes in 0.20.2"). Still to check on other machines.
 
 ## Play
 
@@ -29,7 +30,7 @@ Headphones are strongly recommended: sound comes from where it happens, and it i
 | G | Throw a rock (3 per run) |
 | Q / Shift or C / F | Shriek / Mist / Still (unlock on nights 1, 2, 3) |
 | Esc | Pause |
-| F3 | Debug text (debug builds also: M top-down map, F9 developer panel) |
+| F3 | Debug text: fps, view, governor lines (debug builds also: M top-down map, F9 developer panel) |
 
 Menus: New run / Continue, Shop, Stats, How to play, Export / Import save, Character creator, Settings.
 Saves, settings and logs live in `%APPDATA%\Godot\app_userdata\Vampires Cant See\` (`vcs_run.json`, `vcs_meta.json`, `settings.json`, `flags.json`, `creator.json`, `seen.json`, `vcs-log.txt`).
@@ -38,7 +39,7 @@ Full rules and numbers: [html-version/docs/MANUAL.md](html-version/docs/MANUAL.m
 ## What changed from the browser version
 
 A full GDScript port for Godot 4.4.1 (Compatibility renderer). The JS game is the single source of truth: it is untouched, and the port is checked against it
-with Node-generated golden fixtures (about 1.1 million checks in 84 tests, including exact draw-call hashes for every figure, sprite, floor effect, HUD element
+with Node-generated golden fixtures (about 1.1 million checks in 106 tests, including exact draw-call hashes for every figure, sprite, floor effect, HUD element
 and the vessel overlay).
 
 - **Same game:** sonar view with GPU wall, floor and ceiling shaders; echo people on a canvas layer; Forge and Schedule villagers with routines, conversations, barks and voices;
@@ -48,7 +49,7 @@ and the vessel overlay).
 - **Audio:** the original synth voices re-baked to WAV (`tools/bake-audio.mjs`), ambience beds, heartbeats, breath, live villager speech.
 - **Tools:** character creator, F9 developer panel with flags and tunables, M top-down map, log buffer and error screen, boot checks.
 - **Differences:** fixed 640x360 internal frame scaled to the window; no browser tab lock; system file dialogs for save export and import;
-  no adaptive-quality governor yet; no Windows export yet. The full list of what is not included is in [AI_HANDOFF.md](AI_HANDOFF.md).
+  the adaptive quality governor is ported (no `renderScale`); no Windows export yet. The full list of what is not included is in [AI_HANDOFF.md](AI_HANDOFF.md).
 
 ## Repository layout
 

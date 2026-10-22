@@ -34,7 +34,7 @@ Godot_v4.4.1-stable_win64.exe --headless --path project -s res://tests/run_tests
 
 Scope notes: `people.json` and `figure.json` are generated with Forge, Schedule and Struggle **not** loaded; their tests
 pass `noForge` / `Pose.use_struggle = false`. `people_sched.json` and `figure_struggle.json` cover the loaded case.
-`figure_vol.json` loads `figure.js` (no Struggle, no Flags). Vessels (`vis.vessels`, off by default) are not ported.
+`figure_vol.json` loads `figure.js` (no Struggle, no Flags). Vessels (`vis.vessels`, off by default) are ported and covered by `vessels*.json`.
 
 Godot's JSON parser is not correctly rounded for doubles, so exact data is stored as integers and everything else is
 compared with an epsilon.
@@ -44,9 +44,9 @@ compared with an epsilon.
 | Check | Status | Notes |
 |---|---|---|
 | F1. Reveal maths on screen | **pass** (Phase 1) | `tests/scenarios/f1_readback.gd`, windowed. Per column, the CPU `sample2` + afterglow + lineAlpha is compared with pixels read back from the 640x360 render. Onset is identical to the frame on 9 of 10 columns; fade-curve error 1.3 to 7.4 % of the peak (limit 10 %). Column 216 reads 124 %: a vertical wall-corner line crosses that column, so it is not a shader error. |
-| F2. Hand-drawn feel | **needs your review** | Side-by-side shots (Godot left, original `js/render.js` right, same scene, pose and time) are in `docs/shots/phase1/`. The villager outline is identical in pose, position and boil; the wall edge lines match. Not in yet (Phase 2/3): floor and ceiling grid texture, wall material detail, crooked door tilt, post-front wobble. Line weight in the Godot shots is slightly heavier (anti-aliased 1 px line scaled 2x in the window). Regenerate with `tools/ref-server.mjs` + `tools/js-ref.html` (see below). |
-| F3. CPU budget | **average pass, tail borderline** | `tests/tools/bench.gd` (headless, town map, 14 villagers, 25 live pulses, figures drawn): average 2.7 ms per frame, p95 8.0 ms, max 12 ms against the 6 ms target. Parts: ray cast / depth buffer 1.4 ms avg (was 5.4 ms before the grid fast path), villagers + echoes 0.4 ms, pulse texture 0.1 ms, figure drawing 0.9 ms avg but 5.3 ms p95 when many echoes are alive. Figure drawing is the thing to optimise if the p95 matters; volumetric figures (Phase 7) will need caching. |
-| F4. GPU | pending | 64 pulses at 1280x720 not measured yet. |
+| F2. Hand-drawn feel | **needs your review** | Side-by-side shots (Godot left, original `js/render.js` right, same scene, pose and time) are in `docs/shots/phase1/`. The villager outline is identical in pose, position and boil; the wall edge lines match. The floor and ceiling texture, wall material detail, crooked door tilt and post-front wobble have since been added (shaders and `floor_fx`). Line weight in the Godot shots is slightly heavier (anti-aliased 1 px line scaled 2x in the window). Regenerate with `tools/ref-server.mjs` + `tools/js-ref.html` (see below). |
+| F3. CPU budget | **pass** (re-measured in 0.20.2) | Headless `tests/tools/bench.gd` was 2.7 ms avg / p95 8.0 ms before the perf work. Windowed real-time numbers (`tests/scenarios/perf_play.gd`, GT 1030, 1280x720, 60 Hz): typical walk uncapped 10.3 -> 5.2 ms avg (97 -> 193 fps); with vsync, p99 34.6 -> 24 ms and frames over 33 ms 17 -> 7; crowd of 6 villagers close 25.1 -> 18.0 ms avg, p95 76 -> 26.8, p99 139 -> 32, frames over 33 ms 112 -> 4. Round-2 numbers: see `AI_HANDOFF.md` ("Performance numbers"). |
+| F4. GPU | pending | 64 pulses at 1280x720 still not measured (only the typical and crowd cases above). |
 | F5. Audio | pending | Baked samples not built yet. |
 | F6. Numeric parity | **pass** for ray cast, sonar, RNG, world, player, people (10 min), figures | See table above. |
 | F7. Tooling | **pass** | Headless tests, harness `script check`/`scene verify`, windowed `--write-movie` all work from this path (spaces are fine when quoted). |
@@ -62,13 +62,12 @@ compared with an epsilon.
 
 ## Known gaps
 
-- Floor: one wavefront ring per pulse only (JS draws wavy dotted arcs, texture and footstep rings, plus the ripple
-  rings, door wobble and the weak-ping flicker: Phase 3 polish).
-- Not ported: the Forge editor in the dev panel (no JS equivalent of spawn overrides exists either), the `renderScale` and `dragLook` settings
-  (the Godot frame is a fixed 640x360 and the mouse is always captured while playing), and Windows export (needs export templates).
-- Audio is in but unheard by me: ambience loops, fire, breath, heartbeat, far dog/bell and live villager speech (`audio/speech_synth.gd`,
-  50-120 ms per line on a worker thread) all play; nothing has been listened to (F5 needs your ears).
-- Audio samples play in the slice, but nothing has been listened to yet (F5 pending your review).
+- Floor, walls and ceiling: the wavy dotted arcs, footstep rings, ripple rings, door wobble, weak-ping flicker, floor/ceiling texture, wall material detail, crooked door tilt and post-front wobble are done
+  (shaders and `floor_fx`), as are the quality, boil, reduced motion and effects-level extras (stone hatch, wood dashes, window glint, line taper, soft front), the map-transition wipe and the warm edge glow.
+  The wipe has no golden fixture (the JS uses `Date.now` for the boil frame); the edge-glow radial fallback is omitted (unreachable: maps always have lights).
+- Not ported: the full Forge editor in the dev panel (Alter nearest applies a JSON look patch; no JS equivalent of spawn overrides exists), the `renderScale` and `dragLook` settings
+  (the Godot frame is a fixed 640x360 and the mouse is always captured while playing), and Windows export (needs export templates). The full table is in `AI_HANDOFF.md`.
+- Audio is in but unheard by me (F5 needs your ears): ambience loops, fire, breath, heartbeat, far dog/bell, bark muffling and live villager speech (`audio/speech_synth.gd`, 50-120 ms per line on a worker thread).
 
 ## JS reference shots (F2)
 

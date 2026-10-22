@@ -1,0 +1,53 @@
+# TODO (handoff snapshot, 2026-10-22)
+
+Session goal: (1) restore everything missing in the Godot port compared with `html-version/`, (2) steady 60 fps, (3) docs and version bump.
+Read `AI_HANDOFF.md` first (rules, commands, "NOT included" table, "Changes in 0.20.2"). Never edit `html-version/`.
+
+## Done (committed on `main`, not pushed)
+
+| Commit | What |
+|---|---|
+| 789f495 | Profiling tools: `tests/scenarios/perf_play.gd` (real-time, windowed), `tests/tools/fig_bench.gd`, `tests/tools/pf.gd` |
+| 9fce72b | Perf: grid fast paths for sonar rays, depth columns, line of sight; row-cached pulse textures; threaded audio preload. Ping 17.9 -> 2.7 ms, footstep pulse 1.5 -> 0.15 ms, depth columns 1.2 -> 0.6 ms, strongest_echo 6.4 -> 0.9 ms |
+| 227f64a | Perf: volumetric figure built once and replayed per sweep strip, fast clipping, adaptive curve flattening, single triangulation. Swept figure 40-80 -> 6 ms, lit 6.5 -> 3.9 ms |
+| e83ddbc | Perf: JS adaptive quality governor and fxCap ported (`render/governor.gd`); depth buffer, HUD and title caching. EchoView 2.3 -> 1.3 ms, HUD 0.86 -> 0.26 ms |
+| 1c2c17b | Gameplay parity: bark distance/occlusion muffling and voice stops, sonarCooldown fx (quick_call, quick_ping, g_quick were dead), feedToggle release, pending gifts saved, save on window close, Esc handling, gates, enter_map resets, transitionMs |
+| 35aaf2a | UI parity: listening headcount "Voices inside: N", large text, Notice overlay, F3 view/sched/governor lines, menu keyboard focus and Esc, Essence now row, version label, dev panel tools, `--sys=`/`--tun=` |
+| f682c69 | Render parity: wall/floor shaders follow quality, line boil, material detail, reduced motion, effects level (stone hatch, wood dashes, window glint, line taper, soft front); `EchoLayer.warm_up()` at boot |
+| 87510fb | Render parity: map-transition wipe (`HudDraw.draw_wipe`), directional warm edge glow (`render/edge_glow.gd`) |
+
+Full suite after 35aaf2a: 106 tests, 1,108,495 checks, 0 failures. Not re-run after f682c69/87510fb (their workers ran filters gameplay, flow, parity_gaps, hud, world, edge_glow: all pass).
+Listening at windows: verified wired end to end (E key, gating, slow walk, muffled speech, subtitles, tutorial hint); only the headcount was missing (now restored).
+
+## Uncommitted in the working tree
+
+1. **Docs + version (finished, safe to commit):** `AI_HANDOFF.md`, `README.md`, `docs/PARITY.md`, `docs/PORT.md`, `PLAN.md`, `project/project.godot` (`config/version="0.20.2"`). `AI_HANDOFF.md` has a `<!-- PERF-ROUND2 -->` placeholder table ("to be filled in") in "Changes in 0.20.2": fill it once round 2 is measured, or delete it. It also lists `unit/test_fig_cache.gd`, which only exists uncommitted (see 2).
+2. **Perf round 2 (HALF-FINISHED, untested, do not commit blindly):** `project/render/draw_canvas.gd`, `echo_layer.gd`, `echo_view.gd`, `figure_line.gd`, `pose.gd`, `render_state.gd`, `project/tests/scenarios/perf_play.gd`, `project/tests/tools/pf.gd`, new `tests/scenarios/bench_draw.gd`, `fig_shots.gd`, `tests/tools/img_crop.gd`, `img_diff.gd`, `tests/unit/test_fig_cache.gd`. Intent: cache each frozen echo's recorded figure across frames and replay it (DrawCanvas path only, RecordingCanvas parity untouched), enforce the figure budget with a cost estimate, find the crowd hitch bursts. The worker was stopped mid-task (rate limit, then stop order). Check first: `grep -rn "PF\." project --include=*.gd | grep -v /tests/` (temporary instrumentation must be gone), then run the filters below. If they fail or the gain is not measurable, `git checkout -- project/render` and `git clean` the new test files.
+
+## Findings
+
+Perf profile (GT 1030, NVIDIA 582.67, Win 11, 1280x720, 60 Hz; `perf_play`, windowed real time). The game is CPU-bound GDScript; GPU about 1.5 ms.
+
+| Scenario | Before | After round 1 |
+|---|---|---|
+| Typical walk, vsync on | 17.0 ms avg, p95 22.5, p99 34.6, 58.7 fps, 17 frames > 33 ms | 17.1 avg, p95 17.0, p99 24, 58.4 fps, 7 > 33 ms |
+| Crowd (6 villagers 1.5-6 cells), vsync on | 25.1 avg, p95 76, p99 139, 39.8 fps, 112 > 33 ms | 18.0 avg, p95 26.8, p99 32, 55.5 fps, 4 > 33 ms |
+| Typical, uncapped | 10.3 ms (97 fps) | 5.2 ms (193 fps) |
+| Crowd, uncapped | 11.8 ms, p95 17.8 | 7.5-9.4 ms, p95 20-30, bursts of 4 x 50 ms frames |
+
+Remaining shortfall: crowd p95 ~27 ms with vsync (about 156 of 1100 frames over 20 ms). Cause: several volumetric figures close by (lit ~4 ms, swept ~6 ms each, GDScript path building: FigureVol.parts, rim_part, mask_root, emit_poly) plus unexplained 4-frame ~50 ms bursts after pings (unprofiled; candidates: several figures sweeping at once, people events, GC).
+
+Gaps still not ported (decisions in the AI_HANDOFF "NOT included" table): Windows export (needs templates: ask the user), renderScale (fixed 640x360; governor replaces it), dragLook (not applicable), multi-tab lock (n/a), JS Forge editor (partial: Alter nearest), screen-reader announcements, OS reduced-motion, log persistence and uncaught-error screen, debug light radii, italic muffled subtitles, wipe golden fixture, menu styling.
+
+## Next steps (priority order)
+
+1. Decide on the round-2 edits (see Uncommitted 2): run
+   `"./Godot_v4.4.1-stable_win64.exe" --headless --path project -s res://tests/run_tests.gd -- --filter=figure` and the same with `vessels`, `sprites`, `floor_fx`, `hud`, `gameplay`, `fig_cache`; then measure
+   `"./Godot_v4.4.1-stable_win64.exe" --path project --rendering-driver opengl3 -- --scenario=perf_play --fx=2` and `... --fx=2 --crowd=6 --nomove`, each with `--vsync=0` too, two runs each. Keep and commit only if tests pass and crowd p95 improves; otherwise revert.
+2. Fill or delete the `<!-- PERF-ROUND2 -->` table in AI_HANDOFF.md, fix the test_fig_cache mention to match, commit the docs + version.
+3. Run the full suite (about 9 min, background): `"./Godot_v4.4.1-stable_win64.exe" --headless --path project -s res://tests/run_tests.gd` and record the summary line in AI_HANDOFF.md.
+4. Crowd perf if still short: profile the post-ping 50 ms bursts with PF instrumentation (`tests/tools/pf.gd`, printed by perf_play), cache figure geometry per echo, cap volumetric figures per frame by estimated cost.
+5. Windowed visual check of the new shader extras (window glint, reduced-motion door pulse never seen in a screenshot), vessel figures (vessel_view shots were too dark), wipe and edge glow: `--write-movie <abs dir>\f.png --fixed-fps 60 --quit-after 120 -- --scenario=quality_modes --qmode=high|low|reduced` and `transition_test`, `edge_glow`.
+6. User playtest (audio by ear, look sign-off), then the rest of the AI_HANDOFF TODO list.
+
+Known oddities: windowed runs that quit from a scenario sometimes segfault at exit after finishing (signal 11; villager_test, perf_play): exit-time cleanup, not investigated.
