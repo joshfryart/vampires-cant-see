@@ -38,6 +38,11 @@ func render_frame(world: World, player: Player, people: People, sonar: Sonar, t:
 	canvas.reset()
 	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf)
 	rs.update_boil(t)
+	rs.fig_ms = 0.0
+	rs.fig_vol = 0
+	rs.fig_line = 0
+	rs.fig_budget = EchoLayer.FIG_BUDGET_MS
+	rs.lights = world.lights
 	if lock.is_empty():
 		rs.lock_id = -1
 	else:
@@ -94,7 +99,7 @@ static func echo_to_dict(e: People.Echo) -> Dictionary:
 	return {
 		"personId": e.person_id, "kind": e.kind, "x": e.x, "y": e.y, "angle": e.angle, "lookAngle": e.look_angle,
 		"phase": e.phase, "phaseRate": e.phase_rate, "t": e.t, "strength": e.strength, "zMin": e.z_min, "zMax": e.z_max,
-		"fade": e.fade, "look": e.look, "mode": e.mode, "sit": e.sit, "wary": e.wary, "modeAge": e.mode_age,
+		"fade": e.fade, "look": e.look, "mode": e.mode, "sit": e.sit, "wary": e.wary, "chat": e.chat, "modeAge": e.mode_age,
 	}
 
 

@@ -30,6 +30,13 @@ var lock_k: float = 0.0
 var lock_age: float = 1.0
 var lock_sp: float = 9.0
 var lock_rs: float = 0.0
+## Volumetric figure budget (js r.figMs / figBudget / figVol / figLine): ms spent on vol figures this frame, the cut-off, counts.
+var fig_ms: float = 0.0
+var fig_budget: float = 1e9
+var fig_vol: int = 0
+var fig_line: int = 0
+## World lights {x, y, radius} for the rim light on volumetric figures (js r.visWorld.lights).
+var lights: Array = []
 ## cos/sin of each column's view-angle offset (fixed fov), for Raycast.depth_columns.
 var col_cos: PackedFloat64Array = PackedFloat64Array()
 var col_sin: PackedFloat64Array = PackedFloat64Array()

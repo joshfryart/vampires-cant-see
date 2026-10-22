@@ -10,6 +10,8 @@ const COL_PERSON := [255, 107, 91]
 const C_LOW := [91, 127, 214]
 const C_HI := [242, 248, 255]
 const COL_LOCK := "#ff8a78"
+## Per-frame time allowed for volumetric figures (ms); past it the rest of the frame's villagers are line figures.
+const FIG_BUDGET_MS := 2.5
 
 
 static func _round_js(x: float) -> int:
@@ -89,11 +91,57 @@ static func draw_grab_arms(rs: RenderState, c: Canvas, p: Pose, hs: float, lw: f
 	c.restore()
 
 
-## Ports drawPerson (js/render.js:2933) for the line figure. e: echo dictionary (see Pose.pose_person) with zMin, zMax.
+## Nearest world light within 3 radii of the echo into o.rim_k / o.rim_side (k 0 = none). Steady, never flickers (js rimLight).
+static func rim_light(rs: RenderState, e: Dictionary, player: Dictionary, o: FigureVolDraw.Opts) -> void:
+	o.rim_k = 0.0
+	o.rim_side = 1.0
+	if rs.lights.is_empty():
+		return
+	var bd := INF
+	var bl: Variant = null
+	for l in rs.lights:
+		var rad: float = float(l["radius"])
+		if not (rad > 0.0):
+			continue
+		var d: float = sqrt((float(l["x"]) - e["x"]) * (float(l["x"]) - e["x"]) + (float(l["y"]) - e["y"]) * (float(l["y"]) - e["y"]))
+		if d < 3.0 * rad and d < bd:
+			bd = d
+			bl = l
+	if bl == null:
+		return
+	o.rim_k = maxf(0.0, minf(1.0, 1.0 - bd / (3.0 * float(bl["radius"]))))
+	var s: float = (float(bl["x"]) - e["x"]) * -sin(player["angle"]) + (float(bl["y"]) - e["y"]) * cos(player["angle"])
+	o.rim_side = -1.0 if s < 0.0 else 1.0
+
+
+## Capsule radius (px) of the figure at height u, for the band-front rings when no silhouette row is found.
+static func vol_ring_rx(p: Pose, u: float) -> float:
+	var lk: Dictionary = p.look
+	var sho: float = clampf(float(lk["shoulder"]), 0.8, 1.25) if (lk.get("shoulder") is float or lk.get("shoulder") is int) else 1.0
+	var bwv: float = float(lk["build"]) if (lk.get("build") is float or lk.get("build") is int) else 1.0
+	var asr: float = absf(p.sr)
+	var X := p.X
+	var hw: float = absf(X[4] - X[5]) * 0.5
+	if u < p.hip_u:
+		return (hw + 0.045 * bwv * p.lh * p.hs) * 1.05
+	if u < p.sh_u:
+		var sw: float = absf(X[2] - X[3]) * 0.5 * sho + 0.05 * p.hs * asr
+		var hw2: float = hw * 1.1 + 0.035 * p.hs * asr
+		return (hw2 + (sw - hw2) * ((u - p.hip_u) / maxf(1e-6, p.sh_u - p.hip_u))) * 1.05
+	if u < p.head_u - 0.06 * p.lh:
+		return 0.022 * p.lh * p.hs * 1.3
+	return p.hr * 0.95
+
+
+## Ports drawPerson (js/render.js:2933). e: echo dictionary (see Pose.pose_person) with zMin, zMax.
 ## b = strength 0..1, age = seconds since the wavefront reached them (-1 = already lit). True when drawn.
 static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary, tan_half: float, e: Dictionary, b: float, age: float, flash_white: bool, now: float, locked: bool) -> bool:
-	if not p.pose_person(rs, player, tan_half, e, age, locked, now):
+	# Volumetric figure: effects >= 1, quality >= 1, nearer than FIG_VOL_DEPTH (checked in pose_person), within the frame
+	# budget. The held victim is exempt from the budget cut.
+	var vol_want: bool = rs.fx >= 1 and rs.quality >= 1 and (locked or not (rs.fig_ms > rs.fig_budget))
+	if not p.pose_person(rs, player, tan_half, e, age, locked, now, vol_want):
 		return false
+	var vol: bool = p.vol
 	var depth: float = p.depth
 	var sweeping: bool = p.sweeping
 	var dur: float = p.dur
@@ -149,10 +197,36 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 		return false
 	var uniform: bool = hi - lo < 0.03 and front_strip < 0
 	var lh: float = p.lh
+	var fo := FigureVolDraw.Opts.new()
+	var eo := FigureVolDraw.Opts.new()
+	var vol_t0 := 0
+	var look: Dictionary = p.look
+	if vol:
+		fo.fx = rs.fx
+		fo.lw = lw
+		fo.alpha = alpha
+		fo.depth = depth
+		fo.reduced = rs.reduced
+		rim_light(rs, e, player, fo)
+		eo.lw = lw
+		eo.alpha = alpha
+		vol_t0 = Time.get_ticks_usec()
+		rs.fig_vol += 1
+	else:
+		rs.fig_line += 1
+	var draw_fig := func(cv: Canvas, sa: float, style: String) -> void:
+		if vol:
+			FigureVolDraw.draw(cv, sa, style, p, look, fo)
+			eo.sa = sa
+			eo.style = style
+			FigureVolDraw.draw_extras(cv, p, look, eo)
+		else:
+			FigureLine.draw(cv, p, sa, style)
+	var span := PackedFloat64Array([0.0, 0.0])
 	var to_y := func(z: float) -> float: return p.f_floor_y - z * Pose.FIG_H * lh * p.f_sy * p.vs
 	var wrapped := func(cv: Canvas) -> void:
 		if uniform:
-			FigureLine.draw(cv, p, hi, base_style)
+			draw_fig.call(cv, hi, base_style)
 			return
 		for s in n_strips:
 			var sa: float = strip_a[s]
@@ -166,7 +240,7 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 			var y_bot: float = p.f_floor_y + 30.0 * rs.wscale if za <= 1e-3 else to_y.call(za)
 			cv.rect(p.min_x, y_top, p.max_x - p.min_x, y_bot - y_top)
 			cv.clip()
-			FigureLine.draw(cv, p, sa, "#ffffff" if s == front_strip and not locked else base_style)
+			draw_fig.call(cv, sa, "#ffffff" if s == front_strip and not locked else base_style)
 			cv.restore()
 		# The band front: thin rings wrapping the body where the wave is right now.
 		if strips and rs.quality >= 2 and age < Pose.SWEEP:
@@ -179,24 +253,39 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 					continue
 				var u: float = zn * p.f_h
 				var rcx: float = p.f_cx + p.f_sway * u * p.hs + Pose.sweep_wave(zn, age) * 0.02 * p.hs
-				var rad: float
-				if u < p.hip_u:
-					rad = p.hip_s * 1.3
-				elif u < p.sh_u:
-					rad = p.body_rx / p.hs / p.f_sx
-				elif u < p.head_u - 0.06 * lh:
-					rad = 0.04
+				var rx: float
+				if vol:
+					# The ring hugs the volumetric silhouette at this height, else a radius estimate.
+					var ry: float = p.f_floor_y - u * p.f_sy * p.vs
+					if FigureVol.span_at(p, look, ry, span):
+						rx = (span[1] - span[0]) * 0.5 * 1.08 + lw
+						rcx = (span[0] + span[1]) * 0.5
+					else:
+						rx = vol_ring_rx(p, u)
 				else:
-					rad = p.hr / p.hs * 0.9
-				var rx: float = rad * p.hs * 1.15
+					var rad: float
+					if u < p.hip_u:
+						rad = p.hip_s * 1.3
+					elif u < p.sh_u:
+						rad = p.body_rx / p.hs / p.f_sx
+					elif u < p.head_u - 0.06 * lh:
+						rad = 0.04
+					else:
+						rad = p.hr / p.hs * 0.9
+					rx = rad * p.hs * 1.15
 				var g2: float = (1.0 - age / Pose.SWEEP) * (1.0 - m * 0.3)
 				cv.global_alpha = minf(1.0, alpha * g2 * 1.4)
 				cv.begin_path()
 				cv.ellipse(rcx, p.f_floor_y - u * p.f_sy * p.vs, rx, maxf(1.0, rx * 0.22), 0.0, 0.0, TWO_PI)
 				cv.stroke()
 	clipped_draw(rs, c, p.min_x - lw, p.max_x + lw, depth, wrapped)
+	if vol:
+		rs.fig_ms += (Time.get_ticks_usec() - vol_t0) / 1000.0
 	if locked:
-		draw_grab_arms(rs, c, p, p.hs, lw, alpha, p.g_jolt, p.t_n, p.pid, base_style, rs.lock_rs)
+		if rs.fx >= 1:
+			FigureVolDraw.draw_grab_arms_vol(c, rs.ow, rs.oh, rs.wscale, p.X, p.Y, p.hs, lw, alpha, p.g_jolt, p.t_n, p.pid, base_style, rs.lock_rs)
+		else:
+			draw_grab_arms(rs, c, p, p.hs, lw, alpha, p.g_jolt, p.t_n, p.pid, base_style, rs.lock_rs)
 	c.global_alpha = 1.0
 	return true
 
@@ -249,6 +338,12 @@ static func draw_solo(rs: RenderState, c: Canvas, e: Dictionary, o: Dictionary) 
 	var player: Dictionary = o["player"] if o.has("player") else {"x": 0.0, "y": 0.0, "angle": 0.0}
 	rs.horizon = rs.oh / 2.0
 	rs.zbuf.fill(1e9)
+	rs.lights = o.get("lights", [])
+	rs.fx = int(clampi(int(round(float(o["fx"]))), 0, 2)) if o.has("fx") else rs.fx
+	rs.fig_ms = 0.0
+	rs.fig_vol = 0
+	rs.fig_line = 0
+	rs.fig_budget = 1e9
 	if o.has("quality"):
 		rs.quality = int(o["quality"])
 	var t: float = float(o["t"]) if o.has("t") else 0.0

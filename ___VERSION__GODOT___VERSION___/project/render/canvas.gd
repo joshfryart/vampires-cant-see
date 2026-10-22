@@ -9,6 +9,9 @@ var global_alpha: float = 1.0
 var stroke_style: String = "#000"
 var fill_style: String = "#000"
 var line_width: float = 1.0
+## Accepted for parity with the canvas API; the Godot drawing always joins and caps round.
+var line_join: String = "miter"
+var line_cap: String = "butt"
 ## Text state (js ctx.font / textAlign / textBaseline): font_px, bold, align "left"|"center"|"right".
 var font_px: float = 10.0
 var font_bold: bool = false

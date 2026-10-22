@@ -13,6 +13,9 @@ const SWEEP := 0.22
 const SWEEP_OVER := 1.3
 const STRIP_Z := [0.0, 0.25, 0.45, 0.65, 0.85, 1.05, 1.7]
 const FLASH_AGE := 0.12
+## Volumetric figures (effects >= 1) apply only closer than this; the chat gesture runs at CHAT_HZ.
+const FIG_VOL_DEPTH := 10.0
+const CHAT_HZ := 0.6
 const DEFAULT_LOOK := {"height": 1.0, "build": 1.0, "stride": 1.0, "acc": "scarf", "body": "bean", "head": "round", "hat": "none", "hair": "none", "beard": false, "nose": 1.0, "coat": false, "prop": "none"}
 
 ## True once core/struggle.gd drives the held victim (js: STRUGGLE_POSE exists). figure.json was recorded without it.
@@ -85,6 +88,11 @@ var alpha: float = 1.0
 var lw: float = 1.0
 var sr: float = 0.0
 var cr: float = 1.0
+# volumetric figure only
+var vol: bool = false
+var vsy: float = 0.0
+var cos_yaw: float = 1.0
+var vol_sh_s: float = 0.062
 
 var _proj_fwd: float = 0.0
 var _proj_sx: float = 0.0
@@ -94,6 +102,23 @@ func _init() -> void:
 	X.resize(28)
 	Y.resize(28)
 	Z.resize(28)
+
+
+## Child factor 0..1 from look.height (1 at 0.66 and below, 0 from 0.82 up); vol figures only.
+static func kid_k(lh_: float) -> float:
+	return clampf((0.82 - lh_) / 0.16, 0.0, 1.0)
+
+
+## Half-width factor of a head kind (matches the hr scaling in pose_person and the outline in figure_vol.gd).
+static func head_kind_w(k: Variant) -> float:
+	return 0.92 * 0.9 if k == "egg" else (0.8 * 0.9 if k == "long" else (0.95 if k == "square" else 0.9))
+
+
+## Height offset of the chatting hand (lh units already applied); reduced motion holds a static 0.03.
+static func chat_lift(tn: float, pid_: int, lh_: float, anim_: bool) -> float:
+	if not anim_:
+		return 0.03 * lh_
+	return 0.06 * lh_ * (0.5 + 0.5 * sin(tn * TAU * CHAT_HZ + pid_))
 
 
 static func smoothstep(a: float, b: float, x: float) -> float:
@@ -159,11 +184,12 @@ func put(rs: RenderState, k: int, f: float, s: float, u: float) -> void:
 
 ## Ports posePerson (js/render.js:2318) for the line figure. e: {x, y, angle, lookAngle, phase, phaseRate, look, mode, sit,
 ## wary, modeAge, personId, fade}. Returns false when the figure is off screen. Fills X/Y/Z and the pose fields.
-func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictionary, age: float, locked: bool, now: float) -> bool:
+func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictionary, age: float, locked: bool, now: float, vol_want: bool = false) -> bool:
 	var half_w: float = rs.ow / 2.0
 	if not project(player, e["x"], e["y"], half_w, tan_half):
 		return false
 	depth = _proj_fwd
+	var vol_: bool = vol_want and depth < FIG_VOL_DEPTH
 	var vs_: float = rs.oh / depth
 	var hs_: float = half_w / tan_half / depth
 	var cx0: float = _proj_sx
@@ -221,7 +247,8 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	var head_s := 0.0
 	var tilt_ := 0.0
 	var bob := 0.0
-	var kid_w := 1.0
+	# Vol only: a child (short look.height) gets narrower shoulders and hips so the bigger head reads as a child's.
+	var kid_w: float = 1.0 - 0.32 * kid_k(lh_) if vol_ else 1.0
 	var body: String = lk["body"] if lk.get("body") is String else ""
 	var hip_s_: float = (0.055 if body == "pear" else (0.06 if body == "round" else (0.03 if body == "stick" else 0.04))) * bw * kid_w
 	var sh_s: float = (0.075 if body == "round" else (0.05 if body == "stick" else (0.05 if body == "pear" else 0.062))) * bw * kid_w
@@ -244,6 +271,7 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	var stars_ := false
 	var eyes_x_ := false
 	var hands_over := false
+	var scratch_vol := false
 	var mode_age: float = float(e["modeAge"]) if e.get("modeAge") is float or e.get("modeAge") is int else 9.0
 	if mode_ == "grapple" and use_struggle:
 		# Held by the vampire: panic flailing, then pushing away, then slack as the blood goes (core/struggle.gd).
@@ -430,6 +458,7 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 		lean_ = 0.03 * lh_ if wary else 0.0
 		head_f = 0.03 * lh_ if wary else 0.0
 		var scratch: bool = anim_ and not wary and (pid_ % 3 == 1) and sin(tn * 0.5 + pid_) > 0.55
+		scratch_vol = scratch
 		for side in 2:
 			var sg: float = 1.0 if side == 0 else -1.0
 			var carry: bool = side == 1 and hold_r
@@ -454,6 +483,67 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 				elb_f[side] = hand_f[side] * 0.4 - 0.01
 				elb_s[side] = sg * (sh_s + 0.075)
 				elb_u[side] = (sh_u_ + hand_u[side]) * 0.5 + 0.015
+	# ---- Volumetric-only pose tweaks (never run for line figures) ----
+	var ex_f := 0.0
+	var ex_s := 0.0
+	var ex_u := 0.0
+	if vol_:
+		var free: bool = mode_ != "grapple" and mode_ != "fed" and mode_ != "cower"
+		var stoop: float = clampf(float(lk["stoop"]), 0.0, 0.4) if (lk.get("stoop") is float or lk.get("stoop") is int) else 0.0
+		if stoop > 0.0 and free:
+			lean_ += stoop * 0.1 * lh_
+			head_f += stoop * 0.06 * lh_
+			sh_u_ -= stoop * 0.04 * lh_
+			head_u_ -= stoop * 0.05 * lh_
+		if scratch_vol:
+			# Head scratch: the hand rests on the side of the head (outside the hood), elbow out.
+			var hk: float = head_kind_w(lk.get("head")) * (1.0 + 0.25 * kid_k(lh_))
+			var hr_u: float = 0.088 * lh_ * sqrt(bw) * hk * (1.22 if (lk.get("hat") == "hood" or lk.get("acc") == "hood") else 1.1)
+			var jig: float = sin(tn * 6.0) if anim_ else 0.0
+			hand_f[0] = lean_ + head_f + 0.004 * lh_ * jig
+			hand_s[0] = head_s + hr_u + 0.012 * lh_
+			hand_u[0] = head_u_ + 0.035 * lh_ + 0.008 * lh_ * jig
+			elb_f[0] = lean_ - 0.01 * lh_
+			elb_s[0] = sh_s + 0.16 * lh_
+			elb_u[0] = sh_u_ + 0.08 * lh_
+		elif bool(e.get("chat", false)) and not moving_ and free:
+			var lift2: float = chat_lift(tn, pid_, lh_, anim_)
+			hand_u[0] += lift2
+			hand_f[0] += 0.05 * lh_
+			elb_u[0] += lift2 * 0.5
+		var ex: String = lk["extra"] if lk.get("extra") is String else "none"
+		if ex == "shovel" and moving_:
+			hand_f[0] = 0.03 * lh_
+			hand_s[0] = sh_s * 1.25
+			hand_u[0] = sh_u_ - 0.04 * lh_
+			elb_f[0] = 0.0
+			elb_s[0] = sh_s * 1.7
+			elb_u[0] = sh_u_ - 0.1 * lh_
+			ex_f = -0.1 * lh_
+			ex_s = sh_s * 0.9
+			ex_u = sh_u_ + 0.3 * lh_
+		elif ex == "shovel":
+			ex_f = foot_f[0] + 0.02 * lh_
+			ex_s = foot_s[0] + 0.05 * bw
+			ex_u = foot_u[0]
+		elif ex == "bundle" and mode_ == "flee":
+			ex_f = lean_ * 0.75 + 0.05 * lh_
+			ex_s = 0.0
+			ex_u = ((sh_u_ + 0.02 * lh_) + (sh_u_ + hip_u_) * 0.5) * 0.5
+			hand_f[0] = ex_f
+			hand_s[0] = sh_s * 0.4
+			hand_u[0] = ex_u + 0.03 * lh_
+			elb_f[0] = 0.02 * lh_
+			elb_s[0] = sh_s * 1.4
+			elb_u[0] = (sh_u_ + ex_u) * 0.5
+		elif ex == "bundle":
+			ex_f = hand_f[0] + 0.03 * lh_
+			ex_s = hand_s[0] * 0.9
+			ex_u = hand_u[0] - 0.04 * lh_
+		else:
+			ex_f = hand_f[0]
+			ex_s = hand_s[0]
+			ex_u = hand_u[0] + 0.05 * lh_
 	f_sy = sq
 	f_sx = 1.0 / sq
 	for side in 2:
@@ -471,6 +561,10 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	put(rs, 0, lean_ + head_f, head_s, head_u_)
 	put(rs, 1, lean_, 0.0, sh_u_ + 0.02 * lh_)
 	put(rs, 23, lean_ + head_f, head_s, head_u_ + 0.1 * lh_)
+	if vol_:
+		# Extra item: slot 24 grips (the side-0 hand), slot 25 is its tip.
+		put(rs, 24, hand_f[0], hand_s[0], hand_u[0])
+		put(rs, 25, ex_f, ex_s, ex_u)
 	var hr0: float = 0.088 * lh_ * sqrt(bw) * hs_
 	var hry0: float = 0.092 * lh_ * vs_ * f_sy
 	var head_kind_: String = lk["head"] if lk.get("head") is String and lk["head"] != "" else "round"
@@ -509,7 +603,7 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	var lod_: int = 0 if rs.quality < 1 else (2 if fig_px > 70.0 else (1 if fig_px > 34.0 else 0))
 	var min_x_: float = X[0]
 	var max_x_: float = X[0]
-	for k in 24:
+	for k in (26 if vol_ else 24):
 		if X[k] < min_x_:
 			min_x_ = X[k]
 		if X[k] > max_x_:
@@ -557,4 +651,8 @@ func pose_person(rs: RenderState, player: Dictionary, tan_half: float, e: Dictio
 	dur = dur_
 	sr = sin(rel)
 	cr = cos(rel)
+	vol = vol_
+	vsy = vs_ * f_sy
+	cos_yaw = cos(yaw)
+	vol_sh_s = sh_s
 	return true
