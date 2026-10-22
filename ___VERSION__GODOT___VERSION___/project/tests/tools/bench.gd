@@ -9,7 +9,7 @@ func _init() -> void:
 	var world := World.from_def(def)
 	var player := Player.create(17.5, 12.5, 0.0)
 	var sonar := Sonar.create()
-	var people := People.create(world, def, {"seed": 5})
+	var people := People.create(world, def, {"seed": 5, "noForge": true})
 	var view := EchoView.new()
 	var rs := RenderState.new()
 	var canvas := DrawCanvas.new()

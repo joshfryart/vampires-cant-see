@@ -2,8 +2,9 @@ class_name People
 extends RefCounted
 ## Ports js/people.js. One People instance is the JS people `state`.
 ## Phase 1 scope: path walking, sound/sight reactions (startle, flee, hide, cower, wary), feeding hooks, echo snapshots.
-## Left for Phase 4 (marked PHASE4): Schedule/Forge-driven villagers (person.sched), conversations, spawn/despawn/alter.
-## Without Forge/Schedule loaded the JS behaves exactly like this port, which is what the golden traces use.
+## Forge-generated villagers with night schedules (person.sched), conversations, spawn/despawn/alter are included. Pass
+## opts.noForge = true to create() to get the plain walkers of a JS run without Forge/Schedule loaded (the golden traces of
+## people.json use that mode).
 ## Logic uses plain floats; people carry x, y as floats, never Vector2.
 
 const TWO_PI := JsMath.TWO_PI
@@ -21,6 +22,15 @@ const LIT_MIN := 0.3
 const WARY_SEE_MUL := 0.5
 const WHIMPER_GAP := 1.5
 const MAX_EVENTS := 64
+const HIDE_UNUSED := 0
+const FEAR_HOME := 8.0
+const CHAT_DIST := 1.5
+const TABLE_DIST := 2.8
+const CHAT_SCAN := 0.25
+const CHAT_COOL := [10.0, 22.0]
+const CHAT_FEAR := 3.0
+const FOREVER := 1e9
+const MAX_PEOPLE := 24
 const ACCESSORIES := ["tophat", "nightcap", "bonnet", "cane", "scarf", "lantern", "hood", "umbrella", "cap", "basket"]
 const HATS := ["tophat", "nightcap", "bonnet", "cap", "hood"]
 const PROPS := ["cane", "lantern", "umbrella", "basket"]
@@ -78,6 +88,9 @@ class Person:
 	var ph0: float = 0.0
 	var phase_rate: float = 0.0
 	var seated: bool = false
+	var sched: Variant = null
+	var chat: Variant = null
+	var chat_cool: float = 0.0
 
 
 class Echo:
@@ -128,6 +141,19 @@ var next_id: int = 0
 var base_count: int = 0
 var pool_min: float = 30.0
 var pool_max: float = 50.0
+var chat_in: float = 0.0
+var route_calls: int = 0
+var walk_cache: PackedByteArray = PackedByteArray()
+var cost_cache: PackedFloat64Array = PackedFloat64Array()
+var places: Dictionary = {}
+var map_def: Dictionary = {}
+var use_forge: bool = true
+var forge_log: Dictionary = {"spawned": [], "altered": []}
+var forge_fired: int = 0
+var forge_reinf: Array = []
+var forge_lantern: bool = false
+var forge_in: float = 0.0
+var last_state_ref: bool = false
 
 
 static func normalize_look_seed(seed: float, pid: int) -> float:
@@ -300,8 +326,15 @@ static func create(w: World, map_def: Dictionary, opts: Dictionary = {}) -> Peop
 	var pmin: float = float(opts["poolMin"]) if (opts.get("poolMin") is float or opts.get("poolMin") is int) and float(opts["poolMin"]) > 0.0 else 30.0
 	var pmax: float = float(opts["poolMax"]) if (opts.get("poolMax") is float or opts.get("poolMax") is int) and float(opts["poolMax"]) >= pmin else maxf(pmin, 50.0)
 	var acc_off: int = int(floor(Rng.new(float(JsMath.u32(sd * 7919.0 + 13.0))).next() * ACCESSORIES.size()))
+	s.use_forge = opts.get("noForge") != true
+	s.map_def = map_def
 	var spawns: Array = w.spots["people"]
 	var defs: Array = map_def.get("paths", []) if map_def.get("paths") is Array else []
+	if s.use_forge and map_def.get("places") is Dictionary:
+		for k in map_def["places"]:
+			var c: Variant = map_def["places"][k]
+			if c is Array and c.size() >= 2 and (c[0] is float or c[0] is int) and (c[1] is float or c[1] is int) and not w.is_solid(float(c[0]) + 0.5, float(c[1]) + 0.5):
+				s.places[k] = {"x": float(c[0]) + 0.5, "y": float(c[1]) + 0.5}
 	for i in spawns.size():
 		var def: Variant = defs[i] if i < defs.size() else null
 		var path: Array = build_path(w, spawns[i], def, i)
@@ -315,9 +348,24 @@ static func create(w: World, map_def: Dictionary, opts: Dictionary = {}) -> Peop
 		p.pool = pool
 		p.left = pool
 		var role_s: String = def["role"] if def is Dictionary and def.get("role") is String else ""
-		p.role = role_s
-		p.watch = role_s == "guard"
-		p.gait = "mail" if role_s == "guard" else "walk"
+		var gp: Variant = null
+		if s.use_forge:
+			var arch_id: String = def["archetype"] if def is Dictionary and def.get("archetype") is String else ""
+			if arch_id == "" and role_s != "":
+				var ba: Variant = Forge.by_role(role_s)
+				arch_id = ba["id"] if ba != null and ba.get("id") != null else ""
+			var spec := {"archetype": arch_id if arch_id != "" else "patron"}
+			if def is Dictionary and def.get("seed") != null:
+				spec["seed"] = def["seed"]
+			if def is Dictionary and def.get("home") != null:
+				spec["home"] = def["home"]
+			var gen := Forge.generate(spec, {"stateSeed": sd, "index": float(i), "accOffset": float(acc_off)})
+			gp = gen["person"] if gen["person"] != null else null
+		p.role = (gp["role"] if gp != null and gp["role"] != "" else role_s)
+		p.archetype = gp["archetype"] if gp != null else "patron"
+		p.watch = gp["watch"] if gp != null else role_s == "guard"
+		p.feedable = gp["feedable"] if gp != null else true
+		p.gait = gp["gait"] if gp != null else ("mail" if role_s == "guard" else "walk")
 		p.id = i
 		p.x = path[0]["x"]
 		p.y = path[0]["y"]
@@ -328,14 +376,21 @@ static func create(w: World, map_def: Dictionary, opts: Dictionary = {}) -> Peop
 		p.state = "idle"
 		p.idle_left = path[0]["wait"]
 		p.look_in = 0.5 + s.rng.next() * 0.6
-		p.look = make_look(sd, i, acc_off)
+		p.look = gp["look"] if gp != null else make_look(sd, i, acc_off)
 		p.sit = sit
 		s.people.append(p)
+		# a role with a night schedule walks routed trips between named places instead of its hand-made loop
+		var sched_role: Variant = gp["schedRole"] if gp != null else (role_s if role_s != "" else null)
+		if s.use_forge and not sit and def is Dictionary and sched_role != null and Schedule.has_role(sched_role):
+			p.sched = Schedule.make(sched_role, s.places, {"x": path[0]["x"], "y": path[0]["y"]}, Rng.new(float(JsMath.u32(sd * 31.0 + float(i) * 977.0 + 5.0))), {"home": def.get("home"), "slot": i})
+			if p.sched != null:
+				p.idle_left = 0.0
+				face_tables(p.sched, map_def)
 	if opts.get("shuffle") == true:
 		# v0.8: shuffle draws come after all per-person draws so unshuffled streams are unchanged.
 		for p in s.people:
 			var n: int = p.path.size()
-			if n <= 1 or p.sit:
+			if n <= 1 or p.sit or p.sched != null:
 				continue
 			var k: int = mini(n - 1, int(floor(s.rng.next() * n)))
 			if s.rng.next() < 0.5:
@@ -497,6 +552,8 @@ static func start_cower(p: Person, px: float, py: float) -> void:
 
 func enter_flee(p: Person, px: float, py: float, r: Dictionary, quiet: bool = false) -> void:
 	var n: int = p.path.size()
+	if p.chat != null:
+		end_chat(p)
 	if p.mode == "path" or p.mode == "startle" or p.mode == "dazed":
 		p.flee_x = px
 		p.flee_y = py
@@ -530,6 +587,8 @@ func enter_flee(p: Person, px: float, py: float, r: Dictionary, quiet: bool = fa
 
 ## Bump notice: freeze for bumpFreeze (mode "startle"), then flee.
 func start_bump(p: Person, px: float, py: float, r: Dictionary) -> void:
+	if p.chat != null:
+		end_chat(p)
 	p.mode = "startle"
 	p.bumping = true
 	p.mode_left = r["bumpFreeze"]
@@ -561,8 +620,296 @@ func walk_toward(p: Person, dx: float, dy: float, dist: float, step: float, r: f
 	return moved
 
 
+## Seated eat/drink stops face the nearest table prop (within 1.6 cells) and remember their table group (js faceTables).
+static func face_tables(sc: Dictionary, map_def_d: Dictionary) -> void:
+	var props_d: Array = map_def_d.get("props", []) if map_def_d.get("props") is Array else []
+	var re := RegEx.new()
+	re.compile("\\d+$")
+	for st in sc["stops"]:
+		if st["act"] != "eat" and st["act"] != "drink":
+			continue
+		st["group"] = re.sub(st["place"], "")
+		var best := 2.56
+		for pr in props_d:
+			if pr["type"] != "table":
+				continue
+			var d: float = (float(pr["col"]) + 0.5 - st["x"]) * (float(pr["col"]) + 0.5 - st["x"]) + (float(pr["row"]) + 0.5 - st["y"]) * (float(pr["row"]) + 0.5 - st["y"])
+			if d < best:
+				best = d
+				st["face"] = atan2(float(pr["row"]) + 0.5 - st["y"], float(pr["col"]) + 0.5 - st["x"])
+
+
+## End p's conversation (and its partner's, if it points back).
+func end_chat(p: Person) -> void:
+	var c: Variant = p.chat
+	if c == null:
+		return
+	p.chat = null
+	var q := find_person(int(c["partner"]))
+	if q != null and q.chat != null and int(q.chat["partner"]) == p.id:
+		q.chat = null
+	p.chat_cool = time + float(CHAT_COOL[0]) + (float(CHAT_COOL[1]) - float(CHAT_COOL[0])) * chat_rng.next()
+
+
+func chat_ready(p: Person) -> bool:
+	return p.chat == null and p.mode == "path" and not (p.wary > 0.0) and not p.bumping and p.ret == null and not (p.chat_cool > time) and not p.sit
+
+
+func start_chat(a: Person, b: Person, kind: String, until: float, table: bool) -> void:
+	a.chat = {"partner": b.id, "kind": kind, "until": until, "table": table, "mood": "warm" if table else "neutral"}
+	b.chat = {"partner": a.id, "kind": kind, "until": until, "table": table, "mood": "warm" if table else "neutral"}
+	if not table:
+		a.angle = atan2(b.y - a.y, b.x - a.x)
+		b.angle = atan2(a.y - b.y, a.x - b.x)
+
+
+## Proximity scan (throttled): tablemates chat while seated; calm pairs within CHAT_DIST roll a meeting.
+func scan_chats(w: World) -> void:
+	if fear >= CHAT_FEAR:
+		return
+	var t2: float = TABLE_DIST * TABLE_DIST
+	var c2: float = CHAT_DIST * CHAT_DIST
+	for i in people.size():
+		var a: Person = people[i]
+		if a.sched == null or a.chat != null:
+			continue
+		for j in range(i + 1, people.size()):
+			var b: Person = people[j]
+			if b.sched == null or b.chat != null:
+				continue
+			var dx: float = a.x - b.x
+			var dy: float = a.y - b.y
+			var d2: float = dx * dx + dy * dy
+			if d2 > t2:
+				continue
+			if a.seated and b.seated:
+				var sa: Variant = a.sched["stops"][a.sched["si"]] if a.sched["si"] >= 0 and a.sched["si"] < a.sched["stops"].size() else null
+				var sb: Variant = b.sched["stops"][b.sched["si"]] if b.sched["si"] >= 0 and b.sched["si"] < b.sched["stops"].size() else null
+				if sa != null and sb != null and sa.get("group") != null and sa["group"] == sb.get("group") and not a.sched["en"] and not b.sched["en"] and a.mode == "path" and b.mode == "path" and not (a.wary > 0.0) and not (b.wary > 0.0):
+					start_chat(a, b, "chat", FOREVER, true)
+					break
+				continue
+			if d2 > c2 or a.seated or b.seated:
+				continue
+			if not chat_ready(a) or not chat_ready(b):
+				continue
+			if not segment_clear(w, a.x, a.y, b.x, b.y):
+				continue
+			var same: bool = a.sched["home"] != null and a.sched["home"] == b.sched["home"]
+			var roll := Schedule.chat_roll(str(a.sched["role"]), str(b.sched["role"]), same, chat_rng.next(), chat_rng.next())
+			var cool: float = time + float(CHAT_COOL[0]) + (float(CHAT_COOL[1]) - float(CHAT_COOL[0])) * chat_rng.next()
+			if roll["kind"] == "ignore":
+				a.chat_cool = cool
+				b.chat_cool = cool
+				continue
+			start_chat(a, b, roll["kind"], time + float(roll["sec"]), false)
+			a.chat["mood"] = roll["mood"]
+			b.chat["mood"] = roll["mood"]
+			break
+
+
+## Standing meeting: face the partner, stop walking, end on time. Tablemates (c.table) are not held here.
+func chat_hold(p: Person, dt: float) -> bool:
+	var c: Dictionary = p.chat
+	var q := find_person(int(c["partner"]))
+	if q == null or time >= float(c["until"]):
+		end_chat(p)
+		return false
+	p.angle = atan2(q.y - p.y, q.x - p.x)
+	p.look_angle += (0.0 - p.look_angle) * minf(1.0, 4.0 * dt)
+	p.phase *= maxf(0.0, 1.0 - 8.0 * dt)
+	if p.phase < 0.01:
+		p.phase = 0.0
+	return true
+
+
+## Lit-street cost: cells whose own light is >= LIT_MIN are cheap, dark cells cost more. Cached per state.
+func step_cost(w: World, cx: int, cy: int, pref: float) -> float:
+	if not (pref > 0.0):
+		return 1.0
+	var k: int = cy * w.width + cx
+	var c: float = cost_cache[k]
+	if c < 0.0:
+		c = 1.0 if lit_at(w, cx + 0.5, cy + 0.5) >= LIT_MIN else 1.0 + pref
+		cost_cache[k] = c
+	return c
+
+
+## Cheapest walkable route (4-connected, doors open) from p to cell (tx, ty), preferring lit cells. Cell centres, start
+## excluded; null when unreachable. The binary heap and tie order follow the JS so routes are identical; distances and
+## predecessors live in flat arrays and walkability is cached per cell (props never move).
+func route_to(w: World, p: Person, tx: int, ty: int, pref: float) -> Variant:
+	route_calls += 1
+	var sx: int = int(floor(p.x))
+	var sy: int = int(floor(p.y))
+	if sx == tx and sy == ty:
+		return []
+	var gw: int = w.width
+	var gh: int = w.height
+	var n: int = gw * gh
+	if walk_cache.size() != n:
+		walk_cache = PackedByteArray()
+		walk_cache.resize(n)
+		cost_cache = PackedFloat64Array()
+		cost_cache.resize(n)
+		cost_cache.fill(-1.0)
+	var dist := PackedFloat64Array()
+	dist.resize(n)
+	dist.fill(INF)
+	var prev := PackedInt32Array()
+	prev.resize(n)
+	prev.fill(-2)
+	var start: int = sy * gw + sx
+	dist[start] = 0.0
+	prev[start] = -1
+	var heap: Array = [[0.0, sx, sy]]
+	var guard := 0
+	var dxs := [1, -1, 0, 0]
+	var dys := [0, 0, 1, -1]
+	while heap.size() > 0 and guard < 20000:
+		guard += 1
+		var top: Array = heap[0]
+		var last: Array = heap.pop_back()
+		if heap.size() > 0:
+			heap[0] = last
+			var i := 0
+			while true:
+				var l: int = i * 2 + 1
+				var r: int = l + 1
+				var m: int = i
+				if l < heap.size() and heap[l][0] < heap[m][0]:
+					m = l
+				if r < heap.size() and heap[r][0] < heap[m][0]:
+					m = r
+				if m == i:
+					break
+				var t: Array = heap[m]
+				heap[m] = heap[i]
+				heap[i] = t
+				i = m
+		var cx: int = top[1]
+		var cy: int = top[2]
+		if top[0] > dist[cy * gw + cx]:
+			continue
+		if cx == tx and cy == ty:
+			break
+		for k in 4:
+			var nx: int = cx + dxs[k]
+			var ny: int = cy + dys[k]
+			if nx < 0 or ny < 0 or nx >= gw or ny >= gh:
+				# off-grid cells are solid in the JS world: not walkable
+				continue
+			var nk: int = ny * gw + nx
+			var wk: int = walk_cache[nk]
+			if wk == 0:
+				wk = 1 if cell_walkable(w, nx, ny) else 2
+				walk_cache[nk] = wk
+			if wk == 2:
+				continue
+			var nd: float = top[0] + step_cost(w, nx, ny, pref)
+			if dist[nk] <= nd:
+				continue
+			dist[nk] = nd
+			prev[nk] = cy * gw + cx
+			heap.append([nd, nx, ny])
+			var j: int = heap.size() - 1
+			while j > 0:
+				var up: int = (j - 1) >> 1
+				if heap[up][0] <= heap[j][0]:
+					break
+				var t2: Array = heap[up]
+				heap[up] = heap[j]
+				heap[j] = t2
+				j = up
+	var tk: int = ty * gw + tx
+	if tx < 0 or ty < 0 or tx >= gw or ty >= gh or prev[tk] == -2:
+		return null
+	var cells: Array = []
+	var c: int = tk
+	while c != -1:
+		cells.append(c)
+		c = prev[c]
+	cells.reverse()
+	cells.pop_front()
+	var out: Array = []
+	for cc in cells:
+		out.append({"x": float(cc % gw) + 0.5, "y": float(cc / gw) + 0.5})
+	return out
+
+
+## Waypoint reached on a scheduled trip: keep walking the route, or settle at the stop.
+func sched_arrive(p: Person) -> void:
+	var s_: Dictionary = p.sched
+	if p.idx < p.path.size() - 1:
+		p.idx += 1
+		return
+	settle(p, int(s_["target"]))
+
+
+## At the stop for good: idle there, seated when the act is a sitting one.
+func settle(p: Person, si: int) -> void:
+	var s_: Dictionary = p.sched
+	s_["en"] = false
+	s_["si"] = si
+	s_["retarget"] = false
+	p.state = "idle"
+	p.idle_left = 0.0
+	var stop: Variant = s_["stops"][si] if si >= 0 and si < s_["stops"].size() else null
+	p.seated = stop != null and Schedule.is_seated(stop["act"])
+	if p.seated and stop != null and stop.get("face") is float:
+		p.angle = stop["face"]
+		p.look_angle = 0.0
+		p.look_target = 0.0
+
+
+## Idle with a schedule: dwell until the night clock moves on (or a flight broke the trip), then route to the stop.
+func sched_idle(w: World, p: Person) -> void:
+	var s_: Dictionary = p.sched
+	if s_["en"]:
+		p.state = "walk"
+		return
+	# High village fear sends everyone but the watch home for the rest of the night (the last stop is bed).
+	if not s_.get("homeEarly", false) and fear >= FEAR_HOME and not p.watch:
+		s_["homeEarly"] = true
+	var want: int = s_["stops"].size() - 1 if s_.get("homeEarly", false) else Schedule.stop_at(s_["stops"], night_frac)
+	if want == int(s_["si"]) and not s_["retarget"]:
+		return
+	var stop: Dictionary = s_["stops"][want]
+	s_["target"] = want
+	s_["retarget"] = false
+	var cells: Variant = route_to(w, p, int(floor(stop["x"])), int(floor(stop["y"])), 0.6 if rp["lightPref"] > 0.0 else 0.0)
+	if cells == null or cells.is_empty():
+		settle(p, want)
+		return
+	var trip: Array = [{"x": p.x, "y": p.y, "wait": 0.0}]
+	for c in cells:
+		trip.append({"x": c["x"], "y": c["y"], "wait": 0.0})
+	p.path = Schedule.simplify(trip)
+	p.idx = 1
+	p.seated = false
+	s_["en"] = true
+	p.state = "walk"
+	p.look_target = 0.0
+
+
+## Flight route on a scheduled trip: the path is open (start to stop), so never wrap from its end back to its start.
+static func route_open(p: Person, g: int, stay: bool = false) -> void:
+	if g > p.idx:
+		p.fdir = 1
+		if not stay and p.idx < p.path.size() - 1:
+			p.idx += 1
+	elif g < p.idx:
+		p.fdir = -1
+		p.idx -= 1
+	else:
+		p.fdir = 1
+	if p.idx < 0:
+		p.idx = 0
+
+
 func step_path(p: Person, dt: float, r: float) -> void:
-	# PHASE4: conversation hold (p.chat) lives here.
+	if p.chat != null and not p.chat["table"] and chat_hold(p, dt):
+		return
 	if p.ret != null:
 		if p.ri2 >= p.ret.size():
 			p.ret = null
@@ -598,7 +945,9 @@ func step_path(p: Person, dt: float, r: float) -> void:
 		p.phase *= maxf(0.0, 1.0 - 8.0 * dt)
 		if p.phase < 0.01:
 			p.phase = 0.0
-		# PHASE4: schedIdle for p.sched
+		if p.sched != null:
+			sched_idle(world, p)
+			return
 		if p.idle_left <= 0.0 and p.path.size() > 1 and (not p.sit or p.idx != 0 or sqrt((p.path[0]["x"] - p.x) * (p.path[0]["x"] - p.x) + (p.path[0]["y"] - p.y) * (p.path[0]["y"] - p.y)) > 0.05):
 			p.state = "walk"
 			p.look_target = 0.0
@@ -613,7 +962,9 @@ func step_path(p: Person, dt: float, r: float) -> void:
 		p.x = tgt["x"]
 		p.y = tgt["y"]
 		p.walked += dist
-		# PHASE4: schedArrive for p.sched
+		if p.sched != null:
+			sched_arrive(p)
+			return
 		p.state = "idle"
 		p.idle_left = tgt["wait"] * (0.85 + 0.3 * rng.next())
 		p.idx = 0 if p.sit else (p.idx + 1) % p.path.size()
@@ -621,6 +972,12 @@ func step_path(p: Person, dt: float, r: float) -> void:
 	var moved: float = walk_toward(p, dx, dy, dist, step, r)
 	if moved < step * 0.05:
 		# Stuck against a wall (bad path); give up on this leg.
+		if p.sched != null:
+			p.sched["en"] = false
+			p.sched["retarget"] = true
+			p.state = "idle"
+			p.idle_left = 1.0
+			return
 		p.state = "idle"
 		p.idle_left = tgt["wait"]
 		p.idx = 0 if p.sit else (p.idx + 1) % p.path.size()
@@ -684,7 +1041,12 @@ func step_flee(p: Person, dt: float, r: float, rpar: Dictionary) -> void:
 		if g < 0:
 			start_cower(p, px, py)
 			return
-		# PHASE4: scheduled people use routeOpen here.
+		if p.sched != null:
+			if g == p.idx:
+				start_cower(p, px, py)
+			else:
+				route_open(p, g)
+			return
 		route_loop(p, g, (p.idx + 1) % n, (p.idx - 1 + n) % n, px, py)
 		return
 	var moved: float = walk_toward(p, dx, dy, dist, step, r)
@@ -696,6 +1058,9 @@ func step_flee(p: Person, dt: float, r: float, rpar: Dictionary) -> void:
 		var g2: int = farthest_waypoint(p, px, py)
 		if g2 < 0:
 			start_cower(p, px, py)
+			return
+		if p.sched != null:
+			route_open(p, g2, true)
 			return
 		route_loop(p, g2, p.idx, (p.idx - p.fdir + n + n) % n, px, py)
 	else:
@@ -727,7 +1092,14 @@ func resume_path(p: Person, r: Dictionary) -> void:
 	p.block_count = 0
 	p.look_target = 0.0
 	p.wary = r["waryTime"] if r["waryTime"] > 0.0 else 0.0
-	# PHASE4: scheduled people re-plan their trip here.
+	if p.sched != null:
+		# Scheduled people re-plan the trip to their current stop from wherever the flight left them.
+		p.sched["en"] = false
+		p.sched["retarget"] = true
+		p.seated = false
+		p.state = "idle"
+		p.idle_left = 0.0
+		return
 	if p.sit:
 		p.idx = 0
 		if n > 1 and sqrt((p.path[0]["x"] - p.x) * (p.path[0]["x"] - p.x) + (p.path[0]["y"] - p.y) * (p.path[0]["y"] - p.y)) > 0.05:
@@ -781,7 +1153,13 @@ func update(w: World, dt_in: float, ctx: Variant = null) -> void:
 		else:
 			p.mode_age += dt
 		p.ph0 = p.phase
-	# PHASE4: end/scan conversations here (needs Schedule).
+	for p in people:
+		if p.chat != null and (p.mode != "path" or p.wary > 0.0 or fear >= CHAT_FEAR or (p.chat["table"] and not (p.seated and not p.sched["en"]))):
+			end_chat(p)
+	chat_in -= dt
+	if chat_in <= 0.0:
+		chat_in = CHAT_SCAN
+		scan_chats(w)
 	for p in people:
 		var mode: String = p.mode
 		if mode == "fed" or mode == "grapple":
@@ -892,6 +1270,8 @@ func react(x: float, y: float, kind: String, ctx: Variant = null, dist: float = 
 		if sees_you:
 			enter_flee(p, float(pl["x"]), float(pl["y"]), rpar)
 			continue
+		if p.chat != null:
+			end_chat(p)
 		p.mode = "startle"
 		p.mode_left = rpar["startleTime"]
 		p.pre_state = p.state
@@ -1078,7 +1458,7 @@ func update_echoes(sonar: Sonar, t_prev: float, t: float) -> Array[Echo]:
 			e.mode = p.mode
 			e.sit = p.sit or p.seated
 			e.wary = p.wary > 0.0
-			e.chat = false
+			e.chat = p.chat != null
 			e.mode_age = p.mode_age
 			e.phase_rate = p.phase_rate
 			if dup >= 0:
@@ -1147,3 +1527,125 @@ static func echo_brightness(echo: Echo, t: float, fade: float) -> float:
 
 static func echo_age(echo: Echo, t: float) -> float:
 	return t - echo.t
+
+
+## Who a villager is talking to: {partner, kind, mood} or null. Mood hint: warm | neutral | curt | hushed (fear up).
+func conversation_for(id: int) -> Variant:
+	var p := find_person(id)
+	if p == null or p.chat == null:
+		return null
+	var c: Dictionary = p.chat
+	return {"partner": c["partner"], "kind": c["kind"], "mood": "hushed" if fear >= 1.5 else c["mood"]}
+
+
+## Mid-night spawn. spec {archetype, seed?, home?, ang?}; at {x, y}. Returns {ok, code, id}.
+func spawn(w: World, spec: Variant, at: Variant) -> Dictionary:
+	if not (spec is Dictionary) or not (spec.get("archetype") is String) or not (at is Dictionary):
+		return {"ok": false, "code": "E_PEOPLE_ARGS", "id": -1}
+	var ax: float = float(at["x"]) if at.get("x") is float or at.get("x") is int else NAN
+	var ay: float = float(at["y"]) if at.get("y") is float or at.get("y") is int else NAN
+	if not is_finite(ax) or not is_finite(ay):
+		return {"ok": false, "code": "E_PEOPLE_ARGS", "id": -1}
+	var ww: World = w if w != null else world
+	if people.size() >= MAX_PEOPLE:
+		return {"ok": false, "code": "E_FORGE_LIMIT", "id": -1}
+	if ww == null or ww.is_solid(ax, ay):
+		return {"ok": false, "code": "E_PEOPLE_SOLID", "id": -1}
+	var raw: float = float(spec["seed"]) if spec.get("seed") is float or spec.get("seed") is int else NAN
+	var sd: float = fposmod(floor(absf(raw)), 4294967296.0) if is_finite(raw) else 0.0
+	var sdi: int = int(sd)
+	var entry: int = ((sdi >> 16) ^ sdi) & 0xFFFF
+	var gen := Forge.generate({"archetype": spec["archetype"], "seed": entry, "home": spec.get("home")}, {"stateSeed": seed_value, "index": float(next_id), "accOffset": float(acc_offset)})
+	if not gen["ok"] or gen["person"] == null:
+		return {"ok": false, "code": gen["code"] if gen["code"] != "OK" else "E_FORGE_UNKNOWN", "id": -1}
+	var gp: Dictionary = gen["person"]
+	var prng := Rng.new(sd)
+	var pmin: float = pool_min if pool_min > 0.0 else 30.0
+	var pmax: float = pool_max if pool_max > 0.0 else maxf(pmin, 50.0)
+	var pool: float = pmin + (pmax - pmin) * prng.next()
+	var id: int = next_id
+	next_id += 1
+	var arch: Variant = Forge.archetype(gp["archetype"])
+	var speed: float = float(arch["speed"]) if arch != null and (arch.get("speed") is float or arch.get("speed") is int) and float(arch["speed"]) > 0.0 else DEFAULT_SPEED
+	var ang: float = float(spec["ang"]) if spec.get("ang") is float or spec.get("ang") is int else 0.0
+	var p := Person.new()
+	p.pool = pool
+	p.left = pool
+	p.role = gp["role"]
+	p.archetype = gp["archetype"]
+	p.watch = bool(gp["watch"])
+	p.feedable = gp["feedable"] != false
+	p.gait = gp["gait"]
+	p.id = id
+	p.x = ax
+	p.y = ay
+	p.angle = ang
+	p.speed = speed
+	p.path = [{"x": ax, "y": ay, "wait": DEFAULT_WAIT}]
+	p.idx = 0
+	p.idle_left = DEFAULT_WAIT
+	p.look_in = 0.5 + prng.next() * 0.6
+	p.look = gp["look"]
+	if gp["schedRole"] != null and Schedule.has_role(gp["schedRole"]):
+		p.sched = Schedule.make(gp["schedRole"], places, {"x": ax, "y": ay}, prng, {"home": gp["home"], "slot": id})
+		if p.sched != null:
+			p.idle_left = 0.0
+			face_tables(p.sched, map_def)
+	people.append(p)
+	forge_log["spawned"].append({"a": gp["archetype"], "s": sd, "x": ax, "y": ay, "ang": ang, "id": id})
+	return {"ok": true, "code": "OK", "id": id}
+
+
+## Remove a person (not while grappled, dazed or fed). Their echoes stay.
+func despawn(id: int) -> Dictionary:
+	var p := find_person(id)
+	if p == null:
+		return {"ok": false, "code": "E_PEOPLE_NONE"}
+	if p.mode == "grapple" or p.mode == "dazed" or p.mode == "fed":
+		return {"ok": false, "code": "E_FORGE_BUSY"}
+	if p.chat != null:
+		end_chat(p)
+	people.erase(p)
+	forge_log["spawned"] = forge_log["spawned"].filter(func(e): return int(e["id"]) != id)
+	forge_log["altered"] = forge_log["altered"].filter(func(e): return int(e["id"]) != id)
+	return {"ok": true, "code": "OK"}
+
+
+## Patch a person look through Forge.alter. The look is replaced by a new Dictionary; old echoes keep the old one.
+func alter(id: int, patch: Variant) -> Dictionary:
+	var p := find_person(id)
+	if p == null:
+		return {"ok": false, "code": "E_PEOPLE_NONE"}
+	var r := Forge.alter(p.look, patch)
+	if not r["ok"]:
+		return {"ok": false, "code": r["code"] if r["code"] != "OK" else "E_FORGE_TYPE"}
+	p.look = r["look"]
+	var ch := {}
+	for k in r["changed"]:
+		ch[k] = r["look"][k]
+	var e: Variant = null
+	for it in forge_log["altered"]:
+		if int(it["id"]) == id:
+			e = it
+	if e != null:
+		e["look"].merge(ch, true)
+	elif forge_log["altered"].size() < 16:
+		forge_log["altered"].append({"id": id, "look": ch})
+	return {"ok": true, "code": "OK"}
+
+
+## Compact record of mid-night spawns and look alters for the run snapshot; altered ids are renumbered to the ids a replay
+## assigns (base_count + spawn index).
+func forge_state() -> Dictionary:
+	var remap := {}
+	var i := 0
+	for e in forge_log["spawned"]:
+		remap[int(e["id"])] = base_count + i
+		i += 1
+	var spawned: Array = []
+	for e in forge_log["spawned"]:
+		spawned.append({"a": e["a"], "s": e["s"], "x": e["x"], "y": e["y"], "ang": e["ang"]})
+	var altered: Array = []
+	for e in forge_log["altered"]:
+		altered.append({"id": remap.get(int(e["id"]), int(e["id"])), "look": e["look"].duplicate()})
+	return {"spawned": spawned, "altered": altered}

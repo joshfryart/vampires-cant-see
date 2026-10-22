@@ -53,7 +53,7 @@ func test_looks_match() -> void:
 		var spec: Dictionary = run["spec"]
 		var def: Dictionary = GameData.map_def(spec["map"])
 		var w := World.from_def(def)
-		var st := People.create(w, def, {"seed": spec["seed"], "shuffle": spec["shuffle"]})
+		var st := People.create(w, def, {"seed": spec["seed"], "shuffle": spec["shuffle"], "noForge": true})
 		eq(st.people.size(), run["looks"].size(), "%s seed %s people" % [spec["map"], str(spec["seed"])])
 		for i in mini(st.people.size(), run["looks"].size()):
 			var l: Dictionary = run["looks"][i]
@@ -76,7 +76,7 @@ func test_runs() -> void:
 		run_no += 1
 		var def: Dictionary = GameData.map_def(spec["map"])
 		var w := World.from_def(def)
-		var st := People.create(w, def, {"seed": spec["seed"], "shuffle": spec["shuffle"]})
+		var st := People.create(w, def, {"seed": spec["seed"], "shuffle": spec["shuffle"], "noForge": true})
 		var sonar := Sonar.create()
 		var ops: Array = spec["ops"]
 		var oi := 0
