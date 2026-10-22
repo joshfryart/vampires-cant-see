@@ -92,6 +92,8 @@ var react_dz: float = -1.0
 var barks_st: Barks = null
 var listen_st: Listen = null
 var bark_sub: Variant = null       # {de, en, muffled, speaker, dist, start, end}
+var bark_spk: Array = []           # live bark voices {id, h (audio.speak handle), end} (js S.barks.spk)
+var gates_by_map: Dictionary = {}  # cached G tile centres per map (js interactDoors)
 var lis_px: float = NAN
 var lis_py: float = NAN
 var lis_speed: float = 0.0
@@ -336,11 +338,18 @@ func people_for(name: String, seed_override: Variant = null) -> People:
 ## js enterMap: switch to a map and place the player.
 func enter_map(name: String, x: float, y: float, angle: float, door_id: String) -> void:
 	end_drink("map")
+	end_listen()
+	end_barks()
+	landings.clear()
 	if people != null:
 		people.clear_echoes()
+	if powers != null:
+		powers.rocks.clear()
 	if sonar != null:
 		sonar.reset()
 	ripple.rings.clear()
+	if audio != null:
+		audio.stop_all(0.15)
 	map_name = name
 	world = worlds[name]
 	people = people_for(name)
@@ -358,6 +367,8 @@ func enter_map(name: String, x: float, y: float, angle: float, door_id: String) 
 	grace = float(GameData.sounds()["react"]["arriveGrace"])
 	player_lit = world.light_at(player.x, player.y)
 	step_timer = 0.0
+	hud_a = 0.0
+	bob_amp = 0.0
 	cool = 0.3
 	react_cfg = GameData.sounds()["react"].duplicate()
 	react_cfg["dazedTime"] = 3.0
@@ -432,6 +443,8 @@ func player_kind() -> String:
 
 ## js applyRoom / applyReverb / followRoom: the room kind and zone at the player set the reverb.
 func apply_room() -> void:
+	if sonar != null and flow != null:
+		sonar.cooldown = float(cfg["sonarCooldown"]) * flow.fxv("sonarCooldown")
 	room_kind = player_kind()
 	apply_reverb(room_kind)
 
@@ -459,7 +472,7 @@ func change_map(to_map: String, to_door: String) -> bool:
 	if not worlds.has(to_map) or worlds[to_map].arrival(to_door) == null:
 		push_warning("E_MAP_LINK: no such map/door %s/%s" % [to_map, to_door])
 		return false
-	transition = {"to_map": to_map, "to_door": to_door, "t": 0.0, "dur": 0.7, "swapped": false}
+	transition = {"to_map": to_map, "to_door": to_door, "t": 0.0, "dur": maxf(100.0, float(cfg.get("transitionMs", 700.0))) / 1000.0, "swapped": false}
 	wipe_k = 0.0
 	state = "transition"
 	audio.play("creak", {"gain": SoundData.level("creak")["gain"], "pan": 0.0})
@@ -549,10 +562,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R: feed_press += 1
 			KEY_E: interact_press = true
 			KEY_ESCAPE:
+				# Menus consume Esc first (sub-views go back to their main view); the sleep sequence ignores Esc (js).
+				if menus != null and menus.has_method("consume_escape") and menus.consume_escape():
+					return
 				if state == "playing" or state == "transition" or state == "feeding":
 					pause()
 				elif state == "paused":
 					resume()
+				elif state == "sleeping":
+					pass
 				else:
 					Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -599,7 +617,7 @@ func step(dt: float, inp: Dictionary) -> void:
 	if st0 == "title" or st0 == "paused" or st0 == "runend" or st0 == "error":
 		if st0 == "title":
 			title_t += dt
-		pressed.clear()
+		drop_inputs()
 		hud.set_state(self)
 		return
 	if st0 == "boon" or st0 == "gift":
@@ -610,7 +628,7 @@ func step(dt: float, inp: Dictionary) -> void:
 				else:
 					flow.pick_boon(i)
 				break
-		pressed.clear()
+		drop_inputs()
 		hud.set_state(self)
 		return
 	if card_text != "":
@@ -628,7 +646,7 @@ func step(dt: float, inp: Dictionary) -> void:
 		audio.tick(clock)
 		flow.step_seq(dt)
 		sonar.prune(clock)
-		pressed.clear()
+		drop_inputs()
 		hud.set_state(self)
 		return
 	clock += dt
@@ -640,7 +658,7 @@ func step(dt: float, inp: Dictionary) -> void:
 	if state == "transition":
 		step_transition(dt)
 		sonar.prune(clock)
-		pressed.clear()
+		drop_inputs()
 		hud.set_state(self)
 		return
 	var was_drinking: bool = drink != null
@@ -667,8 +685,9 @@ func step(dt: float, inp: Dictionary) -> void:
 			var im := inp.duplicate()
 			im["forward"] = 0.0
 			im["strafe"] = 0.0
-			player.update(world, im, dt)
+			player.update(world, im, dt, player_cfg)
 			powers.step_mist(dt)
+			update_bob(dt, 0.0)
 			step_timer = 0.0
 		else:
 			var cfg2 := player_cfg
@@ -691,10 +710,7 @@ func step(dt: float, inp: Dictionary) -> void:
 	step_listen(dt)
 	if not was_drinking:
 		if check_link_door():
-			feed_press = 0
-			ping_clicks = 0
-			interact_press = false
-			pressed.clear()
+			drop_inputs()
 			return
 		follow_room()
 		if interact_press:
@@ -703,6 +719,8 @@ func step(dt: float, inp: Dictionary) -> void:
 			powers.throw_rock()
 		if feed_press > 0 and state == "playing" and not start_drink(false):
 			miss_feed()
+	elif feed_press > 0 and feed_toggle and drink != null and not drink["forced"]:
+		end_drink("release")
 	interact_press = false
 	feed_press = 0
 	if ping_clicks > 0:
@@ -733,6 +751,14 @@ func step(dt: float, inp: Dictionary) -> void:
 	hud.set_state(self)
 
 
+## Forget this frame's queued presses (menu clicks and keys must not leak into play).
+func drop_inputs() -> void:
+	pressed.clear()
+	feed_press = 0
+	ping_clicks = 0
+	interact_press = false
+
+
 ## The fatal error screen (js fatal): log it, save a run in play, free the mouse and show the report buttons.
 func fatal(code: String, message: String) -> void:
 	if state == "error":
@@ -748,8 +774,10 @@ func fatal(code: String, message: String) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and scenario == null and not manual_boot:
 		pressed.clear()
-		if run_on and (state == "playing" or state == "transition"):
-			pause()
+		if run_on and (state == "playing" or state == "transition" or state == "feeding"):
+			pause()   # pause() ends a drink first (js 399-406)
+	elif what == NOTIFICATION_WM_CLOSE_REQUEST and flow != null and run_on:
+		flow.save_run("close")   # js pagehide
 
 
 func pause() -> void:
@@ -972,12 +1000,36 @@ func end_listen() -> void:
 		listen_st.active = false
 		listen_st.win = null
 		listen_st.count = 0
+	lis_px = NAN
+	lis_py = NAN
+	lis_speed = 0.0
 
 
 func barks_reset() -> void:
+	end_bark_voices()
 	if barks_st != null:
 		barks_st.reset()
 	bark_sub = null
+
+
+## js endBarks: stop the bark voices and drop the bark state.
+func end_barks() -> void:
+	barks_reset()
+	barks_st = null
+
+
+func end_bark_voices() -> void:
+	for s in bark_spk:
+		(s["h"]["stop"] as Callable).call()
+	bark_spk.clear()
+
+
+func stop_bark_voice(id: Variant) -> void:
+	bark_spk = bark_spk.filter(func(s) -> bool:
+		if s["id"] != id:
+			return true
+		(s["h"]["stop"] as Callable).call()
+		return false)
 
 
 ## js stepListen: hold E facing a window from outside to hear the room behind it.
@@ -1014,21 +1066,49 @@ func step_barks(_dt: float) -> void:
 		"fear": hunger.fear if hunger != null else 0.0, "enabled": on,
 		"restrained": int(drink["id"]) if drink != null and float(drink["rs"]) > 0.5 else null,
 		"length_fn": func(sd, kind, mood_s, role, weak): return VoiceData.speak_length(sd, kind, mood_s, role, weak)})
+	if not on and not bark_spk.is_empty():
+		end_bark_voices()
+		bark_sub = null
+	for id in res["stop"]:
+		stop_bark_voice(id)
 	for b in res["barks"]:
 		play_bark(b)
+	if bark_sub != null and clock > float(bark_sub["end"]) + Listen.SUB_FADE:
+		bark_sub = null
 
 
-## Plays one bark: distance gain, pan, muffling, subtitle when close and in sight.
+## Plays one bark (js playBark): linear distance fall, pan, low-pass from distance, walls/doors/glass and indoor-outdoor
+## muffling, subtitle when close and in sight. Quiet barks (gain <= 0.015) are dropped.
 func play_bark(b: Dictionary) -> void:
 	var occ: Variant = occlusion_to(b["x"], b["y"])
 	var d: float = b["dist"]
-	if d <= 5.0 and occ == null:
+	var in_out: bool = world.kind_at(player.x, player.y) != world.kind_at(b["x"], b["y"])
+	if d <= 5.0 and occ == null and show_subtitles:
 		var cur: Variant = bark_sub
 		if cur == null or clock > float(cur["end"]) or d <= float(cur["dist"]):
 			var t := Barks.subtitle_for(b)
 			if t["de"] != "":
 				bark_sub = {"de": t["de"], "en": t["en"], "muffled": false, "speaker": b["id"], "dist": d, "start": clock, "end": clock + maxf(0.5, float(b["len"]))}
-	audio.speak({"kind": b["kind"], "seed": b["seed"], "mood": b["mood"], "gain": b["gain"], "pan": pan_to(b["x"], b["y"]), "voice": VoiceData.for_person(b["voiceSeed"], b["role"]), "weak": b["weak"] if b["kind"] == "struggle" else null})
+	var fall: float = maxf(0.0, 1.0 - d / 14.0)
+	var gain: float = fall * float(b["gain"]) * (1.15 if b.get("loud", false) else 1.0)
+	var lp: float = 2400.0 * (1.0 - 0.45 * minf(1.0, d / 14.0))
+	if occ != null:
+		var has_diff: bool = occ["diff"] != null
+		var mat: String = occ["mat"]
+		lp = 1000.0 if has_diff else (650.0 if mat == "door" else (900.0 if mat == "glass" else 420.0))
+		gain *= 0.7 if has_diff else 0.55
+	if in_out:
+		lp = minf(lp, 380.0)
+		gain *= 0.6
+	var weak: float = float(b["weak"]) if b.get("weak") != null else 0.0
+	if b["kind"] == "struggle":
+		lp = minf(lp, 600.0 if b.get("restrained", false) else 2200.0 - 1500.0 * weak)
+	if not (gain > 0.015):
+		return
+	var h: Dictionary = audio.speak({"kind": b["kind"], "seed": b["seed"], "mood": b["mood"], "gain": minf(1.0, gain), "pan": pan_to(b["x"], b["y"]), "lpHz": lp, "voice": VoiceData.for_person(b["voiceSeed"], b["role"]), "weak": b["weak"] if b["kind"] == "struggle" else null})
+	if h.has("stop"):
+		bark_spk = bark_spk.filter(func(s) -> bool: return float(s["end"]) > clock)
+		bark_spk.append({"id": b["id"], "h": h, "end": clock + float(h.get("end", b["len"]))})
 
 
 # ---------------------------------------------------------------- sounds
@@ -1308,13 +1388,26 @@ func bump_doors(inp: Dictionary) -> void:
 		toggle_door(cx, cy, true)
 
 
+## Door cells E may toggle: spots.doors plus the G gate tiles (js interactDoors).
+func interact_doors() -> Array:
+	if not gates_by_map.has(map_name):
+		var gl: Array = []
+		for y in world.height:
+			for x in world.width:
+				if world.tile_at(x + 0.5, y + 0.5) == "G":
+					gl.append(Vector2(x + 0.5, y + 0.5))
+		gates_by_map[map_name] = gl
+	var gates: Array = gates_by_map[map_name]
+	return world.spots["doors"] + gates if not gates.is_empty() else world.spots["doors"]
+
+
 ## E: toggle the nearest door in reach and in front (js interact, doors only for the slice).
 func interact() -> String:
 	var reach: float = float(GameData.sounds()["reach"])
 	var arc: float = float(GameData.sounds()["reachArc"])
 	var best: Variant = null
 	var best_d := INF
-	var doors: Array = world.spots["doors"]
+	var doors: Array = interact_doors()
 	for i in doors.size():
 		var dx: float = doors[i].x - player.x
 		var dy: float = doors[i].y - player.y
@@ -1334,6 +1427,8 @@ func interact() -> String:
 	if night != null:
 		if flow.try_sleep():
 			return "sleep"
+		if flow.sleep_denied:
+			return "blocked"
 		var sp_list: Array = world.spots.get("crypt", []) + world.spots.get("safe", []).filter(func(sp): return not flow.is_sealed(sp))
 		for sp in sp_list:
 			if sqrt((sp.x - player.x) * (sp.x - player.x) + (sp.y - player.y) * (sp.y - player.y)) <= reach:

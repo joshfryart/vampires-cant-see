@@ -25,6 +25,8 @@ var crypt_warn_until: float = 0.0
 var auto_acc: float = 0.0
 var seed_param: Variant = null     # fixed run seed (tests, --seed=)
 var save_failed: bool = false
+var store_warned: bool = false
+var sleep_denied: bool = false     # last try_sleep was refused (too early / sealed): E must not also pulse (js S.sleepDenied)
 var has_run: bool = false
 var night_length_min: float = NIGHT_LENGTH_MIN
 var autosave_sec: float = AUTOSAVE_SEC
@@ -279,6 +281,7 @@ func end_run(kind: String) -> void:
 	Log.info("run", "end %s" % kind)
 	run_kind = kind
 	seq = null
+	g.landings.clear()
 	var n: Night = g.night
 	var survived: int = (n.nights if kind == "won" else maxi(0, n.night - 1)) if n != null else 0
 	var fed: int = n.fed_count if n != null else 0
@@ -385,6 +388,7 @@ func forge_washout() -> void:
 func try_sleep(force: bool = false) -> bool:
 	if g.state != "playing" or g.night == null or g.world == null:
 		return false
+	sleep_denied = false
 	var p: Player = g.player
 	var reach: float = float(GameData.sounds()["reach"])
 	var w: World = g.world
@@ -401,6 +405,7 @@ func try_sleep(force: bool = false) -> bool:
 		if near_crypt and g.clock < crypt_warn_until:
 			crypt_warn_until = 0.0
 		elif near_crypt or near_safe:
+			sleep_denied = true
 			if near_crypt:
 				crypt_warn_until = g.clock + 4.0
 				g.show_card("Sleep early?", Game.CARD_LEN - 1.0, "Each night grows harder. Press E again to sleep.")
@@ -412,6 +417,7 @@ func try_sleep(force: bool = false) -> bool:
 			return false
 	var lists := [w.spots.get("crypt", []), w.spots.get("safe", [])]
 	var sealed := false
+	sleep_denied = false
 	for a in 2:
 		for sp in lists[a]:
 			if sqrt((sp.x - p.x) * (sp.x - p.x) + (sp.y - p.y) * (sp.y - p.y)) <= reach:
@@ -424,6 +430,7 @@ func try_sleep(force: bool = false) -> bool:
 				g.audio.play("yawn", {"gain": SoundData.level("yawn")["gain"], "pan": 0.0})
 				return true
 	if sealed:
+		sleep_denied = true
 		g.show_card("Sealed", Game.CARD_LEN - 1.0)
 		g.audio.play("miss", {"gain": SoundData.level("miss")["gain"], "pan": 0.0})
 	return false
@@ -571,11 +578,30 @@ func pick_gift(i: int) -> bool:
 
 # ---------------------------------------------------------------- saves
 
+## A write failed: show the "not saved" dot and, once per session, a notice (js storageFail).
+func _store_fail(code: String) -> void:
+	save_failed = true
+	if store_warned:
+		return
+	store_warned = true
+	notices.append("Could not save (%s). Progress may be lost." % code)
+
+
+## A write succeeded: clear the dot and re-arm the one-time notice (js storageOk).
+func _store_ok() -> void:
+	if not save_failed:
+		return
+	save_failed = false
+	if store.persistent:
+		store_warned = false
+
+
 func save_meta() -> bool:
 	var r := store.write("meta", Meta.SCHEMA, meta)
 	if not r["ok"]:
-		save_failed = true
+		_store_fail(str(r.get("code", "E_SAVE_WRITE")))
 		return false
+	_store_ok()
 	return true
 
 
@@ -609,7 +635,8 @@ func get_snapshot() -> Dictionary:
 	if g.night != null:
 		snap["night"] = g.night.serialize()
 	snap["rocks"] = g.powers.rocks_left
-	var r := {"seed": run["seed"], "boons": run["boons"].duplicate(), "closedSafe": run["closedSafe"].duplicate(true), "pendingBoons": run["pendingBoons"].duplicate() if run["pendingBoons"] != null else null}
+	var r := {"seed": run["seed"], "boons": run["boons"].duplicate(), "closedSafe": run["closedSafe"].duplicate(true), "pendingBoons": run["pendingBoons"].duplicate() if run["pendingBoons"] != null else null,
+		"pendingGifts": run["pendingGifts"].duplicate() if run.get("pendingGifts") != null else null}
 	r["hunger"] = g.hunger.serialize() if g.hunger != null else null
 	snap["run"] = r
 	if not forge.is_empty():
@@ -628,8 +655,9 @@ func save_run(_why: String) -> bool:
 		return false
 	var r := store.write("run", SaveCodec.RUN_SCHEMA, snap)
 	if not r["ok"]:
-		save_failed = true
+		_store_fail(str(r.get("code", "E_SAVE_WRITE")))
 		return false
+	_store_ok()
 	has_run = true
 	return true
 
@@ -660,6 +688,18 @@ func replay_forge(st: People, name: String, forge: Variant) -> void:
 			st.alter(int(al["id"]), al["look"])
 
 
+## A saved pendingGifts list as a fresh array of known gift ids; null when empty, missing or any id is unknown (js validateRun).
+static func clean_gifts(v: Variant) -> Variant:
+	if not (v is Array) or (v as Array).is_empty():
+		return null
+	var out: Array = []
+	for id in v:
+		if not (id is String) or Hunger.gift_by_id(id) == null:
+			return null
+		out.append(id)
+	return out
+
+
 ## Restore a snapshot; validates everything, never throws. True if the map was applied.
 func apply_snapshot(snap: Dictionary) -> bool:
 	if snap.get("v") == null or int(snap["v"]) < 1 or int(snap["v"]) > 4:
@@ -673,7 +713,7 @@ func apply_snapshot(snap: Dictionary) -> bool:
 		if not (rs is Dictionary):
 			return false
 		var raw: Variant = rs.get("hunger")
-		run = {"seed": int(rs["seed"]), "boons": (rs["boons"] as Array).duplicate(), "closedSafe": (rs["closedSafe"] as Dictionary).duplicate(true), "pendingBoons": rs.get("pendingBoons"), "pendingGifts": null}
+		run = {"seed": int(rs["seed"]), "boons": (rs["boons"] as Array).duplicate(), "closedSafe": (rs["closedSafe"] as Dictionary).duplicate(true), "pendingBoons": rs.get("pendingBoons"), "pendingGifts": clean_gifts(rs.get("pendingGifts"))}
 		var hs: Variant = Hunger.restore(raw) if int(snap["v"]) >= 4 and raw != null else null
 		g.hunger = hs if hs != null else Hunger.create()
 		fx = compute_fx()
@@ -732,7 +772,10 @@ func continue_run() -> bool:
 	var san: Variant = SaveCodec.sanitize_run(mg["data"])
 	if san == null or not g.worlds.has(san["map"]):
 		return fail.call("E_SAVE_SCHEMA")
-	run = {"seed": int(san["run"]["seed"]), "boons": (san["run"]["boons"] as Array).duplicate(), "closedSafe": (san["run"]["closedSafe"] as Dictionary).duplicate(true), "pendingBoons": san["run"].get("pendingBoons"), "pendingGifts": null}
+	var gifts: Variant = clean_gifts(san["run"].get("pendingGifts"))
+	if san["run"].get("pendingGifts") != null and (san["run"]["pendingGifts"] as Array).size() > 0 and gifts == null:
+		return fail.call("E_SAVE_SCHEMA")
+	run = {"seed": int(san["run"]["seed"]), "boons": (san["run"]["boons"] as Array).duplicate(), "closedSafe": (san["run"]["closedSafe"] as Dictionary).duplicate(true), "pendingBoons": san["run"].get("pendingBoons"), "pendingGifts": gifts}
 	g.hunger = Hunger.create()
 	fx = compute_fx()
 	reset_world_for_run()
@@ -744,7 +787,9 @@ func continue_run() -> bool:
 	g.init_ambient()
 	g.tut.start()
 	auto_acc = 0.0
-	if run["pendingBoons"] != null and (run["pendingBoons"] as Array).size() > 0:
+	if run["pendingGifts"] != null and (run["pendingGifts"] as Array).size() > 0:
+		g.set_state("gift")
+	elif run["pendingBoons"] != null and (run["pendingBoons"] as Array).size() > 0:
 		g.set_state("boon")
 	else:
 		g.set_state("playing")
@@ -792,7 +837,9 @@ func import_text(text: String) -> bool:
 	if run_san != null:
 		var w := store.write("run", SaveCodec.RUN_SCHEMA, run_san)
 		if not w["ok"]:
-			save_failed = true
+			_store_fail(str(w.get("code", "E_SAVE_WRITE")))
+		else:
+			_store_ok()
 	else:
 		store.remove("run")
 	has_run = store.has("run")

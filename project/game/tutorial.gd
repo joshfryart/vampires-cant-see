@@ -99,7 +99,7 @@ func step(dt: float) -> void:
 			queue("listen")
 		if n.night == 1 and n.min >= 510.0:
 			queue("sleep")
-	if g.card_text != "" or g.hint_t > 0.0:
+	if g.card_text != "" or g.unlock_hint_t > 0.0:
 		g.hint_text = ""
 		return
 	if cur != null:
