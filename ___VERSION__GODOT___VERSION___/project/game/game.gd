@@ -167,6 +167,7 @@ var wall_mat: ShaderMaterial
 var floor_mat: ShaderMaterial
 var ceil_mat: ShaderMaterial
 var cam: Camera3D
+var map_view: MapView
 var viewport: SubViewport
 var echo_view: EchoView
 var walls_inst: MeshInstance3D
@@ -269,6 +270,9 @@ func _build_view() -> void:
 	viewport.add_child(fx_overlay)
 	hud = Hud.new()
 	add_child(hud)
+	map_view = MapView.new()
+	map_view.attach(self)
+	add_child(map_view)
 	menus = Menus.new()
 	add_child(menus)
 
