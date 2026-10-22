@@ -18,6 +18,14 @@ var last_us: int = 0
 var rs_fov: float = RenderState.FOV_DEG * PI / 180.0
 
 
+## Settings that change how the canvas draws: effects level, material detail, line boil, reduced motion.
+func apply_config(cfg: Dictionary, reduced: bool) -> void:
+	rs.fx = clampi(int(round(float(cfg["effects"]))), 0, 2)
+	rs.mat_detail = cfg["materialDetail"] == true
+	rs.boil_cfg = cfg["lineBoil"] == true
+	rs.reduced = reduced
+
+
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE

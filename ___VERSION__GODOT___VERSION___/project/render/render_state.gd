@@ -19,6 +19,7 @@ var fx: int = 0
 ## Horizontal field of view in radians (js fov); set_fov rebuilds the per-column ray offsets when it changes.
 var fov: float = FOV_DEG * PI / 180.0
 var mat_detail: bool = true
+var boil_cfg: bool = true
 var horizon: float = 180.0
 ## Per-column wall distance (js r.zbuf), larger than any figure depth when no wall.
 var zbuf: PackedFloat32Array = PackedFloat32Array()
@@ -63,7 +64,7 @@ func set_fov(f: float) -> void:
 
 ## Line boil is on at quality >= 2 unless reduced motion (js drawFirstPerson / drawSolo).
 func update_boil(t: float) -> void:
-	boil_on = not reduced and quality >= 2
+	boil_on = boil_cfg and not reduced and quality >= 2
 	bf = Ripple.boil_frame(t) if boil_on else 0
 
 

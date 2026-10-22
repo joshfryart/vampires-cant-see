@@ -65,7 +65,7 @@ func sync(g: Game) -> void:
 	_g = g
 	var st: String = g.state
 	var key := "%s/%s" % [st, _view]
-	if st != "title":
+	if st != "title" and st != "paused":
 		_view = "main"
 		key = st
 	match st:
@@ -82,6 +82,9 @@ func _build_title() -> void:
 	_clear()
 	_panel.visible = true
 	match _view:
+		"settings":
+			_build_settings()
+			return
 		"shop":
 			_build_shop()
 			return
@@ -106,6 +109,9 @@ func _build_title() -> void:
 		sync(_g))
 	_button("Stats", func():
 		_view = "stats"
+		sync(_g))
+	_button("Settings", func():
+		_view = "settings"
 		sync(_g))
 	_button("Quit", func(): _g.get_tree().quit())
 	_label("WASD move · mouse look · click/Space ping · right-click/R drink · E door/sleep · Q shriek · Shift mist · F still · G rock · Esc pause", 11, Color(0.6, 0.65, 0.8))
@@ -151,8 +157,14 @@ func _build_stats() -> void:
 func _build_pause() -> void:
 	_clear()
 	_panel.visible = true
+	if _view == "settings":
+		_build_settings()
+		return
 	_label("Paused", 24)
 	_button("Resume", func(): _g.resume())
+	_button("Settings", func():
+		_view = "settings"
+		sync(_g))
 	_button("Save and quit to menu", func():
 		_g.flow.save_run("quit")
 		_g.run_on = false
@@ -201,3 +213,72 @@ func _build_runend() -> void:
 	_label(str(r.get("essence", "")), 15, Color(0.9, 0.85, 0.5))
 	_button("New run", func(): _g.flow.begin_run())
 	_button("Menu", func(): _g.set_state("title"))
+
+
+# ---------------------------------------------------------------- settings
+
+const SETTINGS_ROWS := [
+	["Volume", "volume", 0.0, 1.0, 0.05], ["Ambience", "ambienceGain", 0.0, 1.0, 0.05],
+	["Mouse sensitivity", "mouseSensitivity", 0.0005, 0.01, 0.0005], ["Invert mouse", "invertMouse"],
+	["Move speed", "moveSpeed", 1.0, 6.0, 0.25], ["Field of view", "fovDeg", 50.0, 100.0, 1.0],
+	["Night length (minutes)", "nightLengthMin", 2.0, 30.0, 1.0], ["Ping range", "sonarRange", 4.0, 20.0, 0.5],
+	["Ping fade (s)", "sonarFade", 1.0, 8.0, 0.25], ["Ping cooldown (s)", "sonarCooldown", 0.2, 3.0, 0.05],
+	["Feeding reach", "feedReach", 1.0, 3.0, 0.1], ["Hold to drink / toggle", "feedToggle"],
+	["Effects (0 off, 1 low, 2 high)", "effects", 0.0, 2.0, 1.0], ["Wobbly lines", "lineBoil"], ["Material detail", "materialDetail"],
+	["Reduced motion", "reduceMotion"], ["Large text", "largeText"], ["Subtitles", "subtitles"], ["Translation", "translation"],
+	["Villager voices", "villagerVoices"], ["Autosave every (s)", "autosaveSec", 5.0, 300.0, 5.0],
+]
+
+
+func _build_settings() -> void:
+	_label("Settings", 22, Color(0.9, 0.85, 0.5))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(430, 360)
+	_box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6)
+	list.custom_minimum_size = Vector2(410, 0)
+	scroll.add_child(list)
+	for row in SETTINGS_ROWS:
+		var key: String = row[1]
+		var hb := HBoxContainer.new()
+		hb.add_theme_constant_override("separation", 8)
+		list.add_child(hb)
+		var l := Label.new()
+		l.text = row[0]
+		l.custom_minimum_size = Vector2(190, 0)
+		hb.add_child(l)
+		if row.size() == 2:
+			var cb := CheckBox.new()
+			cb.button_pressed = _g.cfg[key] == true
+			cb.focus_mode = Control.FOCUS_NONE
+			cb.toggled.connect(func(on): _g.set_config(key, on))
+			hb.add_child(cb)
+		else:
+			var sl := HSlider.new()
+			sl.min_value = row[2]
+			sl.max_value = row[3]
+			sl.step = row[4]
+			sl.value = float(_g.cfg[key])
+			sl.custom_minimum_size = Vector2(140, 0)
+			sl.focus_mode = Control.FOCUS_NONE
+			hb.add_child(sl)
+			var val := Label.new()
+			val.text = _fmt(float(_g.cfg[key]))
+			val.custom_minimum_size = Vector2(50, 0)
+			hb.add_child(val)
+			sl.value_changed.connect(func(v):
+				val.text = _fmt(v)
+				_g.set_config(key, v))
+	_button("Reset to defaults", func():
+		for k in Config.DEFAULTS:
+			_g.cfg[k] = Config.DEFAULTS[k]
+		_g.set_config("cfgV", Config.DEFAULTS["cfgV"])
+		sync(_g))
+	_button("Back", func():
+		_view = "main"
+		sync(_g))
+
+
+static func _fmt(v: float) -> String:
+	return str(snappedf(v, 0.0001))

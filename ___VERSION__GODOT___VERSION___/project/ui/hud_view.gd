@@ -45,11 +45,11 @@ func render_frame(g: Game) -> void:
 			_plain_hud(g)
 		queue_redraw()
 		return
-	var boil: bool = not g.reduced
+	var boil: bool = not g.reduced and g.cfg["lineBoil"] == true
 	var s := {
 		"blood01": n.blood / n.blood_max if n.blood_max > 0.0 else 0.0, "weak": n.weakness(), "frac": n.min / 600.0,
 		"hour": n.clock()["hour"], "minute": n.clock()["minute"], "t": g.clock, "boil": boil, "reduced": g.reduced,
-		"largeText": false, "fx": 0, "pulse01": g.hud_a * g.hud_frac if g.hud_a > 0.01 else 0.0,
+		"largeText": g.large_text, "fx": g.echo_view.rs.fx, "pulse01": g.hud_a * g.hud_frac if g.hud_a > 0.01 else 0.0,
 		"vialPulse": g.vial_pulse, "feeding": g.drink != null, "veil": g.veil_k, "rocks": g.powers.rocks_left,
 	}
 	var h: Hunger = g.hunger
@@ -67,9 +67,9 @@ func render_frame(g: Game) -> void:
 		s["powers"] = rows
 	hud.draw_hud(canvas, s)
 	if g.card_text != "":
-		HudDraw.draw_card(canvas, g.card_text, g.card_age, g.clock, boil, g.card_sub)
+		HudDraw.draw_card(canvas, g.card_text, g.card_age, g.clock, boil, g.card_sub, g.large_text)
 	elif g.hint_text != "":
-		HudDraw.draw_hint(canvas, g.hint_text, g.hint_age, g.hint_dur)
+		HudDraw.draw_hint(canvas, g.hint_text, g.hint_age, g.hint_dur, g.large_text)
 	queue_redraw()
 
 

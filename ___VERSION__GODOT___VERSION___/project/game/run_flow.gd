@@ -27,6 +27,7 @@ var seed_param: Variant = null     # fixed run seed (tests, --seed=)
 var save_failed: bool = false
 var has_run: bool = false
 var night_length_min: float = NIGHT_LENGTH_MIN
+var autosave_sec: float = AUTOSAVE_SEC
 
 
 func _init(game: Game, storage: Object = null) -> void:
@@ -262,6 +263,7 @@ func begin_run() -> bool:
 	g.run_on = true
 	auto_acc = 0.0
 	g.init_ambient()
+	g.tut.start()
 	g.set_state("playing")
 	g.show_card("Night 1")
 	save_run("new run")
@@ -470,6 +472,7 @@ func next_night() -> void:
 	var up: Variant = unlocked_power(n)
 	g.show_card("Night %d%s" % [n, unlock_text(n)], 0.0, str(up["how"]).strip_edges() if up != null and str(up["how"]).strip_edges() != "" else "")
 	g.init_ambient()
+	g.tut.clear()
 
 
 ## The power that unlocks on night n (n > 1), or null.
@@ -732,6 +735,7 @@ func continue_run() -> bool:
 	compute_far_spot()
 	g.run_on = true
 	g.init_ambient()
+	g.tut.start()
 	auto_acc = 0.0
 	if run["pendingBoons"] != null and (run["pendingBoons"] as Array).size() > 0:
 		g.set_state("boon")
@@ -745,6 +749,6 @@ func continue_run() -> bool:
 func tick_autosave(dt: float) -> void:
 	if g.state == "playing" and g.run_on:
 		auto_acc += dt
-		if auto_acc >= AUTOSAVE_SEC:
+		if auto_acc >= autosave_sec:
 			auto_acc = 0.0
 			save_run("autosave")

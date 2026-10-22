@@ -111,6 +111,24 @@ var hud_frac: float = 0.0
 var hint_text: String = ""
 var hint_age: float = 0.0
 var hint_dur: float = 4.0
+var hint_t: float = 0.0
+var cfg: Dictionary = Config.defaults_copy()
+var player_cfg: Dictionary = Player.DEFAULT_CFG.duplicate()
+var base_range: float = BASE_RANGE
+var base_fade: float = BASE_FADE
+var feed_reach: float = FEED_REACH
+var feed_arc: float = deg_to_rad(60.0)
+var pool_min: float = 30.0
+var pool_max: float = 50.0
+var dazed_time: float = 3.0
+var feed_toggle: bool = false
+var show_subtitles: bool = true
+var show_translation: bool = true
+var villager_voices: bool = true
+var large_text: bool = false
+var fov_base_deg: float = FOV_DEG
+var ambience_gain: float = AMBIENCE_GAIN
+var tut: Tutorial
 var hud_view: HudView
 var dog_t: float = 25.0
 var bell_t: float = 30.0
@@ -163,12 +181,15 @@ func boot() -> void:
 	add_child(audio)
 	_build_view()
 	_load_worlds()
+	cfg = Config.load_file() if test_storage == null else Config.defaults_copy()
 	flow = RunFlow.new(self, test_storage)
+	tut = Tutorial.new(self, test_storage == null)
 	powers = Powers.new(self)
 	var start_name: String = want_map if want_map != "" else String(GameData.maps()["startMap"])
 	var sp := start_place(worlds[start_name])
 	player = Player.create(sp["x"], sp["y"], sp["angle"])
 	sonar = Sonar.create()
+	apply_config()
 	enter_map(start_name, sp["x"], sp["y"], sp["angle"], "")
 	if scenario_name != "":
 		var script: GDScript = load("res://tests/scenarios/%s.gd" % scenario_name)
@@ -259,7 +280,7 @@ func people_for(name: String, seed_override: Variant = null) -> People:
 		return people_by_map[name]
 	var idx: int = maxi(0, world_names.find(name))
 	var sd: float = float(seed_override) if seed_override != null else float(mix_seed(run_seed, idx, night_no))
-	var st := People.create(worlds[name], GameData.map_def(name), {"seed": sd, "poolMin": 30.0, "poolMax": 50.0, "shuffle": true})
+	var st := People.create(worlds[name], GameData.map_def(name), {"seed": sd, "poolMin": pool_min, "poolMax": pool_max, "shuffle": true})
 	people_by_map[name] = st
 	return st
 
@@ -573,9 +594,9 @@ func step(dt: float, inp: Dictionary) -> void:
 		di["mouseDx"] = float(inp.get("mouseDx", 0.0)) * 0.5
 		var px: float = player.x
 		var py: float = player.y
-		var cfg := Player.DEFAULT_CFG.duplicate()
-		cfg["moveSpeed"] = float(cfg["moveSpeed"]) * drag_speed_k(dk)
-		player.update(world, di, dt, cfg)
+		var dcfg := player_cfg.duplicate()
+		dcfg["moveSpeed"] = float(dcfg["moveSpeed"]) * drag_speed_k(dk)
+		player.update(world, di, dt, dcfg)
 		var moved: float = sqrt((player.x - px) * (player.x - px) + (player.y - py) * (player.y - py))
 		step_victim_pull(dk, dt)
 		player_steps(dt, moved)
@@ -590,9 +611,9 @@ func step(dt: float, inp: Dictionary) -> void:
 			powers.step_mist(dt)
 			step_timer = 0.0
 		else:
-			var cfg2 := Player.DEFAULT_CFG
+			var cfg2 := player_cfg
 			if listen_st != null and listen_st.active:
-				cfg2 = Player.DEFAULT_CFG.duplicate()
+				cfg2 = player_cfg.duplicate()
 				cfg2["moveSpeed"] = float(cfg2["moveSpeed"]) * Listen.MOVE_K
 			player.update(world, inp, dt, cfg2)
 			var moved2: float = sqrt((player.x - px2) * (player.x - px2) + (player.y - py2) * (player.y - py2))
@@ -630,6 +651,7 @@ func step(dt: float, inp: Dictionary) -> void:
 	sonar.prune(clock)
 	simulate_world(dt)
 	step_barks(dt)
+	tut.step(dt)
 	if run_on:
 		step_ambient(dt)
 		crackle_torches()
@@ -704,12 +726,12 @@ func update_ambience() -> void:
 	if not live:
 		audio.fire_bed(0, 0.0, 0.0)
 		audio.fire_bed(1, 0.0, 0.0)
-	if kind == amb_key and AMBIENCE_GAIN == amb_lvl:
+	if kind == amb_key and ambience_gain == amb_lvl:
 		return
-	var ok := audio.ambience(kind, AMBIENCE_GAIN)
+	var ok := audio.ambience(kind, ambience_gain)
 	if ok or kind == "none":
 		amb_key = kind
-		amb_lvl = AMBIENCE_GAIN
+		amb_lvl = ambience_gain
 
 
 ## Steady fire noise: the 2 nearest torches within FIRE_NEAR cells, fading to 0 at that distance, panned to the torch.
@@ -830,7 +852,7 @@ func step_barks(_dt: float) -> void:
 		return
 	if barks_st == null:
 		barks_st = Barks.new(map_name.length() * 131 + 7 if map_name != "" else 1)
-	var on: bool = not (listen_st != null and listen_st.active) and powers.mist == null
+	var on: bool = villager_voices and not (listen_st != null and listen_st.active) and powers.mist == null
 	var res := barks_st.step({
 		"now": clock, "player": {"x": player.x, "y": player.y}, "people": Barks.people_snapshot(people.people),
 		"fear": hunger.fear if hunger != null else 0.0, "enabled": on,
@@ -974,7 +996,7 @@ func occlusion_to(x: float, y: float) -> Variant:
 
 ## Fear-scaled react config; rebuilt only when dazedTime, fear, still or mist state changes (js reactCfgNow).
 func react_cfg_now() -> Dictionary:
-	var dz := 3.0
+	var dz := dazed_time
 	var calm: bool = hunger != null and (hunger.is_still() or powers.mist != null)
 	var key: float = (hunger.fear if hunger != null else 0.0) * 2.0 + (1.0 if calm else 0.0)
 	if react_dz != dz or react_key != key or react_cfg.is_empty():
@@ -1059,15 +1081,16 @@ func pulse() -> bool:
 	var wash: float = night.wash_k() if night != null and outdoor else 0.0
 	var fr: float = flow.fxv("sonarRange") if flow != null else 1.0
 	var ff: float = flow.fxv("sonarFade") if flow != null else 1.0
-	sonar.range_ = BASE_RANGE * float(room["rangeMul"]) * fr * (1.0 - 0.4 * weak) * (1.0 - 0.5 * wash)
+	sonar.range_ = base_range * float(room["rangeMul"]) * fr * (1.0 - 0.4 * weak) * (1.0 - 0.5 * wash)
 	sonar.bounces = mini(BASE_BOUNCES, int(room["bounceCap"]))
-	sonar.fade = BASE_FADE * float(room["fadeMul"]) * ff * (1.0 - 0.3 * weak) * (1.0 - 0.6 * wash)
+	sonar.fade = base_fade * float(room["fadeMul"]) * ff * (1.0 - 0.3 * weak) * (1.0 - 0.6 * wash)
 	var fired: bool = sonar.emit(world, player.x, player.y, clock, {"z": SoundData.level("ping")["z"], "facing": player.angle})
 	sonar.range_ = keep[0]
 	sonar.bounces = keep[1]
 	sonar.fade = keep[2]
 	if not fired:
 		return false
+	tut.pulsed()
 	if weak > 0.0 and sonar.last_pulse != null:
 		tag_weak(sonar.last_pulse, weak, 1.0 - 0.4 * weak)
 	react_to(player.x, player.y, "ping")
@@ -1165,6 +1188,8 @@ func simulate_world(dt: float) -> void:
 	drain_people_events()
 	people_sounds(t_prev)
 	var made := people.update_echoes(sonar, t_prev, clock)
+	if not made.is_empty():
+		tut.queue("person")
 	for e in made:
 		# floor rings under the person: a heartbeat is a small ring, a footstep a modest one, a ping the full size
 		var small: float = 0.4 if e.kind == "vheart" else (0.45 if e.kind == "personStep" or e.kind == "step" else 1.0)
@@ -1252,7 +1277,7 @@ func push_victim_echo(p: People.Person) -> void:
 func start_drink(forced: bool) -> bool:
 	if state != "playing" or drink != null:
 		return false
-	var target := people.feed_target(player.x, player.y, player.angle, FEED_REACH, deg_to_rad(60.0))
+	var target := people.feed_target(player.x, player.y, player.angle, feed_reach, feed_arc)
 	if target == null:
 		return false
 	var front: bool = People.sees(target, world, player.x, player.y, People.REACT_DEFAULTS)
@@ -1318,10 +1343,10 @@ func step_drink(dt: float) -> void:
 	if d["interrupt"]:
 		end_drink("witness")
 		return
-	if not d["forced"] and float(d["t"]) > dt * 1.5 and not feed_held():
+	if not d["forced"] and float(d["t"]) > dt * 1.5 and not feed_held() and not feed_toggle:
 		end_drink("released")
 		return
-	if sqrt((p.x - player.x) * (p.x - player.x) + (p.y - player.y) * (p.y - player.y)) > FEED_REACH + 0.3:
+	if sqrt((p.x - player.x) * (p.x - player.x) + (p.y - player.y) * (p.y - player.y)) > feed_reach + 0.3:
 		end_drink("reach")
 		return
 	var want_rs: float = 1.0 if key_down(KEY_E) else 0.0
@@ -1459,6 +1484,41 @@ func _render() -> void:
 	wall_mat.set_shader_parameter("focal_px", 320.0 / tan(fov_now() / 2.0))
 
 
+## Push the settings into the running game (js applyConfig): volume, sonar, feeding, motion, text and effects.
+func apply_config() -> void:
+	audio.volume = float(cfg["volume"])
+	flow.night_length_min = float(cfg["nightLengthMin"])
+	flow.autosave_sec = float(cfg["autosaveSec"])
+	reduced = cfg["reduceMotion"] == true
+	player_cfg = {"mouseSensitivity": cfg["mouseSensitivity"], "invertMouse": cfg["invertMouse"], "moveSpeed": cfg["moveSpeed"], "turnSpeedKeys": cfg["turnSpeedKeys"], "keyTurnSpeed": cfg["keyTurnSpeed"]}
+	base_range = float(cfg["sonarRange"])
+	base_fade = float(cfg["sonarFade"])
+	sonar.speed = float(cfg["sonarSpeed"])
+	sonar.cooldown = float(cfg["sonarCooldown"]) * (flow.fxv("sonarCooldown") if flow.run != null else 1.0)
+	feed_reach = float(cfg["feedReach"])
+	feed_arc = deg_to_rad(float(cfg["feedArcDeg"]))
+	pool_min = float(cfg["poolMin"])
+	pool_max = maxf(float(cfg["poolMax"]), pool_min)
+	dazed_time = float(cfg["dazedTime"])
+	feed_toggle = cfg["feedToggle"] == true
+	show_subtitles = cfg["subtitles"] == true
+	show_translation = cfg["translation"] == true
+	villager_voices = cfg["villagerVoices"] == true
+	large_text = cfg["largeText"] == true
+	fov_base_deg = float(cfg["fovDeg"])
+	ambience_gain = float(cfg["ambienceGain"])
+	react_key = -1.0
+	echo_view.apply_config(cfg, reduced)
+
+
+## Change one setting, save the file and apply it.
+func set_config(key: String, value: Variant) -> void:
+	cfg[key] = value
+	if test_storage == null:
+		Config.save_file(cfg)
+	apply_config()
+
+
 ## Per-frame feed effects: the FOV narrows while holding a victim, the vial pulses and gulps land (js stepFeedFx).
 func step_feed_fx(dt: float) -> void:
 	var up: float = 1.0 / 0.35 if drink != null else -1.0 / 0.4
@@ -1477,7 +1537,7 @@ func fov_ease() -> float:
 
 ## Current horizontal field of view in radians (the base 66 degrees, narrowed while feeding unless reduced motion).
 func fov_now() -> float:
-	var base: float = deg_to_rad(FOV_DEG)
+	var base: float = deg_to_rad(fov_base_deg)
 	if reduced or fov_k <= 0.0:
 		return base
 	return base * (1.0 - (1.0 - GRAB_FOV) * fov_ease())

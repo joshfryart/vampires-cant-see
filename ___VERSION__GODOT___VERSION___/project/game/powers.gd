@@ -68,7 +68,7 @@ func use_power(id: String) -> Dictionary:
 ## Shriek: a loud pulse at double range; people react far away.
 func do_shriek() -> void:
 	var weak: float = g.night.weakness() if g.night != null else 0.0
-	var rng_: float = Game.BASE_RANGE * g.fxv("sonarRange") * 2.0 * (1.0 - 0.4 * weak)
+	var rng_: float = g.base_range * g.fxv("sonarRange") * 2.0 * (1.0 - 0.4 * weak)
 	g.emit_sound("shriek", g.player.x, g.player.y, {"range": rng_})
 	g.audio.play("shriek", {"gain": SoundData.level("shriek")["gain"], "pan": 0.0})
 	var react: Dictionary = GameData.sounds()["react"]
