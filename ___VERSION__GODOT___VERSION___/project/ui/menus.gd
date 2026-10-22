@@ -56,7 +56,21 @@ func _place(below_title: bool) -> void:
 		_panel.offset_right = 210.0
 		_panel.offset_top = 0.0
 		_panel.offset_bottom = 0.0
-	_panel.reset_size.call_deferred()
+	_refit.call_deferred(below_title)
+
+
+## Shrink the panel to its content and keep it centred (or hanging below the title) once the layout has settled.
+func _refit(below_title: bool) -> void:
+	await _panel.get_tree().process_frame
+	var ms: Vector2 = _panel.get_combined_minimum_size()
+	if below_title:
+		_panel.offset_top = 215.0
+		_panel.offset_bottom = 215.0 + ms.y
+	else:
+		_panel.offset_top = -ms.y / 2.0
+		_panel.offset_bottom = ms.y / 2.0
+	_panel.offset_left = -maxf(210.0, ms.x / 2.0)
+	_panel.offset_right = maxf(210.0, ms.x / 2.0)
 
 
 func _clear() -> void:
@@ -102,6 +116,7 @@ func sync(g: Game) -> void:
 		"boon": _build_choice("A gift of the night", g.flow.run["pendingBoons"], true)
 		"gift": _build_choice("Blood gift", g.flow.run["pendingGifts"], false)
 		"runend": _build_runend()
+		"error": _build_error()
 		_: _panel.visible = false
 	if _panel.visible and key != _last_key:
 		_focus_first.call_deferred()
@@ -175,15 +190,24 @@ func _build_shop() -> void:
 	_label("Shop", 22, Color(0.9, 0.85, 0.5))
 	_label("Essence: %d" % int(_g.flow.meta["essence"]), 15)
 	var meta: Dictionary = _g.flow.meta
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(430, 340)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_box.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6)
+	list.custom_minimum_size = Vector2(410, 0)
+	scroll.add_child(list)
 	for u in GameData.get_json("upgrades")["upgrades"]:
 		var t: int = Meta.tier_of(meta, u["id"])
 		var cost: int = Meta.cost_of(meta, u["id"])
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		_box.add_child(row)
+		list.add_child(row)
+		row.add_child(IconRect.new(str(u.get("icon", "bat")), 40.0))
 		var info := Label.new()
-		info.text = "%s  [%d/%d]  %s" % [u["name"], t, Meta.MAX_TIER, u["desc"][mini(t, Meta.MAX_TIER) - (1 if t >= Meta.MAX_TIER else 0)]]
-		info.custom_minimum_size = Vector2(300, 0)
+		info.text = "%s  %s%s  %s" % [u["name"], "●".repeat(t), "○".repeat(Meta.MAX_TIER - t), u["desc"][mini(t, Meta.MAX_TIER) - (1 if t >= Meta.MAX_TIER else 0)]]
+		info.custom_minimum_size = Vector2(260, 0)
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(info)
 		var id: String = u["id"]
@@ -247,6 +271,9 @@ func _build_choice(title: String, ids: Variant, boon: bool) -> void:
 		var card := VBoxContainer.new()
 		card.add_theme_constant_override("separation", 2)
 		_box.add_child(card)
+		var ic := IconRect.new(str(info["icon"]) if info != null else "bat", 56.0)
+		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		card.add_child(ic)
 		var name_l := Label.new()
 		name_l.text = str(info["name"]) if info != null else str(id)
 		name_l.add_theme_font_size_override("font_size", 17)
@@ -386,6 +413,9 @@ func _build_guide() -> void:
 	for p in hd["powers"]:
 		var locked: bool = cur > 0 and cur < int(p["unlock"])
 		var key: String = "Shift or C" if str(p["key"][0]).begins_with("Shift") else str(p["key"][0]).trim_prefix("Key")
+		var pic := IconRect.new(str(p["icon"]), 44.0)
+		pic.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		list.add_child(pic)
 		_guide_text(list, str(p["name"]), 15, Color(0.55, 0.6, 0.7) if locked else Color(1.0, 0.9, 0.7))
 		if locked:
 			_guide_text(list, "Unlocks night %d" % int(p["unlock"]), 12, Color(0.6, 0.65, 0.8))
@@ -450,3 +480,22 @@ func _import_save() -> void:
 			else:
 				_g.flow.import_text(f.get_as_text())
 			sync(_g))
+
+
+# ---------------------------------------------------------------- error screen
+
+func _build_error() -> void:
+	_clear()
+	_panel.visible = true
+	_place(false)
+	_label("Something went wrong", 22, Color(0.9, 0.3, 0.3))
+	_label(str(_g.last_error.get("code", "E_UNKNOWN")), 14, Color(1.0, 0.8, 0.4))
+	_label(str(_g.last_error.get("message", "")), 13)
+	_label("If a run was in progress it was saved. Copy the report below into a bug report.", 12, Color(0.6, 0.65, 0.8))
+	_button("Copy report", func(): DisplayServer.clipboard_set(Log.report("%s: %s" % [_g.last_error.get("code", ""), _g.last_error.get("message", "")])))
+	_button("Save log to file", func():
+		var f := FileAccess.open("user://vcs-log.txt", FileAccess.WRITE)
+		if f != null:
+			f.store_string(Log.report())
+			_g.flow.notices.append("Log saved to " + ProjectSettings.globalize_path("user://vcs-log.txt")))
+	_button("Quit", func(): _g.get_tree().quit())

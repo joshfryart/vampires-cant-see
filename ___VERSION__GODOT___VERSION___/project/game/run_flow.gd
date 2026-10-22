@@ -250,6 +250,7 @@ func begin_run() -> bool:
 		return false
 	var seed_v: int = int(seed_param) if seed_param != null else (randi() & JsMath.M32)
 	run = {"seed": seed_v, "boons": [], "closedSafe": {}, "pendingBoons": null, "pendingGifts": null}
+	Log.info("run", "begin seed=%d" % seed_v)
 	g.hunger = Hunger.create()
 	fx = compute_fx()
 	reset_world_for_run()
@@ -275,6 +276,7 @@ func end_run(kind: String) -> void:
 	if g.state == "runend":
 		return
 	g.end_drink("run")
+	Log.info("run", "end %s" % kind)
 	run_kind = kind
 	seq = null
 	var n: Night = g.night
@@ -622,7 +624,7 @@ func save_run(_why: String) -> bool:
 	var snap := get_snapshot()
 	var v := SaveCodec.validate_run(snap, SaveCodec.RUN_SCHEMA)
 	if not v["ok"]:
-		push_warning("run snapshot invalid (%s)" % v["code"])
+		Log.warn("save", "run snapshot invalid (%s)" % v["code"])
 		return false
 	var r := store.write("run", SaveCodec.RUN_SCHEMA, snap)
 	if not r["ok"]:

@@ -114,3 +114,17 @@ func test_export_import_and_abandon() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	g.free()
 	g2.free()
+
+
+func test_fatal_error_screen() -> void:
+	var g := _game()
+	g.flow.seed_param = 3
+	g.flow.begin_run()
+	g.fatal("E_TEST", "boom")
+	eq(g.state, "error", "error state")
+	eq(g.last_error["code"], "E_TEST", "error code kept")
+	ok(Log.report().find("boom") >= 0, "the report holds the error")
+	ok(g.flow.store.has("run"), "the run was saved on fatal")
+	g.step(0.05, {})
+	eq(g.state, "error", "stays on the error screen")
+	g.free()

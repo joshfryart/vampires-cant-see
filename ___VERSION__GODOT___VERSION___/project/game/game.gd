@@ -145,6 +145,8 @@ var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
 var step_timer: float = 0.0
+## {code, message} of the last fatal error shown on the error screen.
+var last_error: Dictionary = {}
 ## Seconds on the title screen (drives the crypt backdrop and the title boil).
 var title_t: float = 0.0
 ## Head bob (js updateBob): amplitude ramp, walk cycle phase and the resulting vertical offset in 640x360 pixels.
@@ -705,6 +707,17 @@ func step(dt: float, inp: Dictionary) -> void:
 		flow.tick_autosave(dt)
 	pressed.clear()
 	hud.set_state(self)
+
+
+## The fatal error screen (js fatal): log it, save a run in play, free the mouse and show the report buttons.
+func fatal(code: String, message: String) -> void:
+	if state == "error":
+		return
+	Log.error("fatal", "%s: %s" % [code, message])
+	if flow != null and run_on and drink == null:
+		flow.save_run("fatal")
+	last_error = {"code": code, "message": message}
+	set_state("error")
 
 
 ## Losing the window focus pauses (and saves) a run in play, as losing pointer lock does in the browser.
