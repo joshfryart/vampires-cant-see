@@ -2,7 +2,7 @@ class_name Sonar
 extends RefCounted
 ## Ports js/sonar.js (Phase 1 subset). One Sonar instance is the JS sonar `state`.
 ## Ray tables use Packed*32 arrays on purpose: JS stores them in Float32Array, so values quantise the same way.
-## Not yet ported: strongestEcho, enclosure, sample3/brightnessAt3 helpers (Phase 3).
+## Not yet ported: sample3/brightnessAt3 helpers.
 
 const TWO_PI := JsMath.TWO_PI
 const TOL := 0.35
@@ -419,3 +419,83 @@ static func echo_delay(d: float, spd: float = SONAR_SPEED) -> float:
 
 static func beam_at(pulse: Pulse, ang: float) -> float:
 	return pulse.vbeam[ray_index(pulse, ang)] if pulse.vbeam.size() > 0 else 1.0
+
+
+## Surface hit along world angle `ang` (nearest ray) for visuals and audio (js hitInfo):
+## {hit, dist, mat, rough, nx, ny, cosInc, beam}.
+static func hit_info(pulse: Pulse, ang: float) -> Dictionary:
+	var i: int = ray_index(pulse, ang)
+	var d: float = pulse.vis[i]
+	var code: int = pulse.vnorm[i] if pulse.vnorm.size() > 0 else NO_HIT
+	var hit: bool = code != NO_HIT
+	var mat: String = MATS[pulse.vmat[i]] if hit else ""
+	var nx: float = 1.0 if code == 0 else (-1.0 if code == 1 else 0.0)
+	var ny: float = 1.0 if code == 2 else (-1.0 if code == 3 else 0.0)
+	var ra: float = (float(i) / pulse.vis.size()) * TWO_PI
+	return {
+		"hit": hit, "dist": d, "mat": mat, "rough": Acoustics.rough_of(mat) if hit else 0.0, "nx": nx, "ny": ny,
+		"cosInc": maxf(0.0, -(cos(ra) * nx + sin(ra) * ny)) if hit else 0.0,
+		"beam": pulse.vbeam[i] if pulse.vbeam.size() > 0 else 1.0,
+	}
+
+
+## The loudest wall return of a pulse heard from its origin (js strongestEcho): {dist, angle, theta, mat, rough, level, cosInc}
+## or an empty Dictionary when no wall is in range. facing defaults to the pulse facing.
+static func strongest_echo(pulse: Pulse, facing: float = NAN) -> Dictionary:
+	if pulse == null or pulse.vis.is_empty():
+		return {}
+	var f: float = facing if not is_nan(facing) else (pulse.facing if pulse.has_facing else 0.0)
+	var n: int = pulse.vis.size()
+	var best: Dictionary = {}
+	for i in n:
+		var d: float = pulse.vis[i]
+		if not (d > 0.0) or d >= pulse.range - 1e-4:
+			continue
+		var angle: float = (float(i) / n) * TWO_PI
+		var h := hit_info(pulse, angle)
+		if not h["hit"]:
+			continue
+		var theta: float = angle - f
+		var level: float = Acoustics.echo_level("wall", d, theta, h["mat"]) + 20.0 * log(maxf(h["cosInc"], 0.25)) / log(10.0)
+		if best.is_empty() or level > best["level"]:
+			best = {"dist": d, "angle": angle, "theta": theta, "mat": h["mat"], "rough": h["rough"], "level": level, "cosInc": h["cosInc"]}
+	return best
+
+
+## Enclosure of a pulse as heard from its origin (js enclosure): {hitFrac, meanAlpha}.
+static func enclosure(pulse: Pulse) -> Dictionary:
+	if pulse == null or pulse.vis.is_empty():
+		return {"hitFrac": 0.0, "meanAlpha": 0.0}
+	var n: int = pulse.vis.size()
+	var hits := 0
+	var alpha := 0.0
+	for i in n:
+		var d: float = pulse.vis[i]
+		if not (d > 0.0) or d >= pulse.range - 1e-4:
+			continue
+		if pulse.vnorm.size() > 0 and pulse.vnorm[i] == NO_HIT:
+			continue
+		hits += 1
+		if pulse.vmat.size() > 0:
+			alpha += float(Acoustics.mat_of(MATS[pulse.vmat[i]])["alpha"])
+	return {"hitFrac": float(hits) / n, "meanAlpha": alpha / hits if hits > 0 else 0.0}
+
+
+## Water-ripple arcs on a wall point (js wallArc): for k in 0..trail-1 the ring radius is ring - k*0.35; returns an Array of
+## trail entries, each [zLow, zHigh] or empty when the ring has not reached the face.
+static func wall_arc(pulse: Pulse, t: float, hit_x: float, hit_y: float, trail: int) -> Array:
+	var dx: float = hit_x - pulse.x
+	var dy: float = hit_y - pulse.y
+	var dh2: float = dx * dx + dy * dy
+	var ring: float = (t - pulse.t0) * pulse.speed
+	var out: Array = []
+	for k in trail:
+		var r: float = ring - k * 0.35
+		if r * r > dh2 and r > 0.0:
+			var dz: float = sqrt(r * r - dh2)
+			var lo: float = pulse.z - dz
+			var hi: float = pulse.z + dz
+			out.append([0.0 if lo < 0.0 else lo, 1.0 if hi > 1.0 else hi])
+		else:
+			out.append([])
+	return out

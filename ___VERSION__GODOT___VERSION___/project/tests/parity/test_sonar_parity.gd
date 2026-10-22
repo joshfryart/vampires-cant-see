@@ -28,6 +28,42 @@ func test_scenes() -> void:
 		eq(s.emit(w, float(sc["x"]), float(sc["y"]), t0 + 0.5, {"facing": float(sc["facing"])}), sc["emitAgain"], lbl + " emit during cooldown")
 		near(s.cooldown_left(t0 + 0.3), float(sc["cooldownLeft"]), EPS, lbl + " cooldown_left")
 		var primary: Sonar.Pulse = s.last_pulse
+		var ex: Dictionary = sc["extra"]
+		for h in ex["hitInfo"]:
+			var got := Sonar.hit_info(primary, float(h["ang"]))
+			eq(got["hit"], h["hit"], lbl + " hitInfo hit")
+			near(got["dist"], float(h["dist"]), EPS32, lbl + " hitInfo dist")
+			eq(got["mat"], h["mat"] if h["mat"] != null else "", lbl + " hitInfo mat")
+			near(got["rough"], float(h["rough"]), EPS, lbl + " hitInfo rough")
+			near(got["nx"], float(h["nx"]), EPS, lbl + " hitInfo nx")
+			near(got["ny"], float(h["ny"]), EPS, lbl + " hitInfo ny")
+			near(got["cosInc"], float(h["cosInc"]), EPS32, lbl + " hitInfo cosInc")
+			near(got["beam"], float(h["beam"]), EPS32, lbl + " hitInfo beam")
+		for pair in [["strongest", NAN], ["strongestFacing", 1.0]]:
+			var want: Variant = ex[pair[0]]
+			var se := Sonar.strongest_echo(primary, pair[1])
+			if want == null:
+				ok(se.is_empty(), lbl + " strongest should be empty")
+			else:
+				near(se["dist"], float(want["dist"]), EPS32, lbl + " strongest dist")
+				near(se["angle"], float(want["angle"]), EPS, lbl + " strongest angle")
+				near(se["level"], float(want["level"]), 1e-5, lbl + " strongest level")
+				eq(se["mat"], want["mat"], lbl + " strongest mat")
+		var enc := Sonar.enclosure(primary)
+		near(enc["hitFrac"], float(ex["enclosure"]["hitFrac"]), EPS, lbl + " enclosure hitFrac")
+		near(enc["meanAlpha"], float(ex["enclosure"]["meanAlpha"]), 1e-7, lbl + " enclosure meanAlpha")
+		for arc in ex["arcs"]:
+			var got_arc := Sonar.wall_arc(primary, t0 + float(arc["dt"]), float(arc["qx"]), float(arc["qy"]), 4)
+			var cnt := 0
+			for k in 4:
+				var wlo: Variant = arc["out"][2 * k]
+				if wlo == null:
+					ok(got_arc[k].is_empty(), lbl + " arc %d should be empty" % k)
+				else:
+					cnt += 1
+					near(got_arc[k][0], float(wlo), 1e-5, lbl + " arc lo")
+					near(got_arc[k][1], float(arc["out"][2 * k + 1]), 1e-5, lbl + " arc hi")
+			eq(cnt, int(arc["n"]), lbl + " arc count")
 		near(Sonar.nearest_dist(primary), float(sc["nearest"]), EPS32, lbl + " nearest")
 		eq(s.pulses.size(), int(sc["pulseCount"]), lbl + " pulse count")
 

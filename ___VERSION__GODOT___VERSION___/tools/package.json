@@ -1,0 +1,9 @@
+{
+  "name": "vcs-godot-port-tools",
+  "private": true,
+  "description": "Build-time tools for the Godot port (audio baking). Not shipped.",
+  "type": "module",
+  "dependencies": {
+    "node-web-audio-api": "^2.2.0"
+  }
+}

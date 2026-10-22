@@ -1,3 +1,4 @@
 .godot/
 out/
 .cli-anything/
+tools/node_modules/

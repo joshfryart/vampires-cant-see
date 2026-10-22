@@ -53,6 +53,7 @@ var interact_press: bool = false
 var feed_held_mouse: bool = false
 var rng := RandomNumberGenerator.new()
 var react_cfg: Dictionary = {}
+var room_zone: String = ""
 
 var textures: PulseTextures
 var wall_mat: ShaderMaterial
@@ -137,6 +138,8 @@ func load_map(name: String) -> void:
 	state = "playing"
 	react_cfg = GameData.sounds()["react"].duplicate()
 	react_cfg["dazedTime"] = 3.0
+	room_zone = world.name
+	audio.set_room(world.kind, Acoustics.t60_for(room_zone, world.kind))
 	for child in viewport.get_children():
 		if child.has_meta("map_mesh"):
 			child.queue_free()
@@ -217,6 +220,7 @@ func _process(delta: float) -> void:
 ## One logic step (js update): input -> world -> drinking. Also called directly by scripted tests.
 func step(dt: float, inp: Dictionary) -> void:
 	clock += dt
+	audio.tick(clock)
 	var was_drinking: bool = drink != null
 	if was_drinking:
 		var dk: Dictionary = drink
@@ -315,9 +319,44 @@ func spatial(x: float, y: float, gain: float, extra: Dictionary = {}) -> Diction
 	var dx: float = x - player.x
 	var dy: float = y - player.y
 	var o := {"gain": gain, "pan": pan_to(x, y), "dist": sqrt(dx * dx + dy * dy), "behind": cos(atan2(dy, dx) - player.angle) < 0.0}
-	o["occluded"] = first_solid(player.x, player.y, x, y) != null
+	var occ: Variant = occlusion_to(x, y)
+	o["occluded"] = occ != null
+	if occ != null:
+		o["occ"] = occ
 	o.merge(extra, true)
 	return o
+
+
+## Acoustic material of the solid cell at (x, y): "door" for a closed D, else the world material (js blockMaterial).
+func block_material(x: float, y: float) -> String:
+	if world.tile_at(x, y) == "D":
+		return "door"
+	var m := world.material_at(x, y)
+	return m if m != "" else "stone"
+
+
+## Occlusion detail for a world sound at (x, y): null when the line is clear, else {mat, diff} where diff is the least
+## Maekawa loss (dB) over open doorways both the player and the sound can see (NAN when none) (js occlusionTo).
+func occlusion_to(x: float, y: float) -> Variant:
+	var hit: Variant = first_solid(player.x, player.y, x, y)
+	if hit == null:
+		return null
+	var out := {"mat": block_material(hit.x, hit.y), "diff": null}
+	var ac := Acoustics.a()
+	var direct: float = sqrt((x - player.x) * (x - player.x) + (y - player.y) * (y - player.y))
+	for dr in world.spots["doors"]:
+		if not world.is_door_open(floor(dr.x), floor(dr.y)):
+			continue
+		var d1: float = sqrt((dr.x - player.x) * (dr.x - player.x) + (dr.y - player.y) * (dr.y - player.y))
+		var d2: float = sqrt((x - dr.x) * (x - dr.x) + (y - dr.y) * (y - dr.y))
+		if d1 > float(ac["doorwayReach"]) or d1 + d2 > direct + 12.0:
+			continue
+		if first_solid(player.x, player.y, dr.x, dr.y) != null or first_solid(dr.x, dr.y, x, y) != null:
+			continue
+		var loss: float = Acoustics.maekawa((d1 + d2 - direct) * float(ac["cellM"]), float(ac["maekawaHz"]))
+		if out["diff"] == null or loss < float(out["diff"]):
+			out["diff"] = loss
+	return out
 
 
 func react_to(x: float, y: float, kind: String, dist: float = -1.0) -> void:

@@ -1,0 +1,1750 @@
+{
+ "rate": 44100,
+ "playGain": 0.3,
+ "peakTarget": 0.9,
+ "entries": {
+  "play:step": [
+   {
+    "file": "play_step_stone_f0_lo.wav",
+    "scale": 4.3031776825173065,
+    "ms": 85,
+    "peak": 0.20914776623249054,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_stone_f0_mid.wav",
+    "scale": 3.978395639795854,
+    "ms": 85,
+    "peak": 0.22622184455394745,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_stone_f0_hi.wav",
+    "scale": 3.8668180751628327,
+    "ms": 85,
+    "peak": 0.23274950683116913,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_stone_f1_lo.wav",
+    "scale": 4.690248607807615,
+    "ms": 87,
+    "peak": 0.1918874830007553,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_stone_f1_mid.wav",
+    "scale": 4.729619403239867,
+    "ms": 86,
+    "peak": 0.1902901530265808,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_stone_f1_hi.wav",
+    "scale": 4.606367570696572,
+    "ms": 86,
+    "peak": 0.19538171589374542,
+    "kind": "play",
+    "name": "step",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f0_lo.wav",
+    "scale": 3.970211739665025,
+    "ms": 111,
+    "peak": 0.22668816149234772,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f0_mid.wav",
+    "scale": 3.776970763016165,
+    "ms": 113,
+    "peak": 0.23828619718551636,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f0_hi.wav",
+    "scale": 3.616704705214924,
+    "ms": 115,
+    "peak": 0.24884530901908875,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f1_lo.wav",
+    "scale": 3.751188129253378,
+    "ms": 112,
+    "peak": 0.23992398381233215,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f1_mid.wav",
+    "scale": 3.5986842674436272,
+    "ms": 113,
+    "peak": 0.25009140372276306,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_wood_f1_hi.wav",
+    "scale": 3.6722015974855036,
+    "ms": 114,
+    "peak": 0.24508458375930786,
+    "kind": "play",
+    "name": "step",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f0_lo.wav",
+    "scale": 6.016920225917018,
+    "ms": 124,
+    "peak": 0.14957818388938904,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f0_mid.wav",
+    "scale": 7.499643953656609,
+    "ms": 126,
+    "peak": 0.12000569701194763,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f0_hi.wav",
+    "scale": 7.8189826269722635,
+    "ms": 122,
+    "peak": 0.11510448902845383,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f1_lo.wav",
+    "scale": 6.298516899882973,
+    "ms": 121,
+    "peak": 0.1428907811641693,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f1_mid.wav",
+    "scale": 6.994571451766125,
+    "ms": 123,
+    "peak": 0.12867121398448944,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_step_grass_f1_hi.wav",
+    "scale": 6.800453663996573,
+    "ms": 121,
+    "peak": 0.1323441118001938,
+    "kind": "play",
+    "name": "step",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:personStep": [
+   {
+    "file": "play_personStep_stone_f0_lo.wav",
+    "scale": 3.884952265588346,
+    "ms": 108,
+    "peak": 0.2316630780696869,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_stone_f0_mid.wav",
+    "scale": 4.874071845579069,
+    "ms": 109,
+    "peak": 0.18465054035186768,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_stone_f0_hi.wav",
+    "scale": 4.719900666208154,
+    "ms": 109,
+    "peak": 0.19068197906017303,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_stone_f1_lo.wav",
+    "scale": 4.644247038539775,
+    "ms": 108,
+    "peak": 0.19378814101219177,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_stone_f1_mid.wav",
+    "scale": 4.843379788300329,
+    "ms": 109,
+    "peak": 0.18582065403461456,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_stone_f1_hi.wav",
+    "scale": 4.720202769194988,
+    "ms": 108,
+    "peak": 0.19066977500915527,
+    "kind": "play",
+    "name": "personStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f0_lo.wav",
+    "scale": 4.7258561578050635,
+    "ms": 102,
+    "peak": 0.19044168293476105,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f0_mid.wav",
+    "scale": 4.459075215895866,
+    "ms": 105,
+    "peak": 0.20183557271957397,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f0_hi.wav",
+    "scale": 4.401368200915487,
+    "ms": 103,
+    "peak": 0.20448186993598938,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f1_lo.wav",
+    "scale": 4.428255178977518,
+    "ms": 106,
+    "peak": 0.2032403200864792,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f1_mid.wav",
+    "scale": 4.40159305108023,
+    "ms": 103,
+    "peak": 0.2044714242219925,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_wood_f1_hi.wav",
+    "scale": 4.178539877957644,
+    "ms": 106,
+    "peak": 0.21538624167442322,
+    "kind": "play",
+    "name": "personStep",
+    "material": "wood",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f0_lo.wav",
+    "scale": 9.294908720247506,
+    "ms": 114,
+    "peak": 0.0968272015452385,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f0_mid.wav",
+    "scale": 7.912079392253356,
+    "ms": 117,
+    "peak": 0.11375012248754501,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f0_hi.wav",
+    "scale": 9.039563949161526,
+    "ms": 112,
+    "peak": 0.09956232458353043,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f1_lo.wav",
+    "scale": 8.888815604396786,
+    "ms": 114,
+    "peak": 0.10125083476305008,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f1_mid.wav",
+    "scale": 6.87628942998092,
+    "ms": 114,
+    "peak": 0.1308845430612564,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_personStep_grass_f1_hi.wav",
+    "scale": 7.407314268712634,
+    "ms": 111,
+    "peak": 0.12150152772665024,
+    "kind": "play",
+    "name": "personStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:guardStep": [
+   {
+    "file": "play_guardStep_stone_f0_lo.wav",
+    "scale": 4.737270911163,
+    "ms": 135,
+    "peak": 0.1899828016757965,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_stone_f0_mid.wav",
+    "scale": 4.679124317495104,
+    "ms": 135,
+    "peak": 0.19234368205070496,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_stone_f0_hi.wav",
+    "scale": 5.120194451829225,
+    "ms": 128,
+    "peak": 0.17577457427978516,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_stone_f1_lo.wav",
+    "scale": 4.396743825552911,
+    "ms": 130,
+    "peak": 0.20469693839550018,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_stone_f1_mid.wav",
+    "scale": 5.052369276651325,
+    "ms": 130,
+    "peak": 0.1781342476606369,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_stone_f1_hi.wav",
+    "scale": 4.798786088933859,
+    "ms": 130,
+    "peak": 0.18754743039608002,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "stone",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f0_lo.wav",
+    "scale": 4.218273460130219,
+    "ms": 135,
+    "peak": 0.21335743367671967,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f0_mid.wav",
+    "scale": 4.643364774731992,
+    "ms": 135,
+    "peak": 0.19382496178150177,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f0_hi.wav",
+    "scale": 5.096305046683802,
+    "ms": 128,
+    "peak": 0.17659853398799896,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 0,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f1_lo.wav",
+    "scale": 4.469740920257226,
+    "ms": 130,
+    "peak": 0.20135395228862762,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f1_mid.wav",
+    "scale": 4.705786378816645,
+    "ms": 130,
+    "peak": 0.1912539005279541,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_guardStep_grass_f1_hi.wav",
+    "scale": 4.90136783579024,
+    "ms": 130,
+    "peak": 0.18362221121788025,
+    "kind": "play",
+    "name": "guardStep",
+    "material": "grass",
+    "foot": 1,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:doorOpen": [
+   {
+    "file": "play_doorOpen_lo.wav",
+    "scale": 5.057886484665423,
+    "ms": 545,
+    "peak": 0.17793993651866913,
+    "kind": "play",
+    "name": "doorOpen",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_doorOpen_mid.wav",
+    "scale": 5.324237773258685,
+    "ms": 548,
+    "peak": 0.16903828084468842,
+    "kind": "play",
+    "name": "doorOpen",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_doorOpen_hi.wav",
+    "scale": 5.360164779112549,
+    "ms": 551,
+    "peak": 0.1679052859544754,
+    "kind": "play",
+    "name": "doorOpen",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:doorClose": [
+   {
+    "file": "play_doorClose_mid.wav",
+    "scale": 4.9948216354801005,
+    "ms": 168,
+    "peak": 0.18018661439418793,
+    "kind": "play",
+    "name": "doorClose",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:creak": [
+   {
+    "file": "play_creak_lo.wav",
+    "scale": 4.609765519936377,
+    "ms": 735,
+    "peak": 0.19523769617080688,
+    "kind": "play",
+    "name": "creak",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_creak_mid.wav",
+    "scale": 4.592042135070015,
+    "ms": 740,
+    "peak": 0.19599123299121857,
+    "kind": "play",
+    "name": "creak",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_creak_hi.wav",
+    "scale": 4.541913345061989,
+    "ms": 734,
+    "peak": 0.19815437495708466,
+    "kind": "play",
+    "name": "creak",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:scream": [
+   {
+    "file": "play_scream_lo.wav",
+    "scale": 4.93032761573046,
+    "ms": 720,
+    "peak": 0.18254365026950836,
+    "kind": "play",
+    "name": "scream",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_scream_mid.wav",
+    "scale": 4.919231303648091,
+    "ms": 720,
+    "peak": 0.18295541405677795,
+    "kind": "play",
+    "name": "scream",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_scream_hi.wav",
+    "scale": 4.93730819570739,
+    "ms": 720,
+    "peak": 0.18228556215763092,
+    "kind": "play",
+    "name": "scream",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:startle": [
+   {
+    "file": "play_startle_lo.wav",
+    "scale": 4.382021906490035,
+    "ms": 173,
+    "peak": 0.20538464188575745,
+    "kind": "play",
+    "name": "startle",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_startle_mid.wav",
+    "scale": 4.386170956592011,
+    "ms": 173,
+    "peak": 0.20519036054611206,
+    "kind": "play",
+    "name": "startle",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_startle_hi.wav",
+    "scale": 4.3903285093347035,
+    "ms": 173,
+    "peak": 0.2049960494041443,
+    "kind": "play",
+    "name": "startle",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:interact": [
+   {
+    "file": "play_interact_lo.wav",
+    "scale": 3.846582308631695,
+    "ms": 106,
+    "peak": 0.2339739352464676,
+    "kind": "play",
+    "name": "interact",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_interact_mid.wav",
+    "scale": 3.9386379825099054,
+    "ms": 104,
+    "peak": 0.22850538790225983,
+    "kind": "play",
+    "name": "interact",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_interact_hi.wav",
+    "scale": 4.273133218539737,
+    "ms": 105,
+    "peak": 0.2106182873249054,
+    "kind": "play",
+    "name": "interact",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:chime": [
+   {
+    "file": "play_chime_mid.wav",
+    "scale": 4.292271825600578,
+    "ms": 1513,
+    "peak": 0.20967917144298553,
+    "kind": "play",
+    "name": "chime",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:heartbeat": [
+   {
+    "file": "play_heartbeat_mid.wav",
+    "scale": 6.059792651833992,
+    "ms": 352,
+    "peak": 0.14851993322372437,
+    "kind": "play",
+    "name": "heartbeat",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:feed": [
+   {
+    "file": "play_feed_mid.wav",
+    "scale": 4.50653152588507,
+    "ms": 257,
+    "peak": 0.19971013069152832,
+    "kind": "play",
+    "name": "feed",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:gulp": [
+   {
+    "file": "play_gulp_lo.wav",
+    "scale": 4.566513196946776,
+    "ms": 235,
+    "peak": 0.19708691537380219,
+    "kind": "play",
+    "name": "gulp",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_gulp_mid.wav",
+    "scale": 4.933451925290988,
+    "ms": 234,
+    "peak": 0.1824280470609665,
+    "kind": "play",
+    "name": "gulp",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_gulp_hi.wav",
+    "scale": 4.589060392613341,
+    "ms": 234,
+    "peak": 0.1961185783147812,
+    "kind": "play",
+    "name": "gulp",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:struggle": [
+   {
+    "file": "play_struggle_lo.wav",
+    "scale": 5.327797789542648,
+    "ms": 306,
+    "peak": 0.16892533004283905,
+    "kind": "play",
+    "name": "struggle",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_struggle_mid.wav",
+    "scale": 5.6699258191158,
+    "ms": 305,
+    "peak": 0.15873223543167114,
+    "kind": "play",
+    "name": "struggle",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_struggle_hi.wav",
+    "scale": 5.1620226507566205,
+    "ms": 306,
+    "peak": 0.17435026168823242,
+    "kind": "play",
+    "name": "struggle",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:clatter": [
+   {
+    "file": "play_clatter_lo.wav",
+    "scale": 6.1591855652409615,
+    "ms": 215,
+    "peak": 0.14612321555614471,
+    "kind": "play",
+    "name": "clatter",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_clatter_mid.wav",
+    "scale": 5.134219503223829,
+    "ms": 216,
+    "peak": 0.1752944141626358,
+    "kind": "play",
+    "name": "clatter",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_clatter_hi.wav",
+    "scale": 5.266531848237885,
+    "ms": 215,
+    "peak": 0.1708904504776001,
+    "kind": "play",
+    "name": "clatter",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:scuffle": [
+   {
+    "file": "play_scuffle_lo.wav",
+    "scale": 8.277766408411809,
+    "ms": 113,
+    "peak": 0.10872498154640198,
+    "kind": "play",
+    "name": "scuffle",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_scuffle_mid.wav",
+    "scale": 6.663247879466194,
+    "ms": 113,
+    "peak": 0.13506926596164703,
+    "kind": "play",
+    "name": "scuffle",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_scuffle_hi.wav",
+    "scale": 6.870599594780308,
+    "ms": 115,
+    "peak": 0.13099293410778046,
+    "kind": "play",
+    "name": "scuffle",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:gasp": [
+   {
+    "file": "play_gasp_lo.wav",
+    "scale": 3.240382961710482,
+    "ms": 270,
+    "peak": 0.27774494886398315,
+    "kind": "play",
+    "name": "gasp",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_gasp_mid.wav",
+    "scale": 3.498475250876299,
+    "ms": 270,
+    "peak": 0.2572549283504486,
+    "kind": "play",
+    "name": "gasp",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_gasp_hi.wav",
+    "scale": 3.7417467467551186,
+    "ms": 263,
+    "peak": 0.2405293732881546,
+    "kind": "play",
+    "name": "gasp",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:miss": [
+   {
+    "file": "play_miss_mid.wav",
+    "scale": 4.430465014879232,
+    "ms": 191,
+    "peak": 0.20313894748687744,
+    "kind": "play",
+    "name": "miss",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:yawn": [
+   {
+    "file": "play_yawn_mid.wav",
+    "scale": 4.327318870385797,
+    "ms": 885,
+    "peak": 0.20798097550868988,
+    "kind": "play",
+    "name": "yawn",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:shriek": [
+   {
+    "file": "play_shriek_lo.wav",
+    "scale": 3.3024538600580966,
+    "ms": 520,
+    "peak": 0.2725246250629425,
+    "kind": "play",
+    "name": "shriek",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_shriek_mid.wav",
+    "scale": 3.4638390394154497,
+    "ms": 520,
+    "peak": 0.25982731580734253,
+    "kind": "play",
+    "name": "shriek",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_shriek_hi.wav",
+    "scale": 3.5088664355230015,
+    "ms": 520,
+    "peak": 0.25649309158325195,
+    "kind": "play",
+    "name": "shriek",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:mist": [
+   {
+    "file": "play_mist_mid.wav",
+    "scale": 4.325223716081663,
+    "ms": 261,
+    "peak": 0.20808172225952148,
+    "kind": "play",
+    "name": "mist",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:still": [
+   {
+    "file": "play_still_mid.wav",
+    "scale": 3.0016366226242917,
+    "ms": 620,
+    "peak": 0.2998364269733429,
+    "kind": "play",
+    "name": "still",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:gift": [
+   {
+    "file": "play_gift_mid.wav",
+    "scale": 4.288859654865895,
+    "ms": 1034,
+    "peak": 0.20984598994255066,
+    "kind": "play",
+    "name": "gift",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:overflow": [
+   {
+    "file": "play_overflow_mid.wav",
+    "scale": 4.78127148081886,
+    "ms": 67,
+    "peak": 0.18823444843292236,
+    "kind": "play",
+    "name": "overflow",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "play:whimper": [
+   {
+    "file": "play_whimper_lo.wav",
+    "scale": 3.9324884754371086,
+    "ms": 418,
+    "peak": 0.2288627177476883,
+    "kind": "play",
+    "name": "whimper",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_whimper_mid.wav",
+    "scale": 3.8962101056495326,
+    "ms": 420,
+    "peak": 0.23099370300769806,
+    "kind": "play",
+    "name": "whimper",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_whimper_hi.wav",
+    "scale": 3.7392217564616566,
+    "ms": 420,
+    "peak": 0.24069179594516754,
+    "kind": "play",
+    "name": "whimper",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   }
+  ],
+  "play:dog": [
+   {
+    "file": "play_dog_lo.wav",
+    "scale": 4.374452458104524,
+    "ms": 414,
+    "peak": 0.2057400345802307,
+    "kind": "play",
+    "name": "dog",
+    "material": null,
+    "foot": null,
+    "pitch": 0.92,
+    "ref": 0.3
+   },
+   {
+    "file": "play_dog_mid.wav",
+    "scale": 4.247947613456176,
+    "ms": 413,
+    "peak": 0.21186701953411102,
+    "kind": "play",
+    "name": "dog",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   },
+   {
+    "file": "play_dog_hi.wav",
+    "scale": 4.580143563492243,
+    "ms": 413,
+    "peak": 0.19650039076805115,
+    "kind": "play",
+    "name": "dog",
+    "material": null,
+    "foot": null,
+    "pitch": 1.08,
+    "ref": 0.3
+   },
+   {
+    "file": "play_dog_3yips.wav",
+    "scale": 4.247947613456176,
+    "ms": 654,
+    "peak": 0.21186701953411102,
+    "kind": "play",
+    "name": "dog",
+    "pitch": 1,
+    "yips": 3,
+    "ref": 0.3
+   }
+  ],
+  "play:bell": [
+   {
+    "file": "play_bell_mid.wav",
+    "scale": 5.0654345730672725,
+    "ms": 5727,
+    "peak": 0.1776747852563858,
+    "kind": "play",
+    "name": "bell",
+    "material": null,
+    "foot": null,
+    "pitch": 1,
+    "ref": 0.3
+   }
+  ],
+  "ping:ping": [
+   {
+    "file": "ping_lo.wav",
+    "scale": 1.6030933305474673,
+    "ms": 28,
+    "peak": 0.5614145994186401,
+    "kind": "ping",
+    "name": "ping",
+    "pitch": 0.98,
+    "ref": 0.5249999999999999
+   },
+   {
+    "file": "ping_mid.wav",
+    "scale": 1.5242062556326859,
+    "ms": 28,
+    "peak": 0.5904712677001953,
+    "kind": "ping",
+    "name": "ping",
+    "pitch": 1,
+    "ref": 0.5249999999999999
+   },
+   {
+    "file": "ping_hi.wav",
+    "scale": 1.5162747316706373,
+    "ms": 28,
+    "peak": 0.593559980392456,
+    "kind": "ping",
+    "name": "ping",
+    "pitch": 1.02,
+    "ref": 0.5249999999999999
+   }
+  ],
+  "echo:crisp": [
+   {
+    "file": "echo_crisp_indoor.wav",
+    "scale": 2.3130400775185427,
+    "ms": 70,
+    "peak": 0.38909831643104553,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_crisp_indoor_r45.wav",
+    "scale": 2.3130400775185427,
+    "ms": 70,
+    "peak": 0.38909831643104553,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_crisp_indoor_r70.wav",
+    "scale": 2.3130400775185427,
+    "ms": 70,
+    "peak": 0.38909831643104553,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_crisp_outdoor.wav",
+    "scale": 3.0869325463231716,
+    "ms": 70,
+    "peak": 0.2915515601634979,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_crisp_outdoor_r45.wav",
+    "scale": 3.0869325463231716,
+    "ms": 70,
+    "peak": 0.2915515601634979,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_crisp_outdoor_r70.wav",
+    "scale": 3.0869325463231716,
+    "ms": 70,
+    "peak": 0.2915515601634979,
+    "kind": "echo",
+    "name": "crisp",
+    "voice": "crisp",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:hollow": [
+   {
+    "file": "echo_hollow_indoor.wav",
+    "scale": 2.845007184354725,
+    "ms": 169,
+    "peak": 0.31634366512298584,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_hollow_indoor_r45.wav",
+    "scale": 2.845007184354725,
+    "ms": 169,
+    "peak": 0.31634366512298584,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_hollow_indoor_r70.wav",
+    "scale": 2.845007184354725,
+    "ms": 169,
+    "peak": 0.31634366512298584,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_hollow_outdoor.wav",
+    "scale": 4.061349245569031,
+    "ms": 169,
+    "peak": 0.2216012328863144,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_hollow_outdoor_r45.wav",
+    "scale": 4.061349245569031,
+    "ms": 169,
+    "peak": 0.2216012328863144,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_hollow_outdoor_r70.wav",
+    "scale": 4.061349245569031,
+    "ms": 169,
+    "peak": 0.2216012328863144,
+    "kind": "echo",
+    "name": "hollow",
+    "voice": "hollow",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:tick": [
+   {
+    "file": "echo_tick_indoor.wav",
+    "scale": 2.9445395731581216,
+    "ms": 40,
+    "peak": 0.3056505024433136,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_tick_indoor_r45.wav",
+    "scale": 2.9445395731581216,
+    "ms": 44,
+    "peak": 0.3056505024433136,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_tick_indoor_r70.wav",
+    "scale": 2.9445395731581216,
+    "ms": 63,
+    "peak": 0.3056505024433136,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_tick_outdoor.wav",
+    "scale": 8.903303656380526,
+    "ms": 39,
+    "peak": 0.1010860726237297,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_tick_outdoor_r45.wav",
+    "scale": 8.903303656380526,
+    "ms": 44,
+    "peak": 0.1010860726237297,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_tick_outdoor_r70.wav",
+    "scale": 8.903303656380526,
+    "ms": 62,
+    "peak": 0.1010860726237297,
+    "kind": "echo",
+    "name": "tick",
+    "voice": "tick",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:ring": [
+   {
+    "file": "echo_ring_indoor.wav",
+    "scale": 2.3283694330060967,
+    "ms": 470,
+    "peak": 0.3865365982055664,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_ring_indoor_r45.wav",
+    "scale": 2.3283694330060967,
+    "ms": 470,
+    "peak": 0.3865365982055664,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_ring_indoor_r70.wav",
+    "scale": 2.3283694330060967,
+    "ms": 470,
+    "peak": 0.3865365982055664,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_ring_outdoor.wav",
+    "scale": 3.4961791733736898,
+    "ms": 470,
+    "peak": 0.25742387771606445,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_ring_outdoor_r45.wav",
+    "scale": 3.4961791733736898,
+    "ms": 470,
+    "peak": 0.25742387771606445,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_ring_outdoor_r70.wav",
+    "scale": 3.4961791733736898,
+    "ms": 470,
+    "peak": 0.25742387771606445,
+    "kind": "echo",
+    "name": "ring",
+    "voice": "ring",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:soft": [
+   {
+    "file": "echo_soft_indoor.wav",
+    "scale": 26.158747378488496,
+    "ms": 110,
+    "peak": 0.03440531715750694,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_soft_indoor_r45.wav",
+    "scale": 26.158747378488496,
+    "ms": 110,
+    "peak": 0.03440531715750694,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_soft_indoor_r70.wav",
+    "scale": 26.158747378488496,
+    "ms": 110,
+    "peak": 0.03440531715750694,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_soft_outdoor.wav",
+    "scale": 37.305955116159595,
+    "ms": 110,
+    "peak": 0.024124834686517715,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_soft_outdoor_r45.wav",
+    "scale": 37.305955116159595,
+    "ms": 110,
+    "peak": 0.024124834686517715,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_soft_outdoor_r70.wav",
+    "scale": 37.305955116159595,
+    "ms": 110,
+    "peak": 0.024124834686517715,
+    "kind": "echo",
+    "name": "soft",
+    "voice": "soft",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:person": [
+   {
+    "file": "echo_person_indoor.wav",
+    "scale": 2.5434212165321513,
+    "ms": 109,
+    "peak": 0.35385408997535706,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_person_indoor_r45.wav",
+    "scale": 2.5434212165321513,
+    "ms": 109,
+    "peak": 0.35385408997535706,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "indoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_person_indoor_r70.wav",
+    "scale": 2.5434212165321513,
+    "ms": 109,
+    "peak": 0.35385408997535706,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "indoor",
+    "rough": 0.7,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_person_outdoor.wav",
+    "scale": 3.6334042793310366,
+    "ms": 109,
+    "peak": 0.24770158529281616,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_person_outdoor_r45.wav",
+    "scale": 3.6334042793310366,
+    "ms": 109,
+    "peak": 0.24770158529281616,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "outdoor",
+    "rough": 0.45,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_person_outdoor_r70.wav",
+    "scale": 3.6334042793310366,
+    "ms": 109,
+    "peak": 0.24770158529281616,
+    "kind": "echo",
+    "name": "person",
+    "voice": "person",
+    "room": "outdoor",
+    "rough": 0.7,
+    "ref": 0.35
+   }
+  ],
+  "echo:plain": [
+   {
+    "file": "echo_plain_indoor.wav",
+    "scale": 2.0873264903595463,
+    "ms": 140,
+    "peak": 0.43117356300354004,
+    "kind": "echo",
+    "name": "plain",
+    "voice": "plain",
+    "room": "indoor",
+    "rough": 0,
+    "ref": 0.35
+   },
+   {
+    "file": "echo_plain_outdoor.wav",
+    "scale": 4.579593467097324,
+    "ms": 140,
+    "peak": 0.1965239942073822,
+    "kind": "echo",
+    "name": "plain",
+    "voice": "plain",
+    "room": "outdoor",
+    "rough": 0,
+    "ref": 0.35
+   }
+  ]
+ }
+}

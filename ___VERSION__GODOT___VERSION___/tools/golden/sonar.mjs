@@ -75,7 +75,25 @@ for (const sc of SCENES) {
     bands.push({ dt, hit, o: hit ? [o[0], o[1]] : null });
   }
   // pickReflectors is not exported; the bounce children made by emit (gen 1/2) exercise it.
+  const extra = (function () {
+    const A = [];
+    for (let i = 0; i < 24; i++) {
+      const ang = (i / 24) * Math.PI * 2 + 0.07;
+      const o = {};
+      Sonar.hitInfo(primary, ang, o);
+      A.push({ ang, hit: o.hit, dist: o.dist, mat: o.mat, rough: o.rough, nx: o.nx, ny: o.ny, cosInc: o.cosInc, beam: o.beam });
+    }
+    const se = (f) => { const e = Sonar.strongestEcho(primary, f); return e ? { dist: e.dist, angle: e.angle, theta: e.theta, mat: e.mat, rough: e.rough, level: e.level, cosInc: e.cosInc } : null; };
+    const arcs = [];
+    for (const dt of [0.3, 0.7, 1.4]) for (const [qx, qy] of [[x + 2, y], [x, y + 3], [x - 1.5, y - 1.5]]) {
+      const out = new Float32Array(8);
+      const n = Sonar.wallArc(primary, t0 + dt, qx, qy, 4, out);
+      arcs.push({ dt, qx, qy, n, out: Array.from(out).map((v) => (Number.isNaN(v) ? null : v)) });
+    }
+    return { hitInfo: A, strongest: se(undefined), strongestFacing: se(1.0), enclosure: Sonar.enclosure(primary), arcs };
+  })();
   scenes.push({
+    extra,
     map: sc.map, x, y, facing: sc.facing, opts: sc.opts, t0, emitOk: ok, emitAgain: again, cooldownLeft: cd,
     nearest: Sonar.nearestDist(primary), pulseCount: s.pulses.length,
     pulses: s.pulses.map(pulseOut),
