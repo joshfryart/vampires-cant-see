@@ -3,7 +3,8 @@ extends RefCounted
 ## Builds the wall mesh from a World: one quad per exposed wall face, 1 cell = 1 m.
 ## Vertex data used by sonar_wall.gdshader:
 ##   UV    = (u along the face 0..1, v height 0..1 where 0 is the floor edge)
-##   COLOR = (r: line strength at u=0, g: line strength at u=1, b: tile char code / 255, a: 1)
+##   COLOR = (r: line strength at u=0, g: line strength at u=1, b: tile char code / 255, a: 1 for a link door, else 0)
+##   NORMAL = (nx, 0, ny): the face normal in world xz (points into the open cell); the wall cell is floor(p - 0.01 n)
 ## Line strength is 1 at a real corner (convex or concave) and 0.35 where the face continues flush
 ## into the next cell, mirroring the vertical lines in js/render.js drawWalls.
 
@@ -27,12 +28,14 @@ static func build(world: World) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var cols := PackedColorArray()
+	var norms := PackedVector3Array()
 	var idx := PackedInt32Array()
 	for cy in world.height:
 		for cx in world.width:
 			if not _solid(world, cx, cy):
 				continue
 			var code: float = float(world.tile_at(cx + 0.5, cy + 0.5).unicode_at(0)) / 255.0
+			var link: float = 1.0 if world.is_link_door(cx, cy) else 0.0
 			for n in SIDES:
 				if _solid(world, cx + n.x, cy + n.y):
 					continue
@@ -52,13 +55,15 @@ static func build(world: World) -> ArrayMesh:
 				uvs.append(Vector2(1, 1))
 				uvs.append(Vector2(0, 1))
 				for i in 4:
-					cols.append(Color(s0, s1, code, 1.0))
+					cols.append(Color(s0, s1, code, link))
+					norms.append(Vector3(n.x, 0.0, n.y))
 				idx.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_COLOR] = cols
+	arrays[Mesh.ARRAY_NORMAL] = norms
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var mesh := ArrayMesh.new()
 	if verts.size() > 0:

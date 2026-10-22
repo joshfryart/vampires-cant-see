@@ -47,6 +47,8 @@ var worlds: Dictionary = {}
 var world_names: Array = []
 var people_by_map: Dictionary = {}
 var meshes: Dictionary = {}
+var light_images: Dictionary = {}
+var light_textures: Dictionary = {}
 var transition: Variant = null   # {to_map, to_door, t, dur, swapped}
 var wipe_k: float = 0.0
 var cool: float = 0.0
@@ -202,6 +204,7 @@ func enter_map(name: String, x: float, y: float, angle: float, door_id: String) 
 		var d: Variant = world.doors_by_id.get(door_id)
 		if d != null:
 			world.set_door(d["col"], d["row"], true)
+			update_light_texture()
 			just_arrived = {"map": name, "cx": d["col"], "cy": d["row"]}
 		push_off_people()
 	grace = float(GameData.sounds()["react"]["arriveGrace"])
@@ -229,6 +232,27 @@ func _show_map_mesh(name: String) -> void:
 			inst.visible = n == name
 	walls_inst = meshes[name][0]
 	floor_inst = meshes[name][1]
+	update_light_texture()
+
+
+## Upload the current map's light grid for the wall shader (windows glow when the room beyond is lit).
+func update_light_texture() -> void:
+	var w := world
+	var img: Image = light_images.get(map_name)
+	if img == null:
+		img = Image.create(w.width, w.height, false, Image.FORMAT_RF)
+		light_images[map_name] = img
+	for y in w.height:
+		for x in w.width:
+			img.set_pixel(x, y, Color(w.light_grid[y * w.width + x], 0, 0, 1))
+	var tex: ImageTexture = light_textures.get(map_name)
+	if tex == null:
+		tex = ImageTexture.create_from_image(img)
+		light_textures[map_name] = tex
+	else:
+		tex.update(img)
+	wall_mat.set_shader_parameter("light_tex", tex)
+	wall_mat.set_shader_parameter("map_size", Vector2(w.width, w.height))
 
 
 ## Nudge the player forward when the arrival point overlaps a villager (js pushOffPeople).
@@ -643,6 +667,7 @@ func toggle_door(cx: int, cy: int, want_open: bool) -> bool:
 			if _overlaps_cell(p.x, p.y, 0.25, cx, cy):
 				return false
 	world.set_door(cx, cy, want_open)
+	update_light_texture()
 	var x: float = cx + 0.5
 	var y: float = cy + 0.5
 	emit_sound("door", x, y)
