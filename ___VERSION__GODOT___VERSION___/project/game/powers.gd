@@ -68,14 +68,14 @@ func use_power(id: String) -> Dictionary:
 ## Shriek: a loud pulse at double range; people react far away.
 func do_shriek() -> void:
 	var weak: float = g.night.weakness() if g.night != null else 0.0
-	var rng_: float = g.base_range * g.fxv("sonarRange") * 2.0 * (1.0 - 0.4 * weak)
+	var rng_: float = g.base_range * g.flow.fxv("sonarRange") * 2.0 * (1.0 - 0.4 * weak)
 	g.emit_sound("shriek", g.player.x, g.player.y, {"range": rng_})
 	g.audio.play("shriek", {"gain": SoundData.level("shriek")["gain"], "pan": 0.0})
 	var react: Dictionary = GameData.sounds()["react"]
 	var base: float = float(react.get("startleDist", 3.0))
 	var mul: float = float(react.get("shriekMul", 2.5))
 	g.react_cfg_now()
-	g.react_to(g.player.x, g.player.y, "shriek", base * mul * g.fxv("noise") * float(g.fm["startleMul"]))
+	g.react_to(g.player.x, g.player.y, "shriek", base * mul * g.flow.fxv("noise") * float(g.fm["startleMul"]))
 
 
 ## Mist: a quiet two-cell dash along the move direction (or facing).
