@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode unshaded, cull_disabled, depth_draw_opaque;
+render_mode unshaded, cull_disabled, depth_draw_never;
 // Floor: black, with a thin ring at each pulse's wavefront radius so the 12 cells/s travel speed reads on the ground.
 // Phase 1 stand-in for js/render.js drawRipple / drawFloorFront (texture and dotted arcs come in Phase 3).
 #include "res://render/shaders/sonar_common.gdshaderinc"

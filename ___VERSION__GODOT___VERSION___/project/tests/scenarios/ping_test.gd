@@ -7,6 +7,7 @@ func setup(g: Node) -> void:
 	g.player.place(g.world.start.x, g.world.start.y, 0.0)
 
 
-func step(g: Node, _delta: float) -> void:
+func step(g: Node, _delta: float) -> Dictionary:
 	if g.frame_no == 1:
-		g.ping()
+		g.ping_clicks += 1
+	return {}

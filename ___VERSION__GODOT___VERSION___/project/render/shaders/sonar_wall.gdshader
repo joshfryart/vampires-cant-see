@@ -10,11 +10,28 @@ uniform float boil_on = 1.0;
 uniform float line_px = 1.0;       // line width in px at 640x360
 uniform float line_px_near = 1.5;  // width for walls closer than 1.5 cells
 uniform float debug_mode = 0.0;    // 1 = output b0 in red, b1 in green (for read-back tests)
+uniform float margin_px = 3.0;     // wall quads extend this many px past the top/bottom edge so boiled lines are not clipped
+uniform float z_scale = 0.7305835423471995; // world metres per JS height unit (Coords.Z_SCALE)
+uniform float focal_px = 492.7;    // 320 / tan(33 deg): px per metre at depth 1
 
 varying vec3 wpos;
 
+varying float depth_v;
+
 void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec4 vv = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	float depth = max(0.05, -vv.z);
+	float ext = margin_px * depth / (focal_px * z_scale);
+	// move the quad's top/bottom vertices outward and remap v so the edges stay at v = 0 and v = 1
+	if (UV.y > 0.5) {
+		VERTEX.y += margin_px * depth / focal_px;
+		UV.y = 1.0 + ext;
+	} else {
+		VERTEX.y -= margin_px * depth / focal_px;
+		UV.y = -ext;
+	}
+	depth_v = depth;
 }
 
 float cover(float px_from_edge, float width) {
@@ -75,6 +92,10 @@ void fragment() {
 			a = min(1.0, a + 0.5 * flash * strength);
 			float c = cover(side_u / fwx, width) * a;
 			outc = max(outc, mix(fade_color(bv), vec3(1.0), flash) * c);
+		}
+		// the margin past the face only exists so boiled lines are not clipped; do not black out the floor with it
+		if ((v < 0.0 || v > 1.0) && max(outc.r, max(outc.g, outc.b)) < 0.004) {
+			discard;
 		}
 		ALBEDO = outc;
 	}
