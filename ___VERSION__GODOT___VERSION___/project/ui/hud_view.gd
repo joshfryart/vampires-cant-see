@@ -36,7 +36,11 @@ func render_frame(g: Game) -> void:
 		_vignette = 0.3 if g.drink != null else 0.0
 	_dawn = n.dawn_k() if n != null else 0.0
 	_fade = g.fade_amount()
-	if g.state == "title" or g.state == "runend" or g.state == "boon" or g.state == "gift":
+	if g.state == "title":
+		TitleDraw.draw(canvas, 640.0, 360.0, g.title_t, g.reduced, g.cfg["lineBoil"] == true, true)
+		queue_redraw()
+		return
+	if g.state == "runend" or g.state == "boon" or g.state == "gift":
 		queue_redraw()
 		return
 	var wiping: bool = g.transition != null and g.wipe_k > 0.0

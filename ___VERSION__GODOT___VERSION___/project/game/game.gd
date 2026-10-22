@@ -145,6 +145,8 @@ var menus: Control
 var frame_no: int = 0
 var mouse_dx: float = 0.0
 var step_timer: float = 0.0
+## Seconds on the title screen (drives the crypt backdrop and the title boil).
+var title_t: float = 0.0
 ## Head bob (js updateBob): amplitude ramp, walk cycle phase and the resulting vertical offset in 640x360 pixels.
 var bob_amp: float = 0.0
 var walk_phase: float = 0.0
@@ -569,6 +571,8 @@ func step(dt: float, inp: Dictionary) -> void:
 	last_input = inp
 	var st0: String = state
 	if st0 == "title" or st0 == "paused" or st0 == "runend" or st0 == "error":
+		if st0 == "title":
+			title_t += dt
 		pressed.clear()
 		hud.set_state(self)
 		return

@@ -33,6 +33,32 @@ func _init() -> void:
 	_panel.visible = false
 
 
+## Main title menu sits below the drawn title; every other panel is centred.
+func _place(below_title: bool) -> void:
+	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	if below_title:
+		_panel.anchor_left = 0.5
+		_panel.anchor_right = 0.5
+		_panel.anchor_top = 0.0
+		_panel.anchor_bottom = 0.0
+		_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_panel.offset_left = -210.0
+		_panel.offset_right = 210.0
+		_panel.offset_top = 215.0
+		_panel.offset_bottom = 215.0
+	else:
+		_panel.anchor_left = 0.5
+		_panel.anchor_right = 0.5
+		_panel.anchor_top = 0.5
+		_panel.anchor_bottom = 0.5
+		_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+		_panel.offset_left = -210.0
+		_panel.offset_right = 210.0
+		_panel.offset_top = 0.0
+		_panel.offset_bottom = 0.0
+	_panel.reset_size.call_deferred()
+
+
 func _clear() -> void:
 	for c in _box.get_children():
 		_box.remove_child(c)
@@ -93,6 +119,7 @@ func _focus_first() -> void:
 func _build_title() -> void:
 	_clear()
 	_panel.visible = true
+	_place(_view == "main")
 	match _view:
 		"settings":
 			_build_settings()
@@ -106,8 +133,6 @@ func _build_title() -> void:
 		"guide":
 			_build_guide()
 			return
-	_label("VAMPIRES CAN'T SEE", 26, Color(0.9, 0.2, 0.2))
-	_label("You are a vampire and you are blind. Ping the dark, drink the town, sleep before dawn.", 13, Color(0.7, 0.75, 0.9))
 	for n in _g.flow.notices:
 		_label(n, 12, Color(1.0, 0.8, 0.4))
 	_g.flow.notices.clear()
@@ -186,6 +211,7 @@ func _build_stats() -> void:
 func _build_pause() -> void:
 	_clear()
 	_panel.visible = true
+	_place(false)
 	if _view == "settings":
 		_build_settings()
 		return
@@ -211,6 +237,7 @@ func _build_pause() -> void:
 func _build_choice(title: String, ids: Variant, boon: bool) -> void:
 	_clear()
 	_panel.visible = true
+	_place(false)
 	_label(title, 22, Color(0.9, 0.85, 0.5))
 	if ids == null:
 		return
@@ -242,6 +269,7 @@ func _build_choice(title: String, ids: Variant, boon: bool) -> void:
 func _build_runend() -> void:
 	_clear()
 	_panel.visible = true
+	_place(false)
 	var r: Dictionary = _g.flow.run_result
 	_label(str(r.get("title", "Run over")), 24, Color(0.9, 0.3, 0.3) if r.get("kind") == "lost" else Color(0.5, 0.9, 0.6))
 	_label(str(r.get("message", "")), 15)
