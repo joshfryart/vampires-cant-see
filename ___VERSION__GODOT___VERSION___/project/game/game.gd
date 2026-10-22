@@ -101,6 +101,17 @@ var ripple := RippleFx.Rings.new()   # secondary echo rings (js S.ripple)
 const FIRE_NEAR := 1.5
 const AMBIENCE_GAIN := 0.6
 var far_rng: Rng = null
+const GRAB_FOV := 54.0 / 66.0
+var fov_k: float = 0.0
+var vial_pulse: float = 0.0
+var landings: Array = []
+var veil_k: float = 0.0
+var hud_a: float = 0.0
+var hud_frac: float = 0.0
+var hint_text: String = ""
+var hint_age: float = 0.0
+var hint_dur: float = 4.0
+var hud_view: HudView
 var dog_t: float = 25.0
 var bell_t: float = 30.0
 var amb_key: String = ""
@@ -204,6 +215,8 @@ func _build_view() -> void:
 	ceil_mat = ShaderMaterial.new()
 	ceil_mat.shader = floor_mat.shader
 	ceil_mat.set_shader_parameter("is_ceiling", true)
+	hud_view = HudView.new()
+	viewport.add_child(hud_view)
 	hud = Hud.new()
 	add_child(hud)
 	menus = Menus.new()
@@ -591,6 +604,7 @@ func step(dt: float, inp: Dictionary) -> void:
 		powers.rock_cool -= dt
 	powers.step_rocks()
 	player_lit = world.light_at(player.x, player.y)
+	veil_k += (clampf(player_lit, 0.0, 1.0) - veil_k) * (1.0 - exp(-dt / 0.3))
 	if grace > 0.0:
 		grace -= dt
 	step_listen(dt)
@@ -626,6 +640,11 @@ func step(dt: float, inp: Dictionary) -> void:
 		return
 	if drink != null:
 		step_drink(dt)
+	step_feed_fx(dt)
+	var cd: float = sonar.cooldown_left(clock)
+	if cd > 0.0:
+		hud_frac = minf(1.0, cd / (sonar.cooldown if sonar.cooldown > 0.0 else 0.8))
+	hud_a = clampf(hud_a + (dt if cd > 0.0 else -dt) / 0.15, 0.0, 1.0)
 	if flow != null:
 		flow.tick_autosave(dt)
 	pressed.clear()
@@ -1388,6 +1407,8 @@ func drink_beat(d: Dictionary) -> void:
 	emit_sound("heartbeat", v.x, v.y, {"range": r, "z": 0.55, "bounces": 0})
 	react_to(v.x, v.y, "heartbeat", r)
 	audio.play("heartbeat", spatial(v.x, v.y, float(SoundData.level("heartbeat")["gain"]) * (0.6 + 0.4 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0))))
+	if landings.size() < 8:
+		landings.append(clock + 0.4)
 	ripple.spawn(v.x, v.y, clock, {"kind": "person", "maxR": 1.0, "life": 0.5, "strength": 0.9})
 	if reduced:
 		ripple.spawn(v.x, v.y, clock, {"kind": "person", "maxR": 0.8, "minR": 0.8, "inward": true, "life": 0.4, "strength": 0.6})
@@ -1432,9 +1453,50 @@ func _render() -> void:
 		textures.apply_to(m)
 		m.set_shader_parameter("game_time", clock)
 	wall_mat.set_shader_parameter("boil_frame", int(floor(clock * 10.0)) % 4)
+	echo_view.rs_fov = fov_now()
 	echo_view.render_frame(world, player, people, sonar, clock, lock_info(), ripple.rings)
+	hud_view.render_frame(self)
+	wall_mat.set_shader_parameter("focal_px", 320.0 / tan(fov_now() / 2.0))
+
+
+## Per-frame feed effects: the FOV narrows while holding a victim, the vial pulses and gulps land (js stepFeedFx).
+func step_feed_fx(dt: float) -> void:
+	var up: float = 1.0 / 0.35 if drink != null else -1.0 / 0.4
+	fov_k = clampf(fov_k + up * dt, 0.0, 1.0)
+	if vial_pulse > 0.0:
+		vial_pulse = maxf(0.0, vial_pulse - dt / 0.15)
+	while landings.size() > 0 and landings[0] <= clock:
+		landings.pop_front()
+		vial_pulse = 1.0
+		audio.play("gulp", {"gain": SoundData.level("gulp")["gain"], "pan": 0.0})
+
+
+func fov_ease() -> float:
+	return fov_k * fov_k * (3.0 - 2.0 * fov_k)
+
+
+## Current horizontal field of view in radians (the base 66 degrees, narrowed while feeding unless reduced motion).
+func fov_now() -> float:
+	var base: float = deg_to_rad(FOV_DEG)
+	if reduced or fov_k <= 0.0:
+		return base
+	return base * (1.0 - (1.0 - GRAB_FOV) * fov_ease())
+
+
+## Black overlay amount: the menus' dim and the sleep fade (js seqFade and the run end, boon and gift fades).
+func fade_amount() -> float:
+	match state:
+		"runend": return 0.78
+		"boon": return 0.97
+		"gift": return 0.9
+	var q: Variant = flow.seq if flow != null else null
+	if q != null:
+		var t: float = q["t"]
+		return t / 0.8 if t < 0.8 else (1.0 if t < 1.4 else clampf(1.0 - (t - 1.4) / 0.8, 0.0, 1.0))
+	return 0.0
 
 
 func _sync_camera() -> void:
+	cam.fov = rad_to_deg(fov_now())
 	cam.position = Coords.to_view(player.x, player.y, 0.5)
 	cam.rotation = Vector3(0.0, -player.angle - PI / 2.0, 0.0)

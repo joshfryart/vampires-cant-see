@@ -16,6 +16,8 @@ var quality: int = 3
 var reduced: bool = false
 ## Effects level 0..2 (js r.fx) and the material-detail switch (r.matDetail).
 var fx: int = 0
+## Horizontal field of view in radians (js fov); set_fov rebuilds the per-column ray offsets when it changes.
+var fov: float = FOV_DEG * PI / 180.0
 var mat_detail: bool = true
 var horizon: float = 180.0
 ## Per-column wall distance (js r.zbuf), larger than any figure depth when no wall.
@@ -47,7 +49,16 @@ func _init(width: int = BASE_W, height: int = BASE_H) -> void:
 
 
 func tan_half() -> float:
-	return tan(FOV_DEG * PI / 180.0 / 2.0)
+	return tan(fov / 2.0)
+
+
+func set_fov(f: float) -> void:
+	if absf(f - fov) < 1e-9:
+		return
+	fov = f
+	var offs := Raycast.column_offsets(fov, cols)
+	col_cos = offs[0]
+	col_sin = offs[1]
 
 
 ## Line boil is on at quality >= 2 unless reduced motion (js drawFirstPerson / drawSolo).

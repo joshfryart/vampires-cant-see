@@ -51,17 +51,17 @@ func clip() -> void:
 	_log("clip", [])
 
 
-func arc(x: float, y: float, r: float, a0: float, a1: float, ccw: bool = false) -> void:
-	# JS calls arc with 5 args unless anticlockwise is passed; the fake logs only what was passed.
-	if ccw:
-		_log("arc", [x, y, r, a0, a1, true])
+func arc(x: float, y: float, r: float, a0: float, a1: float, ccw: Variant = null) -> void:
+	# JS logs the anticlockwise argument only when it was passed (true or false)
+	if ccw != null:
+		_log("arc", [x, y, r, a0, a1, bool(ccw)])
 	else:
 		_log("arc", [x, y, r, a0, a1])
 
 
-func ellipse(x: float, y: float, rx: float, ry: float, rot: float, a0: float, a1: float, ccw: bool = false) -> void:
-	if ccw:
-		_log("ellipse", [x, y, rx, ry, rot, a0, a1, true])
+func ellipse(x: float, y: float, rx: float, ry: float, rot: float, a0: float, a1: float, ccw: Variant = null) -> void:
+	if ccw != null:
+		_log("ellipse", [x, y, rx, ry, rot, a0, a1, bool(ccw)])
 	else:
 		_log("ellipse", [x, y, rx, ry, rot, a0, a1])
 
@@ -72,6 +72,38 @@ func stroke() -> void:
 
 func fill() -> void:
 	_log("fill", [])
+
+
+func translate(x: float, y: float) -> void:
+	_log("translate", [x, y])
+
+
+func scale(x: float, y: float) -> void:
+	_log("scale", [x, y])
+
+
+func rotate(a: float) -> void:
+	_log("rotate", [a])
+
+
+func fill_rect(x: float, y: float, w: float, h: float) -> void:
+	_log("fillRect", [x, y, w, h])
+
+
+func fill_text(text: String, x: float, y: float, max_w: float = -1.0) -> void:
+	if max_w >= 0.0:
+		_log("fillText", [text, x, y, max_w])
+	else:
+		_log("fillText", [text, x, y])
+
+
+func stroke_text(text: String, x: float, y: float) -> void:
+	_log("strokeText", [text, x, y])
+
+
+func measure_text(text: String) -> float:
+	_log("measureText", [text])
+	return -1.0
 
 
 # ---- canonical text and hash (tools/golden/figure.mjs) ----

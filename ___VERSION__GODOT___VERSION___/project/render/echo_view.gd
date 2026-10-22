@@ -15,6 +15,7 @@ var cpu_ripple: bool = false
 var gpu_floor: bool = true
 var tex_budget: int = FloorFx.TEX_MAX_CELLS
 var last_us: int = 0
+var rs_fov: float = RenderState.FOV_DEG * PI / 180.0
 
 
 func _init() -> void:
@@ -25,6 +26,7 @@ func _init() -> void:
 ## Build this frame's strokes. echoes: Array of echo dictionaries (see echo_to_dict). lock_id < 0 = nobody held.
 func render_frame(world: World, player: Player, people: People, sonar: Sonar, t: float, lock: Dictionary, rings: Array = []) -> void:
 	var t0 := Time.get_ticks_usec()
+	rs.set_fov(rs_fov)
 	canvas.reset()
 	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf)
 	rs.update_boil(t)
