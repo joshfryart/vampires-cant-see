@@ -94,3 +94,40 @@ Baker: `node tools/bake-rogue-audio.mjs` (node-web-audio-api, seeded, determinis
 | `rg_laid_to_rest` | two low tolls | `Menus.show_laid_to_rest` |
 
 No dog bark was baked (the classic `dog` sound exists).
+
+## stages.json schema (`project/data/rogue/stages.json`)
+`{"stages": [row, ...]}`. A row is plain data read by `StageGen.stage_row(id)`; `StageGen.generate(id, seed)` dispatches on `generator` (only `cave` exists).
+
+| Key | Meaning (Hollow value) |
+|---|---|
+| `id`, `name`, `index`, `generator` | `hollow`, "The Hollow", 1, `cave` |
+| `miles` | stage length for the Miles metric (3) |
+| `drainMul`, `bloodGain`, `hunterBase`, `watchers` | run tuning read by the trek flow (0.8, 1.0, 0, 0) |
+| `preyCount {min,max}` | critters spawned (8-11, never above `caps.critters`) |
+| `lights {min,max}` | glow-worm lights (3-8) |
+| `size {w,h}`, `kind`, `floor`, `materials` | map size (<= 64x48), `indoor`, `stone`, `{"#": "roughStone"}` |
+| `openFraction {min,max}` | share of non-wall cells (floor, markers, water) in the 62x46 interior (0.30-0.38) |
+| `nodes {min,max}`, `spurs {min,max}` | chambers (8-9, 7 of them beat chunks) and blind spurs (2-3) |
+| `shelter.pockets.min`, `shelter.restSpots.min` | covered pockets (3) and non-coffin rest spots (2) |
+| `shelter.coverFrac`, `shelter.restTarget`, `shelter.maxExtraCrevices` | rule fraction (0.4), design target in cells (30), crevice budget (8) |
+| `shelter.safety {kind: 0..1}` | rest-spot safety by kind: coffin 0.9, roost 0.55, crevice 0.7, spur 0.8 (non-coffin kinds get +-0.05 per rest spot from the rng) |
+| `caps` | people 0, critters 12, props 60, lights 16, ambient 24 |
+| `exit {doorId, toMap, toDoor}` | `mouth` -> `stage:wood` (placeholder until WP8 resolves it) / `cave` |
+| `ambient` | `fillerDripsPerRoom [1,2]`, `extraGlowworms [0,2]` |
+
+Cover rule constants: walk speed `Player.DEFAULT_CFG.moveSpeed` = 3.0 cells/s, night length `Night.DEFAULTS.nightSec` = 480 s, so a night's walk is 1440 cells and 0.4 of it (`StageGen.cover_limit`) is 576 BFS cells from any walkable cell to the nearest rest spot (`rest[]`). That is the hard rule `StageGen.analyze` and the tests enforce. The generator also aims at the much tighter `restTarget` (30 cells) by carving crevice alcoves; seeds 1-50 end at <= 38.
+
+### Generated map def (`StageGen.generate`)
+A `data/maps.json` map entry (`name` = stage id, `kind`, `floor`, `materials`, `rows`, `doors`, `props`, `zones`, `paths` [], `hides` [], `places`) plus keys `World.from_def` ignores:
+- `stage`, `seed`; `start {cell [x,y], angle}` (the `@` cell, facing south); `exit {door, cell, arrival [x,y], toMap}`.
+- `beats [{id, cell}]` in order: `coffin_nook, drip_gallery, squeeze, echo_hall, still_pool, dead_end_spurs, rat_warren, cave_mouth`. BFS depth from the start strictly increases along them (spurs excluded).
+- `rest [{cell, kind: coffin|roost|crevice|spur, marker: C|S, safety}]`; `pockets [{zone, kind, rest, cell}]` (each zone is an indoor rect in `zones`).
+- `ambient [{cell, kind}]` anchors for `core/ambient.gd`; `critters [{species, cell}]`; `lights [{cell, radius, kind}]` (one per glow-worm prop).
+- `zones` carry the T60 rooms (`echo_hall` ~2.2 s, `coffin_nook`, `drip_gallery`, `squeeze`, `still_pool`, `rat_warren`, `cave_mouth`; their Sabine inputs are in `data/rogue/acoustics_extra.json`, merged for missing keys only) and the `pocket_*` rects.
+- `gen {attempt, loops, spurs, nodes, openFraction, maxRestDist}`.
+
+### Chunks (`project/data/rogue/chunks.json`)
+`legend` maps a template char to `{tile, marker?, prop?, anchor?, spawn?, rest?, safety?, door?}`; `order` is the beat order; each chunk has `rows` (strings), `w`, `h`, `ports [[x,y,dir]]` (edge floor cells tunnels attach to), `beat_at`, optional `zones [{name, rect:[x0,y0,x1,y1]}]`, `pockets [{zone, kind, cell_char}]`, `flip` (mirror allowed), `transpose` (squeeze only), `door {id, facing}`, `radius`. Chars: `#` wall, `.` floor, `~` water, `@` start, `C` coffin rest, `R` roost rest (stalactite), `k` coffin prop, `m` stalagmite, `t` stalactite, `d` stalactite + drip anchor, `e` drip anchor, `o` ripple anchor on water, `r` rat, `b` bat, `B` bat under a stalactite, `g` glow-worm, `v` draft anchor, `D` exit door, `?` untouched. A stamped rect is protected from later carving.
+
+### Generator pipeline (`core/gen/stage_gen.gd`, `core/gen/gen_cave.gd`)
+`StageGen.generate(stage_id, seed) -> Dictionary` is a pure function of its arguments (mulberry32, `StageGen.seed_for(seed, attempt)`); an attempt that breaks a constraint is discarded and attempt+1 runs (typically 2-3 attempts, <= 300 ms, avg ~100 ms for the Hollow). Utilities: `bfs(plan, sources)`, `distance_transform(plan)`, `mst(pts, forced)`, `carve*`, `carve_tunnel`, `carve_ca_blob`, `stamp(plan, chunk, legend, ox, oy, transpose, flip)`, `rows_of(plan)`, `plan_from_def(def)`, `analyze(def, row)`, `validate(def)` (WorldValidate). Hollow: the 7 chunk rects are walked out in beat order (each within 24 cells of the previous, 2-cell gap), 1-2 CA filler chambers, MST of the centres with the chain edges forced, one loop through a filler, tunnels of width 1-2 between chunk ports, 2-3 spurs (a spur end is a hidden `S` rest spot), growth to a 0.32-0.36 target, crevice alcoves until the rest-distance target holds.

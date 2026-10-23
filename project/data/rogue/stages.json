@@ -1,1 +1,35 @@
-{"stages":[]}
+{
+ "stages": [
+  {
+   "id": "hollow",
+   "name": "The Hollow",
+   "index": 1,
+   "generator": "cave",
+   "miles": 3,
+   "drainMul": 0.8,
+   "bloodGain": 1.0,
+   "hunterBase": 0,
+   "watchers": 0,
+   "preyCount": {"min": 8, "max": 11},
+   "lights": {"min": 3, "max": 8},
+   "size": {"w": 64, "h": 48},
+   "kind": "indoor",
+   "floor": "stone",
+   "materials": {"#": "roughStone"},
+   "openFraction": {"min": 0.30, "max": 0.38},
+   "nodes": {"min": 8, "max": 9},
+   "spurs": {"min": 2, "max": 3},
+   "shelter": {
+    "pockets": {"min": 3},
+    "restSpots": {"min": 2},
+    "coverFrac": 0.4,
+    "restTarget": 30,
+    "maxExtraCrevices": 8,
+    "safety": {"coffin": 0.9, "roost": 0.55, "crevice": 0.7, "spur": 0.8}
+   },
+   "caps": {"people": 0, "critters": 12, "props": 60, "lights": 16, "ambient": 24},
+   "exit": {"doorId": "mouth", "toMap": "stage:wood", "toDoor": "cave"},
+   "ambient": {"fillerDripsPerRoom": [1, 2], "extraGlowworms": [0, 2]}
+  }
+ ]
+}

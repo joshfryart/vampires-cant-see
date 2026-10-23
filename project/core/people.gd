@@ -219,11 +219,11 @@ static func segment_clear(w: World, ax: float, ay: float, bx: float, by: float) 
 	return true
 
 
-## Path legs may pass through doors (people open them) but not walls or solid props.
+## Path legs may pass through doors (people open them) but not walls, solid props or still water.
 static func leg_clear(w: World, ax: float, ay: float, bx: float, by: float) -> bool:
 	var length: float = sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay))
 	var n: int = maxi(1, int(ceil(length / 0.1)))
-	var has_blocks: bool = w.props.size() > 0
+	var has_blocks: bool = w.props.size() > 0 or w.has_water
 	for i in n + 1:
 		var f: float = float(i) / n
 		var x: float = ax + (bx - ax) * f

@@ -118,3 +118,21 @@ func test_validate_all_cave_like() -> void:
 		"zones": [{"name": "pool", "kind": "indoor", "x0": 1, "y0": 1, "x1": 8, "y1": 5}]}
 	var res := WorldValidate.validate_all({"startMap": "cave", "maps": {"cave": cave}})
 	ok(res["ok"], "cave-like def passes validate_all: " + str(res["errors"]))
+
+
+func test_leg_clear_respects_water() -> void:
+	# No props in the map: only the has_water flag makes leg_clear consult blocks().
+	var w := World.from_def(_def())
+	eq(w.props.size(), 0, "no props")
+	ok(not People.leg_clear(w, 1.5, 3.5, 7.5, 3.5), "a leg across the pool is not clear")
+	ok(not People.leg_clear(w, 1.5, 3.5, 4.5, 3.5), "a leg ending in the pool is not clear")
+	ok(People.leg_clear(w, 1.5, 1.5, 7.5, 1.5), "a leg along the dry north shore is clear")
+	ok(People.leg_clear(w, 1.5, 5.5, 7.5, 5.5), "a leg along the dry south shore is clear")
+	ok(not People.leg_clear(w, 1.5, 3.5, 1.5, 0.5), "walls still block")
+	var dry := World.from_def({"name": "dry", "kind": "indoor", "floor": "stone", "rows": ["#####", "#@..#", "#####"]})
+	ok(not dry.has_water, "no water")
+	ok(People.leg_clear(dry, 1.5, 1.5, 3.5, 1.5), "dry map unchanged")
+	var p := People.build_path(w, Vector2(1.5, 1.5), {"points": [[1, 1], [7, 1], [7, 5], [1, 5]]}, 0)
+	eq(p.size(), 4, "a path around the pool keeps its four points")
+	var q := People.build_path(w, Vector2(1.5, 3.5), {"points": [[1, 3], [7, 3]]}, 0)
+	eq(q.size(), 1, "a path through the pool falls back to one point")
