@@ -815,7 +815,7 @@ func _build_rest() -> void:
 	tomb.custom_minimum_size = Vector2(140, 100)
 	tomb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_box.add_child(tomb)
-	_label(tx["title"], 24, Color(0.5, 0.9, 0.6) if r.get("cause") == "victory" else Color(0.9, 0.3, 0.3))
+	_label(tx["title"], 24, Color(0.5, 0.9, 0.6) if r.get("cause") == "victory" or r.get("cause") == "frontier" else Color(0.9, 0.3, 0.3))
 	_label(tx["cause"], 15)
 	_label(tx["tally"], 13, Color(0.7, 0.75, 0.9))
 	for ln in tx["soil"]:

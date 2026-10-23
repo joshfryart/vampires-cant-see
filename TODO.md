@@ -1,3 +1,13 @@
+# TODO (0.21.0, The Long Night)
+
+Done in 0.21.0 (WP9): the Hollow is playable end to end (see `AI_HANDOFF.md`, "Changes in 0.21.0"). Next, in order:
+1. A person plays the Hollow: balance (drain 0.8, bat / rat catchability, Heat and hunters, wait-out-the-day length), listen to the `rg_*` sounds, check critter glyphs in play, mouse capture around the day prompt.
+2. WP13a: the next stage generator (Bramble Wood); until it exists the Hollow exit ends the trek with "To be continued...". `TrekFlow.GENERATORS`, `StageGen.generate`, `data/rogue/stages.json`.
+3. Trek powers unlock table (shriek / still / mist are tied to the classic night number), rest-spot hum at dawn, hidden rest spots.
+4. Cut-line items (docs/ROGUELIKE.md): thrall, bat form, second coffin stage hooks, keep and nobility, holy ground, waystones.
+
+---
+
 # TODO (handoff snapshot, 2026-10-22)
 
 Session goal: (1) restore everything missing in the Godot port compared with `html-version/`, (2) steady 60 fps, (3) docs and version bump.

@@ -11,6 +11,13 @@ const TEXT := {
 	"sleep": "E at the crypt or a dark spot to sleep",
 	"light": "Eye = light on you. Stay dark to stay unseen",
 	"listen": "Hold E facing a lit window to listen",
+	# The Long Night, cave (shown by RogueMode)
+	"drip": "Something drips. Listen.",
+	"squeeze": "Ping to steer in the squeeze.",
+	"dead_end": "A dead end rings short and bright.",
+	"prey": "Bats and rats are food. Hold R close to drink.",
+	"sun": "Outside, the sun can find you.",
+	"dawn": "Dawn: find cover, or wait it out.",
 }
 const SEEN_PATH := "user://seen.json"
 
@@ -97,7 +104,7 @@ func step(dt: float) -> void:
 			queue("light")
 		if g.world != null and Listen.near_lit_window(g.world, {"x": g.player.x, "y": g.player.y}, 2.5):
 			queue("listen")
-		if n.night == 1 and n.min >= 510.0:
+		if n.night == 1 and n.min >= 510.0 and not g.rogue_on():
 			queue("sleep")
 	if g.card_text != "" or g.unlock_hint_t > 0.0:
 		g.hint_text = ""

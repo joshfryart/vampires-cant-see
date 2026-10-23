@@ -146,6 +146,9 @@ static func rest_text(r: Dictionary) -> Dictionary:
 			line = "A hunter found your heart at %s, %s miles from your coffin." % [where, miles]
 		"holy":
 			line = "Holy ground does not forgive. It took you at %s, %s miles from your coffin." % [where, miles]
+		"frontier":
+			title = "To be continued..."
+			line = "The road goes on past %s, %s miles from your coffin, but the way is not yet laid. To be continued..." % [where, miles]
 		"victory":
 			title = "The Long Night Ends"
 			line = "The King's blood is yours. You came %s miles from your coffin, and nothing is left to fear but morning." % miles

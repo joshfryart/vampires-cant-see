@@ -1,7 +1,7 @@
 # AI handoff: Godot port of "Vampires Can't See"
 
 Read this first. It is written for the next AI session (or developer) picking the port up. Status: **alpha, feature-complete against the
-JS game (version 0.20.2) except the items under "NOT included"**. Nothing here has been judged by a person's eyes or ears yet (see "Unverified").
+JS game (version 0.20.2) except the items under "NOT included"; version 0.21.0 adds the Godot-only roguelike mode "The Long Night" (see "Changes in 0.21.0")**. Nothing here has been judged by a person's eyes or ears yet (see "Unverified").
 
 ## Ground rules
 
@@ -22,7 +22,7 @@ Git: `main` on `github.com/joshfryart/vampires-cant-see`. `.gitignore` covers `.
 |---|---|
 | Play | `play.bat` or `Godot_v4.4.1-stable_win64.exe --path project` |
 | Parse-check one script | `python -m cli_anything.godot --json -p project script check res://render/foo.gd` |
-| All tests (~9 min, 106 tests, 1.1M checks) | `Godot_v4.4.1-stable_win64.exe --headless --path project -s res://tests/run_tests.gd` |
+| All tests (~9 min, 225 tests, 1.1M checks) | `Godot_v4.4.1-stable_win64.exe --headless --path project -s res://tests/run_tests.gd` |
 | One test file | same, then `-- --filter=vessels` |
 | Import after adding a `class_name` file or new assets | `Godot_v4.4.1-stable_win64.exe --headless --path project --import` (1-6 min) |
 | Regenerate a golden fixture | `node tools/golden/<name>.mjs` (loads the real `html-version/js` modules, writes `project/tests/fixtures/<name>.json`) |
@@ -66,6 +66,23 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - Multi-line shell heredocs have failed in Git Bash: write files with the Write tool, or a small python script file.
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
+
+## Changes in 0.21.0 (The Long Night)
+
+Version 0.21.0: the roguelike mode "The Long Night" is playable end to end for its first stage, the Hollow (cave). Design and APIs: `docs/ROGUELIKE.md` (read it first). Classic "Five Nights" is hidden from the title and only reachable with the dev flag `--classic`; its code, saves and tests are unchanged.
+
+- **How to run:** `play.bat` or `Godot_v4.4.1-stable_win64.exe --path project`, then "The Long Night" on the title. Arguments go after `--`: `--classic` (show the classic Five Nights buttons), `--scenario=NAME`, `--map=NAME`, `--sys=` / `--tun=`. `flow.seed_param` fixes the trek seed (tests; scenarios set it). WASD move, mouse look, click or Space ping, R or right-click drink (people and critters in reach), E door / sleep at a rest spot / reopen the day prompt, Esc pause (a trek is only checkpointed at stage entry, at sleep, on quit to menu and on window close).
+- **Wiring (`game/rogue_mode.gd`, `RogueMode`, `game.rogue`):** owns the `TrekFlow`, `Critters`, `Ambient`, the day choice and the hunters, and is a `Game.systems` hook (step / on_pulse / draw) while a trek is on. The Menus signals (`trek_new_requested`, `trek_continue_requested`, `rise_again_requested`, `title_requested`) are connected in `connect_ui()`; `TrekFlow.begin(menus.trek_meta, seed, flow.store)`; `RunFlow.begin_run` is never used. While `rogue.active` (`Game.rogue_on()`): `g.night` / `g.hunger` ARE the trek's (the HUD reads them), `flow.fx` = the trek's TrekMeta effects, `flow.run` is a stub `{seed, boons: []...}` (so `run_seed`, warm sense and the sonar effects work), the classic `step_night`, sleep (`flow.try_sleep`), blood gifts and run saves are bypassed (`RunFlow.run_is_active()` returns false so `save_run` never writes a classic save).
+- **Per stage:** `GameData.register_map` + `Game.add_world`, `enter_map` at `descriptor.start` facing `descriptor.angle`, critters from `descriptor.critters` (the same `Critters` instance for later nights: prey never respawns), `Ambient` anchors, `TrekUi.show_stage_card`, the previous stage is dropped. A same-named stale stage (Rise Again) is evicted first.
+- **Per frame:** `trek.step(dt, cell, outdoor, {player_pos, mist, hunters})`; events: `dawn_warning` (bell, hint), `dawn` (birds), `needs_choice` (prompt: Wait out the day / Keep looking; E at a rest spot within 1.5 cells sleeps via `sleep_at_rest`; E elsewhere reopens the prompt), `dusk` (Heat, new hunters), `revived` (teleport), `death` -> `end_run` -> Laid to Rest. Waiting out the day fast-forwards `WaitDay` (`step_waiting`, overlay with the Stir button, interrupts shown, then `apply_wait`). Hunters (`hunters_wanted()`) are `hunter` villagers that follow a BFS distance field to the player at 2.4 cells/s and stake within 1.2 cells (Mist stops it).
+- **Critters:** `Critters.step` each frame, windowed echo snapshots (`echo_snapshot_visible(pulse, t_prev, clock)` for every live pulse), `squeak`, loud pulses frighten them (`on_pulse`), R / right-click / E drink the nearest critter within 1.2 cells (`try_feed_critter`: blood by species x stage `bloodGain`, a small struggle-sized noise, Ratspeak = silent and +25% at tier 2). They are drawn by `render/critter_draw.gd` (line glyphs per species, lit by their echoes, hidden behind closer walls) from the systems `draw` hook.
+- **Audio:** `RogueMode._init_audio` registers `data/rogue/sounds_rogue.json` with the `AudioDirector` (its manifest and stream cache), so `g.audio.play("rg_...")` has pan, distance and occlusion; the wind loop at the cave mouth is a `Beds` player built like `_loop_stream`. Played: drips (`rg_drip_cave` / `rg_drip_pool` from the ambient anchors), bat / rat squeaks, flush sounds (bat flutter, rat skitter), dawn bell (at 90 s and 30 s) and birds, coffin creak at a new trek, stage stinger, soil chime and upgrade sting on a Coffin purchase (watched in `idle_step`), the death toll.
+- **Tutorial hints (cave):** `Something drips. Listen.`, `Ping to steer in the squeeze.`, `A dead end rings short and bright.`, `Bats and rats are food...`, `Outside, the sun can find you.`, `Dawn: find cover, or wait it out.` (`tutorial.gd`, queued by `RogueMode`).
+- **Frontier:** the stage after the Hollow has no generator yet, so leaving through the cave mouth ends the trek with cause `frontier`: Laid to Rest titled "To be continued..." (`TrekUi.rest_text`), Soil paid.
+- **Small edits outside the new files:** `game.gd` (rogue hooks, `rogue_on()`), `run_flow.gd` (`run_is_active` false during a trek), `tutorial.gd` (hint texts), `trek_ui.gd` / `menus.gd` (frontier cause only).
+- **Full suite (0.21.0):** `{"checks":1124883,"failed":0,"failures":[],"tests":225}`.
+- **Tests:** `tests/flow/test_rogue_mode.gd` (14 tests: menu start, walking the Hollow to the exit by its BFS path, feeding, echoes and glyphs, drips, dawn + sleep, wait, Stir, hunters + stake, withering + Rise Again, continue, classic after a trek), scenario `tests/scenarios/cave_tour.gd` (windowed tour; run once, it printed no script errors; the stage card, hints and dawn text were seen in screenshots).
+- **Not verified:** the whole mode was only driven by tests and one scripted windowed run, never played by a person. The wind loop and the sounds were not listened to. The critter glyphs were only exercised by tests, not yet seen in a screenshot with a critter in view. Mouse capture / release around the day prompt was not exercised in a real window.
 
 ## Changes in 0.20.2 (the lag release)
 
@@ -127,6 +144,10 @@ Round 2 (cache each frozen echo's recorded figure across frames and replay it, b
 | Edge-glow radial fallback | not ported | Unreachable: maps always have lights. |
 | Quality 4 (`glowBlur`) | not applicable | Unreachable in the JS as well. |
 | Menu styling beyond Godot defaults | not ported | Menus are still plain controls; icons exist for shop/boon/gift/guide cards only. |
+| Stages after the Hollow (Bramble Wood to The Keep, docs/ROGUELIKE.md) | not built | Only the `cave` generator exists (`TrekFlow.GENERATORS`); the exit of the Hollow ends the trek with cause `frontier` ("To be continued..."). |
+| Wilderness, road, settlement and city stage generators, their critters, fauna sounds and hazards (WP13a-d, 14) | not built | The data (critters, ambient kinds, baked sounds) is ready; the generators, `thrall`, `bat_form`, holy ground and the King are not. |
+| Rest spots humming at dawn, rest spots hidden until near | not built | The markers are drawn like the classic crypt / safe sprites when lit. |
+| Powers on a trek (shriek, still, mist) | classic unlock nights | Hunger unlocks them by `night.night`, which only rises with each Heat; a trek-specific unlock table is open. |
 
 ## Unverified (needs a person)
 

@@ -606,6 +606,8 @@ func save_meta() -> bool:
 
 
 func run_is_active() -> bool:
+	if g.rogue != null and g.rogue.active:
+		return false   # a Long Night trek has its own checkpoints (RogueMode); the classic run save must not be written
 	return g.run_on and g.night != null and g.world != null and ["playing", "paused", "transition", "feeding", "sleeping", "boon", "gift"].has(g.state)
 
 

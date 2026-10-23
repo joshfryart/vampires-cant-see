@@ -82,6 +82,8 @@ var night: Night = null
 var hunger: Hunger = null
 var flow: RunFlow
 var powers: Powers
+## The Long Night (roguelike) mode; `rogue.active` while a trek is on. Classic Five Nights code is bypassed then (see rogue_mode.gd).
+var rogue: RogueMode = null
 var run_on: bool = false
 var seed_base: int = 0
 var card_text: String = ""
@@ -215,6 +217,8 @@ func boot() -> void:
 		flow.notices.append_array(chk["notices"])
 	tut = Tutorial.new(self, test_storage == null)
 	powers = Powers.new(self)
+	rogue = RogueMode.new(self)
+	rogue.connect_ui()
 	var start_name: String = want_map if want_map != "" else String(GameData.maps()["startMap"])
 	var sp := start_place(worlds[start_name])
 	player = Player.create(sp["x"], sp["y"], sp["angle"])
@@ -493,6 +497,11 @@ func push_off_people() -> void:
 		d -= 0.1
 
 
+## True while a Long Night trek is being played (the classic night, sleep and saves are bypassed).
+func rogue_on() -> bool:
+	return rogue != null and rogue.active
+
+
 func player_kind() -> String:
 	return world.kind_at(player.x, player.y)
 
@@ -570,6 +579,8 @@ func check_link_door() -> bool:
 	var d: Variant = world.door_at(cx, cy)
 	if d == null or not world.is_door_open(cx, cy):
 		return false
+	if rogue_on():
+		return rogue.on_exit_door()   # a trek leaves a stage through its exit door (no map link)
 	return change_map(str(d["toMap"]), str(d["toDoor"]))
 
 
@@ -668,11 +679,17 @@ func _process(delta: float) -> void:
 
 ## One logic step (js update): input -> world -> drinking. Also called directly by scripted tests.
 func step(dt: float, inp: Dictionary) -> void:
+	if rogue_on() and rogue.input_locked():
+		inp = {}   # the day prompt is open: nothing moves, pings or drinks
+		ping_clicks = 0
+		feed_press = 0
 	last_input = inp
 	var st0: String = state
 	if st0 == "title" or st0 == "paused" or st0 == "runend" or st0 == "error":
 		if st0 == "title":
 			title_t += dt
+		if rogue != null:
+			rogue.idle_step(dt)
 		drop_inputs()
 		hud.set_state(self)
 		return
@@ -701,6 +718,14 @@ func step(dt: float, inp: Dictionary) -> void:
 		clock += dt
 		audio.tick(clock)
 		flow.step_seq(dt)
+		sonar.prune(clock)
+		drop_inputs()
+		hud.set_state(self)
+		return
+	if rogue_on() and rogue.waiting:
+		clock += dt
+		audio.tick(clock)
+		rogue.step_waiting(dt)
 		sonar.prune(clock)
 		drop_inputs()
 		hud.set_state(self)
@@ -773,7 +798,7 @@ func step(dt: float, inp: Dictionary) -> void:
 			interact()
 		if pressed.has(KEY_G):
 			powers.throw_rock()
-		if feed_press > 0 and state == "playing" and not start_drink(false):
+		if feed_press > 0 and state == "playing" and not start_drink(false) and not (rogue_on() and rogue.try_feed_critter()):
 			miss_feed()
 	elif feed_press > 0 and feed_toggle and drink != null and not drink["forced"]:
 		end_drink("release")
@@ -792,7 +817,7 @@ func step(dt: float, inp: Dictionary) -> void:
 		step_ambient(dt)
 		crackle_torches()
 	update_ambience()
-	if night != null and flow.step_night(dt):
+	if night != null and not rogue_on() and flow.step_night(dt):
 		pressed.clear()
 		hud.set_state(self)
 		return
@@ -835,7 +860,10 @@ func _notification(what: int) -> void:
 		if run_on and (state == "playing" or state == "transition" or state == "feeding"):
 			pause()   # pause() ends a drink first (js 399-406)
 	elif what == NOTIFICATION_WM_CLOSE_REQUEST and flow != null and run_on:
-		flow.save_run("close")   # js pagehide
+		if rogue_on():
+			rogue.on_close()   # the trek checkpoint
+		else:
+			flow.save_run("close")   # js pagehide
 
 
 func pause() -> void:
@@ -857,6 +885,8 @@ func set_state(next: String) -> void:
 	if state == next:
 		return
 	state = next
+	if next == "title" and rogue != null:
+		rogue.on_title()
 	if next != "playing":
 		end_listen()
 		if next != "feeding":
@@ -1342,6 +1372,8 @@ func drain_people_events() -> void:
 			"whimper": kind = "whimper"
 		if kind == "":
 			continue
+		if rogue_on() and (kind == "scream" or kind == "startle"):
+			rogue.on_notice(int(e["id"]))
 		emit_sound(kind, e["x"], e["y"])
 		audio.play(kind, spatial(e["x"], e["y"], float(SoundData.level(kind)["gain"])))
 
@@ -1486,6 +1518,8 @@ func interact() -> String:
 		var cx: int = int(floor(best.x))
 		var cy: int = int(floor(best.y))
 		return "door" if toggle_door(cx, cy, not world.is_door_open(cx, cy)) else "blocked"
+	if rogue_on():
+		return rogue.interact()
 	if night != null:
 		if flow.try_sleep():
 			return "sleep"
@@ -1676,7 +1710,7 @@ func step_drink(dt: float) -> void:
 	d["rs"] = float(d["rs"]) + (want_rs - float(d["rs"])) * (1.0 - exp(-dt / 0.12))
 	if float(d["t"]) >= float(d["struggleAt"]) and struggle(d):
 		return
-	var ov_open: bool = hunger != null and hunger.is_open()
+	var ov_open: bool = hunger != null and hunger.is_open() and not rogue_on()   # no blood gifts on a trek
 	var blood_cap: float = night.blood_max if night != null else BLOOD_MAX
 	if blood >= blood_cap and not ov_open:
 		end_drink("cap")
@@ -1718,7 +1752,7 @@ func step_drink(dt: float) -> void:
 			return
 		var bpm: float = 50.0 + 70.0 * clampf(float(d["left"]) / float(d["pool"]), 0.0, 1.0)
 		d["beatAt"] = float(d["beatAt"]) + 60.0 / bpm
-	if blood >= blood_cap and not (hunger != null and hunger.is_open()):
+	if blood >= blood_cap and not ov_open:
 		end_drink("cap")
 
 
@@ -1776,6 +1810,8 @@ func end_drink(_reason: String) -> void:
 		people.mark_fed(int(d["id"]))
 		if night != null:
 			night.fed_count += 1
+		if rogue_on():
+			rogue.on_human_fed(int(d["id"]))
 	else:
 		people.release(int(d["id"]), player.x, player.y)
 	if state == "feeding":
