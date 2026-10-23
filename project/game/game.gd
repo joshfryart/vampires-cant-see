@@ -63,6 +63,11 @@ var people_by_map: Dictionary = {}
 var meshes: Dictionary = {}
 var light_images: Dictionary = {}
 var light_textures: Dictionary = {}
+## Names added by add_world (not in data/maps.json). They are not in world_names, so classic run loops never see them.
+var generated_worlds: Array = []
+## Mode hook objects with optional step(g, dt), on_pulse(g, pulse), draw(g, canvas). Empty = no-op.
+var systems: Array = []
+var _sys_layer: SysLayer = null
 var transition: Variant = null   # {to_map, to_door, t, dur, swapped}
 var wipe_k: float = 0.0
 var cool: float = 0.0
@@ -304,6 +309,56 @@ func _load_worlds() -> void:
 	world_names = md["maps"].keys()
 	for n in world_names:
 		worlds[n] = World.from_def(md["maps"][n])
+
+
+## Overlay control for systems' draw hooks (640x360 viewport space, above the sonar view).
+class SysLayer extends Control:
+	var canvas := DrawCanvas.new()
+
+	func _init() -> void:
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		canvas.paint(self)
+
+
+## Build a World from a def, register the def with GameData and add it to the world caches (same as _load_worlds). Replaces a same-named world.
+func add_world(name: String, def: Dictionary) -> World:
+	if worlds.has(name):
+		drop_world(name)
+	GameData.register_map(name, def)
+	var w := World.from_def(def)
+	worlds[name] = w
+	if not generated_worlds.has(name):
+		generated_worlds.append(name)
+	return w
+
+
+## Evict a generated world and its people, mesh and light-texture caches. Refuses (false) for the current map and for non-generated names.
+func drop_world(name: String) -> bool:
+	if name == map_name or not generated_worlds.has(name):
+		return false
+	generated_worlds.erase(name)
+	worlds.erase(name)
+	people_by_map.erase(name)
+	if meshes.has(name):
+		for inst in meshes[name]:
+			if is_instance_valid(inst):
+				if inst.get_parent() != null:
+					inst.get_parent().remove_child(inst)
+				inst.queue_free()
+		meshes.erase(name)
+	light_images.erase(name)
+	light_textures.erase(name)
+	GameData.unregister_map(name)
+	return true
+
+
+func _systems_call(method: String, arg: Variant) -> void:
+	for s in systems.duplicate():
+		if s != null and s.has_method(method):
+			s.call(method, self, arg)
 
 
 ## js startPlace: the start tile, else the first door's arrival, else the first free cell.
@@ -729,6 +784,8 @@ func step(dt: float, inp: Dictionary) -> void:
 	ping_clicks = 0
 	sonar.prune(clock)
 	simulate_world(dt)
+	if not systems.is_empty():
+		_systems_call("step", dt)
 	step_barks(dt)
 	tut.step(dt)
 	if run_on:
@@ -1144,6 +1201,8 @@ func emit_sound(kind: String, x: float, y: float, over: Dictionary = {}) -> Sona
 	var pu: Sonar.Pulse = sonar.emit_sound(world, x, y, clock, opts)
 	if pu != null and weak > 0.0:
 		tag_weak(pu, weak, 1.0)
+	if pu != null and not systems.is_empty():
+		_systems_call("on_pulse", pu)
 	return pu
 
 
@@ -1337,6 +1396,8 @@ func pulse() -> bool:
 	if not fired:
 		return false
 	tut.pulsed()
+	if not systems.is_empty():
+		_systems_call("on_pulse", sonar.last_pulse)
 	if weak > 0.0 and sonar.last_pulse != null:
 		tag_weak(sonar.last_pulse, weak, 1.0 - 0.4 * weak)
 	react_to(player.x, player.y, "ping")
@@ -1743,9 +1804,20 @@ func _render() -> void:
 	echo_view.rs_fov = fov_now()
 	echo_view.render_frame(world, player, people, sonar, clock, lock_info(), ripple.rings)
 	hud_view.render_frame(self)
+	if not systems.is_empty() or _sys_layer != null:
+		_render_systems()
 	_sync_postfx()
 	wall_mat.set_shader_parameter("focal_px", 320.0 / tan(fov_now() / 2.0))
 	_sync_quality_uniforms()
+
+
+func _render_systems() -> void:
+	if _sys_layer == null:
+		_sys_layer = SysLayer.new()
+		viewport.add_child(_sys_layer)
+	_sys_layer.canvas.reset()
+	_systems_call("draw", _sys_layer.canvas)
+	_sys_layer.queue_redraw()
 
 
 ## Quality / effects / motion settings for the wall and floor shaders (render.js r.quality, airOn, boilOn, fx). Cached: only changes are pushed.
