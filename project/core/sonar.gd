@@ -55,6 +55,8 @@ var max_pulses: int = 64
 var vis_rays: int = 720
 var reflectors: int = 6
 var bounces: int = 2
+## Opt-in (Ambient sets it): when the ring overflows max_pulses, last_pulse (the player's latest ping) is never the one evicted.
+var protect_last: bool = false
 
 # Result of the last scan (js module-level scanAge / scanFade / scanIdx).
 var scan_age: float = -1.0
@@ -340,7 +342,17 @@ func emit_sound(world, x: float, y: float, t: float, opts: Dictionary = {}) -> P
 	for p in made:
 		pulses.append(p)
 	if pulses.size() > max_pulses:
-		pulses = pulses.slice(pulses.size() - max_pulses)
+		if protect_last and last_pulse != null and pulses.has(last_pulse):
+			var drop: int = pulses.size() - max_pulses
+			var kept: Array[Pulse] = []
+			for p in pulses:
+				if drop > 0 and p != last_pulse:
+					drop -= 1
+				else:
+					kept.append(p)
+			pulses = kept
+		else:
+			pulses = pulses.slice(pulses.size() - max_pulses)
 	return primary
 
 
