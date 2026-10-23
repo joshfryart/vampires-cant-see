@@ -60,3 +60,37 @@ TrekUi:
 - `show_wait_prompt(options := {title, body, wait_label, keep_label, on_wait, on_keep})`, `hide_wait_prompt()`; signals `wait_chosen`, `keep_looking_chosen`
 - `show_waiting(blood, lines)`, `update_waiting(blood, lines)`, `hide_waiting()`; signal `wait_interrupted` (Stir button)
 - static `stage_card_text`, `dawn_text`, `rest_text(result)`
+
+## Audio (baked rogue sounds)
+Baker: `node tools/bake-rogue-audio.mjs` (node-web-audio-api, seeded, deterministic; re-running gives identical files). Output: `project/audio/rogue/rg_*.wav` (mono 44.1 kHz 16 bit, peak 0.9, 27 files, about 3.4 MB) plus the manifest `project/data/rogue/sounds_rogue.json` (`{v, rate, peakTarget, dir, sounds:[{id, file, loop, ms, gain, bus, use}]}`; `gain` = suggested linear play gain). They live in `audio/rogue/`, not `audio/wav/`, because `tools/bake-audio.mjs` wipes `audio/wav/`. `AudioDirector` is unchanged and does not load these yet: WP9 reads the manifest and loads `dir + file` (`ResourceLoader.load_threaded_request` like `preload_streams`, or plain `load`), plays on a World-bus voice with `gain x scale`, and for `loop: true` builds the stream like `_loop_stream` (LOOP_FORWARD, loop_end = bytes / 2; head and tail are already cross-faded). Test: `tests/unit/test_rogue_audio.gd`. Existing sounds are reused where they exist: dog = `play:dog`, fire bed = `fire:bed`, wind = `amb:outdoor`, bell = `play:bell`.
+
+| id | what | who plays it |
+|---|---|---|
+| `rg_drip_cave` | resonant drip | `stalactite` drip anchor in cave chambers (pair with the `drip` sonar emit) |
+| `rg_drip_pool` | bubbly plop | drip anchor over a `~` pool, Still Pool beat |
+| `rg_drip_gutter` | bright tick | drip anchor in town / ruin / road stages (eaves, gutters) |
+| `rg_splash_step_a`, `_b` | wading footstep (foot 0 / 1) | player or critter step onto a `~` water tile, instead of the material step |
+| `rg_bat_squeak` | high squeak | bat critter squeak (Critters `squeak` event, species bat) |
+| `rg_bat_flutter` | wing beats | bat flushed from roost / fly-by, Echo Hall |
+| `rg_rat_skitter` | claw ticks | rat critter scurry (on flee start, or every few cells of movement) |
+| `rg_rat_squeak` | squeak | rat critter squeak / being fed on, Rat Warren |
+| `rg_hare_thump` | low thump | hare/rabbit alarm when it flees; carry far (sonar emit, range 3-4) |
+| `rg_owl_hoot` | hoo, hoo-hooo | night ambient emitter in woods / ruins / cemetery |
+| `rg_wolf_howl` | long howl | distant howl in wild / road stages at night; heat or hunter-alert cue |
+| `rg_cricket_loop` | insect bed (loop) | night ambience for meadow, road, farm stages (outdoor bed layer) |
+| `rg_wind_loop` | wind gust (loop) | Cave Mouth draft emitter, any open-air bed; scale gain by draft strength |
+| `rg_creek_loop` | stream (loop) | positional emitter on creek tiles |
+| `rg_fountain_loop` | fountain (loop) | positional emitter at town fountains |
+| `rg_hearth_crackle` | fire pops (loop) | inn / farmhouse hearth, layered over `fire_bed` |
+| `rg_crow_caw` | caw x2 | crow critter / dawn ambience outdoors, startled flee |
+| `rg_sheep_bleat` | bleat | sheep critter in pasture / farm |
+| `rg_hen_cluck` | cluck x3 | hen critter in farm yard |
+| `rg_coffin_creak` | lid opens + thunk | `Menus.open_coffin` and the title screen "Rise" |
+| `rg_soil_chime` | earthy chime | `coffin_buy` success; Grave Soil tally lines on Laid to Rest |
+| `rg_upgrade_sting` | rising arpeggio | upgrade tier bought (after the chime, or instead of it) |
+| `rg_stage_arrival` | swell + far bell | `TrekUi.show_stage_card` |
+| `rg_dawn_bell` | bell tolls | `TrekUi.set_dawn` entering the warning (<= 90 s), repeat at 30 s |
+| `rg_dawn_birds` | birdsong | dawn warning layer / "The sun is up" |
+| `rg_laid_to_rest` | two low tolls | `Menus.show_laid_to_rest` |
+
+No dog bark was baked (the classic `dog` sound exists).

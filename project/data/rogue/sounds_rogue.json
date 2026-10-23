@@ -1,0 +1,251 @@
+{
+ "v": 1,
+ "rate": 44100,
+ "peakTarget": 0.9,
+ "dir": "res://audio/rogue/",
+ "sounds": [
+  {
+   "id": "rg_drip_cave",
+   "file": "rg_drip_cave.wav",
+   "loop": false,
+   "ms": 506,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "drip anchor in caves / large chambers (sparse, resonant)"
+  },
+  {
+   "id": "rg_drip_pool",
+   "file": "rg_drip_pool.wav",
+   "loop": false,
+   "ms": 132,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "drip falling into a pool / still water tile (bubbly plop)"
+  },
+  {
+   "id": "rg_drip_gutter",
+   "file": "rg_drip_gutter.wav",
+   "loop": false,
+   "ms": 197,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "drip on stone / roof gutter in towns and ruins (bright tick)"
+  },
+  {
+   "id": "rg_splash_step_a",
+   "file": "rg_splash_step_a.wav",
+   "loop": false,
+   "ms": 278,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "footstep through shallow water (alternate with _b by foot)"
+  },
+  {
+   "id": "rg_splash_step_b",
+   "file": "rg_splash_step_b.wav",
+   "loop": false,
+   "ms": 321,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "footstep through shallow water (second foot, deeper ripple)"
+  },
+  {
+   "id": "rg_bat_squeak",
+   "file": "rg_bat_squeak.wav",
+   "loop": false,
+   "ms": 188,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "bat critter squeak (high, short; use with a short-range emit)"
+  },
+  {
+   "id": "rg_bat_flutter",
+   "file": "rg_bat_flutter.wav",
+   "loop": false,
+   "ms": 552,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "bat wings: fly-by / flush from roost"
+  },
+  {
+   "id": "rg_rat_skitter",
+   "file": "rg_rat_skitter.wav",
+   "loop": false,
+   "ms": 628,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "rat critter moving (claw ticks); one-shot per scurry"
+  },
+  {
+   "id": "rg_rat_squeak",
+   "file": "rg_rat_squeak.wav",
+   "loop": false,
+   "ms": 212,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "rat critter squeak when startled / fed on"
+  },
+  {
+   "id": "rg_hare_thump",
+   "file": "rg_hare_thump.wav",
+   "loop": false,
+   "ms": 279,
+   "gain": 0.6,
+   "bus": "World",
+   "use": "hare/rabbit alarm foot-thump (low; carries through ground, good for sonar)"
+  },
+  {
+   "id": "rg_owl_hoot",
+   "file": "rg_owl_hoot.wav",
+   "loop": false,
+   "ms": 1211,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "owl at night in woods / ruins (hoo, hoo-hooo)"
+  },
+  {
+   "id": "rg_wolf_howl",
+   "file": "rg_wolf_howl.wav",
+   "loop": false,
+   "ms": 2519,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "wolf howl (distant; plains/forest at night, heat/danger cue)"
+  },
+  {
+   "id": "rg_crow_caw",
+   "file": "rg_crow_caw.wav",
+   "loop": false,
+   "ms": 600,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "crow caw (daytime/dawn outdoors; startled flee)"
+  },
+  {
+   "id": "rg_sheep_bleat",
+   "file": "rg_sheep_bleat.wav",
+   "loop": false,
+   "ms": 880,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "sheep bleat (pasture/farm)"
+  },
+  {
+   "id": "rg_hen_cluck",
+   "file": "rg_hen_cluck.wav",
+   "loop": false,
+   "ms": 391,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "hen cluck (farm yard)"
+  },
+  {
+   "id": "rg_cricket_loop",
+   "file": "rg_cricket_loop.wav",
+   "loop": true,
+   "ms": 2100,
+   "gain": 0.3,
+   "bus": "World",
+   "use": "night insect bed, meadows/roads/farm (loop)"
+  },
+  {
+   "id": "rg_wind_loop",
+   "file": "rg_wind_loop.wav",
+   "loop": true,
+   "ms": 5000,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "wind gust / draft bed (loop); scale gain with openness or draft strength"
+  },
+  {
+   "id": "rg_creek_loop",
+   "file": "rg_creek_loop.wav",
+   "loop": true,
+   "ms": 3000,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "creek / stream bed (loop); positional on stream tiles"
+  },
+  {
+   "id": "rg_fountain_loop",
+   "file": "rg_fountain_loop.wav",
+   "loop": true,
+   "ms": 3000,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "town fountain bed (loop); brighter and steadier than the creek"
+  },
+  {
+   "id": "rg_hearth_crackle",
+   "file": "rg_hearth_crackle.wav",
+   "loop": true,
+   "ms": 2500,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "hearth/campfire pops (loop) layered over the existing fire_bed"
+  },
+  {
+   "id": "rg_coffin_creak",
+   "file": "rg_coffin_creak.wav",
+   "loop": false,
+   "ms": 1497,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "The Coffin: lid opens (title / hub), then thunk"
+  },
+  {
+   "id": "rg_soil_chime",
+   "file": "rg_soil_chime.wav",
+   "loop": false,
+   "ms": 555,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "Grave Soil gained / spent (earthy marimba-like, soft)"
+  },
+  {
+   "id": "rg_upgrade_sting",
+   "file": "rg_upgrade_sting.wav",
+   "loop": false,
+   "ms": 1192,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "upgrade purchased (rising minor arpeggio over a low swell)"
+  },
+  {
+   "id": "rg_stage_arrival",
+   "file": "rg_stage_arrival.wav",
+   "loop": false,
+   "ms": 2078,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "stage arrival stinger (stage card): low swell and a far bell"
+  },
+  {
+   "id": "rg_dawn_bell",
+   "file": "rg_dawn_bell.wav",
+   "loop": false,
+   "ms": 2908,
+   "gain": 0.5,
+   "bus": "World",
+   "use": "dawn warning: bell tolls (play when the sky first lightens; repeat as time runs out)"
+  },
+  {
+   "id": "rg_dawn_birds",
+   "file": "rg_dawn_birds.wav",
+   "loop": false,
+   "ms": 2254,
+   "gain": 0.35,
+   "bus": "World",
+   "use": "dawn warning: birdsong layered with the bell, or alone as the last-chance cue"
+  },
+  {
+   "id": "rg_laid_to_rest",
+   "file": "rg_laid_to_rest.wav",
+   "loop": false,
+   "ms": 3852,
+   "gain": 0.55,
+   "bus": "World",
+   "use": "Laid to Rest (death) toll: two slow low bells, then silence"
+  }
+ ]
+}
