@@ -15,7 +15,7 @@ extends RefCounted
 ## Event types: chime, washout, dawn_warning {left}, dawn, needs_choice, dusk {heat, hunters}, withering {left}, stake_hit {blood},
 ## stake_ignored, holy, revived {cell}, death {cause}.
 
-const GENERATORS := ["cave"]
+const GENERATORS := ["cave", "wood", "moor"]
 const START_BLOOD := 60.0
 const WARN_SEC := 90.0
 const WITHER_SEC := 25.0

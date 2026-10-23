@@ -98,8 +98,9 @@ func step(world, sonar: Sonar, player_pos: Vector2, dt: float, rng: Rng, t: floa
 		var y: float = e["cy"] + 0.5
 		var within: float = float(k.get("within", DEFAULT_WITHIN))
 		var rays: int = int(k.get("visRays", 90))
-		if Vector2(x, y).distance_to(player_pos) > within:
-			# Out of earshot: skip this beat (no catch-up burst) and reschedule.
+		var dist_p: float = Vector2(x, y).distance_to(player_pos)
+		if dist_p > within or dist_p < float(k.get("quiet", 0.0)):
+			# Out of earshot (or, for crickets, too close: they go quiet near the player): skip this beat (no catch-up burst) and reschedule.
 			e["next"] = clock + _period(k, rng)
 			continue
 		if live.size() >= MAX_LIVE or rays_used + rays > MAX_RAYS:

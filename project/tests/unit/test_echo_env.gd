@@ -2,7 +2,7 @@ extends TestCase
 ## Echolocation validation for generated stages (WP12, docs/ROGUELIKE.md "Echo validation per environment").
 ## Every check is a helper _check_*(stage_id, seeds): the test methods enumerate the stages from data/rogue/stages.json
 ## (rows whose generator is implemented, GENERATORS) and run each helper on seeds 1..SEEDS, so a new stage only needs a row
-## and a generator. Today that is The Hollow (cave) only.
+## and a generator. Today: The Hollow (cave), Bramble Wood (wood) and Gallows Moor (moor).
 
 const SEEDS := 20
 const SAMPLES := 200
@@ -14,7 +14,7 @@ const COLUMNS := 48
 const FOV := 1.2
 const SOAK_SEC := 60.0
 const SOAK_DT := 0.05
-const GENERATORS := ["cave"]
+const GENERATORS := ["cave", "wood", "moor"]
 
 static var _cache: Dictionary = {}
 
@@ -373,3 +373,32 @@ func _check_ambient_soak(stage_id: String, seeds: Array) -> void:
 func test_ambient_soak() -> void:
 	for id in _stage_ids():
 		_check_ambient_soak(id, _seeds())
+
+
+# ---- (9) open air: every walkable cell of an outdoor stage has a wall cell within R (wild 6) -----------------------------------------------------
+
+const OPEN_AIR_R := 6.0
+
+
+func _check_open_air(stage_id: String, seeds: Array) -> void:
+	var worst := 0.0
+	var n := 0
+	for e in _built(stage_id, seeds):
+		var def: Dictionary = e["def"]
+		if String(def["kind"]) != "outdoor":
+			continue
+		n += 1
+		var oa := GenWild.open_air_max(def)
+		worst = maxf(worst, oa)
+		ok(oa <= OPEN_AIR_R, "%s seed %d: a walkable cell is %.2f from the nearest wall (limit %.1f)" % [stage_id, e["seed"], oa, OPEN_AIR_R])
+	if n > 0:
+		print("echo_env: %s open-air worst distance %.2f over %d seeds (limit %.1f)" % [stage_id, worst, n, OPEN_AIR_R])
+
+
+func test_open_air_rule() -> void:
+	var outdoor := 0
+	for id in _stage_ids():
+		_check_open_air(id, _seeds())
+		if String(StageGen.stage_row(id).get("kind", "")) == "outdoor":
+			outdoor += 1
+	ok(outdoor >= 2, "the outdoor stages (wood, moor) are in the suite")

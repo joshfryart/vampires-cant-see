@@ -48,6 +48,8 @@ static func generate(stage_id: String, seed: int) -> Dictionary:
 	match String(row.get("generator", "")):
 		"cave":
 			return GenCave.generate(row, seed)
+		"wood", "moor":
+			return GenWild.generate(row, seed, String(row["generator"]))
 	return {}
 
 
