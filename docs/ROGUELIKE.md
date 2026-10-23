@@ -1,0 +1,46 @@
+# The Long Night: roguelike run mode (design, 0.21.x)
+
+Godot-only. No JS parity. New modules live in sibling files; the classic `Meta`, run schema 4 and `people.gd` parity code are NOT changed. Classic "Five Nights" stays in the code and tests, hidden from the title (dev flag `--classic` brings it back).
+
+Decisions (user, 2026-10-22): currency **Grave Soil** (existing Essence imports 1:1 once); checkpoint-only saves (stage entry and sleep); new baked sounds allowed via `node-web-audio-api` (`tools/bake-rogue-audio.mjs`); new data lives in `project/data/rogue/*.json` (never hand-edit generated `data/*.json`).
+
+## Core rules
+- Sun kills only on an outdoor cell in daylight (`night.gd`). Any roofed cell is sun-safe.
+- Every stage starts at dusk (fog crossing between stages). Leaving early gives a fresh night.
+- Pass the day by (a) **sleeping** at a rest spot (`S`/`C`: coffin, crypt, burrow, barrow, mausoleum): skip to dusk, drain x0.15, small discovery roll by rest-spot safety; or (b) **waiting out the day** in any roofed cell: interruptible fast-forward, drain x0.4, occupants live their schedules, you hear them as faint pulses, discovery means you deal with it (slip away, hide, Mist, feed at risk). Both add +1 **Heat**. Heat 2 spawns a hunter, Heat 3 two. Prey never respawns.
+- Dawn warning ~90 s ahead (birds, bell, cold glow); rest spots hum a faint pulse.
+- Cover guarantee: from any walkable cell a roofed cell is reachable within ~40% of the night's walk time; at least 3 covered pockets per stage, at least 2 true rest spots; rest spots hidden until within ~3 cells or heard.
+- Deaths: sun; withered (blood 0 for 25 s); staked (hunter within 1.2 cells, unmisted, -45 blood); holy ground (-8 blood/s).
+- Metric: **Miles from the Coffin** = cleared-stage miles + stage miles x best progress (BFS distance field from exit via `RunFlow.bfs_cells`). Full route 60 miles.
+
+## Stages
+| # | Stage | Maps | Walls / floor | Ambient | Fauna / people | Mi |
+|---|---|---|---|---|---|---|
+| 1 | The Hollow (cave) | 1 | roughStone, pools `~` | drips, ripples, mouth draft | bats, rats | 3 |
+| 2 | Bramble Wood | 1 | `#` grass thicket, `W` trunks | wind, owl, creek | rabbits, deer | 3 |
+| 3 | Gallows Moor | 1 | grass, `B` cairns, `I` gibbet | wind, crickets, howls | hares, wolves | 3 |
+| 4 | The Old Road | 1 | `I` fences, `B` milestones | carts, shrine bell | travellers, first hunter | 4 |
+| 5 | Crossroads Inn | 1 | timber | hearth, singing | patrons, horse | 3 |
+| 6 | Hamlet and Farms | 1 | barns, fences | sheep, hens, dogs | farmers, dogs | 4 |
+| 7 | Village | `town` | as today | dog, bell | villagers, guards | 5 |
+| 8 | Lychgate Cemetery | 1 | stone, graves | crows, spade | mourners, sexton | 3 |
+| 9 | Market Town | 1 | brick, cobble | fountain, watch | watch, priest | 5 |
+| 10 | Warrens (poor) | 1 | cobble | gutter drips | beggars | 5 |
+| 11 | Guild Row (commerce) | 1 | shopfronts | signs, coins | merchants, guards | 6 |
+| 12 | Silk Ward (nobility) | 1 | railings | fountains, quartet | nobles (+50% feed) | 6 |
+| 13 | The Keep (royalty) | 1-2 | stone, portcullis | throne echo T60 2.5 | royal guard, King | 10 |
+
+Per-stage row in `data/rogue/stages.json`: `drainMul` (0.8 cave to 1.6 keep), `preyCount`, `watchers`, `lights`, `hunterBase`, `bloodGain`, shelter counts and kinds. Drinking from the King wins (+25 Soil).
+
+## The Hollow (cave)
+Seeded procedural from authored beat chunks (`data/rogue/chunks.json`), mulberry32 (`core/rng.gd`): Poisson-disc 8-9 chambers in 62x46, MST + 1 loop, order by tree depth, beat chunks along the main path, cellular-automaton filler chambers, biased drunk-walk tunnels (width 1-2), 2-3 blind spurs, 30-38% floor. Beats in order: Coffin Nook (upright coffin, drip 2 cells ahead after 1.5 s, "Something drips. Listen."), Drip Gallery, The Squeeze, Echo Hall (T60 ~2.2, pillars, bats), Still Pool (`~`), dead-end spurs, Rat Warren, Cave Mouth (wind draft, glow-worm light).
+Echo geometry: big stalagmites = `#` pillar cells; small = solid prop `stalagmite`; `stalactite` non-solid ceiling prop and drip anchor; pools `~` (rays pass, movement blocked); zones per chamber for T60 (`data/rogue/acoustics_extra.json`, merged for missing keys only). Drip: `emit_sound(kind="drip", range 2.5, strength 0.35, fade 1.2, visRays 180, bounces 0)`, only within 12 cells of the player.
+
+## Meta (The Coffin)
+Soil = floor(miles) + 2 x humans fed + floor(critters/2) + 3 x stages cleared unseen + 5 new best stage; Soil Pouch multiplies. Upgrades: far_echo, lingering_echo, quick_call, slow_thirst, deep_draw, soft_step, warm_sense (existing effects), full_veins, drip_ear, thick_blood, long_wither, ratspeak, focused_cry, mist_born, stake_callus, silent_fang, bat_form, thrall, second_coffin, soil_pouch, waystones. Saves: `vcs.rogue` (soil, unlocks, stats, reached) and `vcs.trek` (seed, stage, leg, miles, progress, heat, night, hunger); `core/trek_meta.gd` with sanitize/migrate; `Store.key_of` gets the two kinds.
+
+## Echo validation per environment
+Open air (every walkable cell needs a solid cell within R: wild 6, road 5, city 4), ambient budget (4 live, 180 rays, within 12 cells, player ping protected), fast ray path bit-for-bit vs generic, water tile, no-light caves (glow-worms), caps per map (people 10-12, critters 12, props 60, lights 16, emitters 24), map size <= 64x48, determinism (stage = pure function of seed, id). Tests in `tests/unit/test_echo_env.gd`.
+
+## Work packages
+WP0 resolve perf round 2; 1 this doc; 2 map registry + hooks; 3 water tile, props, covered pockets; 4 critters; 5 ambient emitters; 6 trek meta + saves; 7 cave generator; 8 trek flow; 8b wait-out-the-day; 9 integration (0.21.0); 10 UI; 11 Opus review; 12 echo suite; 13a-d wilderness/road/settlements/city; 14 hazards + powers; 15 docs; 16 final review. Cut-line, lowest priority first: thrall/bat form/second coffin, keep+nobility mechanics, cricket/howl reveals, holy ground, waystones, cemetery+inn, city districts beyond one, procedural variation outside the cave. Never cut: WP0, 2-10, 12.
