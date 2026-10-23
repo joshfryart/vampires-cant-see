@@ -21,6 +21,14 @@ const ENV_KEYS := ["app", "kind", "v", "game", "sum", "data"]
 const IMPORT_KEYS := ["app", "kind", "v", "game", "meta", "run"]
 const RUN_KEYS := ["v", "map", "player", "doors", "people", "night", "run", "rocks", "forge"]
 const RUN_RUN_KEYS := ["seed", "boons", "closedSafe", "pendingBoons"]
+const KEY_ROGUE := "vcs.rogue"
+const KEY_TREK := "vcs.trek"
+const ROGUE_SCHEMA := 1
+const TREK_SCHEMA := 1
+const ROGUE_KEYS := ["v", "soil", "unlocks", "stats", "reached", "legacyImported"]
+const ROGUE_STAT_KEYS := ["treks", "bestMiles", "bestStage", "deaths", "fedHumans", "fedCritters", "soilEarned"]
+const ROGUE_DEATH_KEYS := ["sun", "withered", "staked", "holy"]
+const TREK_KEYS := ["v", "seed", "stage", "leg", "miles", "progress", "heat", "night", "hunger", "unlocksUsed", "deathsAvoided"]
 const HUNGER_KEYS := ["v", "fear", "over", "giftsTonight", "gifts", "essenceBonus", "nextBlood"]
 
 ## Shown in the `game` field of an envelope (js Log.VERSION).
@@ -297,7 +305,16 @@ class Store:
 		return ok
 
 	static func key_of(kind: String) -> String:
-		return KEY_RUN if kind == "run" else (KEY_META if kind == "meta" else "")
+		match kind:
+			"run":
+				return KEY_RUN
+			"meta":
+				return KEY_META
+			"rogue":
+				return KEY_ROGUE
+			"trek":
+				return KEY_TREK
+		return ""
 
 	func _fetch(k: String) -> Variant:
 		var v: Variant = _st.get_item(k)
@@ -677,6 +694,125 @@ static func validate_run(data: Variant, v: Variant = null) -> Dictionary:
 	if not m["ok"]:
 		return {"ok": false, "code": m["code"]}
 	if sanitize_run(m["data"]) == null:
+		return {"ok": false, "code": "E_SAVE_SCHEMA"}
+	return {"ok": true, "code": ""}
+
+
+# ---------------------------------------------------------------- rogue (The Coffin) / trek saves
+
+static func _nn_int(x: Variant, max_v: float) -> bool:
+	return _is_int(x) and float(x) >= 0.0 and float(x) <= max_v
+
+
+static func migrate_rogue(v: Variant, data: Variant) -> Dictionary:
+	if not _is_int(v) or float(v) < 1.0 or not (data is Dictionary):
+		return {"ok": false, "data": null, "code": "E_SAVE_SCHEMA"}
+	if int(v) > ROGUE_SCHEMA:
+		return {"ok": false, "data": null, "code": "E_SAVE_VERSION"}
+	return {"ok": true, "data": data, "code": ""}
+
+
+## Exact-key structural check of a rogue save; returns a cleaned copy or null.
+static func sanitize_rogue(data: Variant) -> Variant:
+	if not (data is Dictionary) or not _exact_keys(data, ROGUE_KEYS):
+		return null
+	if not _is_num(data["v"]) or int(data["v"]) != ROGUE_SCHEMA:
+		return null
+	if not _nn_int(data["soil"], 1000000000.0) or not (data["legacyImported"] is bool):
+		return null
+	var ul: Variant = data["unlocks"]
+	if not (ul is Dictionary) or ul.size() > 64:
+		return null
+	var unlocks := {}
+	for k in ul.keys():
+		if not (k is String) or k.length() > 24 or BAD_KEYS.has(k) or not _nn_int(ul[k], 9.0):
+			return null
+		unlocks[k] = int(ul[k])
+	var st: Variant = data["stats"]
+	if not (st is Dictionary) or not _exact_keys(st, ROGUE_STAT_KEYS):
+		return null
+	var stats := {}
+	for k in ROGUE_STAT_KEYS:
+		if k == "deaths":
+			var d: Variant = st["deaths"]
+			if not (d is Dictionary) or not _exact_keys(d, ROGUE_DEATH_KEYS):
+				return null
+			var deaths := {}
+			for dk in ROGUE_DEATH_KEYS:
+				if not _nn_int(d[dk], 1000000000.0):
+					return null
+				deaths[dk] = int(d[dk])
+			stats["deaths"] = deaths
+		elif k == "bestMiles":
+			if not _is_num(st[k]) or float(st[k]) < 0.0 or float(st[k]) > 1000000000.0:
+				return null
+			stats[k] = st[k]
+		else:
+			if not _nn_int(st[k], 1000000000.0):
+				return null
+			stats[k] = int(st[k])
+	var reached: Variant = _str_list(data["reached"], 64, 32)
+	if reached == null:
+		return null
+	return {"v": ROGUE_SCHEMA, "soil": int(data["soil"]), "unlocks": unlocks, "stats": stats, "reached": reached, "legacyImported": data["legacyImported"]}
+
+
+static func validate_rogue(data: Variant, v: Variant = null) -> Dictionary:
+	var ver: Variant = v if _is_int(v) else (data.get("v") if data is Dictionary and _is_int(data.get("v")) else ROGUE_SCHEMA)
+	var m := migrate_rogue(ver, data)
+	if not m["ok"]:
+		return {"ok": false, "code": m["code"]}
+	if sanitize_rogue(m["data"]) == null:
+		return {"ok": false, "code": "E_SAVE_SCHEMA"}
+	return {"ok": true, "code": ""}
+
+
+static func migrate_trek(v: Variant, data: Variant) -> Dictionary:
+	if not _is_int(v) or float(v) < 1.0 or not (data is Dictionary):
+		return {"ok": false, "data": null, "code": "E_SAVE_SCHEMA"}
+	if int(v) > TREK_SCHEMA:
+		return {"ok": false, "data": null, "code": "E_SAVE_VERSION"}
+	return {"ok": true, "data": data, "code": ""}
+
+
+## Exact-key structural check of a trek (in-progress run) save; returns a cleaned copy or null.
+static func sanitize_trek(data: Variant) -> Variant:
+	if not (data is Dictionary) or not _exact_keys(data, TREK_KEYS):
+		return null
+	if not _is_num(data["v"]) or int(data["v"]) != TREK_SCHEMA:
+		return null
+	if not _nn_int(data["seed"], 4294967295.0) or not _nn_int(data["leg"], 1000000.0) or not _nn_int(data["deathsAvoided"], 1000.0):
+		return null
+	var stage: Variant = data["stage"]
+	if not (stage is String) or stage.length() < 1 or stage.length() > 32:
+		return null
+	for k in ["miles", "progress", "heat"]:
+		if not _is_num(data[k]) or float(data[k]) < 0.0 or float(data[k]) > 1000000.0:
+			return null
+	var night: Variant = null
+	if data["night"] != null:
+		if not (data["night"] is Dictionary):
+			return null
+		night = _clone_json(data["night"], 1)
+		if night == null:
+			return null
+	var hunger: Variant = null
+	if data["hunger"] != null:
+		hunger = _clean_hunger(data["hunger"])
+		if hunger == null:
+			return null
+	var used: Variant = _str_list(data["unlocksUsed"], 32, 24)
+	if used == null:
+		return null
+	return {"v": TREK_SCHEMA, "seed": int(data["seed"]), "stage": stage, "leg": int(data["leg"]), "miles": data["miles"], "progress": data["progress"], "heat": data["heat"], "night": night, "hunger": hunger, "unlocksUsed": used, "deathsAvoided": int(data["deathsAvoided"])}
+
+
+static func validate_trek(data: Variant, v: Variant = null) -> Dictionary:
+	var ver: Variant = v if _is_int(v) else (data.get("v") if data is Dictionary and _is_int(data.get("v")) else TREK_SCHEMA)
+	var m := migrate_trek(ver, data)
+	if not m["ok"]:
+		return {"ok": false, "code": m["code"]}
+	if sanitize_trek(m["data"]) == null:
 		return {"ok": false, "code": "E_SAVE_SCHEMA"}
 	return {"ok": true, "code": ""}
 
