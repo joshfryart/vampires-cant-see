@@ -85,8 +85,8 @@ Version 0.20.2 (the JS game is 0.20.1). Four commits of parity work and two perf
   Command-line channels `--sys=` / `--tun=` (the Godot form of `?sys=` / `?tun=`).
 - **Render:** wall and floor shaders follow quality, line boil, material detail, reduced motion and effects level, including the fx extras (stone hatch, wood dashes, window glint, line taper, soft gradient front);
   map-transition wipe (`HudDraw.draw_wipe`); directional warm edge glow (`render/edge_glow.gd` + `shaders/edge_glow.gdshader`); figure warm-up at boot.
-- **New tools:** scenarios `perf_play.gd` (real-time profile: `--fx --vessels --vsync --secs --crowd --nomove --title`), `quality_modes.gd` (`--qmode=high|low|q2|q0|reduced --qfx --qwindow`), `edge_glow.gd`, `bench_draw.gd`, `fig_shots.gd`;
-  tools `fig_bench.gd`, `sonar_bench.gd`, `view_bench.gd`, `img_crop.gd`, `img_diff.gd`; tests `unit/test_governor.gd`, `unit/test_ui_gaps.gd`, `unit/test_edge_glow_wipe.gd`, `unit/test_fig_cache.gd`, `flow/test_parity_gaps.gd`.
+- **New tools:** scenarios `perf_play.gd` (real-time profile: `--fx --vessels --vsync --secs --crowd --nomove --title`), `quality_modes.gd` (`--qmode=high|low|q2|q0|reduced --qfx --qwindow`), `edge_glow.gd`;
+  tools `fig_bench.gd`, `sonar_bench.gd`, `view_bench.gd`; tests `unit/test_governor.gd`, `unit/test_ui_gaps.gd`, `unit/test_edge_glow_wipe.gd`, `flow/test_parity_gaps.gd`.
 
 ### Performance numbers
 
@@ -99,12 +99,7 @@ Windowed real time, GT 1030, NVIDIA 582.67, Windows 11, 1280x720, 60 Hz, `perf_p
 | Typical, uncapped | 10.3 ms (97 fps) | 5.2 ms (193 fps) |
 | Crowd, uncapped | not measured | avg 7.5-9.4 ms, p95 20-30 |
 
-Round 2 (a second perf pass):
-
-<!-- PERF-ROUND2 -->
-| Case | After round 2 |
-|---|---|
-| (to be filled in) | |
+Round 2 (cache each frozen echo's recorded figure across frames and replay it, budget figures by cost estimate) was tried and **reverted**: the unit filters passed, but windowed crowd runs on the GT 1030 were too noisy to show a gain. Crowd, vsync on, p95 16.95 and 24.84 ms (baseline 26.8; the second run had 25 frames > 33 ms vs 4 at baseline); crowd uncapped p95 17.1 and 30.2 ms (baseline 20-30). Typical walk unchanged (60 fps, p95 ~16.9; uncapped avg 4.9 ms). The crowd tail is still open (see TODO).
 
 ## NOT included (differences from the JS game)
 
