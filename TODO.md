@@ -19,7 +19,7 @@ Read `AI_HANDOFF.md` first (rules, commands, "NOT included" table, "Changes in 0
 Full suite after 35aaf2a: 106 tests, 1,108,495 checks, 0 failures. Not re-run after f682c69/87510fb (their workers ran filters gameplay, flow, parity_gaps, hud, world, edge_glow: all pass).
 Listening at windows: verified wired end to end (E key, gating, slow walk, muffled speech, subtitles, tutorial hint); only the headcount was missing (now restored).
 
-## Uncommitted in the working tree
+## Working tree status
 
 Nothing pending: docs and version 0.20.2 are committed (ec67654). Perf round 2 (cached per-echo figure replay) was tried, tests passed, but crowd p95 was not reliably better (see AI_HANDOFF perf notes); render edits and its scratch tools were reverted.
 
