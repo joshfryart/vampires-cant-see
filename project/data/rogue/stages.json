@@ -1,4 +1,5 @@
 {
+ "order": ["hollow", "wood", "moor", "road", "inn", "hamlet", "village", "cemetery", "market", "warrens", "guild", "silk", "keep"],
  "stages": [
   {
    "id": "hollow",
@@ -6,6 +7,7 @@
    "index": 1,
    "generator": "cave",
    "miles": 3,
+   "next": "wood",
    "drainMul": 0.8,
    "bloodGain": 1.0,
    "hunterBase": 0,
