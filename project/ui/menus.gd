@@ -14,6 +14,21 @@ var _version: Label
 var _notice
 const Notice = preload("res://ui/notice.gd")
 
+## The Long Night UI API (WP9 wires these; full list in docs/ROGUELIKE.md "UI API").
+signal trek_new_requested
+signal trek_continue_requested
+signal rise_again_requested
+signal title_requested
+## The live roguelike meta (TrekMeta dict). Integration may assign it; otherwise it is lazily read from the `rogue` save.
+var trek_meta: Dictionary = {}
+var trek_ui: TrekUi
+var _trek_view: String = ""      # "" | "rest" (Laid to Rest) | "coffin" (the shop opened from the death screen)
+var _coffin_back: String = "title"
+var _coffin_msg: String = ""
+var _rest_result: Dictionary = {}
+## -1 follows the `--classic` command line flag; tests set 0 or 1.
+static var classic_override: int = -1
+
 
 func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -50,6 +65,8 @@ func _init() -> void:
 	add_child(_version)
 	_notice = Notice.new()
 	add_child(_notice)
+	trek_ui = TrekUi.new()
+	add_child(trek_ui)
 
 
 ## Main title menu sits below the drawn title; every other panel is centred.
@@ -80,6 +97,8 @@ func _place(below_title: bool) -> void:
 
 ## Shrink the panel to its content and keep it centred (or hanging below the title) once the layout has settled.
 func _refit(below_title: bool) -> void:
+	if not _panel.is_inside_tree():
+		return
 	await _panel.get_tree().process_frame
 	var ms: Vector2 = _panel.get_combined_minimum_size()
 	if below_title:
@@ -140,6 +159,13 @@ func sync(g: Game) -> void:
 	if st != "title" and st != "paused":
 		_view = "main"
 		key = st
+	if _trek_view != "" and st != "error":
+		key = "trek/" + _trek_view
+		_build_trek_overlay()
+		if _panel.visible and key != _last_key:
+			_focus_first.call_deferred()
+		_last_key = key
+		return
 	match st:
 		"title": _build_title()
 		"paused": _build_pause()
@@ -156,6 +182,9 @@ func sync(g: Game) -> void:
 ## Esc inside a sub-view of the title or pause menu goes back to that menu's main view. Returns true when it did.
 ## game.gd calls this first in its Esc handler: `if menus != null and menus.consume_escape(): return`.
 func consume_escape() -> bool:
+	if _trek_view == "coffin" and _g != null:
+		_coffin_close()
+		return true
 	if _g == null or _view == "main" or (_g.state != "title" and _g.state != "paused"):
 		return false
 	_view = "main"
@@ -183,37 +212,43 @@ func _build_title() -> void:
 			_build_shop()
 			return
 		"stats":
+			_build_trek_stats()
+			return
+		"cstats":
 			_build_stats()
+			return
+		"coffin":
+			_build_coffin()
 			return
 		"guide":
 			_build_guide()
 			return
 	# Notices are shown by the Notice overlay (it drains g.flow.notices in any state).
-	if _g.flow.has_run:
-		_button("Continue", func():
-			if not _g.flow.continue_run():
-				sync(_g))
-		var nb := _button("Abandon run? Click again" if _abandon_ask else "New run", Callable())
-		nb.pressed.connect(func():
+	if has_trek_checkpoint():
+		_button("Continue the Long Night", func(): trek_continue_requested.emit())
+		var tb := _button("Abandon the trek? Click again" if _abandon_ask else "New Long Night", Callable())
+		tb.pressed.connect(func():
 			if not _abandon_ask:
 				_abandon_ask = true
-				nb.text = "Abandon run? Click again"
+				tb.text = "Abandon the trek? Click again"
 				_g.get_tree().create_timer(3.0).timeout.connect(func():
 					_abandon_ask = false
-					if is_instance_valid(nb):
-						nb.text = "New run")
+					if is_instance_valid(tb):
+						tb.text = "New Long Night")
 				return
 			_abandon_ask = false
-			_g.flow.abandon_stored()
-			_g.flow.begin_run())
+			trek_new_requested.emit())
 	else:
-		_button("New run", func(): _g.flow.begin_run())
-	_button("Shop (Essence %d)" % int(_g.flow.meta["essence"]), func():
-		_view = "shop"
+		_button("The Long Night", func(): trek_new_requested.emit())
+	_button("The Coffin (Grave Soil %d)" % int(_tm()["soil"]), func():
+		_coffin_back = "title"
+		_view = "coffin"
 		sync(_g))
 	_button("Stats", func():
 		_view = "stats"
 		sync(_g))
+	if classic_enabled():
+		_build_classic_buttons()
 	_button("How to play", func():
 		_view = "guide"
 		sync(_g))
@@ -227,8 +262,44 @@ func _build_title() -> void:
 	_label("WASD move · mouse look · click/Space ping · right-click/R drink · E door/sleep · Q shriek · Shift mist · F still · G rock · Esc pause", 11, Color(0.6, 0.65, 0.8))
 
 
+## Classic Five Nights is hidden unless the dev flag `--classic` is on (Menus.classic_override forces it in tests).
+static func classic_enabled() -> bool:
+	if classic_override >= 0:
+		return classic_override == 1
+	return OS.get_cmdline_user_args().has("--classic") or OS.get_cmdline_args().has("--classic")
+
+
+## Classic Five Nights entries: the original title code path, unchanged apart from the labels.
+func _build_classic_buttons() -> void:
+	if _g.flow.has_run:
+		_button("Classic: Continue", func():
+			if not _g.flow.continue_run():
+				sync(_g))
+		var nb := _button("Abandon run? Click again" if _abandon_ask else "Classic: New run", Callable())
+		nb.pressed.connect(func():
+			if not _abandon_ask:
+				_abandon_ask = true
+				nb.text = "Abandon run? Click again"
+				_g.get_tree().create_timer(3.0).timeout.connect(func():
+					_abandon_ask = false
+					if is_instance_valid(nb):
+						nb.text = "Classic: New run")
+				return
+			_abandon_ask = false
+			_g.flow.abandon_stored()
+			_g.flow.begin_run())
+	else:
+		_button("Classic: New run", func(): _g.flow.begin_run())
+	_button("Classic: Shop (Essence %d)" % int(_g.flow.meta["essence"]), func():
+		_view = "shop"
+		sync(_g))
+	_button("Classic: Stats", func():
+		_view = "cstats"
+		sync(_g))
+
+
 func _build_shop() -> void:
-	_label("Shop", 22, Color(0.9, 0.85, 0.5))
+	_label("Shop (classic)", 22, Color(0.9, 0.85, 0.5))
 	_label("Essence: %d" % int(_g.flow.meta["essence"]), 15)
 	var meta: Dictionary = _g.flow.meta
 	var scroll := ScrollContainer.new()
@@ -264,7 +335,7 @@ func _build_shop() -> void:
 
 
 func _build_stats() -> void:
-	_label("Stats", 22, Color(0.9, 0.85, 0.5))
+	_label("Stats (classic)", 22, Color(0.9, 0.85, 0.5))
 	var st: Dictionary = _g.flow.meta["stats"]
 	for k in Meta.STAT_KEYS:
 		_label("%s: %d" % [STAT_LABELS.get(k, k), int(st[k])], 14)
@@ -551,3 +622,209 @@ func _build_error() -> void:
 			f.store_string(Log.report())
 			_g.flow.notices.append("Log saved to " + ProjectSettings.globalize_path("user://vcs-log.txt")))
 	_button("Quit", func(): _g.get_tree().quit())
+
+
+# ---------------------------------------------------------------- The Long Night (roguelike)
+
+func has_trek_checkpoint() -> bool:
+	return _g != null and _g.flow != null and _g.flow.store != null and _g.flow.store.has("trek")
+
+
+## The roguelike meta, read from the `rogue` save on first use (or a fresh one).
+func _tm() -> Dictionary:
+	if trek_meta.is_empty():
+		trek_meta = TrekMeta.create()
+		if _g != null and _g.flow != null and _g.flow.store != null:
+			var r: Dictionary = _g.flow.store.read("rogue")
+			if r["ok"]:
+				var mg := TrekMeta.migrate(r["v"], r["data"])
+				var san: Variant = TrekMeta.sanitize(mg["data"]) if mg["ok"] else null
+				if san != null:
+					trek_meta = san
+	return trek_meta
+
+
+func _save_trek_meta() -> void:
+	if _g != null and _g.flow != null and _g.flow.store != null:
+		_g.flow.store.write("rogue", TrekMeta.SCHEMA, _tm())
+
+
+## Show the Laid to Rest screen for a finished trek (result dict: see docs/ROGUELIKE.md "UI API").
+func show_laid_to_rest(result: Dictionary) -> void:
+	_rest_result = result
+	_trek_view = "rest"
+	if _g != null:
+		sync(_g)
+
+
+func hide_laid_to_rest() -> void:
+	_trek_view = ""
+	_rest_result = {}
+	if _g != null:
+		sync(_g)
+
+
+## Open The Coffin (title view, or over the death screen when from_rest); Back returns to where it was opened.
+func open_coffin(from_rest: bool = false) -> void:
+	_coffin_back = "rest" if from_rest else "title"
+	if from_rest:
+		_trek_view = "coffin"
+	else:
+		_view = "coffin"
+	_coffin_msg = ""
+	if _g != null:
+		sync(_g)
+
+
+func _coffin_close() -> void:
+	_coffin_msg = ""
+	if _coffin_back == "rest" and not _rest_result.is_empty():
+		_trek_view = "rest"
+	else:
+		_trek_view = ""
+		_view = "main"
+	sync(_g)
+
+
+func _build_trek_overlay() -> void:
+	_clear()
+	_panel.visible = true
+	_place(false)
+	if _trek_view == "coffin":
+		_build_coffin()
+	else:
+		_build_rest()
+
+
+static func _roman(n: int) -> String:
+	return ["0", "I", "II", "III", "IV", "V"][clampi(n, 0, 5)]
+
+
+## Why an unlock is locked ("Needs Far Echo II"), or "" when its prerequisites are met.
+static func locked_reason(meta: Dictionary, id: String) -> String:
+	var r: Variant = TrekMeta.missing_prereq(meta, id)
+	if r == null:
+		return ""
+	var pu: Variant = TrekMeta.unlock_by_id(r["id"])
+	return "Needs %s %s" % [str(pu["name"]) if pu != null else str(r["id"]), _roman(int(r["tier"]))]
+
+
+## Buy through TrekMeta, save, and remember the line shown on the shop: {ok, code, text}.
+func coffin_buy(id: String) -> Dictionary:
+	var meta := _tm()
+	var u: Variant = TrekMeta.unlock_by_id(id)
+	var r := TrekMeta.buy(meta, id)
+	var text := ""
+	match r["code"]:
+		"OK":
+			text = "You pack fresh soil into the lining. %s deepens." % str(u["name"])
+			_save_trek_meta()
+		"E_META_POOR":
+			text = "Not enough Grave Soil. The coffin stays hungry."
+		"E_META_LOCKED":
+			text = "The lid will not lift yet. %s." % locked_reason(meta, id)
+		"E_META_MAX":
+			text = "Nothing more to pack in there."
+		_:
+			text = "The coffin does not know that."
+	_coffin_msg = text
+	return {"ok": r["ok"], "code": r["code"], "text": text}
+
+
+func _build_coffin() -> void:
+	var meta := _tm()
+	_label("The Coffin", 22, Color(0.9, 0.85, 0.5))
+	_label("Grave Soil: %d" % int(meta["soil"]), 15, Color(0.75, 0.6, 0.4))
+	if _coffin_msg != "":
+		_label(_coffin_msg, 13, Color(0.6, 0.85, 0.6))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(700, 380)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_box.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	scroll.add_child(grid)
+	for u in TrekMeta._d()["upgrades"]:
+		var id: String = u["id"]
+		var t := TrekMeta.tier_of(meta, id)
+		var mx := TrekMeta.max_tier(id)
+		var cost := TrekMeta.cost_of(meta, id)
+		var why := locked_reason(meta, id)
+		var card := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.07, 0.07, 0.1, 0.9)
+		sb.set_content_margin_all(8)
+		sb.set_corner_radius_all(4)
+		sb.border_color = Color(0.4, 0.35, 0.25, 0.6) if why == "" else Color(0.3, 0.3, 0.35, 0.5)
+		sb.set_border_width_all(1)
+		card.add_theme_stylebox_override("panel", sb)
+		card.custom_minimum_size = Vector2(340, 0)
+		grid.add_child(card)
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 3)
+		card.add_child(v)
+		_card_text(v, "%s   %s%s" % [u["name"], "●".repeat(t), "○".repeat(mx - t)], 15, Color(0.55, 0.58, 0.68) if why != "" else Color(1.0, 0.9, 0.7))
+		_card_text(v, str(u.get("flavour", "")), 12, Color(0.6, 0.7, 0.6))
+		_card_text(v, str(u["desc"][t]) if t < mx else str(u["desc"][mx - 1]) + " (max)", 12, Color(0.8, 0.85, 0.95))
+		if cost < 0:
+			_card_text(v, "Fully packed.", 12, Color(0.6, 0.65, 0.8))
+		elif why != "":
+			_card_text(v, "Locked: " + why, 12, Color(0.85, 0.5, 0.4))
+		var b := _button("Max" if cost < 0 else "Buy %d Soil" % cost, func():
+			coffin_buy(id)
+			sync(_g), v)
+		b.disabled = cost < 0 or why != "" or float(meta["soil"]) < cost
+		b.name = "buy_" + id
+	_button("Back", func(): _coffin_close())
+
+
+func _card_text(parent: Control, text: String, size: int, color: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", _fs(size))
+	l.add_theme_color_override("font_color", color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(320, 0)
+	parent.add_child(l)
+
+
+func _build_trek_stats() -> void:
+	var meta := _tm()
+	var st: Dictionary = meta["stats"]
+	_label("Stats", 22, Color(0.9, 0.85, 0.5))
+	var lines := [
+		"Treks: %d" % int(st["treks"]), "Furthest from the Coffin: %.1f miles" % float(st["bestMiles"]),
+		"Best stage: %d" % int(st["bestStage"]), "Stages reached: %d" % (meta["reached"] as Array).size(),
+		"People fed: %d" % int(st["fedHumans"]), "Critters fed: %d" % int(st["fedCritters"]),
+		"Died to the sun: %d" % int(st["deaths"]["sun"]), "Withered: %d" % int(st["deaths"]["withered"]),
+		"Staked: %d" % int(st["deaths"]["staked"]), "Holy ground: %d" % int(st["deaths"]["holy"]),
+		"Grave Soil earned: %d" % int(st["soilEarned"]), "Grave Soil now: %d" % int(meta["soil"])]
+	for ln in lines:
+		_label(ln, 14)
+	_button("Back", func():
+		_view = "main"
+		sync(_g))
+
+
+func _build_rest() -> void:
+	var r := _rest_result
+	var tx := TrekUi.rest_text(r)
+	var tomb := IconRect.new("tomb", 100.0)
+	tomb.custom_minimum_size = Vector2(140, 100)
+	tomb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_box.add_child(tomb)
+	_label(tx["title"], 24, Color(0.5, 0.9, 0.6) if r.get("cause") == "victory" else Color(0.9, 0.3, 0.3))
+	_label(tx["cause"], 15)
+	_label(tx["tally"], 13, Color(0.7, 0.75, 0.9))
+	for ln in tx["soil"]:
+		_label(ln, 13, Color(0.85, 0.8, 0.6))
+	_label(tx["total"], 16, Color(0.9, 0.85, 0.5))
+	if tx["best"] != "":
+		_label(tx["best"], 14, Color(0.5, 0.9, 0.6) if r.get("newBest") == true else Color(0.6, 0.65, 0.8))
+	_button("Rise Again", func(): rise_again_requested.emit())
+	_button("The Coffin", func(): open_coffin(true))
+	_button("Title", func():
+		hide_laid_to_rest()
+		title_requested.emit())

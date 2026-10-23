@@ -44,3 +44,19 @@ Open air (every walkable cell needs a solid cell within R: wild 6, road 5, city 
 
 ## Work packages
 WP0 resolve perf round 2; 1 this doc; 2 map registry + hooks; 3 water tile, props, covered pockets; 4 critters; 5 ambient emitters; 6 trek meta + saves; 7 cave generator; 8 trek flow; 8b wait-out-the-day; 9 integration (0.21.0); 10 UI; 11 Opus review; 12 echo suite; 13a-d wilderness/road/settlements/city; 14 hazards + powers; 15 docs; 16 final review. Cut-line, lowest priority first: thrall/bat form/second coffin, keep+nobility mechanics, cricket/howl reveals, holy ground, waystones, cemetery+inn, city districts beyond one, procedural variation outside the cave. Never cut: WP0, 2-10, 12.
+
+## UI API (WP10)
+`ui/menus.gd` (`Menus`, the `menus` node on Game) and `ui/trek_ui.gd` (`TrekUi`, `menus.trek_ui`). Classic Five Nights entries show only with `--classic` (`Menus.classic_override` forces it in tests).
+
+Menus:
+- signals `trek_new_requested`, `trek_continue_requested` (title buttons; continue shows when the store has a `trek` slot), `rise_again_requested`, `title_requested`
+- `var trek_meta: Dictionary` (TrekMeta state; lazily read from the `rogue` slot if empty; buys write it back)
+- `show_laid_to_rest(result: Dictionary)` / `hide_laid_to_rest()`; result `{cause: sun|withered|staked|holy|victory, stageName, miles, humans, critters, unseen, newBest, soil_breakdown{miles,humans,critters,unseen,newBest,pouch,...}, soilTotal, bestMiles}`
+- `open_coffin(from_rest := false)`, `coffin_buy(id) -> {ok, code, text}`, `has_trek_checkpoint()`, static `locked_reason(meta, id)`
+
+TrekUi:
+- `show_stage_card(index, stage_name, miles, time_of_day := "dusk", seconds := 4.0)`
+- `set_dawn(seconds_left)` (< 0 hides, <= 90 warning, <= 0 "The sun is up"), `dawn_state()`
+- `show_wait_prompt(options := {title, body, wait_label, keep_label, on_wait, on_keep})`, `hide_wait_prompt()`; signals `wait_chosen`, `keep_looking_chosen`
+- `show_waiting(blood, lines)`, `update_waiting(blood, lines)`, `hide_waiting()`; signal `wait_interrupted` (Stir button)
+- static `stage_card_text`, `dawn_text`, `rest_text(result)`
