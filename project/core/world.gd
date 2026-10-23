@@ -9,12 +9,17 @@ const DOORS := "DG"
 const MATERIAL := {
 	"#": "stone", "B": "brick", "W": "wood", "I": "iron", "w": "glass",
 	".": "stone", ",": "wood", "g": "grass", "D": "wood", "G": "iron",
+	"~": "water",
 }
+## Still water: rays and line of sight pass over it, but nothing walks on it (blocks() is true). Its material "water" falls back
+## to stone in Acoustics.mat_of when sounds.json has no such key; RAY_MATS has no water so the ray cache uses index 0 (stone).
+const WATER := "~"
+const WATER_CODE := 126
 const FLOOR_MATS := ["stone", "wood", "grass", "cobble", "roughStone"]
 const MATERIALS := ["stone", "brick", "roughStone", "cobble", "wood", "glass", "iron", "grass"]
-const NON_SOLID := ["cross", "torch"]
+const NON_SOLID := ["cross", "torch", "stalactite", "glowworm"]
 const PROP_R := 0.3
-const DEFAULT_LIGHT := {"torch": 3.0, "brazier": 3.5}
+const DEFAULT_LIGHT := {"torch": 3.0, "brazier": 3.5, "glowworm": 1.5}
 const LIGHT_SCALE := 0.39
 ## Outer halo reaches this many times the core radius (js/world.js OUTER_K).
 const OUTER_K := 1.8
@@ -36,6 +41,8 @@ var cell_open: PackedByteArray = PackedByteArray()
 var solid_grid: PackedByteArray = PackedByteArray()
 var mat_grid: PackedByteArray = PackedByteArray()
 var tile_grid: PackedInt32Array = PackedInt32Array()
+## True when the map has any water tile (keeps blocks() on its old fast path otherwise).
+var has_water: bool = false
 const RAY_MATS := ["stone", "brick", "wood", "iron", "glass", "cobble", "roughStone", "grass"]
 var doors_by_id: Dictionary = {}
 var door_grid: Dictionary = {}
@@ -105,6 +112,8 @@ static func from_def(def: Dictionary) -> World:
 			var mi: int = RAY_MATS.find(mname)
 			w.mat_grid[k2] = 0 if mi < 0 else mi
 			w.tile_grid[k2] = row2.unicode_at(c)
+			if w.tile_grid[k2] == WATER_CODE:
+				w.has_water = true
 	for d in def.get("props", []):
 		var solid := not NON_SOLID.has(d["type"])
 		var light: float = float(d["light"]) if d.get("light") is float or d.get("light") is int else float(DEFAULT_LIGHT.get(d["type"], 0.0))
@@ -197,6 +206,10 @@ func arrival(door_id: String) -> Variant:
 	return {"x": d["col"] + 0.5 + f[0], "y": d["row"] + 0.5 + f[1], "angle": float(f[2])}
 
 
+func _water_cell(x: float, y: float) -> bool:
+	return tile_grid[int(floor(y)) * width + int(floor(x))] == WATER_CODE
+
+
 ## Ports blocks (js/world.js:523): circle of radius r against walls and solid props.
 func blocks(x: float, y: float, r: float) -> bool:
 	if is_nan(x) or is_nan(y) or is_inf(x) or is_inf(y):
@@ -204,6 +217,8 @@ func blocks(x: float, y: float, r: float) -> bool:
 	if not (r > 0.0):
 		r = 0.0
 	if is_solid(x - r, y - r) or is_solid(x + r, y - r) or is_solid(x - r, y + r) or is_solid(x + r, y + r):
+		return true
+	if has_water and (_water_cell(x - r, y - r) or _water_cell(x + r, y - r) or _water_cell(x - r, y + r) or _water_cell(x + r, y + r)):
 		return true
 	var reach: float = r + PROP_R
 	var c0: int = maxi(0, int(floor(x - reach)))

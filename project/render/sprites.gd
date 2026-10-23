@@ -1,7 +1,7 @@
 class_name Sprites
 extends RefCounted
 ## Ports drawSprite (crypt coffin, safe diamond, open doorway) and drawProps (gravestone, cross, barrel, table, chair, bench,
-## well, torch, brazier) from js/render.js onto a Canvas. Lit only while a wavefront passes, with the height band mask on props.
+## well, torch, brazier, plus the roguelike stalagmite, stalactite, coffin, glowworm, stump, boulder, haybale, scarecrow, shrine) from js/render.js onto a Canvas. Lit only while a wavefront passes, with the height band mask on props.
 
 const TWO_PI := JsMath.TWO_PI
 const FLASH_AGE := 0.12
@@ -25,6 +25,15 @@ const PROP_DEF := {
 	"well": {"zc": 0.3, "top": 0.86, "fire": false},
 	"torch": {"zc": 0.72, "top": 0.85, "fire": true},
 	"brazier": {"zc": 0.45, "top": 0.78, "fire": true},
+	"stalagmite": {"zc": 0.3, "top": 0.7, "fire": false},
+	"stalactite": {"zc": 0.85, "top": 1.0, "fire": false},
+	"coffin": {"zc": 0.4, "top": 0.88, "fire": false},
+	"glowworm": {"zc": 0.9, "top": 1.0, "fire": false},
+	"stump": {"zc": 0.14, "top": 0.28, "fire": false},
+	"boulder": {"zc": 0.2, "top": 0.4, "fire": false},
+	"haybale": {"zc": 0.15, "top": 0.3, "fire": false},
+	"scarecrow": {"zc": 0.45, "top": 0.9, "fire": false},
+	"shrine": {"zc": 0.3, "top": 0.62, "fire": false},
 }
 
 
@@ -445,6 +454,121 @@ static func prop_body(c: Canvas, type: String, cx: float, fy: float, hs: float, 
 			c.line_to(cx, fy - 0.5 * vs)
 			c.move_to(cx + w7 * 0.18, fy - 0.5 * vs)
 			c.arc(cx, fy - 0.5 * vs, w7 * 0.18, 0.0, TWO_PI)
+		"stalagmite":
+			var w9: float = 0.2 * hs
+			c.move_to(cx - w9, fy)
+			c.line_to(cx - w9 * 0.45, fy - 0.3 * vs)
+			c.line_to(cx - w9 * 0.2, fy - 0.24 * vs)
+			c.line_to(cx, fy - 0.7 * vs)
+			c.line_to(cx + w9 * 0.3, fy - 0.28 * vs)
+			c.line_to(cx + w9 * 0.55, fy - 0.36 * vs)
+			c.line_to(cx + w9, fy)
+			c.close_path()
+		"stalactite":
+			var w10: float = 0.16 * hs
+			var top_y: float = fy - 1.0 * vs
+			c.move_to(cx - w10, top_y)
+			c.line_to(cx - w10 * 0.3, top_y + 0.22 * vs)
+			c.line_to(cx - w10 * 0.15, top_y + 0.18 * vs)
+			c.line_to(cx, top_y + 0.42 * vs)
+			c.line_to(cx + w10 * 0.2, top_y + 0.2 * vs)
+			c.line_to(cx + w10 * 0.4, top_y + 0.24 * vs)
+			c.line_to(cx + w10, top_y)
+			c.move_to(cx - w10 * 1.3, top_y)
+			c.line_to(cx + w10 * 1.3, top_y)
+		"coffin":
+			var w11: float = 0.2 * hs
+			c.move_to(cx - w11 * 0.6, fy - 0.88 * vs)
+			c.line_to(cx + w11 * 0.6, fy - 0.88 * vs)
+			c.line_to(cx + w11, fy - 0.62 * vs)
+			c.line_to(cx + w11 * 0.7, fy)
+			c.line_to(cx - w11 * 0.7, fy)
+			c.line_to(cx - w11, fy - 0.62 * vs)
+			c.close_path()
+			c.move_to(cx - w11 * 0.5, fy - 0.8 * vs)
+			c.line_to(cx + w11 * 0.5, fy - 0.8 * vs)
+			c.move_to(cx, fy - 0.78 * vs)
+			c.line_to(cx, fy - 0.5 * vs)
+			c.move_to(cx - w11 * 0.4, fy - 0.68 * vs)
+			c.line_to(cx + w11 * 0.4, fy - 0.68 * vs)
+		"glowworm":
+			var top_g: float = fy - 1.0 * vs
+			for gi in 7:
+				var gx: float = cx + sin(ph + gi * 2.1) * 0.22 * hs
+				var gy: float = top_g + (0.06 + 0.05 * float(gi % 4)) * vs + sin(t * 1.3 + ph + gi) * 0.012 * vs
+				var gr: float = maxf(1.0, 0.018 * hs)
+				c.move_to(gx + gr, gy)
+				c.arc(gx, gy, gr, 0.0, TWO_PI)
+				if gi % 2 == 0:
+					c.move_to(gx, gy - gr)
+					c.line_to(gx, top_g)
+		"stump":
+			var w12: float = 0.2 * hs
+			var e4: float = maxf(1.2, vs * 0.025)
+			c.move_to(cx - w12, fy - 0.26 * vs)
+			c.line_to(cx - w12 * 1.25, fy)
+			c.line_to(cx + w12 * 1.25, fy)
+			c.line_to(cx + w12, fy - 0.26 * vs)
+			c.move_to(cx + w12, fy - 0.26 * vs)
+			c.ellipse(cx, fy - 0.26 * vs, w12, e4, 0.0, 0.0, TWO_PI)
+			c.move_to(cx + w12 * 0.45, fy - 0.26 * vs)
+			c.ellipse(cx, fy - 0.26 * vs, w12 * 0.45, e4 * 0.45, 0.0, 0.0, TWO_PI)
+		"boulder":
+			var w13: float = 0.28 * hs
+			c.move_to(cx - w13, fy)
+			c.quad_to(cx - w13 * 1.1, fy - 0.34 * vs, cx - w13 * 0.2, fy - 0.4 * vs)
+			c.quad_to(cx + w13 * 1.0, fy - 0.42 * vs, cx + w13, fy)
+			c.line_to(cx - w13, fy)
+			c.move_to(cx - w13 * 0.4, fy - 0.3 * vs)
+			c.line_to(cx - w13 * 0.1, fy - 0.18 * vs)
+			c.line_to(cx + w13 * 0.3, fy - 0.2 * vs)
+		"haybale":
+			var w14: float = 0.34 * hs
+			c.move_to(cx - w14, fy)
+			c.line_to(cx - w14, fy - 0.3 * vs)
+			c.line_to(cx + w14, fy - 0.3 * vs)
+			c.line_to(cx + w14, fy)
+			c.close_path()
+			c.move_to(cx - w14 * 0.35, fy - 0.3 * vs)
+			c.line_to(cx - w14 * 0.35, fy)
+			c.move_to(cx + w14 * 0.35, fy - 0.3 * vs)
+			c.line_to(cx + w14 * 0.35, fy)
+			c.move_to(cx - w14, fy - 0.3 * vs)
+			c.line_to(cx - w14 * 1.15, fy - 0.36 * vs)
+			c.move_to(cx + w14, fy - 0.3 * vs)
+			c.line_to(cx + w14 * 1.15, fy - 0.36 * vs)
+		"scarecrow":
+			var w15: float = 0.3 * hs
+			c.move_to(cx, fy)
+			c.line_to(cx, fy - 0.72 * vs)
+			c.move_to(cx - w15, fy - 0.58 * vs)
+			c.line_to(cx + w15, fy - 0.58 * vs)
+			c.move_to(cx - w15, fy - 0.58 * vs)
+			c.line_to(cx - w15 * 1.1, fy - 0.4 * vs)
+			c.move_to(cx + w15, fy - 0.58 * vs)
+			c.line_to(cx + w15 * 1.1, fy - 0.4 * vs)
+			c.move_to(cx + w15 * 0.28, fy - 0.8 * vs)
+			c.arc(cx, fy - 0.8 * vs, w15 * 0.28, 0.0, TWO_PI)
+			c.move_to(cx - w15 * 0.5, fy - 0.86 * vs)
+			c.line_to(cx + w15 * 0.5, fy - 0.86 * vs)
+			c.move_to(cx - w15 * 0.25, fy - 0.86 * vs)
+			c.line_to(cx, fy - 0.92 * vs)
+			c.line_to(cx + w15 * 0.25, fy - 0.86 * vs)
+		"shrine":
+			var w16: float = 0.26 * hs
+			c.move_to(cx - w16, fy)
+			c.line_to(cx - w16, fy - 0.2 * vs)
+			c.line_to(cx + w16, fy - 0.2 * vs)
+			c.line_to(cx + w16, fy)
+			c.move_to(cx - w16 * 0.6, fy - 0.2 * vs)
+			c.line_to(cx - w16 * 0.6, fy - 0.46 * vs)
+			c.line_to(cx, fy - 0.62 * vs)
+			c.line_to(cx + w16 * 0.6, fy - 0.46 * vs)
+			c.line_to(cx + w16 * 0.6, fy - 0.2 * vs)
+			c.move_to(cx, fy - 0.32 * vs)
+			c.line_to(cx, fy - 0.46 * vs)
+			c.move_to(cx - w16 * 0.2, fy - 0.4 * vs)
+			c.line_to(cx + w16 * 0.2, fy - 0.4 * vs)
 		"torch":
 			torch_holder(c, cx, fy, vs, hs, lat)
 		"brazier":

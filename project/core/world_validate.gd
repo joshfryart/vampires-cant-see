@@ -6,11 +6,13 @@ extends RefCounted
 const WALLS := "#BWIw"
 const FLOORS := ".,g"
 const MARKERS := "@CSP"
-const VALID := "#BWIw.,gDG@CSP"
+## "~" is still water: allowed in rows, not walkable (props, doors, hides cannot sit on it).
+const VALID := "#BWIw.,gDG@CSP~"
 const MAX_W := 64
 const MAX_H := 48
-const PROP_TYPES := ["gravestone", "cross", "barrel", "table", "chair", "bench", "well", "torch", "brazier"]
-const NON_SOLID := ["cross", "torch"]
+const PROP_TYPES := ["gravestone", "cross", "barrel", "table", "chair", "bench", "well", "torch", "brazier",
+	"stalagmite", "stalactite", "coffin", "glowworm", "stump", "boulder", "haybale", "scarecrow", "shrine"]
+const NON_SOLID := ["cross", "torch", "stalactite", "glowworm"]
 const PROP_R := 0.3
 
 
@@ -251,7 +253,7 @@ static func _validate_contents(map_def: Dictionary, rows: Array, map_name: Strin
 
 static func _blocked_at(rows: Array, solid_list: Array, x: float, y: float) -> bool:
 	var ch := _ch_at(rows, int(floor(x)), int(floor(y)))
-	if _is_wall(ch):
+	if _is_wall(ch) or ch == "~":
 		return true
 	for p in solid_list:
 		var dx: float = x - (float(p["col"]) + 0.5)
