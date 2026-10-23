@@ -70,6 +70,9 @@ var _stake_cd: float = 0.0
 var _stake_ignored: int = 0
 var _stage_done: bool = false
 var _wait: WaitDay = null
+## Spawn indices (into descriptor["critters"]) of prey eaten on this stage: continue must not respawn them (saved in night.trek).
+var eaten: Array = []
+var _ck_at: Vector2i = Vector2i.ZERO   ## the last checkpoint position (stage entry or the rest spot slept at)
 var _revived: bool = false
 
 
@@ -124,6 +127,11 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.cleared = (ex.get("cleared", []) as Array).duplicate() if ex.get("cleared") is Array else []
 	f.reached = (ex.get("reached", []) as Array).duplicate() if ex.get("reached") is Array else []
 	f._warned = bool(ex.get("warned", false))
+	f._wither_t = maxf(0.0, float(ex.get("wither_t", 0.0)))
+	if ex.get("eaten") is Array:
+		for i in ex["eaten"]:
+			if (i is int or i is float) and f.eaten.size() < 256 and int(i) >= 0 and not f.eaten.has(int(i)):
+				f.eaten.append(int(i))
 	var st := String(ex.get("state", "playing"))
 	if not _load_stage_ok(f, String(s["stage"])):
 		return null
@@ -134,6 +142,7 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.player_pos = Vector2(f.at_cell.x + 0.5, f.at_cell.y + 0.5)
 	f.descriptor = f._descriptor()
 	f.descriptor["start"] = f.at_cell
+	f._ck_at = f.at_cell
 	return f
 
 
@@ -237,6 +246,7 @@ func enter_stage(id: String) -> Dictionary:
 	_stake_cd = 0.0
 	_stage_done = false
 	_wait = null
+	eaten = []
 	state = "playing"
 	last_rest = start_cell
 	at_cell = start_cell
@@ -340,8 +350,8 @@ func on_notice(_by: int = -1) -> void:
 
 func step(dt: float, player_cell: Vector2i, on_outdoor: bool, ctx: Dictionary = {}) -> Array:
 	var ev: Array = []
-	if not alive() or not is_finite(dt):
-		return ev
+	if not alive() or not is_finite(dt) or bool(ctx.get("frozen", false)):
+		return ev   # frozen: a prompt is open, the world holds still (no clock, drain, stakes or withering)
 	var pp: Variant = ctx.get("player_pos")
 	update_position(player_cell, pp if pp is Vector2 else Vector2.INF)
 	var left := maxf(0.0, dt)
@@ -491,8 +501,7 @@ func sleep_at_rest(cell: Vector2i) -> Dictionary:
 	else:
 		var add := int(o["heat_add"])
 		if res == "noticed":
-			noticed = true
-			add += 1
+			noticed = true   # found asleep: the +1 Heat of the sleep itself is all (docs/ROGUELIKE.md)
 		_new_night(add, ev)
 		checkpoint()
 	return {"ok": true, "result": res, "events": ev, "heat": heat, "blood": night.blood}
@@ -614,12 +623,14 @@ func end_run(cause_: String = "") -> Dictionary:
 
 # ---------------------------------------------------------------- save
 
-func snapshot() -> Dictionary:
+## quit: the position is the last checkpoint's (stage entry / rest spot), everything else (blood, clock, eaten prey, wither timer) is as is.
+func snapshot(quit: bool = false) -> Dictionary:
 	var nd := night.serialize()
+	var at: Vector2i = _ck_at if quit else at_cell
 	nd[SAVE_EXTRA] = {
 		"humans": humans_fed, "critters": critters_fed, "unseenStages": stages_unseen, "noticed": noticed, "state": state, "day_t": day_t,
-		"at": [at_cell.x, at_cell.y], "rest": [last_rest.x, last_rest.y], "stakeIgnored": _stake_ignored, "cleared": cleared.duplicate(),
-		"reached": reached.duplicate(), "warned": _warned,
+		"at": [at.x, at.y], "rest": [last_rest.x, last_rest.y], "stakeIgnored": _stake_ignored, "cleared": cleared.duplicate(),
+		"reached": reached.duplicate(), "warned": _warned, "eaten": eaten.duplicate(), "wither_t": _wither_t,
 	}
 	var used: Array = []
 	for id in (meta.get("unlocks", {}) as Dictionary):
@@ -636,7 +647,24 @@ func restore_snapshot(save: Variant) -> TrekFlow:
 
 ## Write the checkpoint (kind "trek") when a store is attached. Called at stage entry and by sleep_at_rest.
 func checkpoint() -> bool:
+	_ck_at = at_cell
 	if store == null:
 		return true
 	var w: Dictionary = store.write("trek", SaveCodec.TREK_SCHEMA, snapshot())
+	return bool(w.get("ok", false))
+
+
+## Remember that the critter spawned at index `idx` of descriptor["critters"] was drunk dry (never respawns on continue).
+func mark_eaten(idx: int) -> void:
+	if idx >= 0 and not eaten.has(idx) and eaten.size() < 256:
+		eaten.append(idx)
+
+
+## Quit / close: save a checkpoint-safe state (see snapshot(true)). A live WaitDay (the one begin_wait returned)'s blood and day clock are folded in first.
+func quit_checkpoint(live_wait: WaitDay = null) -> bool:
+	if live_wait != null and _wait == live_wait:
+		apply_wait({"result": "running", "blood_after": live_wait.blood})
+	if store == null:
+		return true
+	var w: Dictionary = store.write("trek", SaveCodec.TREK_SCHEMA, snapshot(true))
 	return bool(w.get("ok", false))

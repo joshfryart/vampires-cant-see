@@ -28,6 +28,7 @@ var _prompt_box: VBoxContainer
 var _waiting: PanelContainer
 var _wait_blood: Label
 var _wait_lines: Label
+var _stir: Button
 var _t: float = 0.0
 
 
@@ -81,6 +82,7 @@ func _init() -> void:
 	var stir := Button.new()
 	stir.text = "Stir"
 	stir.name = "stir"
+	_stir = stir
 	stir.pressed.connect(func(): wait_interrupted.emit())
 	wb.add_child(stir)
 
@@ -247,9 +249,14 @@ func show_wait_prompt(options: Dictionary = {}) -> void:
 			cb.call()
 		keep_looking_chosen.emit())
 	_prompt_box.add_child(keep)
+	# no keyboard focus on the prompt: Space (the ping) or Enter must never pick "Wait out the day" by accident
+	wait.focus_mode = Control.FOCUS_CLICK
+	keep.focus_mode = Control.FOCUS_CLICK
 	_prompt.visible = true
 	if is_inside_tree():
-		wait.grab_focus.call_deferred()
+		var vp := get_viewport()
+		if vp != null:
+			vp.gui_release_focus()
 
 
 func hide_wait_prompt() -> void:
@@ -263,6 +270,8 @@ func wait_prompt_visible() -> bool:
 func show_waiting(blood: float, lines: Array) -> void:
 	update_waiting(blood, lines)
 	_waiting.visible = true
+	if is_inside_tree():
+		_stir.grab_focus.call_deferred()   # Space / Enter on the focused button stirs; the mouse is kept visible by RogueMode
 
 
 func update_waiting(blood: float, lines: Array) -> void:

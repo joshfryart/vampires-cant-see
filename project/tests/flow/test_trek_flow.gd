@@ -20,6 +20,14 @@ func _flow(unlocks: Dictionary = {}, store: Object = null, seed_: int = SEED) ->
 	return TrekFlow.begin(_meta(unlocks), seed_, store)
 
 
+## reach_exit, then end the run as "frontier" by hand when a further stage generator exists (so the Soil maths stays testable).
+func _exit_end(f: TrekFlow) -> Dictionary:
+	var r := f.reach_exit()
+	if r["ok"] and not r["ended"]:
+		return {"ok": true, "ended": true, "result": f.end_run("frontier")}
+	return r
+
+
 func _path(f: TrekFlow) -> Array:
 	var c: Vector2i = f.start_cell
 	var out: Array = [c]
@@ -95,7 +103,11 @@ func test_walk_the_cave_to_the_exit() -> void:
 	ok(f.at_exit(path[path.size() - 1]), "at exit")
 	ok(f.night.blood > 0.0, "still has blood")
 	var r := f.reach_exit()
-	ok(r["ok"] and r["ended"], "no next stage generator: the trek ends")
+	ok(r["ok"], "exit taken")
+	if not r["ended"]:
+		# a next stage generator exists now (wilderness work): end the run here by hand to check the Soil
+		r = {"ok": true, "ended": true, "result": f.end_run("frontier")}
+		near(f.miles(), 3.0, 3.0, "miles after the exit")
 	var res: Dictionary = r["result"]
 	eq(res["cause"], "frontier", "frontier cause")
 	near(res["miles"], 3.0, 1e-9, "result miles")
@@ -350,7 +362,7 @@ func test_feeding_counts_and_soil() -> void:
 func test_notice_costs_unseen() -> void:
 	var f := _flow()
 	f.on_notice(3)
-	var r := f.reach_exit()
+	var r := _exit_end(f)
 	eq(r["result"]["unseen"], 0, "noticed stage is not unseen")
 	eq(r["result"]["cause"], "frontier", "frontier")
 
@@ -421,15 +433,14 @@ func test_frontier_pays_soil_with_pouch() -> void:
 	var f := TrekFlow.begin(meta, SEED)
 	for c in _path(f):
 		f.step(0.3, c, false)
-	var r := f.reach_exit()
+	var r := _exit_end(f)
 	var res: Dictionary = r["result"]
 	eq(res["cause"], "frontier", "frontier")
 	eq(res["soilTotal"], int(floor(11.0 * 1.1 + 1e-9)), "pouch applies to a frontier end")
 	eq(meta["soil"], res["soilTotal"], "paid")
-	eq(meta["stats"]["bestStage"], 1, "best stage recorded")
+	ok(int(meta["stats"]["bestStage"]) >= 1, "best stage recorded")
 	ok(meta["reached"].has("hollow"), "reached recorded")
 	eq(TrekFlow.next_stage_id("hollow"), "wood", "next stage from the row")
-	ok(not TrekFlow.has_generator("wood"), "wood has no generator yet")
 	ok(TrekFlow.stage_order().size() >= 13, "stage order list")
 
 
@@ -452,3 +463,56 @@ func test_determinism() -> void:
 	var rb := b.sleep_at_rest(cell)
 	eq(ra["result"], rb["result"], "same sleep result")
 	near(ra["blood"], rb["blood"], 1e-12, "same blood")
+
+
+func test_eaten_and_wither_survive_a_quit_save() -> void:
+	var st := _store()
+	var f := _flow({}, st)
+	f.mark_eaten(3)
+	f.mark_eaten(3)
+	f.mark_eaten(5)
+	eq(f.eaten.size(), 2, "eaten indices are unique")
+	f.night.blood = 0.0
+	f.step(6.0, f.start_cell, false, {"hunters": []})
+	var left := f.withering_left()
+	ok(left > 0.0 and left < 19.5, "wither running (%.1f)" % left)
+	var far: Vector2i = _path(f)[20]
+	f.update_position(far)
+	ok(f.quit_checkpoint(), "quit checkpoint written")
+	var rd: Dictionary = st.read("trek")
+	var g := TrekFlow.continue_from(rd["data"], f.meta, st)
+	ok(g != null, "loads")
+	eq(g.eaten, [3, 5], "eaten list restored")
+	near(g.withering_left(), left, 0.01, "wither timer restored")
+	eq(g.at_cell, f.start_cell, "position is the checkpoint, not where you quit")
+	ok(g.progress > 0.0, "best progress is kept")
+	# a new stage forgets the list
+	ok(TrekFlow.begin(_meta(), SEED, st).eaten.is_empty(), "fresh trek: nothing eaten")
+
+
+func test_frozen_step_holds_everything() -> void:
+	var f := _flow()
+	var b0 := f.night.blood
+	var m0 := f.night.min
+	var ev := f.step(5.0, f.start_cell, false, {"frozen": true, "player_pos": Vector2(f.start_cell.x + 0.5, f.start_cell.y + 0.5), "hunters": [{"x": f.start_cell.x + 0.5, "y": f.start_cell.y + 0.5}]})
+	eq(ev.size(), 0, "no events")
+	near(f.night.blood, b0, 1e-9, "no drain or stake")
+	near(f.night.min, m0, 1e-9, "clock held")
+
+
+func test_noticed_asleep_is_one_heat() -> void:
+	var f := _flow()
+	f.night.skip_to(5, 59)
+	f.step(2.0, f.start_cell, false, {})
+	var rc := Vector2i(int(f.def["rest"][0]["cell"][0]), int(f.def["rest"][0]["cell"][1]))
+	var best := 99
+	for seed_ in 40:
+		var h := _flow({}, null, seed_ + 1)
+		h.night.skip_to(5, 59)
+		h.step(2.0, h.start_cell, false, {})
+		var c := Vector2i(int(h.def["rest"][0]["cell"][0]), int(h.def["rest"][0]["cell"][1]))
+		var r := h.sleep_at_rest(c)
+		if r.get("ok", false):
+			best = mini(best, h.heat)
+			ok(h.heat <= 1, "sleep adds at most +1 Heat (%s -> %d)" % [r["result"], h.heat])
+	ok(best <= 1, "sampled")

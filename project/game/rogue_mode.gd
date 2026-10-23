@@ -16,6 +16,10 @@ const HUNTER_FIELD_SEC := 0.4
 const HUNTER_MIN_BFS := 16
 const HUNTER_MAX_BFS := 38
 const HEAT_CARD_SEC := 3.0
+## An interrupted wait ends by itself after this many seconds (the Stir button / E / Enter / Space end it sooner).
+const INTERRUPT_TIMEOUT := 8.0
+## Hunter modes People drives itself (shrieked / grappled / frightened): the hunter walk and the stake leave them alone.
+const HUNTER_BUSY := ["fed", "grapple", "dazed", "flee"]
 const INTERRUPT_TEXT := {
 	"occupant_in_room": "Someone is in the room with you.",
 	"occupant_near": "Someone is very close.",
@@ -50,6 +54,9 @@ var _audio_ready: bool = false
 var _wind: AudioStreamPlayer = null
 var _shop_sig: String = ""
 var _t: float = 0.0
+var _spawn_idx: Dictionary = {}   ## critter id -> index in the descriptor's critters list (for the eaten save)
+var _interrupt_t: float = 0.0
+var _classic: Dictionary = {}     ## classic flow state to restore when the trek stops
 var _rng_h: Rng = null
 
 
@@ -123,6 +130,8 @@ func continue_trek() -> bool:
 
 func _start(t: TrekFlow, fresh: bool) -> void:
 	trek = t
+	if _classic.is_empty():
+		_classic = {"has_run": g.flow.has_run, "fx": g.flow.fx.duplicate(true)}
 	active = true
 	last_result = {}
 	g.end_drink("run")
@@ -173,8 +182,15 @@ func _enter_descriptor(d: Dictionary) -> void:
 		g.drop_world(prev)
 	var is_day: bool = trek.night.status != "night"
 	critters = Critters.new(g.world, float(int(d["seed"]) ^ 0x2545F491) + 1.0)
-	for cs in d["critters"]:
-		critters.spawn(String(cs["species"]), Vector2i(int(cs["cell"][0]), int(cs["cell"][1])), is_day)
+	_spawn_idx.clear()
+	var list: Array = d["critters"]
+	for i in list.size():
+		if trek.eaten.has(i):
+			continue   # drunk dry before the save: prey never respawns
+		var cs: Dictionary = list[i]
+		var c := critters.spawn(String(cs["species"]), Vector2i(int(cs["cell"][0]), int(cs["cell"][1])), is_day)
+		if c != null:
+			_spawn_idx[c.id] = i
 	trek.critter_sys = critters
 	trek.people = g.people
 	ambient = Ambient.new(d["ambient"], {"drip_ear": 1.0 + float(trek.fx.get("dripEar", 0.0)) / 2.5})
@@ -201,6 +217,11 @@ func _deactivate(keep_state: bool) -> void:
 	prompt_open = false
 	g.systems.erase(self)
 	g.run_on = false
+	g.sonar.protect_last = false
+	if not _classic.is_empty():
+		g.flow.has_run = bool(_classic["has_run"])
+		g.flow.fx = _classic["fx"]
+		_classic = {}
 	if g.menus != null and g.menus.trek_ui != null:
 		var ui := _ui()
 		ui.hide_wait_prompt()
@@ -225,9 +246,11 @@ func on_close() -> void:
 		_checkpoint_now()
 
 
+## Quit / close: only a checkpoint-safe state is saved (the checkpoint position; blood, eaten prey and the wither timer as they are,
+## a live wait's blood and day clock folded in), so quitting and continuing cannot be used to respawn prey or reset the wither timer.
 func _checkpoint_now() -> void:
 	trek.update_position(Vector2i(floori(g.player.x), floori(g.player.y)), Vector2(g.player.x, g.player.y))
-	trek.checkpoint()
+	trek.quit_checkpoint(wait_day if waiting else null)
 
 
 ## Title / pause / run-end frames: only watches the Coffin shop for a purchase (chime).
@@ -254,12 +277,15 @@ func step(_gm: Variant, dt: float) -> void:
 	var pp := Vector2(g.player.x, g.player.y)
 	var cell := Vector2i(floori(pp.x), floori(pp.y))
 	var outdoor: bool = g.world.kind_at(pp.x, pp.y) == "outdoor"
-	var ctx := {"player_pos": pp, "mist": g.powers.mist != null, "hunters": _hunter_list()}
+	var frozen: bool = prompt_open or waiting
+	var ctx := {"player_pos": pp, "mist": g.powers.mist != null, "hunters": _hunter_list(), "frozen": frozen}
 	_handle(trek.step(dt, cell, outdoor, ctx))
 	if not active:
 		return
-	_note_rest(pp)
-	_step_hunters(dt)
+	_prompt_keys()
+	if not frozen:
+		_note_rest(pp)
+		_step_hunters(dt)
 	_step_critters(dt, pp)
 	_step_ambient(dt, pp)
 	_step_wind()
@@ -269,7 +295,7 @@ func step(_gm: Variant, dt: float) -> void:
 	if trek.night.status == "night" and not _bell30 and trek.dawn_in() <= 30.0 and trek.dawn_warning():
 		_bell30 = true
 		sfx("rg_dawn_bell")
-	if prompt_open and g.scenario == null and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if prompt_open and g.scenario == null and Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
@@ -279,10 +305,37 @@ func step_waiting(dt: float) -> void:
 		return
 	var o := wait_day.step(dt)
 	wait_last = o
+	# a captured mouse (resume from pause, a click outside the overlay) must never leave the Stir button unclickable
+	if g.scenario == null and Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_ui().update_waiting(float(o["blood_after"]), _wait_lines(o))
+	if g.interact_press or g.pressed.has(KEY_ENTER) or g.pressed.has(KEY_KP_ENTER) or g.pressed.has(KEY_SPACE):
+		g.interact_press = false
+		stir()
+		return
+	if String(o["result"]) == "interrupted":
+		_interrupt_t += dt
+		if _interrupt_t >= INTERRUPT_TIMEOUT:
+			stir()
+			return
+	else:
+		_interrupt_t = 0.0
 	match String(o["result"]):
 		"noticed", "withered", "dusk":
 			_finish_wait(o)
+
+
+## Day prompt keys: 1 waits out the day, 2 keeps looking (a click or E also choose; Space and Enter never do).
+func _prompt_keys() -> void:
+	if not prompt_open:
+		return
+	if g.pressed.has(KEY_1) or g.pressed.has(KEY_KP_1):
+		_ui().hide_wait_prompt()
+		_begin_wait()
+	elif g.pressed.has(KEY_2) or g.pressed.has(KEY_KP_2):
+		_ui().hide_wait_prompt()
+		prompt_open = false
+		_recapture()
 
 
 func input_locked() -> bool:
@@ -395,6 +448,7 @@ func _open_choice() -> void:
 	var near: Variant = _rest_near(Vector2(g.player.x, g.player.y), SLEEP_REACH)
 	var body := "Under a roof you can wait out the day. Prey may stir, and Heat will rise."
 	body += "\nYou are at a resting place: press E to sleep instead." if near != null else "\nAt a coffin or a resting place you can sleep (E)."
+	body += "\n1: wait out the day   2: keep looking" + ("" if near != null else "   E: wait")
 	_ui().show_wait_prompt({
 		"title": "The sun is up", "body": body, "wait_label": "Wait out the day", "keep_label": "Keep looking",
 		"on_wait": func(): _begin_wait(), "on_keep": func():
@@ -413,8 +467,12 @@ func _begin_wait() -> void:
 		return
 	waiting = true
 	wait_last = {}
+	_interrupt_t = 0.0
 	g.end_drink("wait")
 	_ui().show_waiting(trek.blood(), [])
+	g.interact_press = false
+	g.pressed.erase(KEY_ENTER)
+	g.pressed.erase(KEY_SPACE)
 	if g.scenario == null:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -490,6 +548,10 @@ func interact() -> String:
 	if trek.needs_choice() and not prompt_open:
 		_open_choice()
 		return "choice"
+	if trek.needs_choice() and prompt_open:
+		_ui().hide_wait_prompt()   # E on the open prompt waits out the day
+		_begin_wait()
+		return "wait"
 	return "none"
 
 
@@ -510,6 +572,8 @@ func try_feed_critter() -> bool:
 	var x := c.x
 	var y := c.y
 	var species := c.species
+	if _spawn_idx.has(c.id):
+		trek.mark_eaten(int(_spawn_idx[c.id]))
 	critters.feed(c)
 	var gain := trek.on_feed_critter(species, base)
 	stats["critters_fed"] = int(stats["critters_fed"]) + 1
@@ -720,7 +784,7 @@ func _hunter_list() -> Array:
 	for id in hunter_ids:
 		var p := g.people.find_person(int(id))
 		if p != null and p.mode != "fed":
-			out.append({"x": p.x, "y": p.y, "noticing": true})
+			out.append({"x": p.x, "y": p.y, "noticing": not HUNTER_BUSY.has(p.mode)})
 	return out
 
 
@@ -737,9 +801,9 @@ func _step_hunters(dt: float) -> void:
 	var w: int = g.world.width
 	for id in hunter_ids:
 		var p := g.people.find_person(int(id))
-		if p == null or p.mode == "fed" or p.mode == "grapple":
-			continue
-		if p.mode != "path":
+		if p == null or HUNTER_BUSY.has(p.mode):
+			continue   # dazed / fleeing / shrieked hunters keep the mode People gave them
+		if p.mode != "path":   # a startle or cower at the sight of the player does not stop the hunt
 			p.mode = "path"
 			p.mode_left = 0.0
 			p.wary = 0.0

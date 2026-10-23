@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.21.0", "version 0.21.0")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.21.1", "version 0.21.1")
 
 
 func test_new_trek_from_the_menu() -> void:
@@ -133,6 +133,10 @@ func test_walk_the_hollow_and_leave() -> void:
 	ok(f.progress > 0.9, "progress near 1 (%.3f)" % f.progress)
 	ok(f.night.blood > 0.0, "blood left")
 	g.step(0.05, {})   # standing in the open door
+	if f.stage_id != "hollow" or r.trek.leg > 0:
+		ok(r.trek.leg == 1 and r.active, "the exit led on to the next stage")
+		_done(g)
+		return
 	ok(not r.active, "the trek ended at the exit (no further stage yet)")
 	eq(g.state, "runend", "run end state")
 	eq(r.last_result.get("cause"), "frontier", "frontier cause")
@@ -385,7 +389,7 @@ func test_continue_from_the_checkpoint() -> void:
 	eq(g.rogue.trek.seed, 11, "same seed")
 	eq(g.rogue.trek.stage_id, "hollow", "same stage")
 	eq(g.state, "playing", "playing")
-	near(g.player.x, rc.x + 0.5, 0.6, "back at the checkpoint cell")
+	near(g.player.x, g.rogue.trek.start_cell.x + 0.5, 0.6, "back at the checkpoint cell (the stage entry; a quit is checkpoint-only)")
 	_step(g, 1.0)
 	_done(g)
 
@@ -403,4 +407,152 @@ func test_classic_still_starts_after_a_trek() -> void:
 	_step(g, 2.0)
 	eq(g.state, "playing", "classic plays")
 	ok(g.flow.save_run("test"), "classic saves again")
+	ok(not g.sonar.protect_last, "the trek's ping protection is off again")
+	ok(g.flow.has_run, "classic has_run is the classic run's own")
+	_done(g)
+
+
+func _feed_two(g: Game, r: RogueMode) -> void:
+	for k in 2:
+		var c: Critters.Critter = r.critters.critters[0]
+		var sp := _spot_near(g, c.x, c.y)
+		g.player.place(sp[0], sp[1], sp[2])
+		g.night.blood = 30.0
+		ok(r.try_feed_critter(), "fed critter %d" % k)
+
+
+func test_quit_continue_does_not_respawn_prey_or_reset_wither() -> void:
+	var g := _game()
+	var r := _trek(g, 11)
+	var n0: int = r.critters.critters.size()
+	_feed_two(g, r)
+	eq(r.critters.critters.size(), n0 - 2, "two eaten")
+	g.night.blood = 0.0
+	_step(g, 8.0, {}, 0.1)
+	var w1: float = r.trek.withering_left()
+	ok(w1 > 0.0 and w1 < 25.0, "wither timer running (%.1f)" % w1)
+	g.set_state("title")
+	g.menus.trek_continue_requested.emit()
+	var r2: RogueMode = g.rogue
+	ok(r2.active, "continued")
+	eq(r2.critters.critters.size(), n0 - 2, "no eaten prey respawned")
+	near(r2.trek.withering_left(), w1, 0.2, "wither timer kept")
+	near(r2.trek.blood(), 0.0, 0.001, "blood kept (no free blood)")
+	# a second quit-continue still holds
+	g.set_state("title")
+	g.menus.trek_continue_requested.emit()
+	eq(g.rogue.critters.critters.size(), n0 - 2, "still N-2")
+	near(g.rogue.trek.withering_left(), w1, 0.2, "still the same wither")
+	_done(g)
+
+
+func test_quit_restores_the_checkpoint_position() -> void:
+	var g := _game()
+	var r := _trek(g, 11)
+	var st: Vector2i = r.trek.start_cell
+	var path := _path(r.trek)
+	var far: Vector2i = path[mini(30, path.size() - 1)]
+	g.player.place(far.x + 0.5, far.y + 0.5, 0.0)
+	_step(g, 0.5)
+	g.set_state("title")
+	g.menus.trek_continue_requested.emit()
+	near(g.player.x, st.x + 0.5, 0.6, "back at the stage entry")
+	_done(g)
+
+
+func test_quit_mid_wait_folds_blood_and_day() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.night.skip_to(5, 59)
+	_step(g, 2.0)
+	r._begin_wait()
+	_step(g, 3.0)
+	var b: float = r.wait_day.blood
+	var dt_: float = r.wait_day.day_t
+	ok(dt_ > 1.0, "the wait advanced")
+	g.set_state("title")
+	g.menus.trek_continue_requested.emit()
+	near(g.rogue.trek.blood(), b, 0.5, "wait blood saved")
+	near(g.rogue.trek.day_t, dt_, 0.5, "day clock saved")
+	_done(g)
+
+
+func test_prompt_freezes_hunters_stakes_and_clock() -> void:
+	var g := _game()
+	var r := _trek(g)
+	r.trek.heat = 2
+	r._spawn_hunters()
+	g.night.skip_to(5, 59)
+	_step(g, 2.0)
+	ok(r.prompt_open, "prompt open")
+	var p := g.people.find_person(int(r.hunter_ids[0]))
+	p.x = g.player.x + 0.5
+	p.y = g.player.y
+	if g.world.blocks(p.x, p.y, 0.2):
+		p.x = g.player.x - 0.5
+	var b0: float = g.night.blood
+	var m0: float = g.night.min
+	var h0 := Vector2(p.x, p.y)
+	_step(g, 2.0)
+	near(g.night.blood, b0, 0.001, "no stake and no drain under the prompt")
+	near(g.night.min, m0, 0.001, "clock held")
+	near(p.x, h0.x, 0.05, "hunter did not walk")
+	_done(g)
+
+
+func test_dazed_hunter_does_not_stake() -> void:
+	var g := _game()
+	var r := _trek(g)
+	r.trek.heat = 2
+	r._spawn_hunters()
+	var p := g.people.find_person(int(r.hunter_ids[0]))
+	p.x = g.player.x + 0.5
+	p.y = g.player.y
+	if g.world.blocks(p.x, p.y, 0.2):
+		p.x = g.player.x - 0.5
+	p.mode = "dazed"
+	p.dazed_left = 3.0
+	ok(not r._hunter_list()[0]["noticing"], "a dazed hunter is not noticing")
+	var b0: float = g.night.blood
+	_step(g, 2.0, {}, 0.05)
+	eq(p.mode, "dazed", "the daze is not overwritten")
+	near(g.night.blood, b0 - g.night.blood_max / g.night.night_sec * g.night.drain_mul * 2.0, 1.5, "no stake during the daze")
+	_done(g)
+
+
+func test_waiting_frees_the_mouse_and_stir_routes() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.night.skip_to(5, 59)
+	_step(g, 2.0)
+	r._begin_wait()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_step(g, 0.2)
+	ok(Input.mouse_mode == Input.MOUSE_MODE_VISIBLE, "mouse released while waiting")
+	g.interact_press = true
+	_step(g, 0.1)
+	ok(not r.waiting, "E stirs")
+	# an interrupted wait ends by itself
+	r._begin_wait()
+	r.wait_day.state = "interrupted"
+	r.wait_day.reason = "occupant_near"
+	_step(g, RogueMode.INTERRUPT_TIMEOUT + 1.0, {}, 0.1)
+	ok(not r.waiting, "an interrupted wait times out")
+	_done(g)
+
+
+func test_day_prompt_needs_an_explicit_choice() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.night.skip_to(5, 59)
+	_step(g, 2.0)
+	ok(r.prompt_open, "prompt open")
+	g.ping_clicks = 1
+	g.pressed[KEY_SPACE] = true
+	g.pressed[KEY_ENTER] = true
+	_step(g, 0.1)
+	ok(r.prompt_open and not r.waiting, "Space / Enter do not choose")
+	g.pressed[KEY_1] = true
+	g.step(0.05, {})
+	ok(r.waiting and not r.prompt_open, "1 waits out the day")
 	_done(g)

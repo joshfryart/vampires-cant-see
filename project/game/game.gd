@@ -1851,6 +1851,8 @@ func _render_systems() -> void:
 	if _sys_layer == null:
 		_sys_layer = SysLayer.new()
 		viewport.add_child(_sys_layer)
+		if hud_view != null and hud_view.get_parent() == viewport:
+			viewport.move_child(_sys_layer, hud_view.get_index())   # critter glyphs draw below the HUD and cards
 	_sys_layer.canvas.reset()
 	_systems_call("draw", _sys_layer.canvas)
 	_sys_layer.queue_redraw()
