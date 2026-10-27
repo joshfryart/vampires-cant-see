@@ -12,12 +12,14 @@ const PING_AT := 22
 const SHOT_A := 34
 const SHOT_B := 46
 const SEED := 7
-## name, stage id, target (a beat id prefix for the cave, else a tile char to face), optional look-up shift in px of 360 (head-bob style pitch)
+## name, stage id, target (a beat id prefix for the cave, else a tile char to face), optional look-up shift in px of 360 (head-bob style pitch),
+## optional free ray length to the wall faced, optional shot frames within the block (default SHOT_A, SHOT_B; vib_wall catches the struck-wall shiver 0.1 to 0.3 s after the hit)
 const VIEWS := [
 	["cave_passage", "hollow", "beat:drip"],
 	["echo_hall", "hollow", "beat:echo"],
 	["squeeze", "hollow", "beat:squeeze"],
 	["pool", "hollow", "beat:pool"],
+	["vib_wall", "hollow", "beat:drip", 0.0, 2.4, [40, 46, 52]],
 	["ceil_cave", "hollow", "beat:drip", 170.0],
 	["ceil_hall", "hollow", "beat:echo", 170.0],
 	["ceil_inn", "inn", "tile:W", 170.0],
@@ -76,13 +78,14 @@ func _free_ray(w: World, x: float, y: float, ang: float) -> float:
 	return d
 
 
-func _best_angle(w: World, x: float, y: float) -> float:
+func _best_angle(w: World, x: float, y: float, dist: float = -1.0) -> float:
+	var want: float = _dist if dist < 0.0 else dist
 	var best := 0.0
 	var bd := -1.0
 	for k in 32:
 		var a := TAU * float(k) / 32.0
 		var d := _free_ray(w, x, y, a)
-		var sc := absf(minf(d, 12.0) - _dist) + (100.0 if d < 3.0 else 0.0)
+		var sc := absf(minf(d, 12.0) - want) + (100.0 if d < minf(3.0, want - 0.4) else 0.0)
 		if bd < 0.0 or sc < bd:
 			bd = sc
 			best = a
@@ -138,7 +141,7 @@ func _place(g: Node, v: Array) -> void:
 			if String(b["id"]).contains(pre):
 				c = Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5)
 				break
-		at = [c.x, c.y, _best_angle(w, c.x, c.y)]
+		at = [c.x, c.y, _best_angle(w, c.x, c.y, float(v[4]) if v.size() > 4 else -1.0)]
 	else:
 		at = _face_tile(w, spec.substr(5), start)
 	g.player.place(at[0], at[1], at[2])
@@ -161,10 +164,12 @@ func step(g: Node, _delta: float) -> Dictionary:
 		g.look_shift = float(v[3]) if v.size() > 3 else 0.0 # look up at the ceiling (the horizon drops by this many px of 360)
 		if at == PING_AT:
 			g.ping_clicks += 1
-		if at == SHOT_A:
+		var shots: Array = v[5] if v.size() > 5 else [SHOT_A, SHOT_B]
+		if at == int(shots[0]):
 			print("STYLETOUR %s q%d pos %.2f,%.2f ang %.2f solid=%s pulses=%d" % [v[0], q, g.player.x, g.player.y, g.player.angle, str(g.world.is_solid(g.player.x, g.player.y)), g.sonar.pulses.size()])
-		if at == SHOT_A or at == SHOT_B:
-			_log.append("%d %s_q%d_%s" % [f, v[0], q, "a" if at == SHOT_A else "b"])
+		var si: int = shots.find(at)
+		if si >= 0:
+			_log.append("%d %s_q%d_%s" % [f, v[0], q, "abc"[si]])
 	if f == 10 + _qs.size() * n * BLOCK - 1 and _dir != "":
 		var fa := FileAccess.open(_dir.path_join("shots.txt"), FileAccess.WRITE)
 		if fa != null:

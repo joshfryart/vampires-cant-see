@@ -759,6 +759,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 	c.stroke_style = "#d8ecff"
 	var fstyle: String = "" if up else ink_floor_style(world)
 	var styled_up: bool = up and ceil_style(world) != ""
+	var vault_mesh_on: bool = styled_up and world.has_meta("vault_mesh")
 	var budget: int = budget_cells
 	var k := 0
 	while k < pulses.size() and budget > 0:
@@ -841,6 +842,8 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 					var hm := 1.0
 					if styled_up:
 						kind = ceil_kind_styled(world, mx, my)
+						if vault_mesh_on and kind.begins_with("vault"):
+							continue # the rock vault is geometry (VaultMesh + sonar_vault.gdshader), not canvas marks
 						hm = ceil_height(world, mx, my)
 					else:
 						kind = floor_kind_for(world, world.material_at(mx, my), fstyle) if fstyle != "" else floor_tex_kind(world.material_at(mx, my))

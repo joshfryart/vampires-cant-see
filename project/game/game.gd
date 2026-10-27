@@ -175,6 +175,7 @@ var textures: PulseTextures
 var wall_mat: ShaderMaterial
 var floor_mat: ShaderMaterial
 var ceil_mat: ShaderMaterial
+var vault_mat: ShaderMaterial
 var cam: Camera3D
 var map_view: MapView
 var dev_panel: DevPanel
@@ -274,6 +275,8 @@ func _build_view() -> void:
 	ceil_mat = ShaderMaterial.new()
 	ceil_mat.shader = floor_mat.shader
 	ceil_mat.set_shader_parameter("is_ceiling", true)
+	vault_mat = ShaderMaterial.new()
+	vault_mat.shader = load("res://render/shaders/sonar_vault.gdshader")
 	fx_grade = ColorRect.new()
 	fx_grade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fx_grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -448,16 +451,31 @@ func _show_map_mesh(name: String) -> void:
 		fl.material_override = floor_mat
 		viewport.add_child(fl)
 		var ce := MeshInstance3D.new()
-		ce.mesh = WorldMeshBuilder.build_ceiling(worlds[name])
+		var vault_extra: Array = []
+		if WorldMeshBuilder.contour_enabled and VaultMesh.enabled_for(worlds[name]):
+			# the ink cave's rock vault: real geometry (ring pass on it with ceil_mat, ink with vault_mat) instead of the flat plane
+			var vm := VaultMesh.build(worlds[name])
+			var vsurf := vm.build_surface()
+			ce.mesh = vsurf
+			for mesh_i in [vsurf, vm.build_stalactites()]:
+				var vi := MeshInstance3D.new()
+				vi.mesh = mesh_i
+				vi.material_override = vault_mat
+				viewport.add_child(vi)
+				vault_extra.append(vi)
+			worlds[name].set_meta("vault_mesh", true)
+		else:
+			ce.mesh = WorldMeshBuilder.build_ceiling(worlds[name])
 		ce.material_override = ceil_mat
 		viewport.add_child(ce)
-		meshes[name] = [walls, fl, ce]
+		meshes[name] = [walls, fl, ce] + vault_extra
 	for n in meshes:
 		for inst in meshes[n]:
 			inst.visible = n == name
 	walls_inst = meshes[name][0]
 	floor_inst = meshes[name][1]
 	wall_mat.set_shader_parameter("styled", 1.0 if walls_inst.get_meta("styled", false) else 0.0)
+	vault_mat.set_shader_parameter("vault_seed", float(world.map_seed % 997))
 	update_light_texture()
 
 
@@ -1843,7 +1861,7 @@ func _render() -> void:
 	textures.sync_from(sonar, world)
 	textures.sync_rings(ripple.rings, clock)
 	ceil_mat.set_shader_parameter("player_indoor", player_kind() != "outdoor")
-	for m in [wall_mat, floor_mat, ceil_mat]:
+	for m in [wall_mat, floor_mat, ceil_mat, vault_mat]:
 		textures.apply_to(m)
 		m.set_shader_parameter("game_time", clock)
 	wall_mat.set_shader_parameter("boil_frame", int(floor(clock * 10.0)) % 4)
@@ -1888,7 +1906,7 @@ func _sync_quality_uniforms() -> void:
 	_push_uniform(wall_mat, "fx", fxv)
 	_push_uniform(wall_mat, "fx_taper", 1.0 if st["fx_taper"] else 0.0)
 	_push_uniform(wall_mat, "quality", float(q))
-	for m in [floor_mat, ceil_mat]:
+	for m in [floor_mat, ceil_mat, vault_mat]:
 		_push_uniform(m, "reduced_motion", rm)
 		_push_uniform(m, "boil_on", boil)
 		_push_uniform(m, "quality", float(q))

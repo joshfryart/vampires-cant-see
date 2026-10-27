@@ -757,9 +757,9 @@ void fragment() {
 					if (style == 1) {
 						// ink rock: the strata themselves quiver (their own dip, breaks and spacing) instead of evenly spaced stripes
 						float fws_v = max(fwidth(UV.x), 1e-5);
-						vec2 rv = rock_detail(UV.x, UV.y, lip, fws_v, fwy, rock_tilt(p, nvv), 0.0, line_px_thin, depth, vy_px);
+						vec2 rv = rock_detail(UV.x, UV.y, lip, fws_v, fwy, rock_tilt(p, nvv), 0.0, line_px_thin, max(depth, 4.3), vy_px); // even courses only: a quivering wall is thinner than a still one
 						cov = rv.x;
-						a *= 0.55;
+						a *= 0.45;
 					} else if (style > 0) {
 						// other ink materials: three faint, broken, wandering lines
 						for (int j = 0; j < 3; j++) {
