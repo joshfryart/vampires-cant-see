@@ -16,6 +16,7 @@ const MANIFEST = join(PORT, 'project', 'data', 'rogue', 'sounds_rogue.json');
 const RATE = 44100;
 const PEAK = 0.9;
 const LOOP_PEAK = 0.35; // ambience beds (wind/creek/fountain/cricket) sit quietly under the one-shots
+const WIND_PEAK = 0.22; // cave-mouth wind bed: quieter than the other beds (user playtest)
 
 function mulberry(seed) {
   let a = seed >>> 0;
@@ -187,7 +188,7 @@ def('rg_cricket_loop', 2.1, 0.5, 'night insect bed, meadows/roads/farm (loop)', 
 def('rg_wind_loop', 5, 0.5, 'wind gust / draft bed (loop); scale gain with openness or draft strength', (c, r) => {
   bed(c, r, { secs: 7, f: 550, q: 0.8, gain: 0.5, lfoHz: 0.23, fDepth: 300, gDepth: 0.7 });
   bed(c, r, { secs: 7, f: 1500, q: 1.5, gain: 0.12, lfoHz: 0.37, fDepth: 500, gDepth: 0.8 });
-}, { fade: 1.0, skip: 0.5, peak: LOOP_PEAK });
+}, { fade: 1.0, skip: 0.5, peak: WIND_PEAK });
 def('rg_creek_loop', 3, 0.5, 'creek / stream bed (loop); positional on stream tiles', (c, r) => {
   bed(c, r, { secs: 5, f: 1400, q: 0.5, gain: 0.35, lfoHz: 0.9, fDepth: 500, gDepth: 0.3 });
   for (let i = 0; i < 70; i++) { const f = 500 + r() * 1500; tone(c, { t: 0.3 + r() * 3.6, f0: f, f1: f * 1.8, dur: 0.05 + r() * 0.05, gain: 0.05 + r() * 0.07, a: 0.003 }); }
