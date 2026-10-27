@@ -37,8 +37,7 @@ const INTERRUPT_TEXT := {
 }
 ## How loud a sonar kind is to the critters (Critters.hear loudness); anything else does not frighten them.
 const NOISE_LOUD := {"shriek": 1.5, "scream": 1.0, "struggle": 0.5, "door": 0.5}
-## Beat id -> tutorial hint id (shown once when the player comes within 4 cells of the beat).
-const BEAT_HINTS := {"squeeze": "squeeze", "dead_end_spurs": "dead_end", "cave_mouth": "sun"}
+## The guided first night lives in game/tutorial.gd (Tutorial.rogue_*); it only reads this mode's state.
 
 var g: Game
 var trek: TrekFlow = null
@@ -172,9 +171,7 @@ func _start(t: TrekFlow, fresh: bool) -> void:
 	g.init_ambient()
 	g.tut.clear()
 	g.tut.queued = {}
-	g.tut.queue("drip")
-	g.tut.queue("ping")
-	g.tut.queue("powers")
+	g.tut.rogue_begin(fresh)
 	if not g.systems.has(self):
 		g.systems.append(self)
 	g.set_state("playing")
@@ -232,6 +229,8 @@ func _enter_descriptor(d: Dictionary) -> void:
 
 
 func _deactivate(keep_state: bool) -> void:
+	if g.tut != null:
+		g.tut.rogue_stop()
 	if not active and not waiting and not prompt_open:
 		return
 	active = false
@@ -313,7 +312,6 @@ func step(_gm: Variant, dt: float) -> void:
 	_step_ambient(dt, pp)
 	step_rest_hum(pp)
 	_step_wind(dt)
-	_step_hints(pp)
 	var ui := _ui()
 	ui.set_dawn(trek.dawn_in() if trek.night.status == "night" else 0.0)
 	if trek.night.status == "night" and not _bell30 and trek.dawn_in() <= 30.0 and trek.dawn_warning():
@@ -399,7 +397,6 @@ func _handle(ev: Array) -> void:
 			"dawn_warning":
 				sfx("rg_dawn_bell")
 				sfx("rg_dawn_birds", NAN, NAN, 0.6)
-				g.tut.queue("dawn")
 			"dawn":
 				sfx("rg_dawn_birds")
 				g.show_card("The sun is up", 0.0, "Find cover.")
@@ -446,6 +443,9 @@ func _on_dusk(e: Dictionary) -> void:
 ## The trek is over (death, or the end of the built stages): pay the Soil and show Laid to Rest.
 func _on_end(result_in: Dictionary = {}) -> void:
 	var r: Dictionary = result_in if not result_in.is_empty() else trek.end_run()
+	if g.tut.rogue_active:
+		r["tutorial"] = true   # the Laid to Rest screen explains Grave Soil and The Coffin this once
+		g.tut.rogue_finish()
 	last_result = r
 	g.end_drink("run")
 	g.audio.stop_all(0.1)
@@ -862,15 +862,6 @@ func power_level() -> float:
 	if float(trek.fx.get("mistBorn", 0.0)) >= 1.0 or trek.night.night >= 2 or trek.heat >= 1 or not trek.cleared.is_empty():
 		return float(POWER_LEVEL_ALL)
 	return float(trek.night.night)
-
-
-func _step_hints(pp: Vector2) -> void:
-	for b in trek.def.get("beats", []):
-		var id: String = String(b["id"])
-		if BEAT_HINTS.has(id) and Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5).distance_to(pp) < 4.0:
-			g.tut.queue(String(BEAT_HINTS[id]))
-	if critters != null and critters.nearest_feedable(pp.x, pp.y, 5.0) != null:
-		g.tut.queue("prey")
 
 
 # hunters ---------------------------------------------------------------

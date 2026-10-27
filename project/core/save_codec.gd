@@ -26,6 +26,8 @@ const KEY_TREK := "vcs.trek"
 const ROGUE_SCHEMA := 1
 const TREK_SCHEMA := 1
 const ROGUE_KEYS := ["v", "soil", "unlocks", "stats", "reached", "legacyImported"]
+## Keys a rogue save may carry on top of ROGUE_KEYS (older saves lack them; a present value must be a bool).
+const ROGUE_OPTIONAL_KEYS := ["tutorialDone"]
 const ROGUE_STAT_KEYS := ["treks", "bestMiles", "bestStage", "deaths", "fedHumans", "fedCritters", "soilEarned"]
 const ROGUE_DEATH_KEYS := ["sun", "withered", "staked", "holy"]
 const TREK_KEYS := ["v", "seed", "stage", "leg", "miles", "progress", "heat", "night", "hunger", "unlocksUsed", "deathsAvoided"]
@@ -714,8 +716,19 @@ static func migrate_rogue(v: Variant, data: Variant) -> Dictionary:
 
 ## Exact-key structural check of a rogue save; returns a cleaned copy or null.
 static func sanitize_rogue(data: Variant) -> Variant:
-	if not (data is Dictionary) or not _exact_keys(data, ROGUE_KEYS):
+	if not (data is Dictionary):
 		return null
+	var opt := 0
+	for k in ROGUE_OPTIONAL_KEYS:
+		if data.has(k):
+			if not (data[k] is bool):
+				return null
+			opt += 1
+	if data.size() != ROGUE_KEYS.size() + opt:
+		return null
+	for k in ROGUE_KEYS:
+		if not data.has(k):
+			return null
 	if not _is_num(data["v"]) or int(data["v"]) != ROGUE_SCHEMA:
 		return null
 	if not _nn_int(data["soil"], 1000000000.0) or not (data["legacyImported"] is bool):
@@ -754,7 +767,10 @@ static func sanitize_rogue(data: Variant) -> Variant:
 	var reached: Variant = _str_list(data["reached"], 64, 32)
 	if reached == null:
 		return null
-	return {"v": ROGUE_SCHEMA, "soil": int(data["soil"]), "unlocks": unlocks, "stats": stats, "reached": reached, "legacyImported": data["legacyImported"]}
+	var out := {"v": ROGUE_SCHEMA, "soil": int(data["soil"]), "unlocks": unlocks, "stats": stats, "reached": reached, "legacyImported": data["legacyImported"]}
+	if opt > 0:
+		out["tutorialDone"] = data["tutorialDone"]
+	return out
 
 
 static func validate_rogue(data: Variant, v: Variant = null) -> Dictionary:

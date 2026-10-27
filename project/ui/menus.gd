@@ -484,6 +484,22 @@ func _build_settings() -> void:
 			sl.value_changed.connect(func(v):
 				val.text = _fmt(v)
 				_g.set_config(key, v))
+	var tb := HBoxContainer.new()
+	tb.add_theme_constant_override("separation", 8)
+	list.add_child(tb)
+	var tl := Label.new()
+	tl.text = "Long Night tutorial"
+	tl.custom_minimum_size = Vector2(190, 0)
+	tb.add_child(tl)
+	var tc := CheckBox.new()
+	tc.name = "TutorialToggle"
+	tc.button_pressed = tutorial_enabled()
+	tc.text = "On" if tc.button_pressed else "Off"
+	tc.focus_mode = Control.FOCUS_ALL
+	tc.toggled.connect(func(on):
+		tc.text = "On" if on else "Off"
+		set_tutorial_enabled(on))
+	tb.add_child(tc)
 	_button("Reset to defaults", func():
 		for k in Config.DEFAULTS:
 			_g.cfg[k] = Config.DEFAULTS[k]
@@ -642,6 +658,20 @@ func _tm() -> Dictionary:
 				if san != null:
 					trek_meta = san
 	return trek_meta
+
+
+## The Long Night tutorial runs while the rogue save's `tutorialDone` is false (a new save: true first run).
+func tutorial_enabled() -> bool:
+	return _tm().get("tutorialDone", false) != true
+
+
+## Settings toggle and the tutorial's own completion: On clears the flag so the next new run replays the guided night; Off sets it
+## (and stops a guided night in progress).
+func set_tutorial_enabled(on: bool) -> void:
+	_tm()["tutorialDone"] = not on
+	_save_trek_meta()
+	if not on and _g != null and _g.tut != null:
+		_g.tut.rogue_stop()
 
 
 func _save_trek_meta() -> void:
@@ -823,6 +853,9 @@ func _build_rest() -> void:
 	_label(tx["total"], 16, Color(0.9, 0.85, 0.5))
 	if tx["best"] != "":
 		_label(tx["best"], 14, Color(0.5, 0.9, 0.6) if r.get("newBest") == true else Color(0.6, 0.65, 0.8))
+	if r.get("tutorial") == true:
+		for ln in TrekUi.tutorial_rest_lines():
+			_label(ln, 13, Color(0.75, 0.85, 0.75))
 	_button("Rise Again", func(): rise_again_requested.emit())
 	_button("The Coffin", func(): open_coffin(true))
 	_button("Title", func():

@@ -3,7 +3,7 @@ extends RefCounted
 ## Roguelike meta-progression (The Coffin): soil, unlock tiers, lifetime stats, the stages reached. Separate from the
 ## parity-locked classic Meta. State is a plain Dictionary exactly as saved under `vcs.rogue`:
 ## {v, soil, unlocks{id:tier}, stats{treks, bestMiles, bestStage, deaths{sun,withered,staked,holy}, fedHumans,
-## fedCritters, soilEarned}, reached[stageIds], legacyImported}. Data: data/rogue/unlocks.json.
+## fedCritters, soilEarned}, reached[stageIds], legacyImported, tutorialDone (additive, optional in saves)}. Data: data/rogue/unlocks.json.
 
 const SCHEMA := 1
 const MAX_SOIL := 1000000000
@@ -49,7 +49,7 @@ static func create() -> Dictionary:
 		ul[u["id"]] = 0
 	return {"v": SCHEMA, "soil": 0, "unlocks": ul,
 		"stats": {"treks": 0, "bestMiles": 0.0, "bestStage": 0, "deaths": {"sun": 0, "withered": 0, "staked": 0, "holy": 0}, "fedHumans": 0, "fedCritters": 0, "soilEarned": 0},
-		"reached": [], "legacyImported": false}
+		"reached": [], "legacyImported": false, "tutorialDone": false}
 
 
 ## Repair arbitrary data into a valid meta; null only when it is not a Dictionary of this schema.
@@ -83,6 +83,10 @@ static func sanitize(d: Variant) -> Variant:
 				out["reached"].append(id)
 	var li: Variant = d.get("legacyImported")
 	out["legacyImported"] = li is bool and li
+	# `tutorialDone` (first-night tutorial finished or skipped) is additive: a save without it (written before the tutorial existed)
+	# counts as done when the player has already made a trek, otherwise the tutorial is still to come.
+	var td: Variant = d.get("tutorialDone")
+	out["tutorialDone"] = td if td is bool else int(out["stats"]["treks"]) > 0
 	return out
 
 

@@ -131,6 +131,14 @@ const SOIL_LABELS := {"miles": "Miles walked", "humans": "People fed", "critters
 const SOIL_ORDER := ["miles", "humans", "critters", "unseen", "newBest", "pouch", "victory"]
 
 
+## The tutorial's one-time explanation under the Laid to Rest tally (shown when the guided night was still on at the end of the run).
+static func tutorial_rest_lines() -> Array:
+	return [
+		"Grave Soil is what the night leaves in the ground. You keep it even when you fall.",
+		"The Coffin spends it on gifts that carry into every new night. Buy one, then Rise Again.",
+	]
+
+
 ## Laid to Rest text for a result dict {cause, stageName, miles, humans, critters, unseen, newBest, soil_breakdown, soilTotal,
 ## bestMiles}: {title, cause, tally, soil: Array[String], total, best}.
 static func rest_text(r: Dictionary) -> Dictionary:
