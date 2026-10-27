@@ -113,7 +113,12 @@ func _report(stage: String, sd: int) -> int:
 		if not dist.has(c):
 			print("WARN seed %d: beat %s unreachable from start" % [sd, b["id"]])
 			warns += 1
-	var sorted := depths.duplicate()
+	# the optional side beat (dead_end_spurs) is reported after the main path and excluded from the order check
+	var main_depths := []
+	for d in depths:
+		if d[1] != "dead_end_spurs":
+			main_depths.append(d)
+	var sorted := main_depths.duplicate()
 	sorted.sort_custom(func(a, b): return a[0] < b[0])
 	var gen_order := []
 	var depth_order := []
@@ -121,13 +126,13 @@ func _report(stage: String, sd: int) -> int:
 		gen_order.append("%s@%d" % [d[1], d[0]])
 	for d in sorted:
 		depth_order.append(String(d[1]))
-	print("beat BFS depth (generator order): " + ", ".join(gen_order))
-	print("beat order by depth: " + " > ".join(depth_order))
+	print("beat BFS depth (generator order; dead_end_spurs is optional): " + ", ".join(gen_order))
 	var ids_order := []
-	for d in depths:
+	for d in main_depths:
 		ids_order.append(String(d[1]))
 	if ids_order != depth_order:
-		print("NOTE seed %d: generator beat order differs from depth order (squeeze/echo_hall after other beats is fine if intended)" % sd)
+		print("WARN seed %d: main-path beats are not in depth order: %s" % [sd, " > ".join(depth_order)])
+		warns += 1
 
 	# squeeze bypass: block the squeeze zone cells, coffin -> echo hall
 	var sq := _zone(def, "squeeze")
@@ -152,7 +157,7 @@ func _report(stage: String, sd: int) -> int:
 	var nook := _zone(def, "coffin_nook")
 	var spur := _beat(def, "dead_end_spurs")
 	if not spur.is_empty() and not nook.is_empty():
-		var cur := _cell(spur["cell"])
+		var cur := _cell(spur.get("end", spur["cell"]))
 		var prev := Vector2i(-99, -99)
 		var steps := 0
 		var junction := cur
@@ -169,7 +174,7 @@ func _report(stage: String, sd: int) -> int:
 			cur = nb[0]
 			steps += 1
 		var near_nook := _in_zone(nook, junction, 1)
-		var dn := int(dist.get(_cell(spur["cell"]), -1))
+		var dn := int(dist.get(_cell(spur.get("end", spur["cell"])), -1))
 		print("dead_end_spurs: corridor of %d cells ends at junction %s (spur beat depth %d)" % [steps, junction, dn])
 		if near_nook:
 			print("WARN seed %d: dead_end_spurs grows out of the Coffin Nook (junction %s inside the nook zone)" % [sd, junction])
@@ -199,9 +204,18 @@ func _report(stage: String, sd: int) -> int:
 			if _in_zone(z, _cell(r["cell"])):
 				nr += 1
 		print("zone %-12s floor %3d  anchors %d  critters %d  rest %d" % [zid, floor_n, na, nc, nr])
+		if (zid == "squeeze" or zid == "rat_warren") and na == 0:
+			print("WARN seed %d: %s has no ambient anchor" % [sd, zid])
+			warns += 1
 		if zid == "echo_hall" and na == 0:
 			print("WARN seed %d: echo hall has no ambient anchor (critters inside: %d; %d floor cells)" % [sd, nc, floor_n])
 			warns += 1
+	var apron := _zone(def, "cave_apron")
+	if apron.is_empty() or String(apron["kind"]) != "outdoor":
+		print("WARN seed %d: no outdoor apron zone" % sd)
+		warns += 1
+	else:
+		print("apron: outdoor zone (%d,%d)-(%d,%d), exit arrival %s" % [apron["x0"], apron["y0"], apron["x1"], apron["y1"], def["exit"]["arrival"]])
 	var walk_n := 0
 	for y in w.height:
 		for x in w.width:

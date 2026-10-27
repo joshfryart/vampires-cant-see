@@ -50,7 +50,7 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 	# 1+2 layout: the beat chain is walked out first (each chunk rect fits, gap for tunnels), then fillers; the MST of all centres must
 	# contain every chain edge, so the tree path from the first to the last beat is the main path in order.
 	var lay: Dictionary = {}
-	for _l in 40:
+	for _l in 6:
 		lay = _layout(rng, w, h, n, order, chunks)
 		if not lay.is_empty():
 			break
@@ -180,6 +180,8 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 	# 5 crevices until the rest-distance target holds
 	_cover(plan, rng, row)
 	_decorate(plan, rng, row, pts, fillr, role)
+	_squeeze_anchor(plan, rects, role)
+	_measure_zones(plan, rects, role)
 	var def := _assemble(plan, rng, row, seed, attempt, chunks, role, info, path, order, spur_ends, loops.size())
 	var rep := StageGen.analyze(def, row)
 	if not rep["ok"]:
@@ -195,66 +197,99 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 
 
 ## Walk out the chain of chunk rects (each rect fits the map, keeps a gap for tunnels and lies within reach of the previous one), then the
-## fillers. Candidate centres are enumerated on a 2-cell lattice and one is picked at random. Returns {} when a node has no candidate.
+## fillers. Candidate centres are enumerated on a 2-cell lattice and one is picked at random; a node with no candidate (or whose successors
+## cannot be placed) backtracks into up to 3 alternative picks of the node before it, within a fixed expansion budget. Returns {} on failure.
 static func _layout(rng: Rng, w: int, h: int, n: int, order: Array, chunks: Dictionary) -> Dictionary:
-	var bounds := Rect2i(3, 3, w - 6, h - 6)
-	var pts: Array = []
-	var rects: Dictionary = {}
-	var xform: Dictionary = {}
-	var fillr: Dictionary = {}
-	var role: Dictionary = {}
-	var path: Array = []
-	for k in n:
-		var is_chunk: bool = k < order.size()
-		var ch: Dictionary = chunks[order[k]] if is_chunk else {}
-		var r: int = 0 if is_chunk else StageGen.rint(rng, 4, 5)
-		var tr_opts: Array = [false]
-		if is_chunk and ch.get("transpose", false) and k > 0:
-			tr_opts = [false, true]
-		var cands: Array = []
-		var placed_rects: Array = rects.values()
-		for tr in tr_opts:
-			var s: Vector2i = StageGen.chunk_size(ch, tr) if is_chunk else Vector2i(2 * r + 1, 2 * r + 1)
-			var y := bounds.position.y
-			while y + s.y <= bounds.end.y:
-				var x := bounds.position.x + ((y / 2) % 2)
-				while x + s.x <= bounds.end.x:
-					var rc := Rect2i(x, y, s.x, s.y)
-					var ok := true
-					for q in placed_rects:
-						if rc.grow(FILLER_GAP).intersects(q):
+	var st := {"pts": [], "rects": {}, "xform": {}, "fillr": {}, "role": {}, "path": [], "budget": 80, "bounds": Rect2i(3, 3, w - 6, h - 6)}
+	if not _place(rng, 0, n, order, chunks, st):
+		return {}
+	return {"pts": st["pts"], "rects": st["rects"], "xform": st["xform"], "fillr": st["fillr"], "role": st["role"], "path": st["path"]}
+
+
+static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, st: Dictionary) -> bool:
+	if k >= n:
+		return true
+	var bounds: Rect2i = st["bounds"]
+	var pts: Array = st["pts"]
+	var rects: Dictionary = st["rects"]
+	var is_chunk: bool = k < order.size()
+	var ch: Dictionary = chunks[order[k]] if is_chunk else {}
+	var r: int = 0 if is_chunk else StageGen.rint(rng, 4, 5)
+	var tr_opts: Array = [false]
+	if is_chunk and ch.get("transpose", false) and k > 0:
+		tr_opts = [false, true]
+	var cands: Array = []
+	var grown: Array = []
+	for q in rects.values():
+		grown.append([q.position.x, q.position.y, q.end.x, q.end.y])
+	for tr in tr_opts:
+		var s: Vector2i = StageGen.chunk_size(ch, tr) if is_chunk else Vector2i(2 * r + 1, 2 * r + 1)
+		# chunks must lie within 24 cells of the previous centre: scan only that window (same lattice, same candidate order as a full scan)
+		var ylo: int = bounds.position.y
+		var yhi: int = bounds.end.y
+		var xlo: int = bounds.position.x
+		var xhi: int = bounds.end.x
+		if is_chunk and k > 0:
+			var pc: Vector2i = pts[k - 1]
+			ylo = maxi(ylo, pc.y - 24 - s.y / 2 - 1)
+			yhi = mini(yhi, pc.y + 24 - s.y / 2 + s.y + 1)
+			xlo = maxi(xlo, pc.x - 24 - s.x / 2 - 1)
+			xhi = mini(xhi, pc.x + 24 - s.x / 2 + s.x + 1)
+		var y := bounds.position.y + 2 * int(ceil(float(ylo - bounds.position.y) / 2.0))
+		while y + s.y <= yhi:
+			var x := bounds.position.x + ((y / 2) % 2)
+			if x < xlo:
+				x += 2 * int(ceil(float(xlo - x) / 2.0))
+			while x + s.x <= xhi:
+				var ok := true
+				for q in grown:
+					# rc.grow(FILLER_GAP).intersects(q), written out on ints (this is the hot loop of the layout)
+					if x - FILLER_GAP < q[2] and x + s.x + FILLER_GAP > q[0] and y - FILLER_GAP < q[3] and y + s.y + FILLER_GAP > q[1]:
+						ok = false
+						break
+				if ok and k > 0 and (is_chunk or k >= order.size()):
+					var c := Vector2(x + s.x / 2, y + s.y / 2)
+					if is_chunk:
+						if Vector2(pts[k - 1]).distance_to(c) > 24.0:
 							ok = false
-							break
-					if ok and k > 0 and (is_chunk or k >= order.size()):
-						var c := Vector2(x + s.x / 2, y + s.y / 2)
-						var near: float = 1.0e9 if not is_chunk else Vector2(pts[k - 1]).distance_to(c)
-						if is_chunk and near > 24.0:
+					else:
+						var best := 1.0e9
+						for p in pts:
+							best = minf(best, Vector2(p).distance_to(c))
+						if best > 22.0:
 							ok = false
-						elif not is_chunk:
-							var best := 1.0e9
-							for p in pts:
-								best = minf(best, Vector2(p).distance_to(c))
-							if best > 22.0:
-								ok = false
-					if ok:
-						cands.append([rc, tr])
-					x += 2
-				y += 2
-		if cands.is_empty():
-			return {}
-		var pick: Array = cands[int(floor(rng.next() * float(cands.size())))]
+				if ok:
+					cands.append([Rect2i(x, y, s.x, s.y), tr])
+				x += 2
+			y += 2
+	var tries: int = mini(3, cands.size())
+	for _t in tries:
+		if int(st["budget"]) <= 0:
+			return false
+		st["budget"] = int(st["budget"]) - 1
+		var ix: int = int(floor(rng.next() * float(cands.size())))
+		var pick: Array = cands[ix]
+		cands.remove_at(ix)
 		var rect: Rect2i = pick[0]
-		var c2 := Vector2i(rect.position.x + rect.size.x / 2, rect.position.y + rect.size.y / 2)
-		pts.append(c2)
+		pts.append(Vector2i(rect.position.x + rect.size.x / 2, rect.position.y + rect.size.y / 2))
 		rects[k] = rect
 		if is_chunk:
 			var fl: bool = ch.get("flip", false) and rng.next() < 0.5
-			xform[k] = [pick[1], fl]
-			role[k] = order[k]
-			path.append(k)
+			st["xform"][k] = [pick[1], fl]
+			st["role"][k] = order[k]
+			st["path"].append(k)
 		else:
-			fillr[k] = r
-	return {"pts": pts, "rects": rects, "xform": xform, "fillr": fillr, "role": role, "path": path}
+			st["fillr"][k] = r
+		if _place(rng, k + 1, n, order, chunks, st):
+			return true
+		pts.pop_back()
+		rects.erase(k)
+		st["xform"].erase(k)
+		st["role"].erase(k)
+		st["fillr"].erase(k)
+		if is_chunk:
+			st["path"].pop_back()
+	return false
 
 
 ## Cheap acceptance test run right after the tunnels: BFS depth from the start must increase along the beat chain.
@@ -272,6 +307,98 @@ static func _early_order_ok(plan: StageGen.Plan, info: Dictionary, role: Diction
 					return false
 				last = d
 	return true
+
+
+## One quiet drip at the far end of the squeeze (the end with the greater walking depth from the start), so the corridor has a distant sound
+## to steer by. Placed 1 cell inside the far port.
+static func _squeeze_anchor(plan: StageGen.Plan, rects: Dictionary, role: Dictionary) -> void:
+	var node := -1
+	for n in role:
+		if role[n] == "squeeze":
+			node = n
+	if node < 0 or plan.start.x < 0:
+		return
+	var rc: Rect2i = rects[node]
+	var dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+	var mx := -1
+	for y in range(rc.position.y, rc.end.y):
+		for x in range(rc.position.x, rc.end.x):
+			mx = maxi(mx, dist[y * plan.w + x])
+	if mx < 2:
+		return
+	for y in range(rc.position.y, rc.end.y):
+		for x in range(rc.position.x, rc.end.x):
+			var i := y * plan.w + x
+			if dist[i] == mx - 1 and not plan.markers.has(i) and not plan.prop_cells.has(i):
+				plan.add_anchor("drip", x, y)
+				return
+
+
+## Zones are measured from the carved cave instead of the template rectangles: every beat zone becomes the bounding box of the open cells
+## in its chunk plus the open cells (tunnel mouths, widened ground) connected to them within 2 cells outside the rect, never entering another
+## chunk. The squeeze stays tight (its 1-wide length is the beat). The apron is an `outdoor` zone (the sun rule uses World.kind_at), all
+## other zones stay indoor. Acoustics T60 is looked up by zone name, so the echo hall keeps its 2.2 s whatever its measured size.
+static func _measure_zones(plan: StageGen.Plan, rects: Dictionary, role: Dictionary) -> void:
+	var by_name := {}
+	for n in role:
+		by_name[role[n]] = n
+	var apron := Rect2i()
+	for z in plan.zones:
+		if String(z["name"]) == "cave_apron":
+			apron = Rect2i(int(z["x0"]), int(z["y0"]), int(z["x1"]) - int(z["x0"]) + 1, int(z["y1"]) - int(z["y0"]) + 1)
+	for z in plan.zones:
+		if String(z["name"]) == "cave_apron":
+			z["kind"] = "outdoor"
+			continue
+		if not by_name.has(z["name"]) or z["name"] == "squeeze":
+			continue
+		var own: int = by_name[z["name"]]
+		var zr := Rect2i(int(z["x0"]), int(z["y0"]), int(z["x1"]) - int(z["x0"]) + 1, int(z["y1"]) - int(z["y0"]) + 1)
+		var lim := zr.grow(2)
+		var seen := {}
+		var q: Array = []
+		for y in range(zr.position.y, zr.end.y):
+			for x in range(zr.position.x, zr.end.x):
+				if plan.tile(x, y) != 0:
+					seen[y * plan.w + x] = true
+					q.append(Vector2i(x, y))
+		if q.is_empty():
+			continue
+		var qi := 0
+		while qi < q.size():
+			var c: Vector2i = q[qi]
+			qi += 1
+			for d in StageGen.N4:
+				var nc: Vector2i = c + d
+				var ni: int = nc.y * plan.w + nc.x
+				if seen.has(ni) or not lim.has_point(nc) or plan.tile(nc.x, nc.y) == 0:
+					continue
+				var foreign: bool = apron.has_point(nc)
+				for k in rects:
+					if k != own and rects[k].has_point(nc):
+						foreign = true
+				if foreign:
+					continue
+				seen[ni] = true
+				q.append(nc)
+		var x0 := 1 << 20
+		var y0 := 1 << 20
+		var x1 := -1
+		var y1 := -1
+		for c in q:
+			x0 = mini(x0, c.x)
+			y0 = mini(y0, c.y)
+			x1 = maxi(x1, c.x)
+			y1 = maxi(y1, c.y)
+		z["x0"] = x0
+		z["y0"] = y0
+		z["x1"] = x1
+		z["y1"] = y1
+	# zone rectangles are painted in list order (later wins): the outdoor apron goes last so no widened bounding box can roof it over
+	for k in plan.zones.size():
+		if String(plan.zones[k]["name"]) == "cave_apron":
+			plan.zones.append(plan.zones.pop_at(k))
+			break
 
 
 static func SOLID_PROP_AT(plan: StageGen.Plan, i: int) -> bool:
@@ -414,7 +541,7 @@ static func _try_spur(plan: StageGen.Plan, rng: Rng, start: Vector2i, dir: Vecto
 	plan.rest.append({"cell": [end.x, end.y], "kind": "spur", "marker": "S", "safety": 0.8})
 	var prev: Vector2i = cells[maxi(0, cells.size() - 2)]
 	plan.zones.append({"name": "pocket_spur_%d" % (idx + 1), "kind": "indoor", "x0": mini(end.x, prev.x), "y0": mini(end.y, prev.y), "x1": maxi(end.x, prev.x), "y1": maxi(end.y, prev.y)})
-	plan.pockets.append({"zone": "pocket_spur_%d" % (idx + 1), "kind": "spur", "rest": true, "cell": [end.x, end.y]})
+	plan.pockets.append({"zone": "pocket_spur_%d" % (idx + 1), "kind": "spur", "rest": true, "cell": [end.x, end.y], "mouth": [start.x, start.y]})
 	return end
 
 
@@ -429,6 +556,40 @@ static func _clear_around(plan: StageGen.Plan, c: Vector2i, allowed: Dictionary,
 	return true
 
 
+## Walkable mask for the BFS helpers below (floor that is not a solid prop); the border ring is wall so index arithmetic never wraps.
+static func _walk_mask(plan: StageGen.Plan) -> PackedByteArray:
+	var ok := PackedByteArray()
+	ok.resize(plan.w * plan.h)
+	for i in ok.size():
+		ok[i] = 1 if plan.tiles[i] == 1 else 0
+	for k in plan.prop_cells:
+		if StageGen.SOLID_PROPS.has(plan.prop_cells[k]):
+			ok[k] = 0
+	return ok
+
+
+## Incremental multi-source BFS: lowers `dist` (-1 = unreached) to the walking distance from `srcs`, expanding only where that improves it
+## and not past `limit`. On a fresh -1 array it is a plain BFS (same result as StageGen.bfs), so adding one rest spot costs a local update
+## instead of a whole-map pass.
+static func _spread(ok: PackedByteArray, dist: PackedInt32Array, w: int, srcs: Array, limit: int = 1 << 30) -> void:
+	var queue: Array = []
+	for s in srcs:
+		if dist[s] != 0:
+			dist[s] = 0
+			queue.append(s)
+	var head := 0
+	while head < queue.size():
+		var cur: int = queue[head]
+		head += 1
+		var nd: int = dist[cur] + 1
+		if nd > limit:
+			continue
+		for nb in [cur - 1, cur + 1, cur - w, cur + w]:
+			if ok[nb] == 1 and (dist[nb] < 0 or dist[nb] > nd):
+				dist[nb] = nd
+				queue.append(nb)
+
+
 ## Crevice alcoves (2 cells deep, 1 wide, dead end) until the farthest walkable cell is within restTarget of a rest spot.
 static func _cover(plan: StageGen.Plan, rng: Rng, row: Dictionary) -> void:
 	var shelter: Dictionary = row["shelter"]
@@ -438,26 +599,34 @@ static func _cover(plan: StageGen.Plan, rng: Rng, row: Dictionary) -> void:
 	var skip := {}
 	# always at least one crevice so the stage has a rest spot that is not a chunk or spur
 	var forced := 1
+	var ok := _walk_mask(plan)
+	var n: int = plan.w * plan.h
+	var dist := PackedInt32Array()
+	dist.resize(n)
+	dist.fill(-1)
+	var srcs: Array = []
+	for r in plan.rest:
+		srcs.append(plan.idx(r["cell"][0], r["cell"][1]))
+	_spread(ok, dist, plan.w, srcs)
 	while made < extra:
-		var srcs: Array = []
-		for r in plan.rest:
-			srcs.append(plan.idx(r["cell"][0], r["cell"][1]))
-		var dist := StageGen.bfs(plan, srcs)
 		var far := -1
 		var fd := -1
-		for i in dist.size():
+		for i in n:
 			if dist[i] > fd and not skip.has(i):
 				fd = dist[i]
 				far = i
 		if far < 0 or (fd <= target and forced <= 0):
 			return
-		var near := StageGen.bfs(plan, [far])
+		var near := PackedInt32Array()
+		near.resize(n)
+		near.fill(-1)
+		_spread(ok, near, plan.w, [far], 12)
 		var best := -1
 		var best_d := 1 << 30
 		var cdirs: Array = StageGen.N4.duplicate()
 		StageGen.shuffle(rng, cdirs)
 		var best_dir := Vector2i.ZERO
-		for i in near.size():
+		for i in n:
 			if near[i] < 0 or near[i] > 12 or near[i] >= best_d:
 				continue
 			var x: int = i % plan.w
@@ -477,6 +646,11 @@ static func _cover(plan: StageGen.Plan, rng: Rng, row: Dictionary) -> void:
 			skip[far] = true
 			continue
 		_carve_crevice(plan, rng, shelter, best % plan.w, best / plan.w, best_dir, made + 1)
+		var cb: Vector2i = Vector2i(best % plan.w, best / plan.w) + best_dir * 2
+		var ca: Vector2i = Vector2i(best % plan.w, best / plan.w) + best_dir
+		ok[ca.y * plan.w + ca.x] = 1
+		ok[cb.y * plan.w + cb.x] = 1
+		_spread(ok, dist, plan.w, [cb.y * plan.w + cb.x])
 		made += 1
 		forced = 0
 
@@ -581,17 +755,25 @@ static func _assemble(plan: StageGen.Plan, rng: Rng, row: Dictionary, seed: int,
 		doors.append({"id": exit_cfg["doorId"], "col": d["col"], "row": d["row"], "toMap": exit_cfg["toMap"], "toDoor": exit_cfg["toDoor"], "facing": d["facing"]})
 	var door: Dictionary = doors[0] if not doors.is_empty() else {}
 	var fv: Vector2i = StageGen.DIR_OF[door.get("facing", "s")]
-	# beats in order; the spur beat sits between the pool and the warren
+	# beats: the main path in teaching order (strictly increasing walking depth, checked by StageGen.analyze), then the optional side beat
+	# dead_end_spurs (off the path, flagged "optional", excluded from the order check; its cell is the first spur cell, i.e. its mouth on the
+	# path, and "end" is the hidden rest spot). Tutorial hints (RogueMode.BEAT_HINTS) fire within 4 cells of a beat cell: squeeze -> "squeeze"
+	# and cave_mouth -> "sun" lie on the main path in that depth order, dead_end_spurs -> "dead_end" only fires when the player walks past the
+	# mouth of a spur, so no hint can fire before its beat is reachable and the two path hints cannot invert.
 	var by_role := {}
 	for node in role:
 		by_role[role[node]] = node
 	var beats: Array = []
 	for b in order:
-		if b == "rat_warren":
-			beats.append({"id": "dead_end_spurs", "cell": [spur_ends[0].x, spur_ends[0].y]})
 		var node: int = by_role[b]
 		var bc: Vector2i = info[node]["beat_cell"]
 		beats.append({"id": b, "cell": [bc.x, bc.y]})
+	if not spur_ends.is_empty():
+		var sm: Array = [spur_ends[0].x, spur_ends[0].y]
+		for pk in plan.pockets:
+			if pk.get("kind") == "spur" and pk["cell"] == sm:
+				sm = pk["mouth"]
+		beats.append({"id": "dead_end_spurs", "cell": sm, "end": [spur_ends[0].x, spur_ends[0].y], "optional": true})
 	var places := {}
 	for b in beats:
 		places[b["id"]] = b["cell"]

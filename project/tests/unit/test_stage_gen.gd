@@ -2,7 +2,9 @@ extends TestCase
 ## StageGen framework + the cave generator (The Hollow): 50 seeds against the constraints in docs/ROGUELIKE.md.
 
 const SEEDS := 50
-const BEAT_ORDER := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "dead_end_spurs", "rat_warren", "cave_mouth"]
+## Main path in teaching order (strictly increasing walking depth). dead_end_spurs is an optional side beat reported after them.
+const MAIN_ORDER := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "rat_warren", "cave_mouth"]
+const BEAT_ORDER := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "rat_warren", "cave_mouth", "dead_end_spurs"]
 
 static var _defs: Array = []
 static var _ms: Array = []
@@ -95,11 +97,17 @@ func test_beats_in_order() -> void:
 		eq(ids, BEAT_ORDER, "seed %d beat list" % (i + 1))
 		var rep := StageGen.analyze(d, _row())
 		var last := -1
-		for id in ids:
-			if id == "dead_end_spurs":
-				continue
+		for id in MAIN_ORDER:
 			ok(rep["depths"][id] > last, "seed %d depth increases at %s" % [i + 1, id])
 			last = rep["depths"][id]
+		# the spur beat is optional and off the path: flagged, reachable, reported last
+		var sp: Dictionary = d["beats"][d["beats"].size() - 1]
+		eq(sp["id"], "dead_end_spurs", "seed %d spurs reported last" % (i + 1))
+		ok(sp.get("optional", false) == true, "seed %d spur beat is optional" % (i + 1))
+		ok(rep["depths"]["dead_end_spurs"] >= 0, "seed %d spur mouth reachable" % (i + 1))
+		ok(sp.has("end"), "seed %d spur beat has its end cell" % (i + 1))
+		# tutorial hints (RogueMode.BEAT_HINTS): squeeze before sun by depth; dead_end only fires at a spur mouth
+		ok(rep["depths"]["squeeze"] < rep["depths"]["cave_mouth"], "seed %d squeeze hint precedes sun hint" % (i + 1))
 		eq(rep["depths"]["coffin_nook"], 0, "start is at the coffin nook")
 
 
@@ -193,10 +201,10 @@ func test_caps_and_fractions() -> void:
 		lo = minf(lo, f)
 		hi = maxf(hi, f)
 		ok(f >= 0.30 and f <= 0.38, tag + " open fraction %.3f" % f)
-		eq(d["kind"], "indoor", tag + " whole cave is indoor")
+		eq(d["kind"], "indoor", tag + " the cave map is indoor")
 		var names := {}
 		for z in d["zones"]:
-			eq(z["kind"], "indoor", tag + " zone kind")
+			eq(z["kind"], "outdoor" if z["name"] == "cave_apron" else "indoor", tag + " zone kind " + z["name"])
 			ok(not names.has(z["name"]), tag + " unique zone " + z["name"])
 			names[z["name"]] = true
 		eq(d["materials"]["#"], "roughStone", tag + " rough stone walls")
@@ -224,7 +232,18 @@ func test_beat_features() -> void:
 			for x in range(hall["x0"], hall["x1"] + 1):
 				if plan.tile(x, y) == 0 and plan.tile(x - 1, y) != 0 and plan.tile(x + 1, y) != 0 and plan.tile(x, y - 1) != 0 and plan.tile(x, y + 1) != 0:
 					pillars += 1
-		ok(pillars >= 2 and pillars <= 3, tag + " pillar cells %d" % pillars)
+		ok(pillars >= 2 and pillars <= 3, tag + " lone pillar cells %d" % pillars)
+		# showpiece: stalagmite clusters, stalactite props and drip anchors in the hall
+		var mites := 0
+		for p in d["props"]:
+			if p["type"] == "stalagmite" and _in_zone(hall, [p["col"], p["row"]]):
+				mites += 1
+		ok(mites >= 6, tag + " hall stalagmites in clusters %d" % mites)
+		var hall_anchors := 0
+		for a in d["ambient"]:
+			if _in_zone(hall, a["cell"]):
+				hall_anchors += 1
+		ok(hall_anchors >= 2 and hall_anchors <= 4, tag + " hall ambient anchors %d" % hall_anchors)
 		var bats := 0
 		for c in d["critters"]:
 			if c["species"] == "bat":
@@ -234,7 +253,7 @@ func test_beat_features() -> void:
 		for p in d["props"]:
 			if p["type"] == "stalactite" and _in_zone(hall, [p["col"], p["row"]]):
 				stalactites += 1
-		ok(stalactites >= 2, tag + " stalactites over the bats")
+		ok(stalactites >= 7, tag + " stalactite props in the hall %d" % stalactites)
 		near(Acoustics.t60_for("echo_hall", "indoor"), 2.2, 0.1, "echo hall T60")
 		# squeeze: 1-wide corridor of about 31 cells
 		var sq := _zone(d, "squeeze")
@@ -249,6 +268,23 @@ func test_beat_features() -> void:
 							nb += 1
 					ok(nb <= 2, tag + " squeeze cell is 1 wide")
 		ok(walk >= 28 and walk <= 36, tag + " squeeze length %d" % walk)
+		# one quiet drip at the far end of the squeeze (in the deeper half)
+		var sq_dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+		var sq_max := 0
+		var sq_near := 1 << 20
+		for y in range(sq["y0"], sq["y1"] + 1):
+			for x in range(sq["x0"], sq["x1"] + 1):
+				if plan.walkable(x, y):
+					sq_max = maxi(sq_max, sq_dist[plan.idx(x, y)])
+					sq_near = mini(sq_near, sq_dist[plan.idx(x, y)])
+		var sq_drips := 0
+		for a in d["ambient"]:
+			if _in_zone(sq, a["cell"]):
+				sq_drips += 1
+				eq(a["kind"], "drip", tag + " squeeze anchor is a drip")
+				var ad: int = sq_dist[plan.idx(a["cell"][0], a["cell"][1])]
+				ok(ad >= sq_near + (sq_max - sq_near) / 2, tag + " squeeze drip at the far end (depth %d of %d..%d)" % [ad, sq_near, sq_max])
+		eq(sq_drips, 1, tag + " one squeeze drip")
 		# pool
 		var pool := _zone(d, "still_pool")
 		var water := 0
@@ -288,13 +324,18 @@ func test_beat_features() -> void:
 			if c["species"] == "rat" and _in_zone(war, c["cell"]):
 				wr += 1
 		ok(wr >= 3 and wr <= 4, tag + " warren rats %d" % wr)
+		var wa := 0
+		for a in d["ambient"]:
+			if _in_zone(war, a["cell"]):
+				wa += 1
+		ok(wa >= 1 and wa <= 2, tag + " warren anchors %d" % wa)
 		# exit
 		var door: Dictionary = d["doors"][0]
 		eq(door["toMap"], "stage:wood", tag + " exit placeholder")
 		eq(String(d["rows"][door["row"]])[door["col"]], "D", tag + " door cell")
 		var glow := false
 		for l in d["lights"]:
-			if Vector2(l["cell"][0], l["cell"][1]).distance_to(Vector2(door["col"], door["row"])) < 6.0:
+			if Vector2(l["cell"][0], l["cell"][1]).distance_to(Vector2(door["col"], door["row"])) < 9.0:
 				glow = true
 		ok(glow, tag + " glow-worm light by the mouth")
 		# spurs are dead ends
@@ -413,4 +454,97 @@ func test_generation_time() -> void:
 		tot += m
 		worst = maxf(worst, m)
 	print("stage_gen: %d seeds, avg %.1f ms, worst %.1f ms" % [_ms.size(), tot / maxf(1.0, float(_ms.size())), worst])
-	ok(worst < 5000.0, "generation stays under 5 s")
+	ok(worst < 400.0, "worst generation %.1f ms stays under 400 ms (target ~300)" % worst)
+
+
+## The apron: a short outdoor stretch past the cave mouth, inside the same map, with the exit door at its far end.
+func test_outdoor_apron() -> void:
+	var defs := _all()
+	for i in defs.size():
+		var d: Dictionary = defs[i]
+		var tag := "seed %d" % (i + 1)
+		var ap := _zone(d, "cave_apron")
+		ok(not ap.is_empty() and ap["kind"] == "outdoor", tag + " apron zone is outdoor")
+		if ap.is_empty():
+			continue
+		var world := World.from_def(d)
+		var plan := StageGen.plan_from_def(d)
+		var out := 0
+		for y in range(ap["y0"], ap["y1"] + 1):
+			for x in range(ap["x0"], ap["x1"] + 1):
+				if plan.walkable(x, y):
+					out += 1
+					eq(world.kind_at(x + 0.5, y + 0.5), "outdoor", tag + " apron cell is outdoor")
+		ok(out >= 3, tag + " >= 3 outdoor cells (%d)" % out)
+		var depth: int = int(ap["y1"]) - int(ap["y0"]) + 1
+		ok(depth >= 3 and depth <= 5, tag + " apron is 3-5 cells deep (%d)" % depth)
+		var mouth := _zone(d, "cave_mouth")
+		ok(not mouth.is_empty() and mouth["kind"] == "indoor", tag + " mouth zone indoor")
+		eq(world.kind_at(d["start"]["cell"][0] + 0.5, d["start"]["cell"][1] + 0.5), "indoor", tag + " start roofed")
+		var bc: Array = d["places"]["cave_mouth"]
+		eq(world.kind_at(bc[0] + 0.5, bc[1] + 0.5), "indoor", tag + " cave mouth beat roofed")
+		var door: Dictionary = d["doors"][0]
+		var arr: Array = d["exit"]["arrival"]
+		ok(_in_zone(ap, arr), tag + " arrival is in the apron")
+		eq(absi(door["col"] - arr[0]) + absi(door["row"] - arr[1]), 1, tag + " door is adjacent to the arrival")
+		ok(StageGen.analyze(d, _row())["exit_reachable"], tag + " exit reachable through the apron")
+		var rows: Array = d["rows"]
+		for x in 64:
+			eq(String(rows[0])[x], "#", tag + " top border")
+			eq(String(rows[47])[x], "#", tag + " bottom border")
+		for y in 48:
+			eq(String(rows[y])[0], "#", tag + " left border")
+			eq(String(rows[y])[63], "#", tag + " right border")
+
+
+func test_sun_kills_on_the_apron_only() -> void:
+	for seed in [7, 11, 23]:
+		var f := TrekFlow.begin(TrekMeta.create(), seed)
+		var d: Dictionary = f.def
+		var arr: Array = d["exit"]["arrival"]
+		var cell := Vector2i(arr[0], arr[1])
+		ok(f.cell_outdoor(cell), "seed %d apron arrival is outdoor in the World" % seed)
+		f.night.skip_to(5, 59)
+		f.step(2.0, cell, f.cell_outdoor(cell))
+		eq(f.cause, "sun", "seed %d dawn on the apron kills" % seed)
+		var g := TrekFlow.begin(TrekMeta.create(), seed)
+		var roofed: Array = d["start"]["cell"]
+		var rc := Vector2i(roofed[0], roofed[1])
+		ok(not g.cell_outdoor(rc), "seed %d start is roofed" % seed)
+		var bc: Array = d["places"]["cave_mouth"]
+		ok(not g.cell_outdoor(Vector2i(bc[0], bc[1])), "seed %d cave mouth roofed" % seed)
+		g.night.skip_to(5, 59)
+		g.step(2.0, Vector2i(bc[0], bc[1]), g.cell_outdoor(Vector2i(bc[0], bc[1])))
+		ok(g.alive(), "seed %d dawn in the cave mouth is survived" % seed)
+
+
+## Zones are measured from the carved cave: tight boxes around real floor, and their extents differ between seeds.
+func test_zones_measured_per_seed() -> void:
+	var defs := _all()
+	var shapes := {}
+	for d in defs:
+		var plan := StageGen.plan_from_def(d)
+		for nm in ["echo_hall", "drip_gallery", "still_pool", "rat_warren", "cave_mouth"]:
+			var z := _zone(d, nm)
+			ok(not z.is_empty(), nm + " zone exists")
+			if z.is_empty():
+				continue
+			var top := false
+			var bot := false
+			var lef := false
+			var rig := false
+			for x in range(z["x0"], z["x1"] + 1):
+				top = top or plan.tile(x, z["y0"]) != 0
+				bot = bot or plan.tile(x, z["y1"]) != 0
+			for y in range(z["y0"], z["y1"] + 1):
+				lef = lef or plan.tile(z["x0"], y) != 0
+				rig = rig or plan.tile(z["x1"], y) != 0
+			ok(top and bot and lef and rig, nm + " zone box is tight around floor")
+			if not shapes.has(nm):
+				shapes[nm] = {}
+			shapes[nm]["%d,%d" % [z["x1"] - z["x0"], z["y1"] - z["y0"]]] = true
+	var varied := 0
+	for nm in shapes:
+		if shapes[nm].size() > 1:
+			varied += 1
+	ok(varied >= 1, "at least one beat zone changes size between seeds (%d of %d)" % [varied, shapes.size()])
