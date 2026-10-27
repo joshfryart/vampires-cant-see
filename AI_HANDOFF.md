@@ -67,6 +67,18 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.4 (S3b: strata, ceilings, quieter floors)
+
+Version 0.21.4 follows the first look at 0.21.3. Everything is gated on `world.wall_style` (styled maps only); classic maps, the parity hashes and the golden tests are unchanged.
+
+- **Rock strata (`sonar_wall.gdshader`, `rock_detail`)**: seven layered courses per rock face (odd courses only within 4.2 cells), each with its own run length, breaks, height jitter and wobble, still tilted by the world-anchored dip (`rock_tilt`), faded by facing and distance. Minor courses are dimmer. Cracks and seeps are unchanged.
+- **Struck-wall vibration**: the five evenly spaced wavy lines are gone for ink materials. Rock: the strata themselves quiver (`rock_detail` with a pixel offset, alpha x0.55). Other ink styles: three faint, broken, wandering lines (alpha x0.45). Style 0 and classic maps keep the five lines.
+- **Floors (`floor_fx.gd`, `floor_kind_for`)**: in ink worlds stone / roughStone floors are always `rubble` (no brick joints), wood floors are `plank_ink` (short broken boards). Roads and the inn yard keep setts.
+- **Ceilings (`floor_fx.gd`, `_draw_surface_texture` up pass)**: `ceil_style(world)` (cave, inn, wood, moor, road), `ceil_kind_styled`, `ceil_height`, `ceil_mesh_mul`. Hollow: `vault` marks (rock bosses as closed contour loops, short jointed cracks, dip-aligned bedding dashes, grain, stalactite clusters, drip beads). Echo hall (`vault_hall`) is higher (1.4 wall heights) with long sparse stalactites; the squeeze (`vault_tight`) is flush with the wall tops (1.0) with dense short ones; the drip gallery 1.2, pockets 1.05, other cells 1.12 +/- 0.05. The ceiling plane mesh of the cave sits at 1.12. Outdoor cells (and the cave apron) get sky: `canopy` (leaf V-ticks, twigs) in the wood, `stars` on the moor, road and inn yard; inn interiors get `rafter` beams. `FloorProj.hmul` carries the ceiling height (1.0 = the old projection exactly). Styled ceiling strokes are drawn at 0.7 of the floor alpha.
+- **Tour**: `style_tour` gained `ceil_cave`, `ceil_hall`, `ceil_inn`, `ceil_moor` (looking up by `Game.look_shift`, a new scripted-shot horizon shift, 0 in play).
+- **Perf**: hollow typical walk, uncapped, 10 s windowed: avg 5.98 ms (p95 12.9) against the 6.5 ms gate.
+- **Unverified**: nobody has judged the ceilings under real play. Only the cells near the ping front are drawn, so the vault shows as a band that sweeps outward; at 3 to 5 cells the marks are sparse and read as scattered scribbles more than a continuous rock surface. The ceiling is a canvas overlay at its own height, not geometry, so it is not occluded by the lip jag of the walls.
+
 ## Changes in 0.21.3 (S3: the ink wall style is switched on)
 
 Version 0.21.3: trek stages hollow, wood, moor, road and inn now draw with the A+B hybrid wall style specified in `docs/STYLE.md` (read it first). Classic maps (town, crypt, tutorial, later stages) are unchanged and the parity hashes do not move.

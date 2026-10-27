@@ -111,3 +111,12 @@ func _vec4(txt: String, name: String) -> Array:
 	for p in m.get_string(1).split(","):
 		out.append(float(p.strip_edges()))
 	return out
+
+
+## 0.21.4: the vibration stripes soften only for ink materials; the classic five evenly spaced lines stay in the shader for classic maps.
+func test_vibration_gating_text() -> void:
+	var f := FileAccess.open("res://render/shaders/sonar_wall.gdshader", FileAccess.READ)
+	var txt := f.get_as_text()
+	ok(txt.contains("if (style == 1) {\n\t\t\t\t\t\t// ink rock: the strata themselves quiver"), "rock vibration reuses the strata")
+	ok(txt.contains("for (int j = 0; j < 5; j++) {\n\t\t\t\t\t\t\tfloat f = float(j) * 0.25;"), "classic five-line vibration kept for style 0")
+	ok(txt.contains("for (int k = 0; k < 7; k++)"), "seven strata courses")

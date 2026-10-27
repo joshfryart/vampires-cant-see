@@ -152,21 +152,42 @@ float wall_lip(int st, float s, float facing, bool jag) {
 	return 1.0;
 }
 
+// bedding tilt of a rock face: the dip direction and angle come from the world cell (8 cells), so parallel walls agree
+float rock_tilt(vec2 p, vec2 nv) {
+	int gx = int(floor(p.x / 8.0));
+	int gy = int(floor(p.y / 8.0));
+	float ang = TWO_PI * cell_hash(gx, gy, 41);
+	float dip = radians(5.0 + 8.0 * cell_hash(gx, gy, 42));
+	vec2 tg = vec2(-nv.y, nv.x);
+	return tan(dip) * dot(tg, vec2(cos(ang), sin(ang))) / z_scale;
+}
+
 // rock: strata (x) and cracks / seeps (y) as coverage. s = arc length, v = height from the floor, tilt = strata slope per cell of s.
-vec2 rock_detail(float s, float v, float lip, float fws, float fwy, float tilt, float curv, float wd) {
+// Strata are seven layered courses, each with its own run length, breaks and wobble (odd courses only within 4.2 cells); voff shifts them in px (vibration).
+vec2 rock_detail(float s, float v, float lip, float fws, float fwy, float tilt, float curv, float wd, float depth, float voff) {
 	const float GL = 0.6;
 	float g = floor(s / GL);
 	int gi = int(g);
-	float f = (s - g * GL) / GL;
 	float strata = 0.0;
-	for (int k = 0; k < 3; k++) {
-		if (cell_hash(gi, 21, k) < 0.5) {
-			float fs = 0.03 + 0.2 * cell_hash(gi, 22, k);
-			float fe = min(1.0, fs + 0.55 + 0.45 * cell_hash(gi, 23, k));
+	for (int k = 0; k < 7; k++) {
+		if ((k & 1) != 0 && depth > 4.2) {
+			continue;
+		}
+		float lk = 0.4 + 0.7 * cell_hash(k, 70, 0);
+		float off = 7.0 * cell_hash(k, 71, 0);
+		float sk = s / lk + off;
+		int si = int(floor(sk));
+		float f = fract(sk);
+		if (cell_hash(si, 72, k) < 0.5) {
+			float fs = 0.04 + 0.28 * cell_hash(si, 73, k);
+			float fe = 0.96 - 0.3 * cell_hash(si, 74, k);
 			if (f >= fs && f <= fe) {
-				float vk = 0.12 + 0.76 * cell_hash(gi, 24, k) + tilt * (s - (g + 0.5) * GL);
-				float endk = clamp(min(f - fs, fe - f) / 0.08, 0.0, 1.0);
-				strata = max(strata, tent((v - vk) / fwy, wd) * endk);
+				float base = 0.05 + 0.88 * (float(k) + 0.1 + 0.8 * cell_hash(si, 75, k)) / 7.0;
+				float sm = (float(si) + 0.5 - off) * lk;
+				float vk = base + tilt * (s - sm) + 0.03 * (vn1(s * 1.6 + float(k) * 9.0, 76 + k) - 0.5);
+				float endk = clamp(min(f - fs, fe - f) * lk / 0.07, 0.0, 1.0);
+				float w = (k % 3 == 0) ? 1.0 : 0.55;
+				strata = max(strata, tent((v - vk) / fwy - voff, wd) * endk * w);
 			}
 		}
 	}
@@ -519,11 +540,8 @@ void fragment() {
 						vec3 col = bucket_col(bd);
 						float curv = (COLOR.r - 0.5) * 8.0; // signed curvature per cell: convex > 0 (ContourField.CURV_RANGE = 4)
 						if (style == 1) {
-							float ang = TWO_PI * cell_hash(int(floor(p.x / 8.0)), int(floor(p.y / 8.0)), 41);
-							float dip = radians(5.0 + 8.0 * cell_hash(int(floor(p.x / 8.0)), int(floor(p.y / 8.0)), 42));
-							vec2 tg = vec2(-nvv.y, nvv.x);
-							float tilt = tan(dip) * dot(tg, vec2(cos(ang), sin(ang))) / z_scale;
-							vec2 rc = rock_detail(UV.x, UV.y, lip, fws, fwy, tilt, curv, line_px * 0.7);
+							float tilt = rock_tilt(p, nvv);
+							vec2 rc = rock_detail(UV.x, UV.y, lip, fws, fwy, tilt, curv, line_px * 0.7, depth, 0.0);
 							float fk = (0.35 + 0.65 * facing);
 							float st_a = a * fk * (1.0 - smoothstep(5.0, 7.0, depth));
 							float cr_a = a * (1.0 - smoothstep(3.5, 5.0, depth));
@@ -736,9 +754,25 @@ void fragment() {
 					float vy_px = (ngv.x * fwd2.x + ngv.z * fwd2.y) * 0.8 * amp;
 					float a = min(1.0, 2.2 * kv);
 					float cov = 0.0;
-					for (int j = 0; j < 5; j++) {
-						float f = float(j) * 0.25;
-						cov = max(cov, tent((UV.y - f) / fwy - vy_px, line_px_thin));
+					if (style == 1) {
+						// ink rock: the strata themselves quiver (their own dip, breaks and spacing) instead of evenly spaced stripes
+						float fws_v = max(fwidth(UV.x), 1e-5);
+						vec2 rv = rock_detail(UV.x, UV.y, lip, fws_v, fwy, rock_tilt(p, nvv), 0.0, line_px_thin, depth, vy_px);
+						cov = rv.x;
+						a *= 0.55;
+					} else if (style > 0) {
+						// other ink materials: three faint, broken, wandering lines
+						for (int j = 0; j < 3; j++) {
+							float fj = 0.22 + 0.27 * float(j) + 0.12 * (vn1(UV.x * 1.1 + float(j) * 5.0, 51 + j) - 0.5);
+							float brk = smoothstep(0.3, 0.4, vn1(UV.x * 2.5 + float(j) * 3.0, 55 + j));
+							cov = max(cov, tent((UV.y - fj) / fwy - vy_px, line_px_thin * 0.8) * brk);
+						}
+						a *= 0.45;
+					} else {
+						for (int j = 0; j < 5; j++) {
+							float f = float(j) * 0.25;
+							cov = max(cov, tent((UV.y - f) / fwy - vy_px, line_px_thin));
+						}
 					}
 					put(outc, vec3(0.91, 0.95, 1.0), a, cov, 0.0);
 				}

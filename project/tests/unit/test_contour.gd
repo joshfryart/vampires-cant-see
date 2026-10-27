@@ -396,7 +396,7 @@ func test_mesh_attributes() -> void:
 	ok(styles.has(9) and styles.has(8), "inn: drystone (9) and timber (8) present")
 	ok(styles.has(0), "inn: doors / windows keep style 0")
 	for k in styles:
-		ok(k == 0 or k == 8 or k == 9, "no foreign style id %d" % k)
+		ok(k == 0 or k == 6 or k == 7 or k == 8 or k == 9, "no foreign style id %d" % k) # the inn yard has milestones (6) and fences (7) since 0.21.3
 	var hw := _world("hollow", 3)
 	var ah := WorldMeshBuilder.build_contour(hw).surface_get_arrays(0)
 	var ids := {}

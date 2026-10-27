@@ -189,7 +189,7 @@ static func build_floor(world: World) -> ArrayMesh:
 static func build_ceiling(world: World) -> ArrayMesh:
 	var w: float = world.width
 	var h: float = world.height
-	var y: float = Coords.Z_SCALE
+	var y: float = Coords.Z_SCALE * FloorFx.ceil_mesh_mul(world)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(0, y, 0), Vector3(w, y, 0), Vector3(w, y, h), Vector3(0, y, h)])

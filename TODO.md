@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.4 (S3b): denser rock strata, quieter vibration, no brick/plank grid floors in ink worlds, per-chamber cave ceiling plus sky / canopy / rafters (see `AI_HANDOFF.md`, "Changes in 0.21.4"). Still to do: a person judges the ceilings and strata density under real play; ceilings are a sparse band around the ping front (consider denser marks or a mesh vault).
+
 Changes in 0.21.3 (S3): the ink wall style is on for the five trek stages (see `AI_HANDOFF.md`, "Changes in 0.21.3"). Still to do: a person judges the cave strata and the other materials under real play, crease lines, a separate gibbet look, a map-seed uniform for the strata dip.
 
 Changes in 0.21.2 (WP13b): The Old Road (`road`) and Crossroads Inn (`inn`) are generated (`core/gen/gen_road.gd`), the trek runs hollow -> wood -> moor -> road -> inn and ends with "To be continued..." after the inn (see `AI_HANDOFF.md`, "Changes in 0.21.2"). Still to do for them: a person plays both (shrine holy ground, watchers, patrons and schedules, cellar risk), sounds for the `cart` / `bell` / `singing` ambient kinds, a horse prop, then WP13c (Hamlet and Farms onwards).

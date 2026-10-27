@@ -323,6 +323,10 @@ static func floor_kind_for(world: World, mat: String, style: String) -> String:
 		return "rubble"
 	if style == "setts" and (mat == "stone" or mat == "cobble" or mat == "roughStone"):
 		return "sett"
+	if mat == "stone" or mat == "roughStone":
+		return "rubble" # ink worlds never draw brick joints: loose rubble instead
+	if mat == "wood":
+		return "plank_ink" # broken boards, not long straight joints
 	return floor_tex_kind(mat)
 
 
@@ -331,6 +335,73 @@ static func ceil_tex_kind(world: World, x: float, y: float) -> String:
 	var zone := world.zone_at(x, y)
 	var k := floor_tex_kind(Acoustics.ceiling_for(zone if zone != "" else world.name)["mat"])
 	return k if k != "" else "brick"
+
+
+## Ink-world ceiling style (docs/STYLE.md, 0.21.4), or "" for classic worlds: "cave" (hollow), "inn", "wood", "moor", "road".
+static func ceil_style(world: World) -> String:
+	if world == null or world.wall_style.is_empty():
+		return ""
+	var vals: Array = world.wall_style.values()
+	if vals.has("rock"):
+		return "cave"
+	if vals.has("timber"):
+		return "inn"
+	if vals.has("fence") or vals.has("milestone"):
+		return "road"
+	if vals.has("gorse"):
+		return "moor"
+	if vals.has("trunk"):
+		return "wood"
+	return "moor"
+
+
+## Ceiling mark kind for an ink world at (x, y): outdoor cells get sky (canopy over the wood, stars elsewhere), indoor cells their chamber's
+## ceiling (cave: rock vault, tall in the echo hall, tight in the squeeze; inn: timber rafters; pockets elsewhere: vault).
+static func ceil_kind_styled(world: World, x: float, y: float) -> String:
+	var cs := ceil_style(world)
+	if cs == "":
+		return ""
+	if world.kind_at(x, y) == "outdoor":
+		return "canopy" if cs == "wood" else "stars"
+	if cs == "inn":
+		return "rafter"
+	var zone := world.zone_at(x, y)
+	if zone == "echo_hall":
+		return "vault_hall"
+	if zone == "squeeze":
+		return "vault_tight"
+	return "vault"
+
+
+## Ceiling height of an ink world at (x, y) in wall heights (1 = flush with the wall tops). Cave chambers differ by zone: the echo hall is
+## the highest vault, the squeeze sits flush with the wall tops. Sky marks (outdoor) pick their own height per mark; 2 is returned for them.
+static func ceil_height(world: World, x: float, y: float) -> float:
+	var cs := ceil_style(world)
+	if cs == "":
+		return 1.0
+	if world.kind_at(x, y) == "outdoor":
+		return 2.0
+	var zone := world.zone_at(x, y)
+	if cs == "cave":
+		if zone == "echo_hall":
+			return 1.4
+		if zone == "squeeze":
+			return 1.0
+		if zone == "drip_gallery":
+			return 1.2
+		if zone.begins_with("pocket"):
+			return 1.05
+		var cx: int = int(floor(x))
+		var cy: int = int(floor(y))
+		return 1.12 + 0.1 * (hash01(cx * 191 + 7, cy * 193 + 11) - 0.5)
+	if cs == "inn" and zone == "tavern":
+		return 1.15
+	return 1.0
+
+
+## Height of the ceiling plane mesh: the ink cave vault sits above the wall tops.
+static func ceil_mesh_mul(world: World) -> float:
+	return 1.12 if ceil_style(world) == "cave" else 1.0
 
 
 ## Perspective projection of floor (or ceiling) points used by the texture cells.
@@ -349,6 +420,8 @@ class FloorProj:
 	var horizon: float
 	var half: float
 	var up: bool
+	## ceiling height in wall heights (ink worlds; 1 = the wall tops)
+	var hmul: float = 1.0
 	var ow: float
 	var oh: float
 
@@ -359,7 +432,7 @@ class FloorProj:
 		if fwd < 0.3:
 			return false
 		px = half_w + ((-dx * sa + dy * ca) / fwd) * focal
-		py = horizon - half / fwd if up else horizon + half / fwd
+		py = horizon - half * hmul / fwd if up else horizon + half / fwd
 		f = fwd
 		f2 = focal / fwd
 		return px > -40.0 and px < ow + 40.0 and (py > -oh * 2.0 if up else py < oh * 3.0)
@@ -439,6 +512,147 @@ static func _add_setts(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
 			c.close_path()
 
 
+## A polyline through (u, v) cell-space points; a point that does not project ends the stroke.
+static func _poly(c: Canvas, p: FloorProj, pts: Array) -> void:
+	var pen := false
+	for q in pts:
+		if not p.pt(q[0], q[1]):
+			pen = false
+			continue
+		if pen:
+			c.line_to(p.px, p.py)
+		else:
+			c.move_to(p.px, p.py)
+			pen = true
+
+
+## Ink floor planks: boards run along the cell but the joints are short, broken and jittered (no long straight lines).
+static func _add_planks_ink(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
+	for i in 3:
+		if hash01(cx * 229 + i, cy * 233 + 9) < 0.28:
+			continue
+		var v: float = (i + 0.2 + 0.6 * hash01(cx * 191 + i, cy * 197 + 3)) / 3.0
+		var a: float = 0.3 * hash01(cx * 199 + i, cy * 211 + 5)
+		var b: float = 0.55 + 0.45 * hash01(cx * 223 + i, cy * 227 + 7)
+		p.seg(c, cx, cy, a, v, b, v + 0.02 * (hash01(cx * 239 + i, cy * 241 + 2) - 0.5))
+	if hash01(cx * 251 + 1, cy * 257 + 3) < 0.6:
+		var j: float = 0.15 + 0.7 * hash01(cx * 263 + 2, cy * 269 + 4)
+		var v0: float = hash01(cx * 271 + 3, cy * 277 + 5) * 0.5
+		p.seg(c, cx, cy, j, v0, j, v0 + 0.25)
+
+
+## Cave ceiling cell (ink): irregular crack zigzags, a dip-aligned stratum dash, stalactite clusters and drip points.
+## mode 0 = ordinary chamber, 1 = echo hall (sparse, long stalactites), 2 = squeeze (dense, short and tight).
+static func _add_vault(c: Canvas, p: FloorProj, cx: int, cy: int, mode: int) -> void:
+	# rock bosses: irregular closed contour loops, like the wall outline seen from underneath
+	if hash01(cx * 569 + 2, cy * 571 + 6) < [0.3, 0.22, 0.4][mode]:
+		var bu: float = cx + 0.25 + 0.5 * hash01(cx * 577 + 2, cy * 581 + 7)
+		var bv: float = cy + 0.25 + 0.5 * hash01(cx * 587 + 3, cy * 593 + 8)
+		var r0: float = 0.08 + 0.12 * hash01(cx * 599 + 4, cy * 601 + 9)
+		var ph: float = hash01(cx * 607 + 5, cy * 613 + 1) * TWO_PI
+		var lp: Array = []
+		for k in 15:
+			var th: float = TWO_PI * (k % 14) / 14.0
+			var rk: float = r0 * (1.0 + 0.35 * sin(2.0 * th + ph) + 0.25 * (hash01(cx * 617 + k % 14, cy * 619 + 2) - 0.5))
+			lp.append([bu + cos(th) * rk * 1.3, bv + sin(th) * rk])
+		_poly(c, p, lp)
+	# cracks: short, many-jointed
+	var ncr: int = 1 if mode != 2 else 2
+	for i in ncr:
+		if hash01(cx * 281 + i, cy * 283 + 5) < 0.5:
+			var u: float = cx + 0.1 + 0.8 * hash01(cx * 293 + i, cy * 307 + 1)
+			var v: float = cy + 0.1 + 0.8 * hash01(cx * 311 + i, cy * 313 + 2)
+			var ang: float = hash01(cx * 317 + i, cy * 331 + 3) * TWO_PI
+			var pts: Array = [[u, v]]
+			for k in 4:
+				ang += (hash01(cx * 337 + i * 4 + k, cy * 347 + 4) - 0.5) * 2.4
+				var l: float = 0.04 + 0.07 * hash01(cx * 349 + i * 4 + k, cy * 353 + 6)
+				u += cos(ang) * l
+				v += sin(ang) * l
+				pts.append([u, v])
+			_poly(c, p, pts)
+	# grain
+	for i in 2:
+		if hash01(cx * 621 + i, cy * 623 + 3) < 0.55:
+			if p.pt(cx + hash01(cx * 627 + i, cy * 629 + 4), cy + hash01(cx * 631 + i, cy * 633 + 5)):
+				c.move_to(p.px + 0.7, p.py)
+				c.ellipse(p.px, p.py, 0.7, 0.5, 0.0, 0.0, TWO_PI)
+	# bedding: the dip direction is shared across 6 cells, so the dashes line up in drifts rather than a grid
+	if hash01(cx * 359 + 1, cy * 367 + 2) < 0.3:
+		var da: float = hash01(int(floor(cx / 6.0)) * 373 + 1, int(floor(cy / 6.0)) * 379 + 3) * PI
+		var su: float = cx + 0.15 + 0.5 * hash01(cx * 383 + 4, cy * 389 + 5)
+		var sv: float = cy + 0.15 + 0.7 * hash01(cx * 397 + 5, cy * 401 + 6)
+		var sl: float = 0.15 + 0.2 * hash01(cx * 409 + 6, cy * 419 + 7)
+		var wob: float = (hash01(cx * 421 + 7, cy * 431 + 8) - 0.5) * 0.3
+		_poly(c, p, [[su, sv], [su + cos(da + wob) * sl * 0.5, sv + sin(da + wob) * sl * 0.5], [su + cos(da) * sl, sv + sin(da) * sl]])
+	var pst: float = [0.3, 0.2, 0.55][mode]
+	if hash01(cx * 433 + 8, cy * 439 + 9) < pst:
+		var ku: float = cx + 0.2 + 0.6 * hash01(cx * 443 + 9, cy * 449 + 1)
+		var kv: float = cy + 0.2 + 0.6 * hash01(cx * 457 + 1, cy * 461 + 2)
+		var n: int = 2 + int(hash01(cx * 463 + 2, cy * 467 + 3) * (2.2 if mode != 2 else 3.2))
+		for i in n:
+			var u2: float = ku + (hash01(cx * 479 + i, cy * 487 + 3) - 0.5) * 0.28
+			var v2: float = kv + (hash01(cx * 491 + i, cy * 499 + 4) - 0.5) * 0.28
+			if not p.pt(u2, v2):
+				continue
+			var ln: float = ([0.08, 0.16, 0.06][mode] + [0.12, 0.22, 0.08][mode] * hash01(cx * 503 + i, cy * 509 + 5)) * p.half / p.f
+			ln = minf(ln, 36.0)
+			var hw: float = clampf(0.025 * p.f2, 0.8, 4.0)
+			if ln < 1.5:
+				continue
+			var tip: float = (hash01(cx * 521 + i, cy * 523 + 6) - 0.5) * hw * 0.6
+			c.move_to(p.px - hw, p.py)
+			c.line_to(p.px + tip, p.py + ln)
+			c.line_to(p.px + hw, p.py)
+			if i == 0 and hash01(cx * 541 + 1, cy * 547 + 2) < 0.3:
+				# a drip bead hanging under the first tip
+				c.move_to(p.px + tip + 1.0, p.py + ln + 3.5)
+				c.ellipse(p.px + tip, p.py + ln + 3.5, 1.0, 1.4, 0.0, 0.0, TWO_PI)
+
+
+## Wood canopy (ink): small leaf V-ticks and a short twig, at varied heights above the thicket tops.
+static func _add_canopy(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
+	for i in 4:
+		var u: float = cx + hash01(cx * 557 + i, cy * 563 + 1)
+		var v: float = cy + hash01(cx * 569 + i, cy * 571 + 2)
+		p.hmul = 1.25 + 0.4 * hash01(cx * 577 + i, cy * 587 + 3)
+		if not p.pt(u, v):
+			continue
+		var sz: float = clampf(p.f2 * 0.05, 1.5, 5.0)
+		var lean: float = (hash01(cx * 593 + i, cy * 599 + 4) - 0.5) * 1.2
+		c.move_to(p.px - sz, p.py - sz * 0.7 + lean)
+		c.line_to(p.px, p.py)
+		c.line_to(p.px + sz, p.py - sz * 0.7 - lean)
+	if hash01(cx * 601 + 1, cy * 607 + 2) < 0.4:
+		p.hmul = 1.3
+		var tu: float = cx + 0.1 + 0.5 * hash01(cx * 613 + 1, cy * 617 + 3)
+		var tv: float = cy + 0.2 + 0.6 * hash01(cx * 619 + 2, cy * 631 + 4)
+		var ta: float = hash01(cx * 641 + 3, cy * 643 + 5) * PI
+		_poly(c, p, [[tu, tv], [tu + cos(ta) * 0.2, tv + sin(ta) * 0.2], [tu + cos(ta + 0.5) * 0.35, tv + sin(ta + 0.5) * 0.35]])
+
+
+## Night sky (moor, road, inn yard, cave apron): a few stars per cell at high heights.
+static func _add_stars(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
+	var n: int = (1 if hash01(cx * 647 + 1, cy * 653 + 2) < 0.55 else 0) + (1 if hash01(cx * 659 + 2, cy * 661 + 3) < 0.18 else 0)
+	for i in n:
+		var u: float = cx + hash01(cx * 673 + i, cy * 677 + 4)
+		var v: float = cy + hash01(cx * 683 + i, cy * 691 + 5)
+		p.hmul = 1.9 + 2.0 * hash01(cx * 701 + i, cy * 709 + 6)
+		if not p.pt(u, v):
+			continue
+		c.move_to(p.px + 0.8, p.py)
+		c.ellipse(p.px, p.py, 0.8, 0.8, 0.0, 0.0, TWO_PI)
+
+
+## Inn rafters (ink): a pair of beam lines along every second row with occasional broken joints, and tie beams every third column.
+static func _add_rafters(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
+	if cy % 2 == 0 and hash01(cx * 719 + 1, cy * 727 + 2) > 0.1:
+		p.seg(c, cx, cy, 0.0, 0.42, 1.0, 0.42)
+		p.seg(c, cx, cy, 0.0, 0.58, 1.0, 0.58)
+	if cx % 3 == 0 and hash01(cx * 733 + 3, cy * 739 + 4) < 0.5:
+		p.seg(c, cx, cy, 0.0, 0.0, 0.0, 1.0)
+
+
 ## Add one floor cell's marks (blades / brick joints / planks / pebbles) to the current path.
 static func add_floor_cell(c: Canvas, p: FloorProj, kind: String, cx: int, cy: int, hs: float) -> void:
 	if kind == "grass":
@@ -483,6 +697,16 @@ static func add_floor_cell(c: Canvas, p: FloorProj, kind: String, cx: int, cy: i
 			var wv: float = (i + 0.3 + 0.4 * hash01(cx * 163 + i, cy * 167 + 8)) / nd
 			var wl: float = 0.18 + 0.18 * hash01(cx * 173 + i, cy * 179 + 2)
 			p.seg(c, cx, cy, wu - 0.5 * wl * -p.sa, wv - 0.5 * wl * p.ca, wu + 0.5 * wl * -p.sa, wv + 0.5 * wl * p.ca)
+	elif kind == "plank_ink":
+		_add_planks_ink(c, p, cx, cy)
+	elif kind.begins_with("vault"):
+		_add_vault(c, p, cx, cy, 1 if kind == "vault_hall" else (2 if kind == "vault_tight" else 0))
+	elif kind == "canopy":
+		_add_canopy(c, p, cx, cy)
+	elif kind == "stars":
+		_add_stars(c, p, cx, cy)
+	elif kind == "rafter":
+		_add_rafters(c, p, cx, cy)
 	elif kind == "plank":
 		for i in 3:
 			var v2: float = i / 3.0
@@ -534,6 +758,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 	c.line_width = LineStyle.detail_width(LineStyle.ink_for(rs), 1.0, 1.0)
 	c.stroke_style = "#d8ecff"
 	var fstyle: String = "" if up else ink_floor_style(world)
+	var styled_up: bool = up and ceil_style(world) != ""
 	var budget: int = budget_cells
 	var k := 0
 	while k < pulses.size() and budget > 0:
@@ -612,15 +837,21 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 						continue
 					if world.is_solid(mx, my):
 						continue
-					var kind: String = floor_kind_for(world, world.material_at(mx, my), fstyle) if fstyle != "" else floor_tex_kind(world.material_at(mx, my))
-					if kind == "":
-						continue
-					if up:
-						if world.kind_at(mx, my) == "outdoor":
+					var kind: String
+					var hm := 1.0
+					if styled_up:
+						kind = ceil_kind_styled(world, mx, my)
+						hm = ceil_height(world, mx, my)
+					else:
+						kind = floor_kind_for(world, world.material_at(mx, my), fstyle) if fstyle != "" else floor_tex_kind(world.material_at(mx, my))
+						if kind == "":
 							continue
-						kind = ceil_tex_kind(world, mx, my)
+						if up:
+							if world.kind_at(mx, my) == "outdoor":
+								continue
+							kind = ceil_tex_kind(world, mx, my)
 					var bk: int = mini(TEX_BUCKETS - 1, int(floor(g * TEX_BUCKETS * 1.2)))
-					sets[bk].append([cx, cy, kind])
+					sets[bk].append([cx, cy, kind, hm])
 					budget -= 4 if kind == "sett" else 1
 					if budget <= 0:
 						break
@@ -633,14 +864,16 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 			var s: Array = sets[b]
 			if s.is_empty():
 				continue
-			c.global_alpha = minf(0.9, base * (0.3 + 0.7 * (float(b + 1) / TEX_BUCKETS)) * 0.8)
+			c.global_alpha = minf(0.9, base * (0.3 + 0.7 * (float(b + 1) / TEX_BUCKETS)) * 0.8 * (0.7 if styled_up else 1.0))
 			c.begin_path()
 			var water: Array = []
 			for cell in s:
 				if cell[2] == "water":
 					water.append(cell)
 				else:
+					p.hmul = cell[3]
 					add_floor_cell(c, p, cell[2], cell[0], cell[1], half)
+			p.hmul = 1.0
 			if water.size() < s.size():
 				c.stroke()
 			if not water.is_empty():

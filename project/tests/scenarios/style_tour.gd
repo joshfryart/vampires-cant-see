@@ -12,12 +12,16 @@ const PING_AT := 22
 const SHOT_A := 34
 const SHOT_B := 46
 const SEED := 7
-## name, stage id, target (a beat id prefix for the cave, else a tile char to face)
+## name, stage id, target (a beat id prefix for the cave, else a tile char to face), optional look-up shift in px of 360 (head-bob style pitch)
 const VIEWS := [
 	["cave_passage", "hollow", "beat:drip"],
 	["echo_hall", "hollow", "beat:echo"],
 	["squeeze", "hollow", "beat:squeeze"],
 	["pool", "hollow", "beat:pool"],
+	["ceil_cave", "hollow", "beat:drip", 170.0],
+	["ceil_hall", "hollow", "beat:echo", 170.0],
+	["ceil_inn", "inn", "tile:W", 170.0],
+	["ceil_moor", "moor", "tile:B", 170.0],
 	["wood", "wood", "tile:W"],
 	["moor", "moor", "tile:B"],
 	["road", "road", "tile:B"],
@@ -154,6 +158,7 @@ func step(g: Node, _delta: float) -> Dictionary:
 			_place(g, v)
 		if at == 2 and _novib:
 			g.wall_mat.set_shader_parameter("vib_on", 0.0) # the struck-wall shiver lines look like strata for a moment: judge the strata without them
+		g.look_shift = float(v[3]) if v.size() > 3 else 0.0 # look up at the ceiling (the horizon drops by this many px of 360)
 		if at == PING_AT:
 			g.ping_clicks += 1
 		if at == SHOT_A:

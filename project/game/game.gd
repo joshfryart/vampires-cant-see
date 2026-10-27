@@ -1998,10 +1998,15 @@ func fade_amount() -> float:
 	return 0.0
 
 
+## Extra horizon shift in px of 360 for scripted shots that look up at the ceiling (style_tour); 0 in play.
+var look_shift: float = 0.0
+
+
 func _sync_camera() -> void:
 	cam.fov = rad_to_deg(fov_now())
 	cam.position = Coords.to_view(player.x, player.y, 0.5)
 	# A horizon shift of bob px (of 360) is a small pitch: positive bob moves the horizon down, i.e. looks up.
 	var focal: float = 320.0 / tan(fov_now() * 0.5)
-	cam.rotation = Vector3(atan(bob / focal), -player.angle - PI / 2.0, 0.0)
-	echo_view.rs.horizon = echo_view.rs.oh / 2.0 + bob * (echo_view.rs.oh / 360.0)
+	var shift: float = bob + look_shift
+	cam.rotation = Vector3(atan(shift / focal), -player.angle - PI / 2.0, 0.0)
+	echo_view.rs.horizon = echo_view.rs.oh / 2.0 + shift * (echo_view.rs.oh / 360.0)
