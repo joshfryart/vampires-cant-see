@@ -14,7 +14,7 @@
    "hunterBase": 0,
    "watchers": 0,
    "preyCount": {"min": 8, "max": 11},
-   "lights": {"min": 3, "max": 8},
+   "lights": {"min": 3, "max": 12},
    "size": {"w": 64, "h": 48},
    "kind": "indoor",
    "floor": "stone",

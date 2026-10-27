@@ -241,7 +241,7 @@ func test_beat_features() -> void:
 		ok(mites >= 6, tag + " hall stalagmites in clusters %d" % mites)
 		var hall_anchors := 0
 		for a in d["ambient"]:
-			if _in_zone(hall, a["cell"]):
+			if _in_zone(hall, a["cell"]) and not a.get("dead", false):
 				hall_anchors += 1
 		ok(hall_anchors >= 2 and hall_anchors <= 4, tag + " hall ambient anchors %d" % hall_anchors)
 		var bats := 0
@@ -326,7 +326,7 @@ func test_beat_features() -> void:
 		ok(wr >= 3 and wr <= 4, tag + " warren rats %d" % wr)
 		var wa := 0
 		for a in d["ambient"]:
-			if _in_zone(war, a["cell"]):
+			if _in_zone(war, a["cell"]) and not a.get("dead", false):
 				wa += 1
 		ok(wa >= 1 and wa <= 2, tag + " warren anchors %d" % wa)
 		# exit
@@ -349,6 +349,56 @@ func test_beat_features() -> void:
 						nb2 += 1
 				eq(nb2, 1, tag + " spur end is a dead end")
 		ok(spur_pockets >= 2 and spur_pockets <= 3, tag + " 2-3 spurs")
+
+
+## Wayfinding: glow-worm breadcrumbs on the tunnel leading on from each main-path beat, spur tells, funnelled (2-wide) true path.
+func test_wayfinding_crumbs_and_spur_tells() -> void:
+	var defs := _all()
+	for i in defs.size():
+		var d: Dictionary = defs[i]
+		var tag := "seed %d" % (i + 1)
+		var plan := StageGen.plan_from_def(d)
+		var dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+		var crumbs: Array = d["gen"]["crumbs"]
+		eq(crumbs.size(), MAIN_ORDER.size() - 1, tag + " one breadcrumb per beat but the last")
+		var worms := {}
+		for l in d["lights"]:
+			if l["kind"] == "glowworm":
+				worms[str(l["cell"])] = true
+		ok(d["lights"].size() <= 16, tag + " lights <= 16 with the crumbs")
+		var mouths: Array = []
+		for p in d["pockets"]:
+			if p["kind"] == "spur":
+				mouths.append(p["mouth"])
+		var last := -1
+		for k in crumbs.size():
+			var c: Array = crumbs[k]
+			ok(worms.has(str(c)), tag + " crumb %d is a glow-worm light" % k)
+			var dc: int = dist[plan.idx(c[0], c[1])]
+			ok(dc > last, tag + " crumb %d deeper than the one before (%d > %d)" % [k, dc, last])
+			last = dc
+			if k > 0:
+				ok(dc > rep_depth(d, MAIN_ORDER[k - 1]), tag + " crumb %d lies past the previous beat" % k)
+			for m in mouths:
+				ok(maxi(absi(m[0] - c[0]), absi(m[1] - c[1])) > 3, tag + " crumb %d is more than 3 cells from spur mouth %s" % [k, str(m)])
+			var open9 := 0
+			for dd in StageGen.N8:
+				if plan.walkable(c[0] + dd.x, c[1] + dd.y):
+					open9 += 1
+			ok(open9 >= 3, tag + " crumb %d sits in a funnelled (2-wide) tunnel (%d open neighbours)" % [k, open9])
+		# spur tell: a stalactite over every mouth and one dead-air drip anchor per spur
+		var dead := 0
+		for a in d["ambient"]:
+			if a.get("dead", false):
+				dead += 1
+				eq(a["kind"], "drip", tag + " dead-air anchor reuses the drip kind")
+		eq(dead, mouths.size(), tag + " one dead-air anchor per spur")
+		for m in mouths:
+			eq(plan.prop_cells.get(plan.idx(m[0], m[1]), ""), "stalactite", tag + " stalactite over spur mouth " + str(m))
+
+
+func rep_depth(d: Dictionary, id: String) -> int:
+	return int(StageGen.analyze(d, _row())["depths"][id])
 
 
 func test_deterministic_and_distinct() -> void:

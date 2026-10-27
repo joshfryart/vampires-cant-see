@@ -95,15 +95,22 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 		if fillr.has(i):
 			StageGen.carve_ca_blob(plan, rng, pts[i].x, pts[i].y, fillr[i])
 	var all_edges: Array = edges.duplicate()
+	var crumb_from: Array = []   # per chain edge: [beat node, first tunnel cell leaving it] (the glow-worm breadcrumb trail)
 	var loops := _pick_loop(rng, pts, edges, adj, path, role, order, n)
 	for l in loops:
 		all_edges.append(l)
-	for e in all_edges:
+	var chain_n: int = path.size() - 1
+	for ei in all_edges.size():
+		var e: Array = all_edges[ei]
 		var a: int = e[0]
 		var b: int = e[1]
 		var sa := _endpoint(info, pts, a, pts[b])
 		var sb := _endpoint(info, pts, b, pts[a])
 		var width: int = StageGen.rint(rng, 1, 2)
+		if ei < chain_n:
+			# funnel: the tunnel that leads on from a beat is always 2 wide (spurs stay 1 wide), so the true way reads as the broad one
+			width = 2
+			crumb_from.append([a, sa])
 		if not StageGen.carve_tunnel(plan, rng, sa, sb, width):
 			return _fail("r4")
 	if not _early_order_ok(plan, info, role, order):
@@ -177,12 +184,18 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 			if plan.protect[i] != 0 or plan.markers.has(i):
 				return _fail("r8")
 			plan.tiles[i] = 0
+	# the squeeze is the only way from the first half to the echo hall: with its rect blocked the hall must be unreachable (growth, loops and
+	# wandering tunnels used to open bypasses in about one seed in six)
+	if not _squeeze_gates(plan, rects, role, info):
+		return _fail("r12")
 	# 5 crevices until the rest-distance target holds
 	_cover(plan, rng, row)
 	_decorate(plan, rng, row, pts, fillr, role)
 	_squeeze_anchor(plan, rects, role)
 	_measure_zones(plan, rects, role)
-	var def := _assemble(plan, rng, row, seed, attempt, chunks, role, info, path, order, spur_ends, loops.size())
+	var def := _assemble(plan, rng, row, seed, attempt, chunks, role, info, path, order, spur_ends, loops.size(), crumb_from, rects)
+	if def.is_empty():
+		return _fail("r11")
 	var rep := StageGen.analyze(def, row)
 	if not rep["ok"]:
 		for rs in rep["reasons"]:
@@ -307,6 +320,27 @@ static func _early_order_ok(plan: StageGen.Plan, info: Dictionary, role: Diction
 					return false
 				last = d
 	return true
+
+
+## True when the echo hall cannot be reached from the start without crossing the squeeze rect (the rect is blocked in a throw-away copy).
+static func _squeeze_gates(plan: StageGen.Plan, rects: Dictionary, role: Dictionary, info: Dictionary) -> bool:
+	var sq := -1
+	var hall := -1
+	for n in role:
+		if role[n] == "squeeze":
+			sq = n
+		elif role[n] == "echo_hall":
+			hall = n
+	if sq < 0 or hall < 0:
+		return true
+	var blocked := StageGen.Plan.new(plan.w, plan.h)
+	blocked.tiles = plan.tiles.duplicate()
+	var rc: Rect2i = rects[sq]
+	for y in range(rc.position.y, rc.end.y):
+		for x in range(rc.position.x, rc.end.x):
+			blocked.tiles[y * plan.w + x] = 0
+	var hc: Vector2i = info[hall]["beat_cell"]
+	return StageGen.bfs(blocked, [plan.idx(plan.start.x, plan.start.y)])[hc.y * plan.w + hc.x] < 0
 
 
 ## One quiet drip at the far end of the squeeze (the end with the greater walking depth from the start), so the corridor has a distant sound
@@ -536,6 +570,8 @@ static func _try_spur(plan: StageGen.Plan, rng: Rng, start: Vector2i, dir: Vecto
 			if plan.inb(x, y):
 				plan.protect[y * plan.w + x] = 1
 		plan.protect[c.y * plan.w + c.x] = 1
+	# the tell: a stalactite over the mouth (the dull dead-air drip anchor is added by _spur_tells once the zones are measured)
+	plan.add_prop("stalactite", start.x, start.y)
 	var end: Vector2i = cells[cells.size() - 1]
 	plan.markers[end.y * plan.w + end.x] = "S"
 	plan.rest.append({"cell": [end.x, end.y], "kind": "spur", "marker": "S", "safety": 0.8})
@@ -543,6 +579,120 @@ static func _try_spur(plan: StageGen.Plan, rng: Rng, start: Vector2i, dir: Vecto
 	plan.zones.append({"name": "pocket_spur_%d" % (idx + 1), "kind": "indoor", "x0": mini(end.x, prev.x), "y0": mini(end.y, prev.y), "x1": maxi(end.x, prev.x), "y1": maxi(end.y, prev.y)})
 	plan.pockets.append({"zone": "pocket_spur_%d" % (idx + 1), "kind": "spur", "rest": true, "cell": [end.x, end.y], "mouth": [start.x, start.y]})
 	return end
+
+
+## Dead-air anchor of each spur: a `drip` anchor flagged `dead` (a muffled drip; ambient.json has no dedicated kind, W1 can lower the gain of
+## dead anchors) on the first spur cell, from the third on, that lies in no measured beat zone, so the per-zone anchor counts stay as designed.
+## The spur is a 1-wide corridor, so it is followed cell by cell from its mouth.
+static func _spur_tells(plan: StageGen.Plan) -> void:
+	for pk in plan.pockets:
+		if pk.get("kind") != "spur":
+			continue
+		var cur := Vector2i(int(pk["mouth"][0]), int(pk["mouth"][1]))
+		var end := Vector2i(int(pk["cell"][0]), int(pk["cell"][1]))
+		var prev := Vector2i(-99, -99)
+		var cells: Array = [cur]
+		while cur != end and cells.size() < 40:
+			var nxt := Vector2i(-99, -99)
+			for d in StageGen.N4:
+				var n: Vector2i = cur + d
+				if n != prev and plan.walkable(n.x, n.y):
+					nxt = n
+					break
+			if nxt.x == -99:
+				break
+			prev = cur
+			cur = nxt
+			cells.append(cur)
+		var pick: Vector2i = cells[mini(2, cells.size() - 1)]
+		for k in range(2, cells.size()):
+			var inside := false
+			for z in plan.zones:
+				if not String(z["name"]).begins_with("pocket_") and cells[k].x >= int(z["x0"]) and cells[k].x <= int(z["x1"]) and cells[k].y >= int(z["y0"]) and cells[k].y <= int(z["y1"]):
+					inside = true
+					break
+			if not inside:
+				pick = cells[k]
+				break
+		plan.anchors.append({"cell": [pick.x, pick.y], "kind": "drip", "dead": true})
+
+
+## Glow-worm breadcrumbs: one glow-worm prop on the tunnel that leads on from each main-path beat (all but the last), CRUMB_DEPTH cells past
+## the cell just outside the chunk port, never inside a chunk rect, on a free walkable cell and more than CRUMB_SPUR_GAP cells (Chebyshev)
+## from every spur mouth. A trail cell is taken at the preferred depth first, then deeper, then shallower. Returns the cells in beat order
+## (shorter than crumb_from when a beat has no spot, which fails the attempt); def.gen.crumbs carries them.
+const CRUMB_DEPTH := 2
+const CRUMB_SPUR_GAP := 3
+
+
+static func _breadcrumbs(plan: StageGen.Plan, crumb_from: Array, rects: Dictionary) -> Array:
+	var mouths: Array = []
+	for pk in plan.pockets:
+		if pk.get("kind") == "spur":
+			mouths.append(Vector2i(int(pk["mouth"][0]), int(pk["mouth"][1])))
+	var out: Array = []
+	var taken := {}
+	for sp in plan.spawns:
+		taken[int(sp["cell"][1]) * plan.w + int(sp["cell"][0])] = true
+	for an in plan.anchors:
+		taken[int(an["cell"][1]) * plan.w + int(an["cell"][0])] = true
+	var from_start := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+	for cf in crumb_from:
+		var start: Vector2i = cf[1]
+		# walk on along the shortest paths from the start (each step is one deeper), so the trail always leads onward, never back
+		var seen := {start.y * plan.w + start.x: 0}
+		var q: Array = [start]
+		var qi := 0
+		var by_depth := {}   # depth -> [best cell, its open neighbour count]
+		while qi < q.size():
+			var c: Vector2i = q[qi]
+			qi += 1
+			var ci: int = c.y * plan.w + c.x
+			var dc: int = seen[ci]
+			if plan.walkable(c.x, c.y) and not plan.markers.has(ci) and not plan.prop_cells.has(ci) and not taken.has(ci):
+				var near_spur := false
+				for m in mouths:
+					if maxi(absi(m.x - c.x), absi(m.y - c.y)) <= CRUMB_SPUR_GAP:
+						near_spur = true
+				if not near_spur:
+					var open := 0
+					for d in StageGen.N8:
+						if plan.walkable(c.x + d.x, c.y + d.y):
+							open += 1
+					if not by_depth.has(dc) or open > int(by_depth[dc][1]):
+						by_depth[dc] = [c, open]
+			if dc >= 8:
+				continue
+			for d in StageGen.N4:
+				var nc: Vector2i = c + d
+				var ni: int = nc.y * plan.w + nc.x
+				if seen.has(ni) or not plan.walkable(nc.x, nc.y) or from_start[ni] != from_start[ci] + 1:
+					continue
+				var inside := false
+				for k in rects:
+					if rects[k].has_point(nc):
+						inside = true
+						break
+				if inside:
+					continue
+				seen[ni] = dc + 1
+				q.append(nc)
+		# preferred depth first, then deeper, then shallower; a spot in a 2-wide stretch (>= 3 open neighbours) beats one in a 1-wide stretch
+		var try_order: Array = [CRUMB_DEPTH, 3, 4, 5, 6, 7, 8, 1, 0]
+		var pick := Vector2i(-1, -1)
+		for want in [3, 0]:
+			for dd in try_order:
+				if by_depth.has(dd) and int(by_depth[dd][1]) >= want:
+					pick = by_depth[dd][0]
+					break
+			if pick.x >= 0:
+				break
+		if pick.x < 0:
+			return out
+		plan.add_prop("glowworm", pick.x, pick.y)
+		taken[pick.y * plan.w + pick.x] = true
+		out.append([pick.x, pick.y])
+	return out
 
 
 static func _clear_around(plan: StageGen.Plan, c: Vector2i, allowed: Dictionary, pending: Dictionary = {}) -> bool:
@@ -740,7 +890,7 @@ static func _decorate(plan: StageGen.Plan, rng: Rng, row: Dictionary, pts: Array
 			plan.spawns.append({"species": "rat", "cell": [c4.x, c4.y]})
 
 
-static func _assemble(plan: StageGen.Plan, rng: Rng, row: Dictionary, seed: int, attempt: int, chunks: Dictionary, role: Dictionary, info: Dictionary, path: Array, order: Array, spur_ends: Array, loops: int) -> Dictionary:
+static func _assemble(plan: StageGen.Plan, rng: Rng, row: Dictionary, seed: int, attempt: int, chunks: Dictionary, role: Dictionary, info: Dictionary, path: Array, order: Array, spur_ends: Array, loops: int, crumb_from: Array = [], rects: Dictionary = {}) -> Dictionary:
 	var shelter: Dictionary = row["shelter"]
 	var exit_cfg: Dictionary = row["exit"]
 	var rest: Array = []
@@ -777,6 +927,10 @@ static func _assemble(plan: StageGen.Plan, rng: Rng, row: Dictionary, seed: int,
 	var places := {}
 	for b in beats:
 		places[b["id"]] = b["cell"]
+	var crumbs := _breadcrumbs(plan, crumb_from, rects)
+	if crumbs.size() != crumb_from.size():
+		return {}
+	_spur_tells(plan)
 	var lights: Array = []
 	for p in plan.props:
 		if p["type"] == "glowworm":
@@ -804,6 +958,6 @@ static func _assemble(plan: StageGen.Plan, rng: Rng, row: Dictionary, seed: int,
 		"ambient": plan.anchors,
 		"critters": plan.spawns,
 		"lights": lights,
-		"gen": {"attempt": attempt, "loops": loops, "spurs": spur_ends.size(), "nodes": path.size()},
+		"gen": {"attempt": attempt, "loops": loops, "spurs": spur_ends.size(), "nodes": path.size(), "crumbs": crumbs},
 	}
 	return def

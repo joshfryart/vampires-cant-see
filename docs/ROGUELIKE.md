@@ -118,7 +118,7 @@ No dog bark was baked (the classic `dog` sound exists).
 | `miles` | stage length for the Miles metric (3) |
 | `drainMul`, `bloodGain`, `hunterBase`, `watchers` | run tuning read by the trek flow (0.8, 1.0, 0, 0) |
 | `preyCount {min,max}` | critters spawned (8-11, never above `caps.critters`) |
-| `lights {min,max}` | glow-worm lights (3-8) |
+| `lights {min,max}` | glow-worm lights (3-12: 4-6 authored or scattered, plus 6 breadcrumbs) |
 | `size {w,h}`, `kind`, `floor`, `materials` | map size (<= 64x48), `indoor`, `stone`, `{"#": "roughStone"}` |
 | `openFraction {min,max}` | share of non-wall cells (floor, markers, water) in the 62x46 interior (0.30-0.38) |
 | `nodes {min,max}`, `spurs {min,max}` | chambers (8-9, 7 of them beat chunks) and blind spurs (2-3) |

@@ -88,6 +88,17 @@ func _report(stage: String, sd: int) -> int:
 	for cr in def["critters"]:
 		var sp := String(cr["species"])
 		put.call(_cell(cr["cell"]), "B" if sp == "bat" else ("R" if sp == "rat" else "?"))
+	var crumbs: Array = def["gen"].get("crumbs", [])
+	var mouths: Array = []
+	for pk in def["pockets"]:
+		if String(pk["kind"]) == "spur":
+			mouths.append(_cell(pk["mouth"]))
+			put.call(_cell(pk["mouth"]), "M")
+	for an in def["ambient"]:
+		if an.get("dead", false):
+			put.call(_cell(an["cell"]), "A")
+	for cr2 in crumbs:
+		put.call(_cell(cr2), "*")
 	var ex: Vector2i = _cell(def["exit"]["cell"])
 	put.call(ex, "X")
 	var start: Vector2i = _cell(def["start"]["cell"])
@@ -101,7 +112,7 @@ func _report(stage: String, sd: int) -> int:
 	print("=== %s seed %d  (%dx%d) ===" % [stage, sd, w.width, w.height])
 	for r in grid:
 		print(r)
-	print("legend: " + ", ".join(legend) + " | @ start X exit B bat R rat s rest a ambient")
+	print("legend: " + ", ".join(legend) + " | @ start X exit B bat R rat s rest a ambient A dead-air * crumb M spur mouth")
 	var warns := 0
 	var dist := _bfs(w, start)
 
@@ -179,6 +190,32 @@ func _report(stage: String, sd: int) -> int:
 		if near_nook:
 			print("WARN seed %d: dead_end_spurs grows out of the Coffin Nook (junction %s inside the nook zone)" % [sd, junction])
 			warns += 1
+
+	# wayfinding: one crumb per main-path beat but the last, increasing depth, more than 3 cells from every spur mouth, spur tells present
+	if crumbs.size() != 6:
+		print("WARN seed %d: %d breadcrumbs (want 6)" % [sd, crumbs.size()])
+		warns += 1
+	var last_cd := -1
+	var ci := 0
+	for cc in crumbs:
+		var cd := int(dist.get(_cell(cc), -1))
+		if cd <= last_cd:
+			print("WARN seed %d: breadcrumb %d at depth %d is not deeper than the previous (%d)" % [sd, ci, cd, last_cd])
+			warns += 1
+		last_cd = cd
+		for m in mouths:
+			if maxi(absi(m.x - _cell(cc).x), absi(m.y - _cell(cc).y)) <= 3:
+				print("WARN seed %d: breadcrumb %d is within 3 cells of spur mouth %s" % [sd, ci, m])
+				warns += 1
+		ci += 1
+	var dead_n := 0
+	for an in def["ambient"]:
+		if an.get("dead", false):
+			dead_n += 1
+	if dead_n != mouths.size():
+		print("WARN seed %d: %d dead-air anchors for %d spur mouths" % [sd, dead_n, mouths.size()])
+		warns += 1
+	print("wayfinding: %d crumbs at depths %s, %d spur mouths, %d dead-air anchors, %d lights, %d anchors" % [crumbs.size(), str(crumbs.map(func(c2): return int(dist.get(_cell(c2), -1)))), mouths.size(), dead_n, def["lights"].size(), def["ambient"].size()])
 
 	# emptiness per zone
 	var anch: Array = def["ambient"]
