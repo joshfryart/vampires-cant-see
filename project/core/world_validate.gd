@@ -116,7 +116,7 @@ static func _validate_zones(zs: Variant, rows: Array, map_name: String, errors: 
 		if seen.has(z["name"]):
 			_add(errors, "E_MAP_BAD_ZONE", "%s duplicates name %s" % [tag, z["name"]], map_name)
 		seen[z["name"]] = true
-		if z.get("kind") != "indoor" and z.get("kind") != "outdoor":
+		if z.get("kind") != "indoor" and z.get("kind") != "outdoor" and z.get("kind") != "holy":
 			_add(errors, "E_MAP_BAD_ZONE", "%s (%s) has bad kind %s" % [tag, z["name"], JSON.stringify(z.get("kind"))], map_name)
 			continue
 		if not (_is_int(z.get("x0")) and _is_int(z.get("y0")) and _is_int(z.get("x1")) and _is_int(z.get("y1"))) \

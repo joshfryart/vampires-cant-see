@@ -100,6 +100,170 @@
    "exit": {"doorId": "road", "toMap": "stage:road", "toDoor": "moor"},
    "fauna": {"small": "hare", "big": "wolf", "bigCount": [2, 3], "stumps": [0, 0], "boulders": [8, 14]},
    "ambient": {"wind": [3, 4], "owls": [0, 0], "crickets": [6, 8], "lightRadius": 3.0}
+  },
+  {
+   "id": "road",
+   "name": "The Old Road",
+   "index": 4,
+   "generator": "road",
+   "miles": 4,
+   "next": "inn",
+   "drainMul": 1.1,
+   "bloodGain": 1.0,
+   "hunterBase": 0,
+   "watchers": 2,
+   "preyCount": {
+    "min": 5,
+    "max": 7
+   },
+   "lights": {
+    "min": 3,
+    "max": 5
+   },
+   "size": {
+    "w": 64,
+    "h": 48
+   },
+   "kind": "outdoor",
+   "floor": "cobble",
+   "materials": {
+    "#": "grass",
+    "B": "stone",
+    "I": "iron",
+    "W": "wood",
+    ".": "cobble"
+   },
+   "openFraction": {
+    "min": 0.17,
+    "max": 0.4
+   },
+   "shelter": {
+    "pockets": {
+     "min": 3
+    },
+    "restSpots": {
+     "min": 2
+    },
+    "maxPockets": 12,
+    "kinds": [
+     "wayside_crypt",
+     "culvert",
+     "bramble_hollow"
+    ],
+    "coverFrac": 0.4,
+    "restTarget": 28,
+    "safety": {
+     "wayside_crypt": 0.55,
+     "culvert": 0.45,
+     "bramble_hollow": 0.5
+    }
+   },
+   "caps": {
+    "people": 10,
+    "critters": 12,
+    "props": 60,
+    "lights": 16,
+    "ambient": 24
+   },
+   "entry": {
+    "doorId": "moor",
+    "toMap": "stage:moor",
+    "toDoor": "road"
+   },
+   "exit": {
+    "doorId": "inn",
+    "toMap": "stage:inn",
+    "toDoor": "road"
+   },
+   "fauna": {
+    "small": "crow",
+    "big": "hare",
+    "bigCount": [
+     1,
+     2
+    ]
+   },
+   "ambient": {
+    "carts": [
+     2,
+     2
+    ],
+    "wind": [
+     2,
+     3
+    ],
+    "crickets": [
+     3,
+     4
+    ]
+   }
+  },
+  {
+   "id": "inn",
+   "name": "Crossroads Inn",
+   "index": 5,
+   "generator": "inn",
+   "miles": 3,
+   "next": "hamlet",
+   "drainMul": 1.1,
+   "bloodGain": 1.0,
+   "hunterBase": 0,
+   "watchers": 0,
+   "preyCount": {
+    "min": 2,
+    "max": 3
+   },
+   "lights": {
+    "min": 6,
+    "max": 12
+   },
+   "size": {
+    "w": 64,
+    "h": 48
+   },
+   "kind": "outdoor",
+   "floor": "cobble",
+   "materials": {
+    "#": "stone",
+    "W": "wood",
+    ".": "cobble"
+   },
+   "openFraction": {
+    "min": 0.3,
+    "max": 0.6
+   },
+   "shelter": {
+    "pockets": {
+     "min": 3
+    },
+    "restSpots": {
+     "min": 2
+    },
+    "coverFrac": 0.4,
+    "restTarget": 32,
+    "safety": {
+     "cellar": 0.4,
+     "stable": 0.55,
+     "woodshed": 0.6
+    }
+   },
+   "caps": {
+    "people": 8,
+    "critters": 12,
+    "props": 60,
+    "lights": 16,
+    "ambient": 24
+   },
+   "entry": {
+    "doorId": "road",
+    "toMap": "stage:road",
+    "toDoor": "inn"
+   },
+   "exit": {
+    "doorId": "hamlet",
+    "toMap": "stage:hamlet",
+    "toDoor": "inn"
+   }
   }
  ]
 }

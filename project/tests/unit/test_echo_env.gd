@@ -14,7 +14,7 @@ const COLUMNS := 48
 const FOV := 1.2
 const SOAK_SEC := 60.0
 const SOAK_DT := 0.05
-const GENERATORS := ["cave", "wood", "moor"]
+const GENERATORS := ["cave", "wood", "moor", "road", "inn"]
 
 static var _cache: Dictionary = {}
 

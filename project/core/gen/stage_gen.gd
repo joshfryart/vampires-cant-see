@@ -15,7 +15,7 @@ const T_WATER := 2
 const DIR_OF := {"n": Vector2i(0, -1), "s": Vector2i(0, 1), "e": Vector2i(1, 0), "w": Vector2i(-1, 0)}
 const N4 := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 const N8 := [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1)]
-const SOLID_PROPS := ["stalagmite", "coffin", "boulder", "stump"]
+const SOLID_PROPS := ["stalagmite", "coffin", "boulder", "stump", "shrine", "haybale", "scarecrow", "table", "chair", "bench", "barrel", "well", "brazier", "gravestone"]
 ## Walkable cells per second of the player (Player.DEFAULT_CFG moveSpeed) and the default night length in seconds (Night.DEFAULTS nightSec).
 ## Cover rule: a rest spot must be within COVER_FRAC of a night's walk, i.e. 0.4 * 480 s * 3 cells/s = 576 BFS cells (see cover_limit).
 const COVER_FRAC := 0.4
@@ -50,6 +50,8 @@ static func generate(stage_id: String, seed: int) -> Dictionary:
 			return GenCave.generate(row, seed)
 		"wood", "moor":
 			return GenWild.generate(row, seed, String(row["generator"]))
+		"road", "inn":
+			return GenRoad.generate(row, seed, String(row["generator"]))
 	return {}
 
 

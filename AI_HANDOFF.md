@@ -67,6 +67,18 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.2 (WP13b: The Old Road and Crossroads Inn)
+
+Version 0.21.2: stages 4 and 5. The trek now runs hollow -> wood -> moor -> road -> inn and ends with cause `frontier` after the inn (the hamlet has no generator). Design: `docs/ROGUELIKE.md` ("Road stages").
+
+- **Generator:** `core/gen/gen_road.gd` (`GenRoad`, `road` and `inn`; dispatch line in `StageGen.generate`, `TrekFlow.GENERATORS` = cave, wood, moor, road, inn). Rows `road` (drainMul 1.1, 4 miles, watchers 2, pockets `wayside_crypt` / `culvert` / `bramble_hollow`, restTarget 28) and `inn` (drainMul 1.1, 3 miles, rest `cellar` 0.4 / `stable` / `woodshed`, restTarget 32) in `data/rogue/stages.json`. Open-air R = 5.
+- **Holy ground:** the road's shrine sits in an alcove with a 3x3 zone of kind `holy` (`shrine_holy`). `WorldValidate._validate_zones` now accepts kind `holy` (one condition); TrekFlow already drained 8 blood/s on it. The zone is not `outdoor`, so the sun does not apply inside it, and `SoundData.room_profile` falls back to indoor.
+- **People:** generated maps spawn people from `P` markers (row-major) with `paths` defs like the village; road: pilgrim pair, carter, 2 `guard` watchers; inn: innkeeper, drunk, 2 regulars, merchant on `places` schedules (`home: tavern`), 3 seated patrons. Per-person sight cones are not configurable (shared `REACT_DEFAULTS.seeCone`), so the two watchers use the default cone.
+- **Outside the new files:** `StageGen.SOLID_PROPS` extended to every solid prop (shrine, haybale, scarecrow, table, chair, bench, barrel, well, brazier, gravestone), `data/rogue/ambient.json` kinds `cart`, `bell`, `singing`, `tests/unit/test_gen_wild.gd` (road is now generated).
+- **Numbers (50 seeds each):** road avg 63 ms, worst 185 ms, open fraction 0.19-0.27, worst rest distance 36, 3+ pockets, open-air worst 5.00; inn avg 40 ms, worst 81 ms, open fraction 0.40-0.50, worst rest distance 41, 4 pockets, open-air worst 5.00.
+- **Not verified / leftovers:** nothing seen or heard; no horse prop or sprite exists (the stable has hay and a trough bench); `cart` / `bell` / `singing` have no baked sound mapping in `RogueMode` yet (they emit sonar pulses only); inn doorways are open gaps (no `D` doors) so occupants always see in; the common room and cellar are tiny so heat from hostile occupants is untuned.
+- **Tests:** `tests/unit/test_gen_road.gd` (15 tests), `test_echo_env.gd` (road and inn in `GENERATORS`), `tests/flow/test_trek_stages.gd` (TrekFlow and RogueMode walk hollow -> ... -> inn -> frontier, holy drain in `test_gen_road`), tool `tests/tools/road_probe.gd`.
+
 ## Changes in 0.21.1 (WP13a: Bramble Wood and Gallows Moor)
 
 Version 0.21.1: two outdoor stages after the Hollow, so the trek now runs hollow -> wood -> moor and ends with cause `frontier` ("To be continued...") after the moor until the Old Road exists. Design: `docs/ROGUELIKE.md` ("Wild stages").

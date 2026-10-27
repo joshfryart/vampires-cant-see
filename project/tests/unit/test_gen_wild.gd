@@ -78,7 +78,7 @@ func test_rows() -> void:
 	near(float(_row("moor")["drainMul"]), 1.0, 1e-9, "moor drainMul")
 	eq(String(_row("hollow")["exit"]["toDoor"]), String(_row("wood")["entry"]["doorId"]), "hollow mouth leads to the wood's cave door")
 	eq(String(_row("wood")["exit"]["toDoor"]), String(_row("moor")["entry"]["doorId"]), "wood exit leads to the moor's wood door")
-	ok(not TrekFlow.has_generator("road"), "the road is not built yet (frontier)")
+	ok(TrekFlow.has_generator("road"), "the road is built (WP13b)")
 
 
 func test_seeds_validate_and_reach() -> void:

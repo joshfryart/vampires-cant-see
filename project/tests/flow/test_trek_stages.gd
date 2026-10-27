@@ -1,7 +1,7 @@
 extends TestCase
-## The second-stage handoff (WP13a): hollow -> wood -> moor through TrekFlow.reach_exit and through RogueMode on a headless Game, each stage entered at
+## The stage handoff (WP13a/b): hollow -> wood -> moor -> road -> inn through TrekFlow.reach_exit and through RogueMode on a headless Game, each stage entered at
 ## dusk on its entry door with the previous stage's exit linked to it, walked start to exit by its BFS field, the sun and the pockets of the outdoor
-## stages, and the frontier ("To be continued...") after the moor until the road has a generator.
+## stages, and the frontier ("To be continued...") after the inn until the hamlet has a generator.
 
 const SEED := 7
 
@@ -35,7 +35,7 @@ func _path(f: TrekFlow) -> Array:
 
 # ---- TrekFlow ----------------------------------------------------------------------------------------------------------------------------------
 
-func test_trek_flow_hollow_wood_moor_frontier() -> void:
+func test_trek_flow_hollow_to_inn_frontier() -> void:
 	var st := _store()
 	var meta := _meta()
 	var f := TrekFlow.begin(meta, SEED, st)
@@ -93,20 +93,52 @@ func test_trek_flow_hollow_wood_moor_frontier() -> void:
 	ok(f.alive(), "alive at the moor's exit")
 	near(f.miles(), 9.0, 1e-9, "9 miles at the moor's exit")
 	var r3 := f.reach_exit()
-	ok(r3["ok"] and r3["ended"], "after the moor the road has no generator: the trek ends")
-	var res: Dictionary = r3["result"]
-	eq(res["cause"], "frontier", "frontier after the moor")
-	eq(res["stageName"], "Gallows Moor", "ended on the moor")
-	eq(res["stageIndex"], 3, "stage index 3")
-	near(res["miles"], 9.0, 1e-9, "9 miles")
-	eq(res["unseen"], 3, "three stages cleared unseen")
-	eq(res["soilTotal"], 23, "9 miles + 9 unseen + 5 new best")
-	eq(meta["soil"], 23, "soil paid")
-	eq(meta["stats"]["bestStage"], 3, "best stage 3")
-	ok(meta["reached"].has("wood") and meta["reached"].has("moor"), "reached recorded")
+	ok(r3["ok"] and not r3["ended"], "leaving the moor continues to the road")
+	eq(r3["descriptor"]["stage"], "road", "descriptor stage")
+	eq(r3["descriptor"]["name"], "The Old Road", "stage name")
+	eq(r3["descriptor"]["index"], 4, "stage index 4")
+	eq(f.leg, 3, "leg 3")
+	eq(r3["descriptor"]["def"]["doors"][0]["id"], "moor", "the road's door back is named moor")
+	eq(r3["descriptor"]["def"]["doors"][0]["toMap"], "stage:moor", "and leads back to the moor")
+	eq(r3["descriptor"]["exit"]["toMap"], "stage:inn", "road exit target")
+	near(f.night.drain_mul, 1.1, 1e-9, "road drain")
+	eq(f.night.status, "night", "dusk again")
+	eq(f.world.kind, "outdoor", "the road is outdoors")
+	eq(r3["descriptor"]["def"]["paths"].size() >= 4, true, "travellers on the road")
+	for c in _path(f):
+		f.step(1.0 / 3.0, c, f.cell_outdoor(c))
+	ok(f.alive(), "alive at the road's exit")
+	near(f.miles(), 13.0, 1e-9, "13 miles at the road's exit")
+	var r4 := f.reach_exit()
+	ok(r4["ok"] and not r4["ended"], "leaving the road continues to the inn")
+	eq(r4["descriptor"]["stage"], "inn", "descriptor stage")
+	eq(r4["descriptor"]["name"], "Crossroads Inn", "stage name")
+	eq(f.leg, 4, "leg 4")
+	eq(r4["descriptor"]["def"]["doors"][0]["id"], "road", "the inn's door back is named road")
+	eq(r4["descriptor"]["exit"]["toMap"], "stage:hamlet", "inn exit target")
+	near(f.night.drain_mul, 1.1, 1e-9, "inn drain")
+	for c in _path(f):
+		f.step(1.0 / 3.0, c, f.cell_outdoor(c))
+	ok(f.alive(), "alive at the inn's exit")
+	near(f.miles(), 16.0, 1e-9, "16 miles at the inn's exit")
+	var r5 := f.reach_exit()
+	ok(r5["ok"] and r5["ended"], "after the inn the hamlet has no generator: the trek ends")
+	var res: Dictionary = r5["result"]
+	eq(res["cause"], "frontier", "frontier after the inn")
+	eq(res["stageName"], "Crossroads Inn", "ended at the inn")
+	eq(res["stageIndex"], 5, "stage index 5")
+	near(res["miles"], 16.0, 1e-9, "16 miles")
+	eq(res["unseen"], 5, "five stages cleared unseen")
+	eq(res["soilTotal"], 36, "16 miles + 15 unseen + 5 new best")
+	eq(meta["soil"], 36, "soil paid")
+	eq(meta["stats"]["bestStage"], 5, "best stage 5")
+	ok(meta["reached"].has("wood") and meta["reached"].has("moor") and meta["reached"].has("road") and meta["reached"].has("inn"), "reached recorded")
 	ok(not st.has("trek"), "checkpoint cleared")
 	eq(TrekFlow.next_stage_id("moor"), "road", "moor -> road")
-	ok(not TrekFlow.has_generator("road"), "the road has no generator yet")
+	eq(TrekFlow.next_stage_id("road"), "inn", "road -> inn")
+	eq(TrekFlow.next_stage_id("inn"), "hamlet", "inn -> hamlet")
+	ok(TrekFlow.has_generator("road") and TrekFlow.has_generator("inn"), "road and inn are generated")
+	ok(not TrekFlow.has_generator("hamlet"), "the hamlet has no generator yet")
 
 
 func test_checkpoint_in_the_wood_resumes_in_the_wood() -> void:
@@ -125,17 +157,16 @@ func test_checkpoint_in_the_wood_resumes_in_the_wood() -> void:
 
 
 func test_dawn_in_the_open_kills_in_a_pocket_does_not() -> void:
-	for id in ["wood", "moor"]:
+	for id in ["wood", "moor", "road", "inn"]:
+		var legs: int = ["wood", "moor", "road", "inn"].find(id) + 1
 		var f := TrekFlow.begin(_meta(), 5)
-		f.reach_exit()
-		if id == "moor":
+		for _l in legs:
 			f.reach_exit()
 		eq(f.stage_id, id, "in the " + id)
 		var rest: Dictionary = f.def["rest"][0]
 		var rcell := Vector2i(int(rest["cell"][0]), int(rest["cell"][1]))
 		var g := TrekFlow.begin(_meta(), 5)
-		g.reach_exit()
-		if id == "moor":
+		for _l2 in legs:
 			g.reach_exit()
 		# in a pocket: the day comes, the player is roofed and gets the choice
 		f.night.skip_to(5, 59)
@@ -197,7 +228,7 @@ func _walk_out(g: Game, r: RogueMode) -> bool:
 	return not r.active or r.trek.stage_id != from_stage
 
 
-func test_game_walks_hollow_wood_moor_to_the_frontier() -> void:
+func test_game_walks_hollow_to_the_inn_frontier() -> void:
 	var g := _game()
 	g.rogue.new_trek(SEED)
 	var r := g.rogue
@@ -240,12 +271,36 @@ func test_game_walks_hollow_wood_moor_to_the_frontier() -> void:
 	_step(g, 2.0)
 	eq(g.state, "playing", "playing on the moor")
 	ok(_walk_out(g, r), "left the moor")
-	ok(not r.active, "no road yet: the trek ended at the frontier")
+	ok(r.active and r.trek.alive(), "the trek goes on to the road")
+	eq(r.trek.stage_id, "road", "now on the Old Road")
+	eq(g.map_name, "road", "the road's map is current")
+	ok(not g.worlds.has("moor"), "the moor's world was dropped")
+	for c in r.critters.critters:
+		ok(c.species == "crow" or c.species == "hare", "road fauna " + c.species)
+	var rk := {}
+	for e in r.ambient.emitters:
+		rk[e["kind"]] = true
+	ok(rk.has("cart") and rk.has("bell") and rk.has("wind"), "road ambient " + str(rk.keys()))
+	ok(g.people != null and g.people.people.size() >= 4, "travellers walk the road (%d)" % g.people.people.size())
+	_step(g, 2.0)
+	eq(g.state, "playing", "playing on the road")
+	ok(_walk_out(g, r), "left the road")
+	eq(r.trek.stage_id, "inn", "now at the Crossroads Inn")
+	eq(g.map_name, "inn", "the inn's map is current")
+	var ik := {}
+	for e in r.ambient.emitters:
+		ik[e["kind"]] = true
+	ok(ik.has("hearth") and ik.has("singing"), "inn ambient " + str(ik.keys()))
+	ok(g.people.people.size() >= 6 and g.people.people.size() <= 8, "patrons in the inn (%d)" % g.people.people.size())
+	_step(g, 2.0)
+	eq(g.state, "playing", "playing at the inn")
+	ok(_walk_out(g, r), "left the inn")
+	ok(not r.active, "no hamlet yet: the trek ended at the frontier")
 	eq(g.state, "runend", "run end state")
 	eq(r.last_result.get("cause"), "frontier", "frontier cause")
-	near(float(r.last_result["miles"]), 9.0, 1e-9, "9 miles")
-	eq(int(r.last_result["stageIndex"]), 3, "stage index 3")
-	eq(int(r.last_result["soilTotal"]), 23, "soil paid")
+	near(float(r.last_result["miles"]), 16.0, 1e-9, "16 miles")
+	eq(int(r.last_result["stageIndex"]), 5, "stage index 5")
+	eq(int(r.last_result["soilTotal"]), 36, "soil paid")
 	eq(TrekUi.rest_text(r.last_result)["title"], "To be continued...", "frontier title")
 	_done(g)
 
