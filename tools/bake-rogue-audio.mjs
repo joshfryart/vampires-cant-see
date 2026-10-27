@@ -16,7 +16,7 @@ const MANIFEST = join(PORT, 'project', 'data', 'rogue', 'sounds_rogue.json');
 const RATE = 44100;
 const PEAK = 0.9;
 const LOOP_PEAK = 0.35; // ambience beds (wind/creek/fountain/cricket) sit quietly under the one-shots
-const WIND_PEAK = 0.22; // cave-mouth wind bed: quieter than the other beds (user playtest)
+const WIND_PEAK = 0.28; // cave-mouth wind bed: quieter than the other beds (user playtest)
 
 function mulberry(seed) {
   let a = seed >>> 0;
