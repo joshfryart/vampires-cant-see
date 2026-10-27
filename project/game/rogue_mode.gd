@@ -10,6 +10,16 @@ extends RefCounted
 const SOUNDS_PATH := "res://data/rogue/sounds_rogue.json"
 const SLEEP_REACH := 1.5
 const REST_NOTE := 3.0
+## A hidden rest spot (not the coffin nook) becomes known when the player is this close (cells).
+const REST_DISCOVER := 3.0
+## Dawn hum: during the dawn warning every non-coffin rest spot emits a faint `rest_hum` pulse (short range, low strength).
+const REST_HUM_RANGE := 5.0
+const REST_HUM_STRENGTH := 0.18
+const REST_HUM_PERIOD := 3.0
+const REST_HUM_RAYS := 90
+const REST_HUM_WITHIN := 12.0
+## Powers on a trek: the classic night counter would lock Mist (night 2) and Still (night 3) on the first dusk, so a trek uses this level.
+const POWER_LEVEL_ALL := 3
 const FEED_REACH := 1.2
 const HUNTER_SPEED := 2.4
 const HUNTER_FIELD_SEC := 0.4
@@ -26,7 +36,7 @@ const INTERRUPT_TEXT := {
 	"guard_near": "A guard walks nearby.",
 }
 ## How loud a sonar kind is to the critters (Critters.hear loudness); anything else does not frighten them.
-const NOISE_LOUD := {"ping": 0.6, "shriek": 1.5, "scream": 1.0, "struggle": 0.5, "door": 0.5}
+const NOISE_LOUD := {"shriek": 1.5, "scream": 1.0, "struggle": 0.5, "door": 0.5}
 ## Beat id -> tutorial hint id (shown once when the player comes within 4 cells of the beat).
 const BEAT_HINTS := {"squeeze": "squeeze", "dead_end_spurs": "dead_end", "cave_mouth": "sun"}
 
@@ -58,6 +68,12 @@ var _spawn_idx: Dictionary = {}   ## critter id -> index in the descriptor's cri
 var _interrupt_t: float = 0.0
 var _classic: Dictionary = {}     ## classic flow state to restore when the trek stops
 var _rng_h: Rng = null
+var rest_known: Dictionary = {}   ## "x,y" of a discovered rest spot -> true (the coffin nook is always known); reset per stage
+var _hum_next: Dictionary = {}    ## "x,y" -> sonar time of the next hum
+var _hum_live: Sonar.Pulse = null
+var _last_pp: Vector2 = Vector2(NAN, NAN)
+var _speed: float = 0.0           ## smoothed player speed (cells/s), for the critters' sneak test
+var hum_count: int = 0
 
 
 func _init(game: Game) -> void:
@@ -158,6 +174,7 @@ func _start(t: TrekFlow, fresh: bool) -> void:
 	g.tut.queued = {}
 	g.tut.queue("drip")
 	g.tut.queue("ping")
+	g.tut.queue("powers")
 	if not g.systems.has(self):
 		g.systems.append(self)
 	g.set_state("playing")
@@ -198,6 +215,11 @@ func _enter_descriptor(d: Dictionary) -> void:
 	_rng_h = Rng.new(float(int(d["seed"]) ^ 0x68E31DA4) + 1.0)
 	_flee_state.clear()
 	_flee_snd.clear()
+	rest_known.clear()
+	_hum_next.clear()
+	_hum_live = null
+	_last_pp = Vector2(NAN, NAN)
+	_speed = 0.0
 	_bell30 = false
 	hunter_ids.clear()
 	_hfield = PackedInt32Array()
@@ -288,6 +310,7 @@ func step(_gm: Variant, dt: float) -> void:
 		_step_hunters(dt)
 	_step_critters(dt, pp)
 	_step_ambient(dt, pp)
+	step_rest_hum(pp)
 	_step_wind()
 	_step_hints(pp)
 	var ui := _ui()
@@ -342,9 +365,12 @@ func input_locked() -> bool:
 	return active and (prompt_open or waiting)
 
 
-## Sonar pulse hook: loud sounds flush the critters.
+## Sonar pulse hook: loud sounds flush the critters; the player's ping only freezes the ones close by (Critters.on_ping).
 func on_pulse(_gm: Variant, pulse: Variant) -> void:
 	if not active or critters == null or pulse == null:
+		return
+	if String(pulse.kind) == "ping":
+		critters.on_ping(Vector2(pulse.x, pulse.y))   # the player's own ping startle-freezes nearby prey instead of flushing it
 		return
 	var loud: float = float(NOISE_LOUD.get(pulse.kind, 0.0))
 	if loud <= 0.0:
@@ -563,7 +589,9 @@ func interact() -> String:
 func try_feed_critter() -> bool:
 	if not active or critters == null or g.state != "playing" or g.drink != null:
 		return false
-	var c: Critters.Critter = critters.nearest_feedable(g.player.x, g.player.y, FEED_REACH)
+	var c: Critters.Critter = critters.lunge(Vector2(g.player.x, g.player.y))
+	if c == null:
+		c = critters.nearest_feedable(g.player.x, g.player.y, FEED_REACH)
 	if c == null:
 		return false
 	var sp: Dictionary = Critters.spec(c.species)
@@ -652,7 +680,8 @@ func _flee_sounds(before: Dictionary) -> void:
 func _step_critters(dt: float, pp: Vector2) -> void:
 	var is_day: bool = trek.night.status != "night"
 	var before := _states()
-	critters.step(pp, dt, is_day)
+	var sneak: bool = _track_speed(pp, dt) < Critters.SNEAK_SPEED
+	critters.step(pp, dt, is_day, {}, sneak)
 	_flee_sounds(before)
 	var t_prev: float = g.clock - dt
 	for pu in g.sonar.pulses:
@@ -674,6 +703,17 @@ func _step_critters(dt: float, pp: Vector2) -> void:
 					"hen": sfx("rg_hen_cluck", c.x, c.y)
 					"crow": sfx("rg_crow_caw", c.x, c.y)
 					"wolf": sfx("rg_wolf_howl", c.x, c.y)
+
+
+## Smoothed player speed in cells/s (a teleport, e.g. a revive, does not count as running).
+func _track_speed(pp: Vector2, dt: float) -> float:
+	if dt > 0.0 and not is_nan(_last_pp.x):
+		var inst: float = pp.distance_to(_last_pp) / dt
+		if inst > 12.0:
+			inst = 0.0
+		_speed += (inst - _speed) * (1.0 - exp(-dt / 0.15))
+	_last_pp = pp
+	return _speed
 
 
 func _step_ambient(dt: float, pp: Vector2) -> void:
@@ -722,10 +762,81 @@ func _step_wind() -> void:
 	_wind.volume_db = linear_to_db(lin)
 
 
+static func _rkey(cell: Variant) -> String:
+	return "%d,%d" % [int(cell[0]), int(cell[1])]
+
+
+## A rest spot is known when it is the coffin nook or the player has been within REST_DISCOVER cells of it.
+func rest_is_known(r: Dictionary) -> bool:
+	return String(r.get("kind", "")) == "coffin" or rest_known.has(_rkey(r["cell"]))
+
+
+## Rest spots the player knows about (what TrekUi / the flow may list or show). Unknown ones stay hidden until found.
+func known_rests() -> Array:
+	var out: Array = []
+	if trek == null:
+		return out
+	for r in trek.def.get("rest", []):
+		if rest_is_known(r):
+			out.append(r)
+	return out
+
+
 func _note_rest(pp: Vector2) -> void:
+	for r in trek.def.get("rest", []):
+		if rest_is_known(r):
+			continue
+		if Vector2(float(r["cell"][0]) + 0.5, float(r["cell"][1]) + 0.5).distance_to(pp) <= REST_DISCOVER:
+			rest_known[_rkey(r["cell"])] = true
+			g.audio.play("chime", {"gain": float(SoundData.level("chime")["gain"]) * 0.4, "pan": 0.0})
 	var near: Variant = _rest_near(pp, REST_NOTE)
 	if near != null:
 		trek.note_rest(Vector2i(int(near["cell"][0]), int(near["cell"][1])))
+
+
+## Dawn hum: while the dawn warning is on, each non-coffin rest spot (known or not) breathes a faint, short `rest_hum` pulse about every
+## 3 s, so a listening player can find cover by ear. Shares the ambient budget: at most one hum live, none when ambient is full.
+## Returns the number of pulses emitted.
+func step_rest_hum(pp: Vector2) -> int:
+	if trek == null or not trek.dawn_warning():
+		_hum_next.clear()
+		return 0
+	if _hum_live != null and (g.clock - _hum_live.t0 > _hum_live.range / _hum_live.speed + _hum_live.fade or not g.sonar.pulses.has(_hum_live)):
+		_hum_live = null
+	if _hum_live != null or (ambient != null and ambient.live_count(g.sonar) >= Ambient.MAX_LIVE):
+		return 0
+	for r in trek.def.get("rest", []):
+		if String(r.get("kind", "")) == "coffin":
+			continue
+		var k := _rkey(r["cell"])
+		var x: float = float(r["cell"][0]) + 0.5
+		var y: float = float(r["cell"][1]) + 0.5
+		if not _hum_next.has(k):
+			_hum_next[k] = g.clock   # the first hum is immediate, the others follow in turn
+		if g.clock < float(_hum_next[k]):
+			continue
+		_hum_next[k] = g.clock + REST_HUM_PERIOD
+		if Vector2(x, y).distance_to(pp) > REST_HUM_WITHIN:
+			continue
+		var p: Sonar.Pulse = g.sonar.emit_sound(g.world, x, y, g.clock, {
+			"kind": "rest_hum", "range": REST_HUM_RANGE, "strength": REST_HUM_STRENGTH, "z": 0.0, "fade": 1.6,
+			"visRays": REST_HUM_RAYS, "bounces": 0})
+		if p != null:
+			_hum_live = p
+			hum_count += 1
+			return 1
+	return 0
+
+
+## The level Hunger compares each power's unlock to. Classic: the night counter. Trek: everything is usable from the first dusk on
+## (night 2+, any Heat, or a cleared stage), and Mist-born (TrekMeta effect mistBorn) unlocks Mist and Still from stage 1.
+## Shriek (unlock 1) is always available.
+func power_level() -> float:
+	if trek == null:
+		return float(g.night.night) if g.night != null else 1.0
+	if float(trek.fx.get("mistBorn", 0.0)) >= 1.0 or trek.night.night >= 2 or trek.heat >= 1 or not trek.cleared.is_empty():
+		return float(POWER_LEVEL_ALL)
+	return float(trek.night.night)
 
 
 func _step_hints(pp: Vector2) -> void:

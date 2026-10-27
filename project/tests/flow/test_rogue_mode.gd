@@ -556,3 +556,233 @@ func test_day_prompt_needs_an_explicit_choice() -> void:
 	g.step(0.05, {})
 	ok(r.waiting and not r.prompt_open, "1 waits out the day")
 	_done(g)
+
+
+# ---------------------------------------------------------------- catching critters (WP13b)
+
+## A walkable standing point `dist` cells from (x, y) with a clear straight line to it, as [px, py, angle toward (x, y)] (empty if none).
+func _spot_at(g: Game, x: float, y: float, dist: float) -> Array:
+	for a in 16:
+		var ang := TAU * float(a) / 16.0
+		var px := x + cos(ang) * dist
+		var py := y + sin(ang) * dist
+		var clear := not g.world.blocks(px, py, 0.25)
+		for k in 6:
+			var f := float(k) / 6.0
+			if g.world.blocks(x + (px - x) * f, y + (py - y) * f, 0.1):
+				clear = false
+		if clear:
+			return [px, py, atan2(y - py, x - px)]
+	return []
+
+
+func _prey(g: Game, r: RogueMode, species: String) -> Critters.Critter:
+	for c in r.critters.critters:
+		if c.species == species and not _spot_at(g, c.x, c.y, 1.7).is_empty():
+			return c
+	return null
+
+
+func test_creep_ping_then_lunge_feeds() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var c: Critters.Critter = _prey(g, r, "rat")
+	if c == null:
+		c = _prey(g, r, "bat")
+	ok(c != null, "a rat or bat with a clear approach")
+	if c == null:
+		_done(g)
+		return
+	var sp := _spot_at(g, c.x, c.y, 1.7)
+	g.player.place(sp[0], sp[1], sp[2])
+	g.night.blood = 30.0
+	_step(g, 1.0)
+	ok(r._speed < Critters.SNEAK_SPEED, "standing still counts as sneaking")
+	if c.state == "flee":
+		c.state = "wander"
+	c.freeze_t = 0.0
+	var sp1 := _spot_at(g, c.x, c.y, 1.6)   # it wandered a little while we stood still: creep back into reach
+	g.player.place(sp1[0], sp1[1], sp1[2])
+	ok(g.pulse(), "the player pings")
+	ok(c.freeze_t > 0.0, "the ping froze the critter (%.2f)" % c.freeze_t)
+	ok(c.state != "flee", "a ping does not flush it (%s)" % c.state)
+	var n0 := r.critters.critters.size()
+	var fed0: int = r.stats["critters_fed"]
+	g.feed_press = 1
+	g.step(0.016, {})
+	eq(r.critters.critters.size(), n0 - 1, "R lunged and fed")
+	eq(int(r.stats["critters_fed"]), fed0 + 1, "counted")
+	_done(g)
+
+
+func test_running_at_a_fleeing_rat_does_not_feed() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var c: Critters.Critter = _prey(g, r, "rat")
+	ok(c != null, "a rat with a clear approach")
+	if c == null:
+		_done(g)
+		return
+	var sp := _spot_at(g, c.x, c.y, 1.7)
+	g.player.place(sp[0], sp[1], sp[2])
+	g.night.blood = 30.0
+	_step(g, 0.5, {"forward": 1.0})
+	ok(r._speed > Critters.SNEAK_SPEED, "running is not sneaking (%.2f)" % r._speed)
+	# a rat fleeing at full speed cannot be lunged
+	var sp2 := _spot_at(g, c.x, c.y, 1.7)
+	g.player.place(sp2[0], sp2[1], sp2[2])
+	c.state = "flee"
+	c.freeze_t = 0.0
+	c.flee_t = 0.0
+	ok(not r.try_feed_critter(), "no lunge at a full-speed fleeing rat")
+	ok(r.critters.critters.has(c), "the rat is still there")
+	_done(g)
+
+
+func test_ping_is_not_a_loud_event() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var c: Critters.Critter = r.critters.critters[0]
+	c.state = "wander"
+	c.alarm_t = 0.0
+	g.player.place(c.x - 1.0, c.y, 0.0)
+	var ping := Sonar.Pulse.new()
+	ping.kind = "ping"
+	ping.x = g.player.x
+	ping.y = g.player.y
+	r.on_pulse(g, ping)
+	near(c.alarm_t, 0.0, 1e-9, "a ping does not alarm (hear() not called)")
+	var sh := Sonar.Pulse.new()
+	sh.kind = "shriek"
+	sh.x = g.player.x
+	sh.y = g.player.y
+	r.on_pulse(g, sh)
+	ok(c.alarm_t > 0.0 or c.state == "flee", "a shriek still does")
+	_done(g)
+
+
+# ---------------------------------------------------------------- dawn hum and hidden rest spots
+
+func _far_rest(g: Game, f: TrekFlow) -> Array:
+	for rs in f.def["rest"]:
+		if String(rs.get("kind", "")) == "coffin":
+			continue
+		var x: float = float(rs["cell"][0]) + 0.5
+		var y: float = float(rs["cell"][1]) + 0.5
+		for d: float in [8.0, 7.0, 9.0, 6.0, 10.0]:
+			for a in 16:
+				var ang := TAU * float(a) / 16.0
+				var px := x + cos(ang) * d
+				var py := y + sin(ang) * d
+				if not g.world.blocks(px, py, 0.25):
+					return [rs, px, py]
+	return []
+
+
+func _hums(g: Game) -> int:
+	var n := 0
+	for p in g.sonar.pulses:
+		if p.kind == "rest_hum":
+			n += 1
+	return n
+
+
+func _chimes(g: Game) -> int:
+	var n := 0
+	for e in g.audio.log:
+		if e["kind"] == "chime":
+			n += 1
+	return n
+
+
+func test_rest_spots_hidden_and_hum_at_dawn() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var f := r.trek
+	var far := _far_rest(g, f)
+	ok(not far.is_empty(), "a non-coffin rest spot with open floor 6-10 cells away")
+	if far.is_empty():
+		_done(g)
+		return
+	var rs: Dictionary = far[0]
+	g.player.place(far[1], far[2], 0.0)
+	var pp := Vector2(g.player.x, g.player.y)
+	ok(not f.dawn_warning(), "dusk: no dawn warning")
+	ok(not r.rest_is_known(rs), "the far rest spot is unknown")
+	eq(r.step_rest_hum(pp), 0, "no hum before the warning")
+	eq(_hums(g), 0, "no rest_hum pulse at dusk")
+	g.night.skip_to(5, 59)
+	ok(f.dawn_warning(), "dawn warning is on")
+	eq(r.step_rest_hum(pp), 1, "the spot hums during the warning")
+	eq(_hums(g), 1, "one live hum")
+	eq(r.step_rest_hum(pp), 0, "at most one hum live")
+	eq(_hums(g), 1, "still one live hum")
+	var p0: Sonar.Pulse = null
+	for p in g.sonar.pulses:
+		if p.kind == "rest_hum":
+			p0 = p
+	ok(p0 != null and p0.range <= 5.01 and p0.strength <= 0.25, "short and faint")
+	ok(not r.rest_is_known(rs), "hearing is not discovering")
+	ok(not r.known_rests().has(rs), "an unknown rest spot is not listed")
+	# walking up to it discovers it, with a cue, and tells the flow
+	g.player.place(float(rs["cell"][0]) + 0.5, float(rs["cell"][1]) + 0.5, 0.0)
+	var c0 := _chimes(g)
+	g.step(0.05, {})
+	ok(r.rest_is_known(rs), "known once within 3 cells")
+	ok(r.known_rests().has(rs), "listed once known")
+	eq(f.last_rest, Vector2i(int(rs["cell"][0]), int(rs["cell"][1])), "flow.note_rest")
+	ok(_chimes(g) > c0, "a soft cue on discovery")
+	_done(g)
+
+
+func test_hum_only_in_the_warning() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var far := _far_rest(g, r.trek)
+	ok(not far.is_empty(), "need a far rest spot")
+	if far.is_empty():
+		_done(g)
+		return
+	g.player.place(far[1], far[2], 0.0)
+	_step(g, 5.0)
+	eq(r.hum_count, 0, "never hummed before the warning")
+	g.night.skip_to(5, 59)
+	_step(g, 4.0)
+	ok(r.hum_count >= 1, "hummed during the warning (%d)" % r.hum_count)
+	_done(g)
+
+
+# ---------------------------------------------------------------- trek powers
+
+func test_trek_powers_gating() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var f := r.trek
+	g.night.blood = 80.0
+	eq(f.night.night, 1, "first night")
+	eq(g.hunger.power_state("shriek", g.power_night(), 80.0), "ready", "shriek usable on a fresh trek")
+	eq(g.hunger.power_state("mist", g.power_night(), 80.0), "locked", "mist locked before the first dusk")
+	eq(g.hunger.power_state("still", g.power_night(), 80.0), "locked", "still locked before the first dusk")
+	ok(bool(g.powers.use_power("shriek")["ok"]), "shriek works through Powers")
+	f.heat = 1
+	eq(g.hunger.power_state("mist", g.power_night(), 80.0), "ready", "mist after the first dusk")
+	eq(g.hunger.power_state("still", g.power_night(), 80.0), "ready", "still after the first dusk")
+	_done(g)
+	var g2 := _game()
+	var tm: Dictionary = g2.menus._tm()
+	tm["unlocks"]["mist_born"] = 1
+	var r2 := _trek(g2)
+	ok(float(r2.trek.fx["mistBorn"]) >= 1.0, "mist_born effect on the trek")
+	eq(g2.hunger.power_state("mist", g2.power_night(), 80.0), "ready", "mist from stage 1")
+	eq(g2.hunger.power_state("still", g2.power_night(), 80.0), "ready", "still from stage 1")
+	_done(g2)
+
+
+func test_classic_power_gating_unchanged() -> void:
+	var g := _game()
+	ok(not g.rogue_on(), "classic mode")
+	if g.night != null:
+		eq(g.power_night(), float(g.night.night), "classic uses the night counter")
+		if g.night.night == 1:
+			eq(Hunger.create().power_state("mist", g.power_night(), 80.0), "locked", "mist locked on classic night 1")
+	_done(g)

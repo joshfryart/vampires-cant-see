@@ -48,7 +48,7 @@ func use_power(id: String) -> Dictionary:
 	var bad := {"ok": false, "code": "E_UNKNOWN", "cost": null}
 	if g.hunger == null or g.night == null or g.state != "playing" or g.drink != null:
 		return bad
-	var r: Dictionary = g.hunger.use(id, float(g.night.night), g.night.blood)
+	var r: Dictionary = g.hunger.use(id, g.power_night(), g.night.blood)
 	if not r["ok"]:
 		if g.clock - miss_at > 0.35 or miss_at > g.clock:
 			miss_at = g.clock

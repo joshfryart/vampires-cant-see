@@ -497,6 +497,13 @@ func push_off_people() -> void:
 		d -= 0.1
 
 
+## The night number the powers' unlock levels are compared to: the classic night counter, or on a trek RogueMode.power_level().
+func power_night() -> float:
+	if rogue_on():
+		return rogue.power_level()
+	return float(night.night) if night != null else 1.0
+
+
 ## True while a Long Night trek is being played (the classic night, sleep and saves are bypassed).
 func rogue_on() -> bool:
 	return rogue != null and rogue.active

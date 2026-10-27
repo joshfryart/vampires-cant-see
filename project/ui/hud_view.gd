@@ -163,7 +163,7 @@ func render_frame(g: Game) -> void:
 				_power_ids.append(pw["id"])
 		var rows: Array = []
 		for id in _power_ids:
-			rows.append({"id": id, "state": h.power_state(id, float(n.night), n.blood), "cd01": _q(h.cd_left01(id), 100.0), "key": Hud.POWER_KEYS.get(id, "")})
+			rows.append({"id": id, "state": h.power_state(id, g.power_night(), n.blood), "cd01": _q(h.cd_left01(id), 100.0), "key": Hud.POWER_KEYS.get(id, "")})
 		s["powers"] = rows
 	last_s = s
 	var animated: bool = g.card_text != "" or g.hint_text != "" or g.unlock_hint_t > 0.0

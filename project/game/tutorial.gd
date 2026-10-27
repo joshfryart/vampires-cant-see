@@ -15,7 +15,8 @@ const TEXT := {
 	"drip": "Something drips. Listen.",
 	"squeeze": "Ping to steer in the squeeze.",
 	"dead_end": "A dead end rings short and bright.",
-	"prey": "Bats and rats are food. Hold R close to drink.",
+	"prey": "Creep up, ping to freeze it, R to lunge and drink.",
+	"powers": "Q shriek, Shift mist, F still. 1/2 answer the day prompt.",
 	"sun": "Outside, the sun can find you.",
 	"dawn": "Dawn: find cover, or wait it out.",
 }
