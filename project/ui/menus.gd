@@ -259,7 +259,7 @@ func _build_title() -> void:
 		_view = "settings"
 		sync(_g))
 	_button("Quit", func(): _g.get_tree().quit())
-	_label("WASD move · mouse look · click/Space ping · right-click/R drink · E door/sleep · Q shriek · Shift mist · F still · G rock · Esc pause", 11, Color(0.6, 0.65, 0.8))
+	_label("WASD move · mouse look · click/Space ping · right-click/R drink · V sense · E door/sleep · Q shriek · Shift mist · F still · G rock · Esc pause", 11, Color(0.6, 0.65, 0.8))
 
 
 ## Classic Five Nights is hidden unless the dev flag `--classic` is on (Menus.classic_override forces it in tests).
@@ -374,6 +374,7 @@ func _build_pause() -> void:
 		if f != null:
 			f.store_string(Log.report())
 			Log.info("menu", "log saved to " + ProjectSettings.globalize_path("user://vcs-log.txt")))
+	_label("V sense the way · R lunge · Q shriek · Shift mist · F still", 11, Color(0.6, 0.65, 0.8))
 	_label("The run is saved when you pause.", 12, Color(0.6, 0.65, 0.8))
 
 
@@ -538,6 +539,12 @@ func _build_guide() -> void:
 		"Ping: click or Space sends out a sonar pulse that draws walls and doors for a moment. It is loud, so people nearby may hear it.",
 		"Echoes that move are people. Walk up close and hold right-click (or R) to drink. Drink in the dark; lit people see you.",
 		"Sleep: press E at your crypt bed or a dark safe spot before 06:00. Powers: Q shriek, C or Shift mist, F still. Esc pauses.",
+	])
+	sec.call("The Long Night", [
+		"V - Sense the way (free in the cave, costs blood beyond): the cold air shows which way out.",
+		"R - Lunge at a frozen critter or person close in front of you, and drink.",
+		"Q shriek, Shift or C mist, F still: these wake at your first dusk.",
+		"Tab skips the guided first night; Esc pauses.",
 	])
 	sec.call("Goal", [
 		"Feed on the townsfolk, then get home or into a dark safe spot before 06:00. Survive %d nights." % nights,

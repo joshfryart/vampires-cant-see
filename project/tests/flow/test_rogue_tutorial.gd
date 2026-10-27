@@ -93,6 +93,8 @@ func test_gating_follows_the_player() -> void:
 	_ping(g)
 	eq(_cur(g), "rings", "a ping advances to what the rings mean")
 	_step(g, 6.0)
+	eq(_cur(g), "sense_intro", "the V line right after the rings")
+	_step(g, 7.0)
 	eq(_cur(g), "drips", "3: drips and passive hearing")
 	_go(g, r, "drip_gallery")
 	_step(g, 0.3)

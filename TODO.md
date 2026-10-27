@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.7: Sense discoverability (tutorial `sense_intro` step after the rings, brighter pulsing HUD hint under the dawn line, How to play and pause list V, windowed `sense_check` scenario that proved V works), see `AI_HANDOFF.md`, "Changes in 0.21.7". Still to do: a person confirms the hint is noticed in play.
+
 Changes in 0.21.6: Hollow wayfinding (panned draft, breath beads, assist ladder, Sense on V: free in the cave, 4+ blood after), see `AI_HANDOFF.md`, "Changes in 0.21.6". Still to do: a person judges the draft pan, the Sense cue and the thresholds (25 / 50 s) under real play. Full suite green at 0.21.6 with the cave wayfinding layout: {"checks":1249720,"failed":0,"failures":[],"tests":378}.
 
 Changes in 0.21.5 (S3c): the Hollow ceiling is a real rock-vault mesh (`render/vault_mesh.gd`, `sonar_vault.gdshader`), see `AI_HANDOFF.md`, "Changes in 0.21.5". Still to do: a person judges it under real play (cone shapes, line density); other stages keep canvas ceilings.

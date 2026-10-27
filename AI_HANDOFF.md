@@ -67,6 +67,15 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.7 (Sense discoverability)
+
+Playtest: "couldn't find a way to use that new power". V worked (verified in a real window, below), but nothing introduced it. Tests: `tests/flow/test_rogue_sense.gd` (bottom), `test_rogue_tutorial.gd`.
+
+- **Tutorial**: new non-interrupt step `sense_intro` ("V: sense the way. Free in the cave; beyond it, the cold air costs blood.", 6.5 s) right after `rings`, before `drips`. It retires at once if the player runs past the gallery (rank >= 2) or has already sensed, and a resumed trek marks it done. The old interrupt step `sense` is now the reminder (first time lost, or after the cave mouth) and is marked done without showing once the player has used Sense.
+- **HUD hint** (`ui/hud_view.gd _draw_sense_hint`, `RogueMode.sense_hint_look()`): white, 3 px larger, with a slow pulse for the first `SENSE_HINT_PULSE_S` (8 s) of a run, bright until Sense is used once or `SENSE_HINT_BRIGHT_S` (60 s) pass, then fading to the old dim line. It moved down to y 27, under the "Dawn in" line (they overlapped before). Text after the cave: `V sense (-N blood)`.
+- **Menus**: How to play has a "The Long Night" section (V sense, R lunge, Q / Shift or C / F powers, Tab); the title footer and the pause menu list V.
+- **Real window check**: `tests/scenarios/sense_check.gd` starts a trek, injects V via `Input.parse_input_event` and saves frames to the scratchpad (`--out=`). Findings: the V press does reach `Game._unhandled_input` -> `pressed` -> `RogueMode.step` -> `try_sense` (sense_t 2.0, cooldown 8, senses 0 -> 1) and the ring plus arrow cue draws. `parse_input_event` delivers on the next input flush, not synchronously, and `_unhandled_input` ignores input while a scenario runs, so the scenario lifts that guard for 4 frames. The scenario backs nothing up: it starts a new trek and so deletes your `vcs_trek.json`.
+
 ## Changes in 0.21.6 (wayfinding: draft, breath beads, Sense)
 
 Version 0.21.6 makes the way out of the Hollow easier to find without touching echolocation. Tests: `tests/flow/test_rogue_sense.gd`.

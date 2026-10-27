@@ -107,6 +107,7 @@ var _sense_cd: float = 0.0
 var _sense_weak_at: float = -99.0
 var _breath_next: float = 0.0
 var sense_notice_shown: bool = false
+var hint_t: float = 0.0          ## seconds since this trek was started or continued (the Sense hint pulses early, then rests)
 var wind_pan_now: float = 0.0     ## -1 (left) .. 1 (right): where the draft comes from, for tests
 var wind_src: Vector2 = Vector2.ZERO
 
@@ -181,6 +182,7 @@ func continue_trek() -> bool:
 
 func _start(t: TrekFlow, fresh: bool) -> void:
 	trek = t
+	hint_t = 0.0
 	if _classic.is_empty():
 		_classic = {"has_run": g.flow.has_run, "fx": g.flow.fx.duplicate(true)}
 	active = true
@@ -339,6 +341,7 @@ func step(_gm: Variant, dt: float) -> void:
 	if g.state != "playing" and g.state != "feeding":
 		return
 	_t += dt
+	hint_t += dt
 	g.flow.fx = trek.fx
 	var pp := Vector2(g.player.x, g.player.y)
 	var cell := Vector2i(floori(pp.x), floori(pp.y))
@@ -979,6 +982,24 @@ func sense_hint() -> String:
 		return ""
 	var c := sense_cost()
 	return "V sense (free)" if c <= 0.0 else "V sense (-%d blood)" % int(c)
+
+
+const SENSE_HINT_PULSE_S := 8.0    ## the hint pulses for this long at the start of a run
+const SENSE_HINT_BRIGHT_S := 60.0  ## and stays bright until the player has used Sense once or this long has passed
+
+
+## How the HUD should draw the Sense hint: {"bright": 0..1 (1 = prominent, 0 = rested), "pulse": 0..1 (0 = none, else the pulse phase
+## swing 0..1)}. Prominent until Sense has been used once or SENSE_HINT_BRIGHT_S seconds have passed (then it fades out over 4 s).
+func sense_hint_look() -> Dictionary:
+	if not active or trek == null:
+		return {"bright": 0.0, "pulse": 0.0}
+	if trek.senses > 0 or int(stats.get("senses", 0)) > 0:
+		return {"bright": 0.0, "pulse": 0.0}
+	var b: float = clampf((SENSE_HINT_BRIGHT_S + 4.0 - hint_t) / 4.0, 0.0, 1.0)
+	var p := 0.0
+	if hint_t < SENSE_HINT_PULSE_S:
+		p = 0.5 + 0.5 * sin(hint_t * TAU * 0.8)
+	return {"bright": b, "pulse": p}
 
 
 ## Whether Sense could be used right now (for dimming the hint): no cooldown, no freeze, enough blood.

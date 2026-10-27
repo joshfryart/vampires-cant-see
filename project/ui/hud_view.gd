@@ -171,7 +171,12 @@ func render_frame(g: Game) -> void:
 	var sense_txt := ""
 	var sense_dim := false
 	var cue: Dictionary = {}
+	var look: Dictionary = {"bright": 0.0, "pulse": 0.0}
 	if g.rogue_on():
+		look = g.rogue.sense_hint_look()
+		look = {"bright": _q(float(look["bright"]), 10.0), "pulse": _q(float(look["pulse"]), 10.0)}
+		if float(look["pulse"]) > 0.0 or (float(look["bright"]) > 0.0 and float(look["bright"]) < 1.0):
+			animated = true
 		sense_txt = g.rogue.sense_hint()
 		sense_dim = not g.rogue.sense_ready()
 		cue = g.rogue.sense_cue()
@@ -180,7 +185,7 @@ func render_frame(g: Game) -> void:
 			animated = true
 	# Ink style: a trek world with a wall_style (LineStyle.world_ink); classic everywhere else.
 	hud.ink = g.rogue_on() and LineStyle.world_ink(g.world)
-	var sig3: int = [s.hash(), hud.ink, sense_txt, sense_dim, cue].hash()
+	var sig3: int = [s.hash(), hud.ink, sense_txt, sense_dim, cue, look].hash()
 	if animated:
 		sig3 = [sig3, tq, g.card_age, g.hint_age].hash()
 	if _sig_valid and sig3 == _sig:
@@ -194,7 +199,7 @@ func render_frame(g: Game) -> void:
 	canvas.reset()
 	hud.draw_hud(canvas, s)
 	if sense_txt != "":
-		_draw_sense_hint(sense_txt, sense_dim, g.large_text)
+		_draw_sense_hint(sense_txt, sense_dim, g.large_text, float(look["bright"]), float(look["pulse"]))
 	if not cue.is_empty():
 		_draw_sense_cue(float(cue["rel"]), float(cue["a"]))
 	if g.card_text != "":
@@ -206,14 +211,22 @@ func render_frame(g: Game) -> void:
 	queue_redraw()
 
 
-## The Sense key line, top right, dim (dimmer still while it cannot be used).
-func _draw_sense_hint(text: String, dim: bool, large: bool) -> void:
+## The Sense key line, top right. Bright (bigger, with a pulse for the first seconds) until the player has used it or a minute has
+## passed (bright 0..1, pulse 0..1), then dim (dimmer still while it cannot be used).
+func _draw_sense_hint(text: String, dim: bool, large: bool, bright: float = 0.0, pulse: float = 0.0) -> void:
 	canvas.save()
-	canvas.font_px = 13.0 if large else 9.0
+	var base_px: float = 13.0 if large else 9.0
+	canvas.font_px = base_px + 3.0 * bright
 	canvas.text_align = "right"
-	canvas.fill_style = HudDraw.COL_LINE
-	canvas.global_alpha = 0.22 if dim else 0.55
-	canvas.fill_text(text, 632.0, 14.0)
+	canvas.fill_style = HudDraw.COL_LINE if bright < 0.5 else "#ffffff"
+	var a: float = 0.22 if dim else 0.55
+	if bright > 0.0:
+		a = lerpf(a, 0.95 - (0.3 if dim else 0.0), bright)
+		a = clampf(a + 0.05 * pulse * bright, 0.0, 1.0)   # a slow swell for the first seconds so the eye catches it
+		if pulse > 0.0:
+			a = lerpf(a * 0.75, a, pulse)
+	canvas.global_alpha = a
+	canvas.fill_text(text, 632.0, 27.0 + 2.0 * bright)   # under the "Dawn in" line
 	canvas.restore()
 
 

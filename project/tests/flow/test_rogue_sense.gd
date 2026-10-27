@@ -556,3 +556,105 @@ func test_senses_are_saved_additively() -> void:
 	var back2 := TrekFlow.continue_from(old, r._meta(), null)
 	ok(back2 != null and back2.senses == 0, "an older save without the key loads with 0")
 	_done(g)
+
+
+# ---------------------------------------------------------------- 0.21.7 discoverability
+
+func test_sense_intro_follows_the_ping_and_rings_steps() -> void:
+	var ids: Array = []
+	for s in Tutorial.ROGUE_STEPS:
+		ids.append(s["id"])
+	var i: int = ids.find("sense_intro")
+	ok(i > ids.find("rings") and i < ids.find("drips"), "intro sits after the rings and before the drip gallery: %s" % str(ids))
+	ok(ids.find("sense") > i, "the lost reminder stays")
+	ok(not bool(Tutorial.new(null, false).step_def("sense_intro").get("interrupt", false)), "the intro never jumps the queue")
+	ok(String(Tutorial.new(null, false).step_def("sense_intro")["text"]).begins_with("V: sense the way. Free in the cave"))
+
+
+func test_sense_intro_shows_once_after_the_ping_step() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.card_text = ""
+	_step(g, 6.0)
+	eq(g.tut.rogue_cur, "ping")
+	g.tut.rogue_done["ping"] = true
+	g.tut.rogue_cur = ""
+	_step(g, 0.2)
+	eq(g.tut.rogue_cur, "rings")
+	_step(g, 6.0)
+	eq(g.tut.rogue_cur, "sense_intro", "after the rings: V")
+	ok(g.hint_text.begins_with("V: sense the way."), g.hint_text)
+	ok(g.hint_text.find("Tab: skip") > 0, "still skippable")
+	_step(g, 7.0)
+	ok(g.tut.rogue_done.has("sense_intro"))
+	ok(g.tut.rogue_cur != "sense_intro", "shown once")
+	_done(g)
+
+
+func test_sense_intro_is_skipped_when_already_sensed_or_resumed() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.card_text = ""
+	g.pressed[KEY_V] = true
+	g.step(0.05, {})
+	eq(r.trek.senses, 1)
+	g.tut.rogue_done["wake"] = true
+	g.tut.rogue_done["ping"] = true
+	g.tut.rogue_done["rings"] = true
+	g.tut.rogue_cur = ""
+	_step(g, 0.5)
+	ok(g.tut.rogue_cur != "sense_intro", "no lesson for someone who found V")
+	ok(g.tut.rogue_done.has("sense_intro"), "marked done")
+	_step(g, 40.0)
+	ok(not g.tut.rogue_done.has("sense") or g.tut.rogue_cur != "sense", "no reminder either once sensed")
+	_done(g)
+
+
+func test_hint_is_bright_and_pulses_early_then_rests() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var l0: Dictionary = r.sense_hint_look()
+	ok(float(l0["bright"]) >= 1.0, "bright at the start")
+	_step(g, 2.0)
+	ok(float(r.sense_hint_look()["pulse"]) > 0.0, "pulsing in the first seconds")
+	_step(g, 7.0)
+	eq(float(r.sense_hint_look()["pulse"]), 0.0, "no pulse after about 8 s")
+	ok(float(r.sense_hint_look()["bright"]) >= 1.0, "still bright at 9 s")
+	_step(g, 56.0)
+	eq(float(r.sense_hint_look()["bright"]), 0.0, "dim after a minute")
+	_done(g)
+
+
+func test_hint_goes_dim_once_sense_is_used() -> void:
+	var g := _game()
+	var r := _trek(g)
+	ok(float(r.sense_hint_look()["bright"]) >= 1.0)
+	g.pressed[KEY_V] = true
+	g.step(0.05, {})
+	eq(float(r.sense_hint_look()["bright"]), 0.0, "used once: dim")
+	eq(float(r.sense_hint_look()["pulse"]), 0.0)
+	_done(g)
+
+
+func test_hint_after_the_cave_names_the_blood_cost() -> void:
+	var g := _game()
+	var r := _trek(g)
+	_into_wood(g, r)
+	ok(r.sense_hint().begins_with("V sense (-"), r.sense_hint())
+	ok(r.sense_hint().ends_with("blood)"))
+	_done(g)
+
+
+func test_how_to_play_and_pause_list_sense_and_the_powers() -> void:
+	var g := _game()
+	g.menus.sync(g)
+	g.menus._view = "guide"
+	g.set_state("title")
+	g.menus.sync(g)
+	var t := ""
+	for n in g.menus.find_children("*", "Label", true, false):
+		t += (n as Label).text + "\n"
+	ok(t.find("V - Sense the way (free in the cave, costs blood beyond)") >= 0, "guide lists V: " + t.substr(0, 400))
+	ok(t.find("R - Lunge") >= 0, "guide lists R")
+	ok(t.find("Q shriek, Shift or C mist, F still") >= 0, "guide lists the powers")
+	_done(g)

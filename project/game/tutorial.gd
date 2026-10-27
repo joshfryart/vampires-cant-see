@@ -143,6 +143,7 @@ const ROGUE_STEPS := [
 	{"id": "wake", "text": "You rise. You cannot see. Listen.", "min": 2.5},
 	{"id": "ping", "text": "Press Space to ping. Listen to what comes back.", "min": 0.0},
 	{"id": "rings", "text": "Each ring is a wall. A long echo means a big room.", "timed": 5.5},
+	{"id": "sense_intro", "text": "V: sense the way. Free in the cave; beyond it, the cold air costs blood.", "timed": 6.5},
 	{"id": "drips", "text": "Drips sing on their own, no ping needed. Follow them.", "min": 0.0},
 	{"id": "squeeze", "text": "A squeeze. Ping to steer: short echoes mean close walls.", "min": 0.0},
 	{"id": "hall", "text": "That huge echo is the hall. Bats roost here, and bats are food.", "timed": 5.5},
@@ -190,6 +191,7 @@ func rogue_begin(fresh: bool) -> void:
 		rogue_done["wake"] = true
 		rogue_done["ping"] = true
 		rogue_done["rings"] = true
+		rogue_done["sense_intro"] = true
 
 
 ## Stop showing the guided night without marking it done (the trek stopped; the Settings toggle was turned off).
@@ -273,6 +275,7 @@ func _at_dead_end(pp: Vector2) -> bool:
 func _past(id: String) -> bool:
 	match id:
 		"drips": return _rank >= 1
+		"sense_intro": return _rank >= 2 or g.rogue.trek.senses > 0   # already past the gallery, or already sensed: no need to teach it
 		"squeeze": return _rank >= 3
 		"hall": return _rank >= 4
 		"feed": return _rank >= 4 or _fed_run() > 0
@@ -315,6 +318,9 @@ func _gate(id: String, pp: Vector2) -> bool:
 func _next_step(pp: Vector2) -> String:
 	for s in ROGUE_STEPS:
 		var id: String = s["id"]
+		if id == "sense" and not rogue_done.has(id) and g.rogue.trek.senses > 0:
+			rogue_done[id] = true   # the player has found V: the reminder is moot
+			continue
 		if bool(s.get("interrupt", false)) and not rogue_done.has(id) and _trigger(id, pp):
 			return id
 	for s in ROGUE_STEPS:
@@ -341,7 +347,8 @@ func _rogue_step(dt: float) -> void:
 	if rogue_cur != "":
 		var def := step_def(rogue_cur)
 		rogue_age += dt
-		if rogue_age >= _step_secs(def) and (_gate(rogue_cur, pp) or (_past(rogue_cur) and not bool(def.get("interrupt", false)))):
+		var skip_now: bool = rogue_cur == "sense_intro" and _past(rogue_cur)   # a lesson never holds the queue once the player has run past it
+		if skip_now or (rogue_age >= _step_secs(def) and (_gate(rogue_cur, pp) or (_past(rogue_cur) and not bool(def.get("interrupt", false))))):
 			rogue_done[rogue_cur] = true
 			rogue_cur = ""
 	var nxt := _next_step(pp)
