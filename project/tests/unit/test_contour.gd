@@ -8,7 +8,8 @@ const SEEDS := 50
 const FEW := 10
 ## Pre-change hashes of the classic wall mesh (vertex, normal, color, uv, index bytes), captured before WorldMeshBuilder was touched.
 const CLASSIC_HASH := {"crypt": 3992633256, "test": 208008445, "town": 2024417853}
-const CLASSIC_STAGE_HASH := {"hollow": 3738946497, "wood": 918674218, "moor": 1415106364, "road": 4057627582, "inn": 3587000798}
+## hollow re-pinned in 0.21.6 (cave wayfinding: breadcrumbs, spur tells, 2-wide tunnels changed the generated layout); the other stages are unchanged.
+const CLASSIC_STAGE_HASH := {"hollow": 4158156916, "wood": 918674218, "moor": 1415106364, "road": 4057627582, "inn": 3587000798}
 
 static var _cache: Dictionary = {}
 
@@ -364,6 +365,7 @@ func test_classic_mesh_unchanged() -> void:
 func test_contour_switch_selects_contour_path() -> void:
 	var was := WorldMeshBuilder.contour_enabled
 	var w := World.from_def(_def("hollow", 7))
+	WorldMeshBuilder.contour_enabled = false   # explicit: an earlier test's Game boot leaves the switch on in the full suite
 	var classic := WorldMeshBuilder.build(w)
 	WorldMeshBuilder.contour_enabled = true
 	var ink := WorldMeshBuilder.build(w)

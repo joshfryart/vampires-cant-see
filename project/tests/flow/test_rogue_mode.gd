@@ -486,18 +486,35 @@ func test_prompt_freezes_hunters_stakes_and_clock() -> void:
 	_step(g, 2.0)
 	ok(r.prompt_open, "prompt open")
 	var p := g.people.find_person(int(r.hunter_ids[0]))
-	p.x = g.player.x + 0.5
-	p.y = g.player.y
-	if g.world.blocks(p.x, p.y, 0.2):
-		p.x = g.player.x - 0.5
+	# build the scenario on purpose: a hunter on a walkable cell 8 BFS steps from the player (a clear path field, not close enough to
+	# startle or flee from the player), so any movement is the hunt and not People's own reaction to a vampire at arm's length
+	var cell := _cell_at_bfs(g, 8)
+	ok(cell.x >= 0, "a walkable cell 8 steps from the player")
+	p.x = cell.x + 0.5
+	p.y = cell.y + 0.5
+	p.mode = "path"
 	var b0: float = g.night.blood
 	var m0: float = g.night.min
 	var h0 := Vector2(p.x, p.y)
 	_step(g, 2.0)
 	near(g.night.blood, b0, 0.001, "no stake and no drain under the prompt")
 	near(g.night.min, m0, 0.001, "clock held")
-	near(p.x, h0.x, 0.05, "hunter did not walk")
+	near(p.x, h0.x, 0.05, "hunter did not walk (x)")
+	near(p.y, h0.y, 0.05, "hunter did not walk (y)")
+	# control: the same hunter on the same cell does walk once the prompt closes, so the freeze is what held it
+	r.prompt_open = false
+	_step(g, 2.0)
+	ok(Vector2(p.x, p.y).distance_to(h0) > 0.3, "unfrozen, the hunter walks the path field")
 	_done(g)
+
+
+## A walkable cell exactly `steps` BFS cells from the player (first found), or (-1, -1).
+func _cell_at_bfs(g: Game, steps: int) -> Vector2i:
+	var f: PackedInt32Array = RunFlow.bfs_cells(g.world, floori(g.player.x), floori(g.player.y))
+	for i in f.size():
+		if f[i] == steps:
+			return Vector2i(i % g.world.width, i / g.world.width)
+	return Vector2i(-1, -1)
 
 
 func test_dazed_hunter_does_not_stake() -> void:

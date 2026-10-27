@@ -278,7 +278,8 @@ func _past(id: String) -> bool:
 		"feed": return _rank >= 4 or _fed_run() > 0
 		"vial": return _fed_run() == 0
 		"pool": return _rank >= 5
-		"dead_end": return _rank >= 6
+		# a spur can branch off beyond the cave mouth in walking depth (so standing at its mouth already ranks as the cave mouth): at a spur, never retire it
+		"dead_end": return _rank >= 6 and not _at_dead_end(Vector2(g.player.x, g.player.y))
 		"mouth", "powers": return _rank >= BEAT_RANK.size()
 	return false
 
