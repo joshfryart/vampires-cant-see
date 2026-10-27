@@ -152,6 +152,8 @@ const ROGUE_STEPS := [
 	{"id": "dead_end", "text": "A dead end rings short and bright. Some hide a place to rest.", "timed": 6.0},
 	{"id": "mouth", "text": "Outside, the sun can find you. Roofs are safe; open sky is not.", "timed": 7.0},
 	{"id": "powers", "text": "Q shrieks. Mist (Shift) and Still (F) wake at your first dusk.", "timed": 6.0},
+	{"id": "sense", "text": "V: sense the way. Free in the cave; beyond it, the cold air costs blood.", "timed": 7.0, "interrupt": true},
+	{"id": "draft", "text": "Feel that draft? Air wants out. So do you.", "timed": 6.0, "interrupt": true},
 	{"id": "dawn", "text": "Dawn nears. Any roof keeps the sun off. Rest spots hum: listen.", "interrupt": true, "min": 0.0},
 	{"id": "choice", "text": "Sun is up. E at a rest spot sleeps; 1 waits here. Both add Heat.", "interrupt": true, "min": 9.0},
 ]
@@ -287,6 +289,8 @@ func _trigger(id: String, pp: Vector2) -> bool:
 		"hall": return _rank >= 3
 		"dead_end": return _at_dead_end(pp)
 		"mouth": return _rank >= 6
+		"sense": return g.rogue.assist >= 1 or (_rank >= BEAT_RANK.size() - 1 and rogue_done.has("mouth"))   # first time lost, or after the cave-mouth beat
+		"draft": return g.rogue.assist >= 2                                                               # lost for long: once per run
 		"dawn": return g.rogue.trek.dawn_warning()
 		"choice": return g.rogue.trek.needs_choice()
 	return true

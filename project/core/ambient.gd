@@ -21,6 +21,8 @@ var live: Array[Sonar.Pulse] = []
 ## Counters for tests and diagnostics.
 var emitted: int = 0
 var skipped_budget: int = 0
+## Rays cast by the last step() (emit_at shares that per-step budget).
+var rays_step: int = 0
 
 
 static func load_kinds() -> Dictionary:
@@ -86,6 +88,7 @@ func step(world, sonar: Sonar, player_pos: Vector2, dt: float, rng: Rng, t: floa
 	_prune_live(sonar)
 	var rays_used := 0
 	var made := 0
+	rays_step = 0
 	for e in emitters:
 		var k: Dictionary = kinds[e["kind"]]
 		if is_nan(e["next"]):
@@ -118,4 +121,30 @@ func step(world, sonar: Sonar, player_pos: Vector2, dt: float, rng: Rng, t: floa
 			rays_used += rays
 			made += 1
 			emitted += 1
+	rays_step = rays_used
 	return made
+
+
+## One pulse of `kind` at (x, y) emitted by the caller (not a placed anchor: the wayfinding "breath" beads). Shares the budget: refused
+## (false, skipped_budget + 1) when MAX_LIVE pulses are live or this step's rays plus the kind's would pass MAX_RAYS. The kind's
+## strength can be overridden (strength < 0 keeps it). Call after step() so the ray budget counts what the emitters used this step.
+func emit_at(kind: String, world, sonar: Sonar, x: float, y: float, strength: float = -1.0) -> bool:
+	if not kinds.has(kind):
+		return false
+	var k: Dictionary = kinds[kind]
+	var rays: int = int(k.get("visRays", 90))
+	_prune_live(sonar)
+	if live.size() >= MAX_LIVE or rays_step + rays > MAX_RAYS:
+		skipped_budget += 1
+		return false
+	sonar.protect_last = true
+	var p := sonar.emit_sound(world, x, y, clock, {
+		"kind": kind, "range": float(k.get("range", 3.0)), "strength": strength if strength >= 0.0 else float(k.get("strength", 0.3)),
+		"z": float(k.get("z", 0.0)), "fade": float(k.get("fade", 1.2)), "visRays": rays, "bounces": int(k.get("bounces", 0)),
+	})
+	if p == null:
+		return false
+	live.append(p)
+	rays_step += rays
+	emitted += 1
+	return true

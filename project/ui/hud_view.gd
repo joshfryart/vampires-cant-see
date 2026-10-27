@@ -167,9 +167,20 @@ func render_frame(g: Game) -> void:
 		s["powers"] = rows
 	last_s = s
 	var animated: bool = g.card_text != "" or g.hint_text != "" or g.unlock_hint_t > 0.0
+	# Sense (V) on a trek: the key hint at the top right and, for two seconds after use, the arc toward the way out.
+	var sense_txt := ""
+	var sense_dim := false
+	var cue: Dictionary = {}
+	if g.rogue_on():
+		sense_txt = g.rogue.sense_hint()
+		sense_dim = not g.rogue.sense_ready()
+		cue = g.rogue.sense_cue()
+		if not cue.is_empty():
+			cue = {"rel": _q(float(cue["rel"]), 60.0), "a": _q(float(cue["a"]), 10.0)}
+			animated = true
 	# Ink style: a trek world with a wall_style (LineStyle.world_ink); classic everywhere else.
 	hud.ink = g.rogue_on() and LineStyle.world_ink(g.world)
-	var sig3: int = [s.hash(), hud.ink].hash()
+	var sig3: int = [s.hash(), hud.ink, sense_txt, sense_dim, cue].hash()
 	if animated:
 		sig3 = [sig3, tq, g.card_age, g.hint_age].hash()
 	if _sig_valid and sig3 == _sig:
@@ -182,6 +193,10 @@ func render_frame(g: Game) -> void:
 	stat_built += 1
 	canvas.reset()
 	hud.draw_hud(canvas, s)
+	if sense_txt != "":
+		_draw_sense_hint(sense_txt, sense_dim, g.large_text)
+	if not cue.is_empty():
+		_draw_sense_cue(float(cue["rel"]), float(cue["a"]))
 	if g.card_text != "":
 		HudDraw.draw_card(canvas, g.card_text, g.card_age, tq, boil, g.card_sub, g.large_text)
 	elif g.hint_text != "":
@@ -189,6 +204,62 @@ func render_frame(g: Game) -> void:
 	elif g.unlock_hint_t > 0.0:
 		HudDraw.draw_hint(canvas, "Esc → Abilities for details", 3.0 - g.unlock_hint_t, 3.0, g.large_text)
 	queue_redraw()
+
+
+## The Sense key line, top right, dim (dimmer still while it cannot be used).
+func _draw_sense_hint(text: String, dim: bool, large: bool) -> void:
+	canvas.save()
+	canvas.font_px = 13.0 if large else 9.0
+	canvas.text_align = "right"
+	canvas.fill_style = HudDraw.COL_LINE
+	canvas.global_alpha = 0.22 if dim else 0.55
+	canvas.fill_text(text, 632.0, 14.0)
+	canvas.restore()
+
+
+## Sense cue (line art): a faint ring around the view and, toward the bearing of the way out (rel 0 = ahead = up, +PI/2 = right), a
+## bright arc with an arrow head on it. a = 0..1 fade.
+const CUE_RX := 200.0
+const CUE_RY := 112.0
+func _draw_sense_cue(rel: float, a: float) -> void:
+	var cx := 320.0
+	var cy := 180.0
+	var phi: float = rel - PI / 2.0
+	canvas.save()
+	canvas.stroke_style = HudDraw.COL_LINE
+	canvas.line_width = 0.75
+	canvas.global_alpha = 0.16 * a
+	canvas.begin_path()
+	for i in 49:
+		var t: float = TAU * float(i) / 48.0
+		if i == 0:
+			canvas.move_to(cx + CUE_RX * cos(t), cy + CUE_RY * sin(t))
+		else:
+			canvas.line_to(cx + CUE_RX * cos(t), cy + CUE_RY * sin(t))
+	canvas.stroke()
+	canvas.stroke_style = "#ffffff"
+	canvas.line_width = 2.0
+	canvas.global_alpha = 0.85 * a
+	canvas.begin_path()
+	for i in 13:
+		var t2: float = phi - 0.5 + 1.0 * float(i) / 12.0
+		if i == 0:
+			canvas.move_to(cx + CUE_RX * cos(t2), cy + CUE_RY * sin(t2))
+		else:
+			canvas.line_to(cx + CUE_RX * cos(t2), cy + CUE_RY * sin(t2))
+	canvas.stroke()
+	var px: float = cx + CUE_RX * cos(phi)
+	var py: float = cy + CUE_RY * sin(phi)
+	var dx: float = cos(phi)
+	var dy: float = sin(phi)
+	canvas.line_width = 1.8
+	canvas.global_alpha = 0.95 * a
+	canvas.begin_path()
+	canvas.move_to(px - dx * 8.0 - dy * 7.0, py - dy * 8.0 + dx * 7.0)
+	canvas.line_to(px + dx * 11.0, py + dy * 11.0)
+	canvas.line_to(px - dx * 8.0 + dy * 7.0, py - dy * 8.0 - dx * 7.0)
+	canvas.stroke()
+	canvas.restore()
 
 
 func _plain_hud(g: Game) -> void:

@@ -39,6 +39,31 @@ const INTERRUPT_TEXT := {
 const NOISE_LOUD := {"shriek": 1.5, "scream": 1.0, "struggle": 0.5, "door": 0.5}
 ## The guided first night lives in game/tutorial.gd (Tutorial.rogue_*); it only reads this mode's state.
 
+## Wayfinding in the Hollow (docs/ROGUELIKE.md "Wayfinding"). "Lost" = the exit distance has not reached a new best for `lost_t` seconds;
+## the assist level (0..2) is a pure function of that (assist_level). Level 1 adds a quiet draft floor and a breath bead every 6 s three
+## steps along the way out; level 2 a louder floor and a bead every 3 s. Thresholds in seconds of being lost (level 1, level 2), then scaled.
+const ASSIST_T1 := 25.0
+const ASSIST_T2 := 50.0
+const ASSIST_MUL_NO_TUTORIAL := 1.5   ## the guided night is off or done: the player is expected to cope longer
+const ASSIST_MUL_FAR_ECHO := 2.0      ## the far_echo upgrade (fx sonarRange > 1): a longer ping finds the way sooner
+const ASSIST_MUL_DEEP := 2.0          ## stage index >= 1 (every stage after the Hollow)
+const ASSIST_NO_L2_HEAT := 3          ## at Heat >= 3 level 2 never comes (the beads would be a hunter's trail too)
+const WIND_FLOOR := 0.12              ## draft level at assist level 2 (level 1 is half): audible earlier, still quiet
+const WIND_AHEAD := 6                 ## the draft comes from the cell this many steps toward the exit
+const BREATH_AHEAD := 3
+const BREATH_PERIOD_1 := 6.0
+const BREATH_PERIOD_2 := 3.0
+const BREATH_STRENGTH_2 := 0.12
+## Sense (V): the vampire exhales and the cold air shows the way for SENSE_CUE_S seconds. FREE in the Hollow (stage id "hollow"); in
+## every later stage it costs ceil(SENSE_COST_BASE x the stage's drainMul) blood (wood 4, moor 4, road 5, inn 5) and needs blood >=
+## cost + SENSE_MARGIN, else "Too weak to sense". Cooldown SENSE_COOLDOWN s. Not in classic mode, not while a prompt or wait freezes input.
+const SENSE_KEY := KEY_V
+const SENSE_COOLDOWN := 8.0
+const SENSE_CUE_S := 2.0
+const SENSE_COST_BASE := 4.0
+const SENSE_MARGIN := 5.0
+const SENSE_AHEAD := 6
+
 var g: Game
 var trek: TrekFlow = null
 var active: bool = false
@@ -73,6 +98,17 @@ var _hum_live: Sonar.Pulse = null
 var _last_pp: Vector2 = Vector2(NAN, NAN)
 var _speed: float = 0.0           ## smoothed player speed (cells/s), for the critters' sneak test
 var hum_count: int = 0
+## Wayfinding state (per stage): seconds without a new best exit distance, the assist level it gives, the Sense cooldown / cue timers.
+var lost_t: float = 0.0
+var best_dist: int = 1 << 30
+var assist: int = 0
+var sense_t: float = 0.0          ## seconds of the directional cue left (0 = none)
+var _sense_cd: float = 0.0
+var _sense_weak_at: float = -99.0
+var _breath_next: float = 0.0
+var sense_notice_shown: bool = false
+var wind_pan_now: float = 0.0     ## -1 (left) .. 1 (right): where the draft comes from, for tests
+var wind_src: Vector2 = Vector2.ZERO
 
 
 func _init(game: Game) -> void:
@@ -226,6 +262,14 @@ func _enter_descriptor(d: Dictionary) -> void:
 	_ui().show_stage_card(int(c["index"]), String(c["stage_name"]), float(c["miles"]), String(c["time_of_day"]), float(c["seconds"]))
 	sfx("rg_stage_arrival")
 	stats["stages"] = int(stats["stages"]) + 1
+	lost_t = 0.0
+	best_dist = 1 << 30
+	assist = 0
+	sense_t = 0.0
+	_breath_next = 0.0
+	if trek.leg >= 1 and not sense_notice_shown:
+		sense_notice_shown = true
+		g.show_card("The cold air", 0.0, "Beyond the cave, sensing costs blood.")
 
 
 func _deactivate(keep_state: bool) -> void:
@@ -311,6 +355,14 @@ func step(_gm: Variant, dt: float) -> void:
 	_step_critters(dt, pp)
 	_step_ambient(dt, pp)
 	step_rest_hum(pp)
+	if not frozen:
+		_step_lost(dt, cell)
+		_sense_cd = maxf(0.0, _sense_cd - dt)
+		sense_t = maxf(0.0, sense_t - dt)
+		if g.pressed.has(SENSE_KEY):
+			try_sense()
+	assist = assist_level(lost_t, trek.fx, g.tut.rogue_active, trek.leg, trek.heat)
+	_step_breath(cell, frozen)
 	_step_wind(dt)
 	var ui := _ui()
 	ui.set_dawn(trek.dawn_in() if trek.night.status == "night" else 0.0)
@@ -734,11 +786,13 @@ func _step_ambient(dt: float, pp: Vector2) -> void:
 				sfx("rg_owl_hoot", p.x, p.y)
 
 
-## Cave-mouth wind: audible only within WIND_RANGE cells of the exit, never louder than WIND_CAP of the manifest gain.
+## Cave-mouth wind: audible only within WIND_RANGE cells of the exit, never louder than WIND_CAP of the manifest gain. It is also a
+## directional draft: the loop is panned by where the way out lies (the cell WIND_AHEAD steps toward the exit) relative to the facing.
 const WIND_RANGE := 12.0
 const WIND_CAP := 0.5
 const WIND_FADE_S := 2.0   ## seconds for the level to travel 0 -> full (and back): no pops when crossing the range edge
 var _wind_level := 0.0
+var _wind_pan_fx: AudioEffectPanner = null
 
 
 ## Target level 0..WIND_CAP for a distance to the exit (smoothstep: 0 at WIND_RANGE, WIND_CAP at the door).
@@ -747,10 +801,29 @@ static func wind_target(d: float) -> float:
 	return k * k * (3.0 - 2.0 * k) * WIND_CAP
 
 
-## Move the smoothed level toward the target, at most WIND_CAP / WIND_FADE_S per second.
-static func wind_ramp(level: float, target: float, dt: float) -> float:
-	var step: float = WIND_CAP / WIND_FADE_S * dt
+## Move the smoothed level toward the target, at most WIND_CAP / WIND_FADE_S x rate_mul per second.
+static func wind_ramp(level: float, target: float, dt: float, rate_mul: float = 1.0) -> float:
+	var step: float = WIND_CAP / WIND_FADE_S * dt * rate_mul
 	return move_toward(level, target, step)
+
+
+## The draft's floor level for an assist level: 0 at level 0, WIND_FLOOR / 2 at 1, WIND_FLOOR at 2.
+static func wind_floor(level: int) -> float:
+	return WIND_FLOOR * clampf(float(level), 0.0, 2.0) / 2.0
+
+
+## Pan -1 (left) .. 1 (right) of a source at `src` for a listener at `pp` facing `angle` (same convention as Game.pan_to, scaled so it
+## is never hard left/right). 0 when the source is on top of the listener.
+static func wind_pan(pp: Vector2, angle: float, src: Vector2) -> float:
+	if pp.distance_to(src) < 0.4:
+		return 0.0
+	return clampf(sin(atan2(src.y - pp.y, src.x - pp.x) - angle), -1.0, 1.0) * 0.9
+
+
+## Bearing of `target` from `pp` relative to the facing, radians in (-PI, PI]: 0 ahead, +PI/2 to the right, PI behind.
+static func bearing_rel(pp: Vector2, angle: float, target: Vector2) -> float:
+	var a: float = atan2(target.y - pp.y, target.x - pp.x) - angle
+	return atan2(sin(a), cos(a))
 
 
 ## Linear gain of the wind bed for a smoothed level (manifest gain, master volume and ambience gain applied).
@@ -758,7 +831,52 @@ func wind_gain(level: float) -> float:
 	return level * float(_sounds["rg_wind_loop"]["gain"]) * g.audio.volume * g.ambience_gain
 
 
+## The way-out cell the draft, the cue and the beads aim at (n steps along the shortest way).
+func way_cell(n: int) -> Vector2i:
+	return trek.next_toward_exit(Vector2i(floori(g.player.x), floori(g.player.y)), n)
+
+
+## Bearing (relative to the facing) of the cell SENSE_AHEAD steps toward the exit.
+func sense_bearing() -> float:
+	var c := way_cell(SENSE_AHEAD)
+	return bearing_rel(Vector2(g.player.x, g.player.y), g.player.angle, Vector2(c.x + 0.5, c.y + 0.5))
+
+
+func _sense_swell() -> float:
+	if sense_t <= 0.0:
+		return 0.0
+	return clampf(minf((SENSE_CUE_S - sense_t) / 0.25, sense_t / 0.5), 0.0, 1.0)
+
+
+func _draft_pan_fx() -> AudioEffectPanner:
+	if _wind_pan_fx != null:
+		return _wind_pan_fx
+	var i := AudioServer.get_bus_index("Draft")
+	if i < 0:
+		AudioServer.add_bus()
+		i = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(i, "Draft")
+		AudioServer.set_bus_send(i, "Beds")
+		AudioServer.add_bus_effect(i, AudioEffectPanner.new())
+	_wind_pan_fx = AudioServer.get_bus_effect(i, 0) as AudioEffectPanner
+	return _wind_pan_fx
+
+
 func _step_wind(dt: float = 0.016) -> void:
+	if trek == null:
+		return
+	var pp := Vector2(g.player.x, g.player.y)
+	var ex: Vector2i = trek.exit_cell
+	var d: float = Vector2(ex.x + 0.5, ex.y + 0.5).distance_to(pp)
+	var target: float = minf(WIND_CAP, maxf(wind_target(d), wind_floor(assist)))
+	var rate := 1.0
+	if sense_t > 0.0:
+		target = maxf(target, WIND_CAP * _sense_swell())
+		rate = 4.0
+	_wind_level = wind_ramp(_wind_level, target, dt, rate)
+	var sc := way_cell(WIND_AHEAD)
+	wind_src = Vector2(sc.x + 0.5, sc.y + 0.5)
+	wind_pan_now = wind_pan(pp, g.player.angle, wind_src)
 	if g.audio == null or not g.audio.is_inside_tree() or not _sounds.has("rg_wind_loop") or AudioServer.get_bus_index("Beds") < 0:
 		return
 	if _wind == null:
@@ -770,13 +888,14 @@ func _step_wind(dt: float = 0.016) -> void:
 		ls.loop_begin = 0
 		ls.loop_end = ls.data.size() / 2
 		_wind = AudioStreamPlayer.new()
-		_wind.bus = "Beds"
+		_draft_pan_fx()
+		_wind.bus = "Draft" if AudioServer.get_bus_index("Draft") >= 0 else "Beds"
 		_wind.stream = ls
 		_wind.volume_db = -80.0
 		g.audio.add_child(_wind)
-	var ex: Vector2i = trek.exit_cell
-	var d: float = Vector2(ex.x + 0.5, ex.y + 0.5).distance_to(Vector2(g.player.x, g.player.y))
-	_wind_level = wind_ramp(_wind_level, wind_target(d), dt)
+	var fx := _draft_pan_fx()
+	if fx != null:
+		fx.pan = wind_pan_now
 	var lin: float = wind_gain(_wind_level)
 	if lin <= 0.0005:
 		_wind.stream_paused = true
@@ -785,6 +904,123 @@ func _step_wind(dt: float = 0.016) -> void:
 	if not _wind.playing:
 		_wind.play()
 	_wind.volume_db = linear_to_db(lin)
+
+
+# ---------------------------------------------------------------- wayfinding: lost tracker, assist ladder, breath beads, Sense
+
+## Seconds the exit distance has gone without a new best (best_dist) on this stage: resets on progress, grows otherwise.
+func _step_lost(dt: float, cell: Vector2i) -> void:
+	var d := trek.dist_to_exit(cell)
+	if d < 0:
+		return
+	if d < best_dist:
+		best_dist = d
+		lost_t = 0.0
+	else:
+		lost_t = minf(lost_t + dt, 3600.0)
+
+
+## Lost-time thresholds (level 1, level 2) in seconds after the scaling: x1.5 with the tutorial off or done, x2 with the far_echo
+## upgrade (fx sonarRange above 1), x2 from stage index 1 on.
+static func assist_thresholds(fx: Dictionary, tutorial_on: bool, stage_idx: int) -> Vector2:
+	var m := 1.0
+	if not tutorial_on:
+		m *= ASSIST_MUL_NO_TUTORIAL
+	if float(fx.get("sonarRange", 1.0)) > 1.0001:
+		m *= ASSIST_MUL_FAR_ECHO
+	if stage_idx >= 1:
+		m *= ASSIST_MUL_DEEP
+	return Vector2(ASSIST_T1 * m, ASSIST_T2 * m)
+
+
+## The assist level 0..2, a pure function of the lost time, the trek effects, whether the guided night is on, the stage index (0 = Hollow)
+## and Heat. Level 2 never at Heat >= ASSIST_NO_L2_HEAT.
+static func assist_level(lost: float, fx: Dictionary, tutorial_on: bool, stage_idx: int = 0, heat: int = 0) -> int:
+	var th := assist_thresholds(fx, tutorial_on, stage_idx)
+	var lv := 0
+	if lost >= th.x:
+		lv = 1
+	if lost >= th.y:
+		lv = 2
+	if lv >= 2 and heat >= ASSIST_NO_L2_HEAT:
+		lv = 1
+	return lv
+
+
+## A "breath" bead (a tiny quiet ring) three steps toward the exit: every 6 s at assist level 1, every 3 s (a little stronger) at level 2.
+## Never at level 0 or while frozen; skipped (and retried next frame) when the ambient budget is full. Returns the number emitted.
+func _step_breath(cell: Vector2i, frozen: bool) -> int:
+	if assist < 1 or frozen or ambient == null or trek == null:
+		_breath_next = 0.0
+		return 0
+	if g.clock < _breath_next:
+		return 0
+	var c := trek.next_toward_exit(cell, BREATH_AHEAD)
+	if c == cell:
+		return 0
+	var strength: float = BREATH_STRENGTH_2 if assist >= 2 else -1.0
+	if not ambient.emit_at("breath", g.world, g.sonar, c.x + 0.5, c.y + 0.5, strength):
+		return 0
+	_breath_next = g.clock + (BREATH_PERIOD_2 if assist >= 2 else BREATH_PERIOD_1)
+	stats["breaths"] = int(stats.get("breaths", 0)) + 1
+	return 1
+
+
+## Blood Sense costs here: 0 in the Hollow, else ceil(SENSE_COST_BASE x the stage's drainMul).
+func sense_cost() -> float:
+	if trek == null or trek.stage_id == "hollow":
+		return 0.0
+	return ceilf(SENSE_COST_BASE * float(trek.row.get("drainMul", 1.0)) - 0.0001)
+
+
+## The HUD hint for the Sense key ("" outside a trek).
+func sense_hint() -> String:
+	if not active or trek == null:
+		return ""
+	var c := sense_cost()
+	return "V sense (free)" if c <= 0.0 else "V sense (-%d blood)" % int(c)
+
+
+## Whether Sense could be used right now (for dimming the hint): no cooldown, no freeze, enough blood.
+func sense_ready() -> bool:
+	if not active or trek == null or prompt_open or waiting or _sense_cd > 0.0 or g.state != "playing":
+		return false
+	return sense_cost() <= 0.0 or trek.night.blood >= sense_cost() + SENSE_MARGIN
+
+
+## The directional cue the HUD draws: {} when off, else {rel: bearing from the facing, a: 0..1}.
+func sense_cue() -> Dictionary:
+	if not active or trek == null or sense_t <= 0.0:
+		return {}
+	var a: float = clampf(minf((SENSE_CUE_S - sense_t) / 0.15, sense_t / 0.5), 0.0, 1.0)
+	return {"rel": sense_bearing(), "a": a}
+
+
+## Sense (V): exhale. Returns {ok, code (ok | off | frozen | busy | cooldown | weak), cost}. Free in the Hollow; later stages pay blood.
+func try_sense() -> Dictionary:
+	if not active or trek == null or not trek.alive():
+		return {"ok": false, "code": "off", "cost": 0.0}
+	if prompt_open or waiting:
+		return {"ok": false, "code": "frozen", "cost": 0.0}
+	if g.state != "playing" or g.drink != null:
+		return {"ok": false, "code": "busy", "cost": 0.0}
+	var cost := sense_cost()
+	if _sense_cd > 0.0:
+		return {"ok": false, "code": "cooldown", "cost": cost}
+	if cost > 0.0 and trek.night.blood < cost + SENSE_MARGIN:
+		if g.clock - _sense_weak_at > 3.0 or _sense_weak_at > g.clock:
+			_sense_weak_at = g.clock
+			g.show_card("Too weak to sense", Game.CARD_LEN - 1.0)
+			g.audio.play("miss", {"gain": SoundData.level("miss")["gain"], "pan": 0.0})
+		return {"ok": false, "code": "weak", "cost": cost}
+	if cost > 0.0:
+		trek.night.blood = maxf(0.0, trek.night.blood - cost)
+	_sense_cd = SENSE_COOLDOWN
+	sense_t = SENSE_CUE_S
+	trek.senses += 1
+	stats["senses"] = int(stats.get("senses", 0)) + 1
+	sfx("rg_drip_gutter", NAN, NAN, 0.5)
+	return {"ok": true, "code": "ok", "cost": cost}
 
 
 static func _rkey(cell: Variant) -> String:

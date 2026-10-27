@@ -41,6 +41,7 @@ var hunger: Hunger = null
 var deaths_avoided: int = 0
 var humans_fed: int = 0
 var critters_fed: int = 0
+var senses: int = 0               ## Sense uses this run (additive, optional key in the night.trek extension)
 var stages_unseen: int = 0
 var noticed: bool = false
 var state: String = "idle"
@@ -121,6 +122,7 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.humans_fed = int(ex.get("humans", 0))
 	f.critters_fed = int(ex.get("critters", 0))
 	f.stages_unseen = int(ex.get("unseenStages", 0))
+	f.senses = clampi(int(ex.get("senses", 0)), 0, 100000)
 	f.noticed = bool(ex.get("noticed", false))
 	f.day_t = float(ex.get("day_t", 0.0))
 	f._stake_ignored = int(ex.get("stakeIgnored", 0))
@@ -285,6 +287,35 @@ func dist_to_exit(c: Vector2i) -> int:
 	if world == null or c.x < 0 or c.y < 0 or c.x >= world.width or c.y >= world.height:
 		return -1
 	return dist[_idx(c)]
+
+
+const _DOWNHILL := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+
+## The cell `k` steps along the shortest way to the exit: walks the `dist` field downhill (first neighbour in the fixed order
+## E, W, S, N with the strictly lowest distance, so it is deterministic). Result: k steps closer, or the exit cell itself when it is
+## fewer than k steps away. A cell with no distance (rock, outside, unreachable) returns itself. Wayfinding (draft, breath, Sense) reads this.
+func next_toward_exit(cell: Vector2i, k: int) -> Vector2i:
+	var d := dist_to_exit(cell)
+	if d < 0:
+		return cell
+	var cur := cell
+	var left := k
+	while left > 0 and d > 0:
+		var best := cur
+		var bd := d
+		for o in _DOWNHILL:
+			var n: Vector2i = cur + o
+			var dn := dist_to_exit(n)
+			if dn >= 0 and dn < bd:
+				best = n
+				bd = dn
+		if best == cur:
+			break
+		cur = best
+		d = bd
+		left -= 1
+	return cur
 
 
 ## Record the player's cell; progress only ever rises. Returns the best progress.
@@ -630,7 +661,7 @@ func snapshot(quit: bool = false) -> Dictionary:
 	nd[SAVE_EXTRA] = {
 		"humans": humans_fed, "critters": critters_fed, "unseenStages": stages_unseen, "noticed": noticed, "state": state, "day_t": day_t,
 		"at": [at.x, at.y], "rest": [last_rest.x, last_rest.y], "stakeIgnored": _stake_ignored, "cleared": cleared.duplicate(),
-		"reached": reached.duplicate(), "warned": _warned, "eaten": eaten.duplicate(), "wither_t": _wither_t,
+		"reached": reached.duplicate(), "warned": _warned, "eaten": eaten.duplicate(), "wither_t": _wither_t, "senses": senses,
 	}
 	var used: Array = []
 	for id in (meta.get("unlocks", {}) as Dictionary):

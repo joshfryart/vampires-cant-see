@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.6: Hollow wayfinding (panned draft, breath beads, assist ladder, Sense on V: free in the cave, 4+ blood after), see `AI_HANDOFF.md`, "Changes in 0.21.6". Still to do: a person judges the draft pan, the Sense cue and the thresholds (25 / 50 s) under real play.
+
 Changes in 0.21.5 (S3c): the Hollow ceiling is a real rock-vault mesh (`render/vault_mesh.gd`, `sonar_vault.gdshader`), see `AI_HANDOFF.md`, "Changes in 0.21.5". Still to do: a person judges it under real play (cone shapes, line density); other stages keep canvas ceilings.
 
 Changes in 0.21.4 (S3b): denser rock strata, quieter vibration, no brick/plank grid floors in ink worlds, per-chamber cave ceiling plus sky / canopy / rafters (see `AI_HANDOFF.md`, "Changes in 0.21.4"). Still to do: a person judges the ceilings and strata density under real play; ceilings are a sparse band around the ping front (consider denser marks or a mesh vault).
