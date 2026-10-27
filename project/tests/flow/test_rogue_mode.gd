@@ -786,3 +786,31 @@ func test_classic_power_gating_unchanged() -> void:
 		if g.night.night == 1:
 			eq(Hunger.create().power_state("mist", g.power_night(), 80.0), "locked", "mist locked on classic night 1")
 	_done(g)
+
+
+func test_wind_bed_quiet_and_smooth() -> void:
+	# audible only near the exit, capped, and ramps rather than jumping
+	eq(RogueMode.wind_target(RogueMode.WIND_RANGE), 0.0, "wind silent at range edge")
+	eq(RogueMode.wind_target(40.0), 0.0, "wind silent far away")
+	ok(RogueMode.wind_target(0.0) <= RogueMode.WIND_CAP + 1e-6, "wind capped at the door")
+	ok(RogueMode.wind_target(6.0) < RogueMode.wind_target(2.0), "wind grows toward the door")
+	var g := _game()
+	var r := _trek(g)
+	var man: Dictionary = r._sounds.get("rg_wind_loop", {})
+	ok(not man.is_empty(), "wind manifest entry")
+	var full: float = float(man.get("gain", 1.0)) * RogueMode.WIND_CAP
+	ok(full <= 0.3, "wind loudest linear gain %.3f is quiet" % full)
+	# a sudden jump from silence to the door level takes WIND_FADE_S, per-frame change stays small
+	var lvl := 0.0
+	var prev := 0.0
+	var worst := 0.0
+	var t := 0.0
+	while t < 3.0:
+		lvl = RogueMode.wind_ramp(lvl, RogueMode.wind_target(0.0), 0.016)
+		worst = maxf(worst, lvl - prev)
+		prev = lvl
+		t += 0.016
+	ok(worst < 0.01, "wind ramp per frame %.4f is smooth" % worst)
+	ok(RogueMode.wind_ramp(0.0, 0.5, 0.5) < RogueMode.WIND_CAP, "half a second does not reach full level")
+	ok(lvl >= RogueMode.WIND_CAP - 1e-6, "reaches full level after the fade time")
+	_done(g)

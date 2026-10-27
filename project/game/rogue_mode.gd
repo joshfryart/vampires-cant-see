@@ -251,6 +251,7 @@ func _deactivate(keep_state: bool) -> void:
 		ui.set_dawn(-1.0)
 	if _wind != null:
 		_wind.stream_paused = true
+	_wind_level = 0.0
 	if not keep_state:
 		g.audio.stop_all(0.1)
 
@@ -311,7 +312,7 @@ func step(_gm: Variant, dt: float) -> void:
 	_step_critters(dt, pp)
 	_step_ambient(dt, pp)
 	step_rest_hum(pp)
-	_step_wind()
+	_step_wind(dt)
 	_step_hints(pp)
 	var ui := _ui()
 	ui.set_dawn(trek.dawn_in() if trek.night.status == "night" else 0.0)
@@ -733,8 +734,31 @@ func _step_ambient(dt: float, pp: Vector2) -> void:
 				sfx("rg_owl_hoot", p.x, p.y)
 
 
-## The draft at the cave mouth: a looping wind bed whose level follows the distance to the exit.
-func _step_wind() -> void:
+## Cave-mouth wind: audible only within WIND_RANGE cells of the exit, never louder than WIND_CAP of the manifest gain.
+const WIND_RANGE := 12.0
+const WIND_CAP := 0.5
+const WIND_FADE_S := 2.0   ## seconds for the level to travel 0 -> full (and back): no pops when crossing the range edge
+var _wind_level := 0.0
+
+
+## Target level 0..WIND_CAP for a distance to the exit (smoothstep: 0 at WIND_RANGE, WIND_CAP at the door).
+static func wind_target(d: float) -> float:
+	var k: float = clampf(1.0 - d / WIND_RANGE, 0.0, 1.0)
+	return k * k * (3.0 - 2.0 * k) * WIND_CAP
+
+
+## Move the smoothed level toward the target, at most WIND_CAP / WIND_FADE_S per second.
+static func wind_ramp(level: float, target: float, dt: float) -> float:
+	var step: float = WIND_CAP / WIND_FADE_S * dt
+	return move_toward(level, target, step)
+
+
+## Linear gain of the wind bed for a smoothed level (manifest gain, master volume and ambience gain applied).
+func wind_gain(level: float) -> float:
+	return level * float(_sounds["rg_wind_loop"]["gain"]) * g.audio.volume * g.ambience_gain
+
+
+func _step_wind(dt: float = 0.016) -> void:
 	if g.audio == null or not g.audio.is_inside_tree() or not _sounds.has("rg_wind_loop") or AudioServer.get_bus_index("Beds") < 0:
 		return
 	if _wind == null:
@@ -752,8 +776,9 @@ func _step_wind() -> void:
 		g.audio.add_child(_wind)
 	var ex: Vector2i = trek.exit_cell
 	var d: float = Vector2(ex.x + 0.5, ex.y + 0.5).distance_to(Vector2(g.player.x, g.player.y))
-	var lin: float = clampf(1.0 - d / 16.0, 0.0, 1.0) * float(_sounds["rg_wind_loop"]["gain"]) * g.audio.volume * g.ambience_gain
-	if lin <= 0.002:
+	_wind_level = wind_ramp(_wind_level, wind_target(d), dt)
+	var lin: float = wind_gain(_wind_level)
+	if lin <= 0.0005:
 		_wind.stream_paused = true
 		return
 	_wind.stream_paused = false

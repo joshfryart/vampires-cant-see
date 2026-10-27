@@ -144,7 +144,7 @@
    "file": "rg_cricket_loop.wav",
    "loop": true,
    "ms": 2100,
-   "gain": 0.3,
+   "gain": 0.5,
    "bus": "World",
    "use": "night insect bed, meadows/roads/farm (loop)"
   },
@@ -153,7 +153,7 @@
    "file": "rg_wind_loop.wav",
    "loop": true,
    "ms": 5000,
-   "gain": 0.4,
+   "gain": 0.5,
    "bus": "World",
    "use": "wind gust / draft bed (loop); scale gain with openness or draft strength"
   },
@@ -162,7 +162,7 @@
    "file": "rg_creek_loop.wav",
    "loop": true,
    "ms": 3000,
-   "gain": 0.4,
+   "gain": 0.5,
    "bus": "World",
    "use": "creek / stream bed (loop); positional on stream tiles"
   },
@@ -171,7 +171,7 @@
    "file": "rg_fountain_loop.wav",
    "loop": true,
    "ms": 3000,
-   "gain": 0.4,
+   "gain": 0.5,
    "bus": "World",
    "use": "town fountain bed (loop); brighter and steadier than the creek"
   },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Bakes the procedural sounds of the roguelike mode ("rg_*") with node-web-audio-api. Deterministic (seeded noise).
 // Usage: node tools/bake-rogue-audio.mjs        (needs `npm install` in tools/)
-// Output: project/audio/rogue/*.wav (mono, 44.1 kHz, 16 bit, peak-normalised to 0.9) and project/data/rogue/sounds_rogue.json.
+// Output: project/audio/rogue/*.wav (mono, 44.1 kHz, 16 bit, peak-normalised to 0.9; the four ambience beds to 0.35) and project/data/rogue/sounds_rogue.json.
 // Kept apart from project/audio/wav/ on purpose: tools/bake-audio.mjs wipes that folder when it runs.
 // Manifest entry: {id, file, loop, ms, gain, bus, use}. `gain` = suggested linear play gain (samples are normalised to 0.9).
 // Loops are cross-faded head/tail like bake-audio.mjs, so set AudioStreamWAV.loop_mode = LOOP_FORWARD (loop_end = bytes / 2) in code.
@@ -15,6 +15,7 @@ const OUT = join(PORT, 'project', 'audio', 'rogue');
 const MANIFEST = join(PORT, 'project', 'data', 'rogue', 'sounds_rogue.json');
 const RATE = 44100;
 const PEAK = 0.9;
+const LOOP_PEAK = 0.35; // ambience beds (wind/creek/fountain/cricket) sit quietly under the one-shots
 
 function mulberry(seed) {
   let a = seed >>> 0;
@@ -179,23 +180,23 @@ def('rg_hen_cluck', 0.6, 0.45, 'hen cluck (farm yard)', (c, r) => {
   for (const [t, f] of [[0.0, 520], [0.14, 480], [0.31, 540]]) tone(c, { t, f0: f, f1: f * 0.7, dur: 0.08, gain: 0.5, a: 0.004, type: 'square', filt: { type: 'bandpass', f: 1000, q: 3 } });
 });
 // ambience loops
-def('rg_cricket_loop', 2.1, 0.3, 'night insect bed, meadows/roads/farm (loop)', (c, r) => {
+def('rg_cricket_loop', 2.1, 0.5, 'night insect bed, meadows/roads/farm (loop)', (c, r) => {
   for (let t = 0.05; t < 3.2; t += 0.7) for (let k = 0; k < 3; k++) tone(c, { t: t + k * 0.075, f0: 4500, f1: 4500, dur: 0.05, gain: 0.35, a: 0.01, am: { hz: 180, depth: 0.5 } });
   for (let t = 0.4; t < 3.2; t += 1.05) for (let k = 0; k < 2; k++) tone(c, { t: t + k * 0.08, f0: 5100, f1: 5100, dur: 0.045, gain: 0.18, a: 0.01 });
-}, { fade: 0.5, skip: 0.2 });
-def('rg_wind_loop', 5, 0.4, 'wind gust / draft bed (loop); scale gain with openness or draft strength', (c, r) => {
+}, { fade: 0.5, skip: 0.2, peak: LOOP_PEAK });
+def('rg_wind_loop', 5, 0.5, 'wind gust / draft bed (loop); scale gain with openness or draft strength', (c, r) => {
   bed(c, r, { secs: 7, f: 550, q: 0.8, gain: 0.5, lfoHz: 0.23, fDepth: 300, gDepth: 0.7 });
   bed(c, r, { secs: 7, f: 1500, q: 1.5, gain: 0.12, lfoHz: 0.37, fDepth: 500, gDepth: 0.8 });
-}, { fade: 1.0, skip: 0.5 });
-def('rg_creek_loop', 3, 0.4, 'creek / stream bed (loop); positional on stream tiles', (c, r) => {
+}, { fade: 1.0, skip: 0.5, peak: LOOP_PEAK });
+def('rg_creek_loop', 3, 0.5, 'creek / stream bed (loop); positional on stream tiles', (c, r) => {
   bed(c, r, { secs: 5, f: 1400, q: 0.5, gain: 0.35, lfoHz: 0.9, fDepth: 500, gDepth: 0.3 });
   for (let i = 0; i < 70; i++) { const f = 500 + r() * 1500; tone(c, { t: 0.3 + r() * 3.6, f0: f, f1: f * 1.8, dur: 0.05 + r() * 0.05, gain: 0.05 + r() * 0.07, a: 0.003 }); }
-}, { fade: 0.6, skip: 0.3 });
-def('rg_fountain_loop', 3, 0.4, 'town fountain bed (loop); brighter and steadier than the creek', (c, r) => {
+}, { fade: 0.6, skip: 0.3, peak: LOOP_PEAK });
+def('rg_fountain_loop', 3, 0.5, 'town fountain bed (loop); brighter and steadier than the creek', (c, r) => {
   bed(c, r, { secs: 5, type: 'highpass', f: 2200, q: 0.4, gain: 0.22, lfoHz: 1.3, fDepth: 300, gDepth: 0.2 });
   bed(c, r, { secs: 5, f: 900, q: 0.7, gain: 0.18, lfoHz: 0.5, fDepth: 200, gDepth: 0.3 });
   for (let i = 0; i < 90; i++) { const f = 900 + r() * 1800; tone(c, { t: 0.3 + r() * 3.6, f0: f, f1: f * 1.6, dur: 0.04 + r() * 0.04, gain: 0.04 + r() * 0.06, a: 0.002 }); }
-}, { fade: 0.6, skip: 0.3 });
+}, { fade: 0.6, skip: 0.3, peak: LOOP_PEAK });
 def('rg_hearth_crackle', 2.5, 0.4, 'hearth/campfire pops (loop) layered over the existing fire_bed', (c, r) => {
   noise(c, r, { dur: 3.6, gain: 0.05, hold: true, type: 'lowpass', f0: 900, q: 0.5 });
   for (let i = 0; i < 26; i++) noise(c, r, { t: 0.2 + r() * 3.2, dur: 0.008 + r() * 0.02, gain: 0.25 + r() * 0.6, type: 'bandpass', f0: 1500 + r() * 4000, q: 1.2 });
@@ -268,7 +269,7 @@ for (const s of S) {
   let peak = 0;
   for (let i = 0; i < out.length; i++) peak = Math.max(peak, Math.abs(out[i]));
   if (peak < 1e-4) throw new Error('silent: ' + s.id);
-  const k = PEAK / peak;
+  const k = (s.loop && s.loop.peak ? s.loop.peak : PEAK) / peak;
   for (let i = 0; i < out.length; i++) out[i] *= k;
   const file = s.id + '.wav';
   writeFileSync(join(OUT, file), wav16(out));

@@ -2,6 +2,7 @@ extends TestCase
 ## Baked roguelike sounds (tools/bake-rogue-audio.mjs): every manifest id has a sane, non-silent, non-clipping WAV.
 ## Reads the PCM straight from the file so it does not depend on the editor import cache.
 
+const QUIET_BEDS := ["rg_wind_loop", "rg_creek_loop", "rg_fountain_loop", "rg_cricket_loop"]
 const MANIFEST := "res://data/rogue/sounds_rogue.json"
 const REQUIRED := ["rg_drip_cave", "rg_drip_pool", "rg_drip_gutter", "rg_splash_step_a", "rg_bat_squeak", "rg_bat_flutter", "rg_rat_skitter", "rg_rat_squeak", "rg_hare_thump", "rg_owl_hoot", "rg_wolf_howl", "rg_cricket_loop", "rg_wind_loop", "rg_creek_loop", "rg_fountain_loop", "rg_hearth_crackle", "rg_crow_caw", "rg_sheep_bleat", "rg_hen_cluck", "rg_coffin_creak", "rg_soil_chime", "rg_upgrade_sting", "rg_stage_arrival", "rg_dawn_bell", "rg_dawn_birds", "rg_laid_to_rest"]
 
@@ -45,7 +46,13 @@ func test_manifest_and_files() -> void:
 			sq += float(v) * float(v)
 		var pk := float(peak) / 32768.0
 		var rms := sqrt(sq / float(n)) / 32768.0
-		ok(pk > 0.5, "not quiet %s peak %.3f" % [id, pk])
+		var bed: bool = QUIET_BEDS.has(id)
+		ok(pk > (0.2 if bed else 0.5), "not quiet %s peak %.3f" % [id, pk])
+		if bed:
+			ok(pk <= 0.4, "ambience bed %s peak %.3f under 0.4" % [id, pk])
+			ok(rms <= 0.12, "ambience bed %s rms %.3f low" % [id, rms])
+			ok(float(s["gain"]) <= 0.5, "ambience bed %s gain capped" % id)
+			ok(pk * float(s["gain"]) <= 0.2, "ambience bed %s effective peak %.3f" % [id, pk * float(s["gain"])])
 		ok(pk <= 0.95, "not clipping %s peak %.3f" % [id, pk])
 		ok(rms > 0.003, "not silent %s rms %.4f" % [id, rms])
 		if bool(s["loop"]):
