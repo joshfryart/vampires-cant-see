@@ -167,7 +167,9 @@ func render_frame(g: Game) -> void:
 		s["powers"] = rows
 	last_s = s
 	var animated: bool = g.card_text != "" or g.hint_text != "" or g.unlock_hint_t > 0.0
-	var sig3: int = s.hash()
+	# Ink style: a trek world with a wall_style (LineStyle.world_ink); classic everywhere else.
+	hud.ink = g.rogue_on() and LineStyle.world_ink(g.world)
+	var sig3: int = [s.hash(), hud.ink].hash()
 	if animated:
 		sig3 = [sig3, tq, g.card_age, g.hint_age].hash()
 	if _sig_valid and sig3 == _sig:

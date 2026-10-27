@@ -158,17 +158,18 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 	var sweeping: bool = p.sweeping
 	var dur: float = p.dur
 	var alpha: float = minf(1.0, 1.15 * pow(b, 0.65)) / (1.0 + 0.07 * depth) * 1.25
-	var lw: float = (1.5 if depth < 1.5 else 1.0) * rs.wscale
+	var ink: bool = LineStyle.ink_for(rs)
+	var lw: float = LineStyle.figure_width(depth, false, ink, rs.wscale)
 	var base_style: String
 	if locked:
 		if alpha < 0.9:
 			alpha = 0.9
-		lw = 1.6 * rs.wscale
+		lw = LineStyle.figure_width(depth, true, ink, rs.wscale)
 		base_style = COL_LOCK
 	elif flash_white and not (sweeping and rs.quality >= 1):
 		var f: float = 1.0 - age / FLASH_AGE
 		alpha = minf(1.0, alpha + 0.5 * f)
-		lw += 0.5 * f * rs.wscale
+		lw = LineStyle.flash_width(lw, f, rs.wscale)
 		base_style = "#ffffff"
 	else:
 		base_style = sprite_style(COL_PERSON, b)
@@ -238,7 +239,7 @@ static func draw_person(rs: RenderState, c: Canvas, p: Pose, player: Dictionary,
 			eo.style = style
 			FigureVolDraw.draw_extras(cv, p, look, eo)
 		else:
-			FigureLine.draw(cv, p, sa, style)
+			FigureLine.draw(cv, p, sa, style, ink)
 	var span := PackedFloat64Array([0.0, 0.0])
 	var to_y := func(z: float) -> float: return p.f_floor_y - z * Pose.FIG_H * lh * p.f_sy * p.vs
 	var rec_box: Array = [null]

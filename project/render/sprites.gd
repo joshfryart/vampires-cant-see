@@ -124,10 +124,11 @@ static func draw_sprite(rs: RenderState, c: Canvas, world: World, player: Dictio
 	var floor_y: float = horizon + 0.5 * vs
 	var flash: bool = age >= 0.0 and age < FLASH_AGE
 	var rip: bool = age >= 0.0 and age < RippleFx.BAND_DUR and rs.quality >= 1
-	var alpha: float = line_alpha(b, depth) * 1.2
-	var lw: float = (1.5 if depth < 1.5 else 1.0) * rs.wscale
+	var ink: bool = LineStyle.ink_for(rs)
+	var alpha: float = LineStyle.ping_lit(b, depth, ink) * 1.2
+	var lw: float = LineStyle.contour_width(depth, ink, rs.wscale)
 	var idb: int = int(sx_ * 7.0 + sy_ * 13.0) * 24
-	var a_j: float = 0.7 * rs.wscale
+	var a_j: float = LineStyle.boil_amp(ink, rs.wscale)
 	var base: Array
 	var c0: float
 	var c1: float
@@ -138,7 +139,7 @@ static func draw_sprite(rs: RenderState, c: Canvas, world: World, player: Dictio
 	if flash:
 		var f: float = 1.0 - age / FLASH_AGE
 		flash_alpha = minf(1.0, alpha + 0.5 * f)
-		flash_lw = lw + 0.5 * f * rs.wscale
+		flash_lw = LineStyle.flash_width(lw, f, rs.wscale)
 	alpha = flash_alpha
 	lw = flash_lw
 	if kind == "safe":
@@ -161,6 +162,7 @@ static func draw_sprite(rs: RenderState, c: Canvas, world: World, player: Dictio
 			cv.line_to(cx + rs.j(idb + 2, 0) * a_j, my + dh + rs.j(idb + 2, 1) * a_j)
 			cv.line_to(cx - dw + rs.j(idb + 3, 0) * a_j, my + rs.j(idb + 3, 1) * a_j)
 			cv.close_path()
+			LineStyle.fill_silhouette(cv, ink)
 			cv.move_to(cx - dw * 0.35, my - dh * 0.25)
 			cv.line_to(cx - dw * 0.1, my - dh * 0.55)
 			cv.stroke()
@@ -278,6 +280,7 @@ static func draw_sprite(rs: RenderState, c: Canvas, world: World, player: Dictio
 					else:
 						cv.line_to(x2, y2)
 				cv.close_path()
+				LineStyle.fill_silhouette(cv, ink)
 				var mx: float = (xl + xr) / 2.0
 				var my2: float = floor_y - hpx * 0.55
 				cv.move_to(mx, my2 + hpx * 0.22)
@@ -745,14 +748,19 @@ static func draw_props(rs: RenderState, c: Canvas, world: World, player: Diction
 		var vs: float = rs.oh / depth
 		var fy: float = rs.horizon + 0.5 * vs
 		var flash: bool = age >= 0.0 and age < FLASH_AGE
-		var alpha: float = line_alpha(b, depth) * 1.2
-		var lw: float = (1.5 if depth < 1.5 else 1.0) * rs.wscale
+		var ink: bool = LineStyle.ink_for(rs)
+		var alpha: float = LineStyle.ping_lit(b, depth, ink) * 1.2
+		var lw: float = LineStyle.contour_width(depth, ink, rs.wscale)
 		if flash:
 			alpha = minf(1.0, alpha + 0.5 * (1.0 - age / FLASH_AGE))
-			lw += 0.4 * rs.wscale
+			if ink:
+				lw = LineStyle.flash_width(lw, 1.0 - age / FLASH_AGE, rs.wscale)
+			else:
+				lw += 0.4 * rs.wscale
 		var idb: int = int(pr["x"] * 7.0 + pr["y"] * 13.0) * 8
-		var jx: float = rs.j(idb, 0) * 0.7 * rs.wscale if rs.boil_on else 0.0
-		var jy: float = rs.j(idb, 1) * 0.7 * rs.wscale if rs.boil_on else 0.0
+		var boil_px: float = LineStyle.boil_amp(ink, rs.wscale)
+		var jx: float = rs.j(idb, 0) * boil_px if rs.boil_on else 0.0
+		var jy: float = rs.j(idb, 1) * boil_px if rs.boil_on else 0.0
 		var body: String = "#ffffff" if flash else EchoLayer.sprite_style(COL_PROP, b)
 		var phase: float = pr["x"] * 3.1 + pr["y"] * 1.7
 		var full := true

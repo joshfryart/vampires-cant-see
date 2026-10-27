@@ -35,7 +35,7 @@ static func square_head(c: Canvas, x: float, y: float, rx: float, ry: float, rot
 
 
 ## Ports drawLineFigure (js/render.js:2653). sa = strip alpha, style = stroke colour.
-static func draw(c: Canvas, p: Pose, sa: float, style: String) -> void:
+static func draw(c: Canvas, p: Pose, sa: float, style: String, ink: bool = false) -> void:
 	var X := p.X
 	var Y := p.Y
 	var hip_u: float = p.hip_u
@@ -75,8 +75,16 @@ static func draw(c: Canvas, p: Pose, sa: float, style: String) -> void:
 	var moving: bool = p.moving
 	c.global_alpha = minf(1.0, alpha * sa)
 	c.stroke_style = style
+	if ink:
+		# Ink: head and torso carry the near-black fill under the outline (the square head and box/pear torsos use their ellipse bounds).
+		c.begin_path()
+		c.ellipse(X[0], Y[0], hr, hry, tilt * 0.6, 0.0, TWO_PI)
+		LineStyle.fill_silhouette(c, true)
+		c.begin_path()
+		c.ellipse(X[14], Y[14], body_rx, body_ry, -tilt * 0.4, 0.0, TWO_PI)
+		LineStyle.fill_silhouette(c, true)
 	# Limbs: single thicker hose lines with round caps (no hinges).
-	c.line_width = lw * 1.7
+	c.line_width = lw * LineStyle.limb_mul(ink)
 	c.begin_path()
 	for side in 2:
 		c.move_to(X[4 + side], Y[4 + side])

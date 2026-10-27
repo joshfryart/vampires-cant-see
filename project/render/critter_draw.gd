@@ -69,7 +69,8 @@ static func draw_all(rs: RenderState, c: Canvas, player: Dictionary, crit: Critt
 		var fy: float = rs.horizon + 0.5 * vs
 		var flash: bool = age < FLASH_AGE
 		var alpha: float = minf(1.0, Sprites.line_alpha(b, depth) * 1.2 + (0.4 * (1.0 - age / FLASH_AGE) if flash else 0.0))
-		var lw: float = (1.5 if depth < 1.5 else 1.0) * rs.wscale
+		var ink: bool = LineStyle.ink_for(rs)
+		var lw: float = LineStyle.contour_width(depth, ink, rs.wscale)
 		var style: String = "#ffffff" if flash else EchoLayer.sprite_style(colour_of(e.species), b)
 		var sz: float = float(SIZE.get(e.species, 1.0))
 		var phase: float = float(e.critter_id) * 1.7
@@ -79,7 +80,7 @@ static func draw_all(rs: RenderState, c: Canvas, player: Dictionary, crit: Critt
 		c.line_width = lw
 		var fn := func(cv: Canvas) -> void:
 			cv.global_alpha = alpha
-			CritterDraw.glyph(cv, kind, species, cx, fy, hs, vs, sz, face, t, phase, resting, moving, style)
+			CritterDraw.glyph(cv, kind, species, cx, fy, hs, vs, sz, face, t, phase, resting, moving, style, ink)
 		EchoLayer.clipped_draw(rs, c, cx - hw, cx + hw, depth, fn)
 		drawn += 1
 	c.global_alpha = 1.0
@@ -87,8 +88,10 @@ static func draw_all(rs: RenderState, c: Canvas, player: Dictionary, crit: Critt
 
 
 ## One glyph. (cx, fy) = the critter's floor point on screen, hs / vs = pixels per cell sideways / per unit of height.
-static func glyph(c: Canvas, kind: String, species: String, cx: float, fy: float, hs: float, vs: float, sz: float, face: float, t: float, phase: float, resting: bool, moving: bool, style: String) -> void:
+static func glyph(c: Canvas, kind: String, species: String, cx: float, fy: float, hs: float, vs: float, sz: float, face: float, t: float, phase: float, resting: bool, moving: bool, style: String, ink: bool = false) -> void:
 	c.stroke_style = style
+	if ink:
+		_fill_body(c, kind, cx, fy, hs, vs, sz, face, t, phase, moving, resting)
 	c.begin_path()
 	match kind:
 		"wing":
@@ -98,14 +101,53 @@ static func glyph(c: Canvas, kind: String, species: String, cx: float, fy: float
 			else:
 				_wings(c, cx, cy, hs * sz, face, t, phase, moving)
 		"rat":
-			_rat(c, cx, fy - 0.06 * vs, fy, hs * sz, vs * sz, face, t, phase, moving)
+			_rat(c, cx, fy - 0.06 * vs, fy, hs * sz, vs * sz, face, t, phase, moving, ink)
 		"hare":
-			_hare(c, cx, fy - 0.11 * vs * sz, fy, hs * sz, vs * sz, face, t, phase, moving, resting)
+			_hare(c, cx, fy - 0.11 * vs * sz, fy, hs * sz, vs * sz, face, t, phase, moving, resting, ink)
 		"bird":
 			_hen(c, cx, fy - 0.12 * vs * sz, fy, hs * sz, vs * sz, face, t, phase, moving)
 		_:
 			_quad(c, cx, fy - 0.2 * vs * sz, fy, hs * sz, vs * sz, face, t, phase, moving, resting)
 	c.stroke()
+	if ink:
+		_ink_taper(c, kind, cx, fy, hs, vs, sz, face, t, phase, moving, resting)
+
+
+## Ink: the rat's and hare's bodies get the near-black fill under the outline (other kinds keep the open line).
+static func _fill_body(c: Canvas, kind: String, cx: float, fy: float, hs: float, vs: float, sz: float, face: float, t: float, phase: float, moving: bool, resting: bool) -> void:
+	if kind == "rat":
+		c.begin_path()
+		c.ellipse(cx, fy - 0.06 * vs, 0.12 * hs * sz, 0.06 * vs * sz, 0.0, 0.0, TWO_PI)
+		LineStyle.fill_silhouette(c, true)
+	elif kind == "hare":
+		var hop: float = absf(sin(t * 9.0 + phase)) * 0.06 * vs * sz if moving else 0.0
+		var cy: float = fy - 0.11 * vs * sz - hop
+		var hxx: float = cx + face * 0.16 * hs * sz
+		c.begin_path()
+		c.ellipse(cx, cy, 0.15 * hs * sz, 0.1 * vs * sz, 0.0, 0.0, TWO_PI)
+		LineStyle.fill_silhouette(c, true)
+		c.begin_path()
+		c.ellipse(hxx, cy - 0.07 * vs * sz, 0.07 * hs * sz, 0.055 * vs * sz, 0.0, 0.0, TWO_PI)
+		LineStyle.fill_silhouette(c, true)
+
+
+## Ink: the rat's tail and the hare's ears are open strokes, drawn with the 14% end taper (same curves as the classic path).
+static func _ink_taper(c: Canvas, kind: String, cx: float, fy: float, hs: float, vs: float, sz: float, face: float, t: float, phase: float, moving: bool, resting: bool) -> void:
+	var f: float = face
+	var w: float = c.line_width
+	hs *= sz
+	var vz: float = vs * sz
+	if kind == "rat":
+		var cy: float = fy - 0.06 * vs
+		LineStyle.taper(c, LineStyle.quad_points(cx - f * 0.12 * hs, cy + 0.01 * vz, cx - f * 0.22 * hs, cy + 0.07 * vz, cx - f * 0.3 * hs, cy - 0.01 * vz), w, true)
+	elif kind == "hare":
+		var hop: float = absf(sin(t * 9.0 + phase)) * 0.06 * vz if moving else 0.0
+		var cy2: float = fy - 0.11 * vz - hop
+		var hx: float = cx + f * 0.16 * hs
+		var hy: float = cy2 - 0.07 * vz
+		var ear_h: float = 0.1 if resting else 0.2
+		LineStyle.taper(c, LineStyle.quad_points(hx - f * 0.01 * hs, hy - 0.05 * vz, hx - f * 0.05 * hs, hy - (0.05 + ear_h) * vz, hx - f * 0.01 * hs, hy - (0.05 + ear_h * 1.1) * vz), w, true)
+		LineStyle.taper(c, LineStyle.quad_points(hx + f * 0.03 * hs, hy - 0.05 * vz, hx, hy - (0.05 + ear_h * 0.9) * vz, hx + f * 0.045 * hs, hy - (0.05 + ear_h) * vz), w, true)
 
 
 ## A flying bat seen from the front: scalloped wings that flap, a small body, two ears.
@@ -143,7 +185,7 @@ static func _hanging(c: Canvas, cx: float, top: float, hs: float, vs: float) -> 
 
 
 ## A rat in profile: long low body, pointed head on the facing side, round ear, curved tail, scurrying legs.
-static func _rat(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: float, face: float, t: float, phase: float, moving: bool) -> void:
+static func _rat(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: float, face: float, t: float, phase: float, moving: bool, ink: bool = false) -> void:
 	var f: float = face
 	c.move_to(cx + 0.12 * hs, cy)
 	c.ellipse(cx, cy, 0.12 * hs, 0.06 * vs, 0.0, 0.0, TWO_PI)
@@ -152,8 +194,9 @@ static func _rat(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: floa
 	c.line_to(cx + f * 0.12 * hs, cy + 0.04 * vs)
 	c.move_to(cx + f * 0.14 * hs + 0.025 * hs, cy - 0.045 * vs)
 	c.ellipse(cx + f * 0.14 * hs, cy - 0.045 * vs, 0.025 * hs, 0.03 * vs, 0.0, 0.0, TWO_PI)
-	c.move_to(cx - f * 0.12 * hs, cy + 0.01 * vs)
-	c.quad_to(cx - f * 0.22 * hs, cy + 0.07 * vs, cx - f * 0.3 * hs, cy - 0.01 * vs)
+	if not ink:
+		c.move_to(cx - f * 0.12 * hs, cy + 0.01 * vs)
+		c.quad_to(cx - f * 0.22 * hs, cy + 0.07 * vs, cx - f * 0.3 * hs, cy - 0.01 * vs)
 	var s: float = sin(t * 22.0 + phase) * 0.03 * hs if moving else 0.0
 	c.move_to(cx - 0.05 * hs, cy + 0.05 * vs)
 	c.line_to(cx - 0.05 * hs + s, fy)
@@ -162,7 +205,7 @@ static func _rat(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: floa
 
 
 ## A hare / rabbit: round haunch, small head with two tall ears, short tail.
-static func _hare(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: float, face: float, t: float, phase: float, moving: bool, resting: bool) -> void:
+static func _hare(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: float, face: float, t: float, phase: float, moving: bool, resting: bool, ink: bool = false) -> void:
 	var f: float = face
 	var hop: float = absf(sin(t * 9.0 + phase)) * 0.06 * vs if moving else 0.0
 	cy -= hop
@@ -173,10 +216,11 @@ static func _hare(c: Canvas, cx: float, cy: float, fy: float, hs: float, vs: flo
 	c.move_to(hx + 0.07 * hs, hy)
 	c.ellipse(hx, hy, 0.07 * hs, 0.055 * vs, 0.0, 0.0, TWO_PI)
 	var ear_h: float = 0.1 if resting else 0.2
-	c.move_to(hx - f * 0.01 * hs, hy - 0.05 * vs)
-	c.quad_to(hx - f * 0.05 * hs, hy - (0.05 + ear_h) * vs, hx - f * 0.01 * hs, hy - (0.05 + ear_h * 1.1) * vs)
-	c.move_to(hx + f * 0.03 * hs, hy - 0.05 * vs)
-	c.quad_to(hx + f * 0.0, hy - (0.05 + ear_h * 0.9) * vs, hx + f * 0.045 * hs, hy - (0.05 + ear_h) * vs)
+	if not ink:
+		c.move_to(hx - f * 0.01 * hs, hy - 0.05 * vs)
+		c.quad_to(hx - f * 0.05 * hs, hy - (0.05 + ear_h) * vs, hx - f * 0.01 * hs, hy - (0.05 + ear_h * 1.1) * vs)
+		c.move_to(hx + f * 0.03 * hs, hy - 0.05 * vs)
+		c.quad_to(hx + f * 0.0, hy - (0.05 + ear_h * 0.9) * vs, hx + f * 0.045 * hs, hy - (0.05 + ear_h) * vs)
 	c.move_to(cx - f * 0.15 * hs, cy)
 	c.line_to(cx - f * 0.2 * hs, cy - 0.02 * vs)
 	c.move_to(cx - f * 0.07 * hs, cy + 0.08 * vs)

@@ -42,6 +42,12 @@ var time_text: String = "20:00"
 # per-draw-call module state in the JS (lg, fx, feedDim)
 var lg: float = 1.0
 var fx: int = 0
+## Ink style (docs/STYLE.md): set by HudView from the trek world; changing it drops the memoised static layers.
+var ink: bool = false:
+	set(v):
+		if v != ink:
+			ink = v
+			_memo_ok = [false, false]
 var feed_dim: float = 1.0
 
 
@@ -118,7 +124,7 @@ func _draw_vial_body(c: Canvas, blood: float, weak: float, t: float, reduced: bo
 	var fl := 1.0
 	if weak > 0.0:
 		fl = 1.0 - 0.2 * weak if reduced else 1.0 - 0.25 * weak * (0.5 + 0.5 * sin(t * 12.5))
-	c.line_width = 1.0
+	c.line_width = LineStyle.hud_width("primary", ink, 1.0)
 	c.stroke_style = COL_LINE
 	c.global_alpha = 0.5 * fl
 	c.begin_path()
@@ -136,7 +142,7 @@ func _draw_vial_body(c: Canvas, blood: float, weak: float, t: float, reduced: bo
 	c.stroke()
 	if fx >= 1:
 		c.global_alpha = 0.25 * fl
-		c.line_width = 1.0
+		c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 		c.begin_path()
 		c.move_to(25.0 + j(14, 0) * sc, V_RIM + 5.0)
 		c.line_to(24.8 + j(15, 0) * sc, 325.0)
@@ -146,7 +152,7 @@ func _draw_vial_body(c: Canvas, blood: float, weak: float, t: float, reduced: bo
 	var level: float = V_IN_BOT - (V_IN_BOT - V_IN_TOP) * blood
 	var amp: float = 0.0 if reduced else 1.5
 	c.stroke_style = COL_BLOOD
-	c.line_width = 1.1
+	c.line_width = LineStyle.hud_width("primary", ink, 1.1)
 	c.global_alpha = 0.55
 	c.begin_path()
 	for i in 6:
@@ -175,7 +181,7 @@ func _draw_vial_body(c: Canvas, blood: float, weak: float, t: float, reduced: bo
 	c.stroke()
 	if fx >= 1 and level > V_IN_TOP + 1.0 and level < V_IN_BOT - 1.0:
 		c.global_alpha = 0.4
-		c.line_width = 0.9
+		c.line_width = LineStyle.hud_width("detail", ink, 0.9)
 		c.begin_path()
 		c.move_to(24.2, level - 1.2)
 		c.quad_to(25.8, level + 0.4, 28.0, level + 0.4)
@@ -198,7 +204,7 @@ func draw_veil(c: Canvas, k: float, t: float, reduced: bool) -> void:
 	var sc := 0.45
 	var breathe: float = 0.85 + 0.15 * sin(t * PI) if k > 0.95 and not reduced else 1.0
 	c.stroke_style = col
-	c.line_width = 1.0
+	c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 	c.global_alpha = 0.6 * breathe
 	var open_: float = 0.0 if k < 0.1 else (2.5 if k < 0.5 else 4.5)
 	var ex: float = VEIL_X
@@ -245,7 +251,7 @@ func draw_dial(c: Canvas, frac: float, hour: int, minute: int, t: float) -> void
 func _draw_dial(c: Canvas, frac: float, hour: int, minute: int, _t: float) -> void:
 	var sun_k: float = 0.0 if frac <= 0.9 else (1.0 if frac >= 1.0 else (frac - 0.9) / 0.1)
 	c.stroke_style = COL_LINE
-	c.line_width = 1.3
+	c.line_width = LineStyle.hud_width("primary", ink, 1.3)
 	c.global_alpha = feed_dim * 0.3
 	c.begin_path()
 	for i in 9:
@@ -255,14 +261,14 @@ func _draw_dial(c: Canvas, frac: float, hour: int, minute: int, _t: float) -> vo
 		c.move_to(x, y)
 		c.line_to(x + 0.01, y)
 	c.stroke()
-	c.line_width = 1.0
+	c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 	if fx >= 1:
 		c.global_alpha = feed_dim * 0.2
-		c.line_width = 0.8
+		c.line_width = LineStyle.hud_width("frame", ink, 0.8)
 		c.begin_path()
 		c.arc(DX + j(82, 0) * 0.3, DY + j(82, 1) * 0.3, DR - 4.0, PI, TWO_PI, false)
 		c.stroke()
-		c.line_width = 1.0
+		c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 	var mx: float = DX - DR - 6.0
 	c.global_alpha = feed_dim * (0.45 * (1.0 - 0.5 * frac))
 	c.begin_path()
@@ -285,7 +291,7 @@ func _draw_dial(c: Canvas, frac: float, hour: int, minute: int, _t: float) -> vo
 	c.stroke()
 	var ma: float = PI + frac * PI
 	c.global_alpha = feed_dim * 0.6
-	c.line_width = 2.4
+	c.line_width = LineStyle.hud_width("emphasis", ink, 2.4)
 	c.begin_path()
 	var px: float = DX + cos(ma) * DR + j(80, 0) * 0.4
 	var py: float = DY + sin(ma) * DR + j(80, 1) * 0.4
@@ -307,7 +313,7 @@ func draw_over(c: Canvas, o: Dictionary, t: float, reduced: bool) -> void:
 		return
 	var pulse: float = 0.75 + 0.25 * sin(t * 7.0) if v > 0.8 and not reduced else 1.0
 	c.stroke_style = COL_CORAL
-	c.line_width = 1.2
+	c.line_width = LineStyle.hud_width("primary", ink, 1.2)
 	c.global_alpha = 0.55 * pulse
 	c.begin_path()
 	c.move_to(21.0 + j(90, 0) * 0.3, 293.0)
@@ -354,7 +360,7 @@ func _draw_powers(c: Canvas, list: Array, t: float, reduced: bool) -> void:
 			ok = Icons.draw(c, p["id"], 18.0 * lg, t, {"alpha": alpha, "color": COL_BLUE, "still": reduced, "taper": fx == 2})
 		c.restore()
 		c.stroke_style = COL_BLUE
-		c.line_width = 1.0
+		c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 		if not ok:
 			c.global_alpha = alpha
 			c.begin_path()
@@ -384,7 +390,7 @@ func _draw_powers(c: Canvas, list: Array, t: float, reduced: bool) -> void:
 func draw_rocks(c: Canvas, n: int, max_n: int) -> void:
 	var x0: float = (PW_X0_LG + POWER_MAX * PW_DX_LG if lg > 1.0 else PW_X0 + POWER_MAX * PW_DX) + 4.0
 	c.stroke_style = COL_LINE
-	c.line_width = 1.0
+	c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 	for i in max_n:
 		var x: float = x0 + i * 9.0 * lg
 		var y: float = PW_Y
@@ -403,7 +409,7 @@ func draw_rocks(c: Canvas, n: int, max_n: int) -> void:
 func draw_fear(c: Canvas, fear: float) -> void:
 	var n: int = int(ceil(fear / 3.0))
 	c.stroke_style = COL_BLUE
-	c.line_width = 0.9
+	c.line_width = LineStyle.hud_width("detail", ink, 0.9)
 	var i := 0
 	while i < n and i < 5:
 		var part: float = minf(3.0, fear - i * 3.0)
@@ -422,7 +428,7 @@ func draw_fear(c: Canvas, fear: float) -> void:
 
 func draw_still(c: Canvas, k: float) -> void:
 	c.stroke_style = COL_BLUE
-	c.line_width = 1.5
+	c.line_width = LineStyle.hud_width("primary", ink, 1.5)
 	c.global_alpha = 0.12 * k
 	var m := 4.0
 	c.begin_path()
@@ -436,7 +442,7 @@ func draw_still(c: Canvas, k: float) -> void:
 
 func draw_mist(c: Canvas, k: float, t: float, reduced: bool) -> void:
 	c.stroke_style = COL_BLUE
-	c.line_width = 1.0
+	c.line_width = LineStyle.hud_width("detail", ink, 1.0)
 	c.global_alpha = 0.25 * k
 	c.begin_path()
 	for i in 4:
@@ -451,7 +457,7 @@ func draw_mist(c: Canvas, k: float, t: float, reduced: bool) -> void:
 
 func draw_gift(c: Canvas, k: float, _t: float) -> void:
 	c.stroke_style = COL_CORAL
-	c.line_width = 1.2
+	c.line_width = LineStyle.hud_width("primary", ink, 1.2)
 	c.global_alpha = 0.6 * k
 	c.begin_path()
 	c.arc(VX + j(140, 0) * 0.4, 317.0 + j(140, 1) * 0.4, 22.0 + 3.0 * (1.0 - k), 0.0, TWO_PI)
@@ -518,7 +524,7 @@ func draw_hud(c: Canvas, s: Dictionary) -> void:
 	if pulse01 > 0.0:
 		c.global_alpha = 0.5 * minf(1.0, pulse01 / 0.15)
 		c.stroke_style = COL_LINE
-		c.line_width = 0.75
+		c.line_width = LineStyle.hud_width("frame", ink, 0.75)
 		c.begin_path()
 		c.arc(W / 2.0, H - 18.0, 6.0, -PI / 2.0, -PI / 2.0 + TWO_PI * pulse01)
 		c.stroke()

@@ -414,7 +414,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 	p.up = up
 	p.ow = rs.ow
 	p.oh = rs.oh
-	c.line_width = 1.0
+	c.line_width = LineStyle.detail_width(LineStyle.ink_for(rs), 1.0, 1.0)
 	c.stroke_style = "#d8ecff"
 	var budget: int = budget_cells
 	var k := 0
@@ -570,7 +570,7 @@ static func draw_floor_front(rs: RenderState, c: Canvas, world: World, sonar: So
 	var half: float = rs.oh / 2.0
 	c.stroke_style = "#e8f2ff"
 	c.fill_style = "#e8f2ff"
-	c.line_width = 1.5
+	c.line_width = LineStyle.detail_width(LineStyle.ink_for(rs), 1.0, 1.5)
 	for k in pulses.size():
 		var pu: Sonar.Pulse = pulses[k]
 		if pu.gen > 0 or _is_ring_kind(pu.kind):
