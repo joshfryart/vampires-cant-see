@@ -24,7 +24,14 @@ static func _corner(world: World, nx: int, ny: int, n: Vector2i) -> float:
 	return 1.0
 
 
+## Master switch of the contour (ink) wall mesh. Off until the wall shader understands it (docs/STYLE.md S3): the contour path then runs only when a world
+## also has a non-empty wall_style. Tests call build_contour directly.
+static var contour_enabled: bool = false
+
+
 static func build(world: World) -> ArrayMesh:
+	if contour_enabled and not world.wall_style.is_empty():
+		return build_contour(world)
 	var verts := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	var cols := PackedColorArray()
@@ -67,6 +74,100 @@ static func build(world: World) -> ArrayMesh:
 	arrays[Mesh.ARRAY_INDEX] = idx
 	var mesh := ArrayMesh.new()
 	if verts.size() > 0:
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+## Smooth-wall mesh (docs/STYLE.md section 2): two vertices per contour vertex (h = 0 and h = 1), one quad per outline segment (4 own vertices, so per-segment
+## attributes never interpolate across a style change). Attributes:
+##   VERTEX = displaced position, NORMAL = visual normal (the segment's own perpendicular at unrounded corners), UV = (loop base + arc length s, v),
+##   UV2 = the grid anchor (JS x, y), COLOR.r = built faces (style 0 and 6-9): 1 at a corner (convex; concave too for style 0), else 0;
+##   natural faces: signed curvature 0.5 + 0.5 * clamp(k / CURV_RANGE) (convex > 0.5), COLOR.g = (style * 4 + face code N S W E) / 255,
+##   COLOR.b = tile code / 255, COLOR.a = link door.
+static func build_contour(world: World) -> ArrayMesh:
+	var cf := ContourField.for_world(world)
+	var nq := cf.segment_total()
+	var verts := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var uv2s := PackedVector2Array()
+	var cols := PackedColorArray()
+	var norms := PackedVector3Array()
+	var idx := PackedInt32Array()
+	verts.resize(nq * 4)
+	uvs.resize(nq * 4)
+	uv2s.resize(nq * 4)
+	cols.resize(nq * 4)
+	norms.resize(nq * 4)
+	idx.resize(nq * 6)
+	var zs: float = Coords.Z_SCALE
+	var q := 0
+	for L: ContourField.Loop in cf.loops:
+		var n := L.pos.size()
+		var base_s: float = L.index * ContourField.LOOP_S
+		for i in n:
+			var j := (i + 1) % n
+			var pi: Vector2 = L.pos[i]
+			var pj: Vector2 = L.pos[j]
+			var dir := pj - pi
+			var segn := Vector2(dir.y, -dir.x)
+			segn = segn.normalized() if segn.length_squared() > 1e-18 else L.ng[i]
+			var ni: Vector2 = segn if L.hard[i] == 1 else L.nrm[i]
+			var nj: Vector2 = segn if L.hard[j] == 1 else L.nrm[j]
+			var si: float = base_s + L.s[i]
+			var sj: float = base_s + (L.s[j] if j > 0 else L.length)
+			var st: int = L.style[i]
+			var gb: float = float(st * 4 + L.ngcode[i]) / 255.0
+			var cb: float = float(L.code[i]) / 255.0
+			var lk: float = float(L.link[i])
+			var ra: float
+			var rb: float
+			if st == 0 or st >= 6:
+				ra = 1.0 if (L.corner[i] == 1 or (L.corner[i] == 2 and st == 0)) else 0.0
+				rb = 1.0 if (L.corner[j] == 1 or (L.corner[j] == 2 and st == 0)) else 0.0
+			else:
+				ra = 0.5 + 0.5 * clampf(L.curv[i] / ContourField.CURV_RANGE, -1.0, 1.0)
+				rb = 0.5 + 0.5 * clampf(L.curv[j] / ContourField.CURV_RANGE, -1.0, 1.0)
+			var b := q * 4
+			verts[b] = Vector3(pi.x, 0.0, pi.y)
+			verts[b + 1] = Vector3(pj.x, 0.0, pj.y)
+			verts[b + 2] = Vector3(pj.x, zs, pj.y)
+			verts[b + 3] = Vector3(pi.x, zs, pi.y)
+			uvs[b] = Vector2(si, 0.0)
+			uvs[b + 1] = Vector2(sj, 0.0)
+			uvs[b + 2] = Vector2(sj, 1.0)
+			uvs[b + 3] = Vector2(si, 1.0)
+			var ai: Vector2 = L.anchor[i]
+			var aj: Vector2 = L.anchor[j]
+			uv2s[b] = ai
+			uv2s[b + 1] = aj
+			uv2s[b + 2] = aj
+			uv2s[b + 3] = ai
+			cols[b] = Color(ra, gb, cb, lk)
+			cols[b + 1] = Color(rb, gb, cb, lk)
+			cols[b + 2] = Color(rb, gb, cb, lk)
+			cols[b + 3] = Color(ra, gb, cb, lk)
+			norms[b] = Vector3(ni.x, 0.0, ni.y)
+			norms[b + 1] = Vector3(nj.x, 0.0, nj.y)
+			norms[b + 2] = Vector3(nj.x, 0.0, nj.y)
+			norms[b + 3] = Vector3(ni.x, 0.0, ni.y)
+			var ib := q * 6
+			idx[ib] = b
+			idx[ib + 1] = b + 1
+			idx[ib + 2] = b + 2
+			idx[ib + 3] = b
+			idx[ib + 4] = b + 2
+			idx[ib + 5] = b + 3
+			q += 1
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	arrays[Mesh.ARRAY_COLOR] = cols
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	if nq > 0:
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 

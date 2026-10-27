@@ -56,12 +56,24 @@ var kind_grid: PackedStringArray = PackedStringArray()
 var zone_grid: PackedStringArray = PackedStringArray()
 var start: Variant = null
 var spots: Dictionary = {"crypt": [], "safe": [], "people": [], "doors": []}
+## Ink-etched wall style (docs/STYLE.md): tile char -> style name (def key "wallStyle"). Empty = classic walls.
+var wall_style: Dictionary = {}
+## Seed of the contour noise: def "seed" when present, else a hash of the map name.
+var map_seed: int = 0
+## Lazily built ContourField (see ContourField.for_world); null until first asked for.
+var contour: Variant = null
 
 
 ## Ports load (js/world.js:389) without validation.
 static func from_def(def: Dictionary) -> World:
 	var w := World.new()
 	w.name = str(def["name"])
+	if def.get("wallStyle") is Dictionary:
+		w.wall_style = def["wallStyle"].duplicate()
+	if def.get("seed") is int or def.get("seed") is float:
+		w.map_seed = int(def["seed"])
+	else:
+		w.map_seed = name_seed(w.name)
 	w.kind = "outdoor" if def.get("kind", "") == "outdoor" else "indoor"
 	w.rows = def["rows"]
 	w.height = w.rows.size()
@@ -132,6 +144,14 @@ static func from_def(def: Dictionary) -> World:
 	w.outer_grid.resize(w.width * w.height)
 	w.recompute_lights()
 	return w
+
+
+## FNV-1a over the UTF-8 bytes of a map name (the contour noise seed when a def has no "seed").
+static func name_seed(map_name: String) -> int:
+	var h: int = 0x811C9DC5
+	for b in map_name.to_utf8_buffer():
+		h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+	return h
 
 
 func _key(cx: int, cy: int) -> int:
