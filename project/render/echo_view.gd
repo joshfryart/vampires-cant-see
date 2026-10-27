@@ -72,6 +72,19 @@ func shader_state() -> Dictionary:
 	}
 
 
+## True when the walls are drawn as the smooth ink contour, so the depth buffer must follow the outline (docs/STYLE.md S4).
+static func contour_depth_on(world: World) -> bool:
+	return WorldMeshBuilder.contour_enabled and not world.wall_style.is_empty()
+
+
+## One depth fill: the contour-correct columns on ink worlds, the grid DDA otherwise (classic output unchanged).
+func _fill_depth(world: World, player: Player, cs: PackedFloat64Array, sn: PackedFloat64Array, zb: PackedFloat32Array, tc: PackedByteArray) -> void:
+	if contour_depth_on(world):
+		Raycast.depth_columns_contour(world, ContourField.for_world(world), player.x, player.y, player.angle, cs, sn, 16.0, zb, tc)
+	else:
+		Raycast.depth_columns(world, player.x, player.y, player.angle, cs, sn, 16.0, zb, tc)
+
+
 ## Fill rs.zbuf / rs.tch for this view. Cached while the pose, fov and doors are unchanged; quality <= 1 casts half the columns.
 func _update_depth(world: World, player: Player) -> void:
 	var half: bool = rs.quality <= 1
@@ -90,13 +103,13 @@ func _update_depth(world: World, player: Player) -> void:
 	_d_half = half
 	_d_world = wid
 	if not half:
-		Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos, rs.col_sin, 16.0, rs.zbuf, rs.tch)
+		_fill_depth(world, player, rs.col_cos, rs.col_sin, rs.zbuf, rs.tch)
 		return
 	var n: int = rs.col_cos_h.size()
 	if _zh.size() != n:
 		_zh.resize(n)
 		_th.resize(n)
-	Raycast.depth_columns(world, player.x, player.y, player.angle, rs.col_cos_h, rs.col_sin_h, 16.0, _zh, _th)
+	_fill_depth(world, player, rs.col_cos_h, rs.col_sin_h, _zh, _th)
 	var last: int = rs.cols - 1
 	for i in n:
 		var z: float = _zh[i]

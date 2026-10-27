@@ -300,6 +300,32 @@ static func floor_tex_kind(mat: String) -> String:
 	return ""
 
 
+## Ink-world floor style (docs/STYLE.md section 1, "Floors"), or "" for classic worlds: "rubble" (cave: hollow rock) or "setts" (road, inn yard).
+## Water sheen applies to every ink world. Gated on world.wall_style only, so classic floors are unchanged.
+static func ink_floor_style(world: World) -> String:
+	if world == null or world.wall_style.is_empty():
+		return ""
+	var vals: Array = world.wall_style.values()
+	if vals.has("rock"):
+		return "rubble"
+	if vals.has("drystone") or vals.has("fence") or vals.has("milestone"):
+		return "setts"
+	return "ink"
+
+
+## floor_tex_kind for a world: the ink floors replace stone brick joints (hollow: rubble; road and inn yard: setts) and give water its sheen.
+static func floor_kind_for(world: World, mat: String, style: String) -> String:
+	if style == "":
+		return floor_tex_kind(mat)
+	if mat == "water":
+		return "water"
+	if style == "rubble" and (mat == "stone" or mat == "roughStone"):
+		return "rubble"
+	if style == "setts" and (mat == "stone" or mat == "cobble" or mat == "roughStone"):
+		return "sett"
+	return floor_tex_kind(mat)
+
+
 ## Ceiling marks for the zone at (x, y): its ceiling material from the acoustics data, else brick.
 static func ceil_tex_kind(world: World, x: float, y: float) -> String:
 	var zone := world.zone_at(x, y)
@@ -349,6 +375,70 @@ class FloorProj:
 		c.line_to(px, py)
 
 
+## Stone u-ranges of the three sett rows (staggered by a quarter cell on the middle row).
+const SETT_ROWS := [[0.0, 0.5, 0.5, 1.0], [0.0, 0.25, 0.25, 0.75, 0.75, 1.0], [0.0, 0.5, 0.5, 1.0]]
+static var _sett_pts: PackedFloat32Array = PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+
+## One cell of setts: three staggered rows of rounded rects (7 stones, a gap between them). The projection is inlined (the plain FloorProj.pt costs
+## more than the stones); cells nearer than 4 chamfer their corners, the rest draw quads.
+static func _add_setts(c: Canvas, p: FloorProj, cx: int, cy: int) -> void:
+	var dx0: float = cx - p.player_x
+	var dy0: float = cy - p.player_y
+	var f0: float = dx0 * p.ca + dy0 * p.sa
+	var l0: float = -dx0 * p.sa + dy0 * p.ca
+	var fc: float = f0 + 0.5 * (p.ca + p.sa)
+	if minf(minf(f0, f0 + p.ca), minf(f0 + p.sa, f0 + p.ca + p.sa)) < 0.3:
+		return
+	var n: int = 8 if fc < 4.0 else 4
+	var pts: PackedFloat32Array = _sett_pts
+	var ch: float = 0.05
+	for row in 3:
+		var v0: float = row / 3.0 + 0.025
+		var v1: float = (row + 1) / 3.0 - 0.025
+		var us: Array = SETT_ROWS[row]
+		for k in range(0, us.size(), 2):
+			var a: float = us[k] + 0.03
+			var b: float = us[k + 1] - 0.03
+			if n == 8:
+				pts[0] = a + ch
+				pts[1] = v0
+				pts[2] = b - ch
+				pts[3] = v0
+				pts[4] = b
+				pts[5] = v0 + ch
+				pts[6] = b
+				pts[7] = v1 - ch
+				pts[8] = b - ch
+				pts[9] = v1
+				pts[10] = a + ch
+				pts[11] = v1
+				pts[12] = a
+				pts[13] = v1 - ch
+				pts[14] = a
+				pts[15] = v0 + ch
+			else:
+				pts[0] = a
+				pts[1] = v0
+				pts[2] = b
+				pts[3] = v0
+				pts[4] = b
+				pts[5] = v1
+				pts[6] = a
+				pts[7] = v1
+			for q in n:
+				var u: float = pts[q * 2]
+				var v: float = pts[q * 2 + 1]
+				var f: float = f0 + u * p.ca + v * p.sa
+				var px: float = p.half_w + ((l0 - u * p.sa + v * p.ca) / f) * p.focal
+				var py: float = p.horizon - p.half / f if p.up else p.horizon + p.half / f
+				if q == 0:
+					c.move_to(px, py)
+				else:
+					c.line_to(px, py)
+			c.close_path()
+
+
 ## Add one floor cell's marks (blades / brick joints / planks / pebbles) to the current path.
 static func add_floor_cell(c: Canvas, p: FloorProj, kind: String, cx: int, cy: int, hs: float) -> void:
 	if kind == "grass":
@@ -366,6 +456,33 @@ static func add_floor_cell(c: Canvas, p: FloorProj, kind: String, cx: int, cy: i
 		p.seg(c, cx, cy, 0.0, 0.5, 1.0, 0.5)
 		p.seg(c, cx, cy, 0.5, 0.0, 0.5, 0.5)
 		p.seg(c, cx, cy, 0.0, 0.5, 0.0, 1.0)
+	elif kind == "rubble":
+		# two pebbles and one scratch per cell (stone loses its brick joints in ink worlds)
+		for i in 2:
+			var ru: float = cx + 0.15 + 0.7 * hash01(cx * 71 + i, cy * 73 + 1)
+			var rv: float = cy + 0.15 + 0.7 * hash01(cx * 79 + i, cy * 83 + 2)
+			if not p.pt(ru, rv):
+				continue
+			var rrx: float = (0.05 + 0.04 * hash01(cx * 89 + i, cy * 97 + 4)) * p.f2
+			if rrx < 0.8:
+				continue
+			c.move_to(p.px + rrx, p.py)
+			c.ellipse(p.px, p.py, rrx, rrx * 0.5, 0.0, 0.0, TWO_PI)
+		var su: float = 0.1 + 0.5 * hash01(cx * 101 + 3, cy * 103 + 7)
+		var sv: float = 0.15 + 0.7 * hash01(cx * 107 + 5, cy * 109 + 9)
+		var sa: float = hash01(cx * 113 + 1, cy * 127 + 2) * PI
+		var sl: float = 0.12 + 0.12 * hash01(cx * 131 + 6, cy * 137 + 3)
+		p.seg(c, cx, cy, su, sv, su + cos(sa) * sl, sv + sin(sa) * sl)
+	elif kind == "sett":
+		_add_setts(c, p, cx, cy)
+	elif kind == "water":
+		# two or three short sheen dashes per cell, lateral to the view so they read as horizontal screen lines
+		var nd: int = 2 + int(hash01(cx * 139 + 1, cy * 149 + 5) * 2.0)
+		for i in nd:
+			var wu: float = 0.1 + 0.55 * hash01(cx * 151 + i, cy * 157 + 3)
+			var wv: float = (i + 0.3 + 0.4 * hash01(cx * 163 + i, cy * 167 + 8)) / nd
+			var wl: float = 0.18 + 0.18 * hash01(cx * 173 + i, cy * 179 + 2)
+			p.seg(c, cx, cy, wu - 0.5 * wl * -p.sa, wv - 0.5 * wl * p.ca, wu + 0.5 * wl * -p.sa, wv + 0.5 * wl * p.ca)
 	elif kind == "plank":
 		for i in 3:
 			var v2: float = i / 3.0
@@ -416,6 +533,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 	p.oh = rs.oh
 	c.line_width = LineStyle.detail_width(LineStyle.ink_for(rs), 1.0, 1.0)
 	c.stroke_style = "#d8ecff"
+	var fstyle: String = "" if up else ink_floor_style(world)
 	var budget: int = budget_cells
 	var k := 0
 	while k < pulses.size() and budget > 0:
@@ -494,7 +612,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 						continue
 					if world.is_solid(mx, my):
 						continue
-					var kind: String = floor_tex_kind(world.material_at(mx, my))
+					var kind: String = floor_kind_for(world, world.material_at(mx, my), fstyle) if fstyle != "" else floor_tex_kind(world.material_at(mx, my))
 					if kind == "":
 						continue
 					if up:
@@ -503,7 +621,7 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 						kind = ceil_tex_kind(world, mx, my)
 					var bk: int = mini(TEX_BUCKETS - 1, int(floor(g * TEX_BUCKETS * 1.2)))
 					sets[bk].append([cx, cy, kind])
-					budget -= 1
+					budget -= 4 if kind == "sett" else 1
 					if budget <= 0:
 						break
 				if budget <= 0:
@@ -517,9 +635,22 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 				continue
 			c.global_alpha = minf(0.9, base * (0.3 + 0.7 * (float(b + 1) / TEX_BUCKETS)) * 0.8)
 			c.begin_path()
+			var water: Array = []
 			for cell in s:
-				add_floor_cell(c, p, cell[2], cell[0], cell[1], half)
-			c.stroke()
+				if cell[2] == "water":
+					water.append(cell)
+				else:
+					add_floor_cell(c, p, cell[2], cell[0], cell[1], half)
+			if water.size() < s.size():
+				c.stroke()
+			if not water.is_empty():
+				# water sheen in the bounce blue (docs/STYLE.md: 7FA6FF), its own stroke
+				c.stroke_style = "#7fa6ff"
+				c.begin_path()
+				for cell in water:
+					add_floor_cell(c, p, "water", cell[0], cell[1], half)
+				c.stroke()
+				c.stroke_style = "#d8ecff"
 	c.global_alpha = 1.0
 
 
