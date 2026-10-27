@@ -1,6 +1,6 @@
 extends RefCounted
 ## Scenario: REAL-TIME play profile. Run windowed WITHOUT --write-movie/--fixed-fps so frame times are wall-clock:
-##   godot --path project --rendering-driver opengl3 -- --scenario=perf_play [--fx=0|1|2] [--vessels=0|1] [--vsync=0|1] [--secs=20] [--title]
+##   godot --path project --rendering-driver opengl3 -- --scenario=perf_play [--fx=0|1|2] [--vessels=0|1] [--vsync=0|1] [--secs=20] [--title] [--stage=hollow|wood|moor|road|inn]
 ## Starts a run in the town, drops the player in the street with the most villagers nearby, then walks, turns and pings like a player
 ## for --secs real seconds (after a 3 s warm-up) and prints PERFPLAY lines (frame ms percentiles, per-section costs, canvas op counts).
 ## Per-section costs come from tests/tools/pf.gd (PF.add / PF.cnt); they are zero unless temporary PF instrumentation is present in the
@@ -16,6 +16,7 @@ var fx := 2
 var vessels := true
 var vsync := true
 var no_move := false
+var stage := ""   # --stage=<id>: profile a generated trek stage (seed 7, ink wall style) instead of the town
 var crowd := 0
 var next_crowd := 0.0
 var ping_gap := 0.7
@@ -70,6 +71,8 @@ func setup(g: Node) -> void:
 			crowd = int(a.substr(8))
 		elif a == "--nomove":
 			no_move = true
+		elif a.begins_with("--stage="):
+			stage = a.substr(8)
 	rng.seed = 4242
 	print("PERFPLAY hw: adapter=%s | vendor=%s | driver_info=%s | rendering_driver=%s | refresh=%.1f Hz | window=%s | os=%s" % [
 		RenderingServer.get_video_adapter_name(), RenderingServer.get_video_adapter_vendor(), str(OS.get_video_adapter_driver_info()),
@@ -88,6 +91,9 @@ func setup(g: Node) -> void:
 		g.set_state("title")
 		g.flow.begin_run()
 		g.debug_map("town")
+		if stage != "":
+			g.add_world(stage, StageGen.generate(stage, 7))
+			g.debug_map(stage)
 		g.night.night = 2
 		g.night.blood = 80.0
 	RenderingServer.viewport_set_measure_render_time(g.get_tree().root.get_viewport_rid(), true)
@@ -100,6 +106,8 @@ func setup(g: Node) -> void:
 
 
 func _busy_spot(g: Node) -> void:
+	if stage != "":
+		return   # the stage start the debug_map call chose
 	var w: World = g.world
 	var best := -1
 	var bx := 0.0

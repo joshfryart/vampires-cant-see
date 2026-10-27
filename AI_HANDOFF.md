@@ -67,6 +67,17 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.3 (S3: the ink wall style is switched on)
+
+Version 0.21.3: trek stages hollow, wood, moor, road and inn now draw with the A+B hybrid wall style specified in `docs/STYLE.md` (read it first). Classic maps (town, crypt, tutorial, later stages) are unchanged and the parity hashes do not move.
+
+- **Switch-on:** the three generators (`gen_cave`, `gen_wild`, `gen_road`) copy the stage row's `wallStyle` into the def; `Game.boot` sets `WorldMeshBuilder.contour_enabled = true`; `_show_map_mesh` tags each cached wall mesh with meta `styled` (contour path built) and pushes the shader uniform `styled` for the visible map. The inn row also maps `B` (milestone) and `I` (fence) because its yard uses them.
+- **Shader (`render/shaders/sonar_wall.gdshader`):** `styled = 0` runs today's code path unchanged. For styled maps the style id comes from `COLOR.g` (style * 4 + face code), light, cell and ripples use the anchor `UV2` and the grid normal, `UV.x` is arc length. Style 0 (doors, windows) keeps the legacy branches with `u` derived from the anchor. Styles 1..9 get: lip height per material (a discard above it), contour top/bottom edges, silhouette line from the normal, corner posts for built styles, a faint lit body (quality >= 2), and at quality 3 with material detail: rock strata (world-anchored dip, facing, distance fade) with cracks and seeps, thicket / gorse / bark / cairn / milestone / timber / drystone marks. Fence rails and posts draw at every quality. The const block `STRATA_Q`, `HALO_Q`, `LIP_JAG_Q` mirrors `LineStyle.wall_features` (checked as text by `test_style_switch.gd`).
+- **Not done / deviations:** no concave crease line; gibbet and fence share style id 7 (both draw as fence); the dip seed uses the anchor cell only (no map seed uniform); root flare on trunks is not drawn.
+- **Tour:** `tests/scenarios/style_tour.gd` (windowed, writes Movie Maker frames plus `shots.txt`; options `--only=`, `--qs=`, `--novib`, `--dist=`). `tests/scenarios/perf_play.gd` gained `--stage=<id>` to profile a generated stage. Hollow typical walk, uncapped: avg 5.96 ms (p95 13.1) over 10 s on the GT 1030, against a 6.5 ms gate (town, classic: 5.49 over 3 s).
+- **Floor note (S4):** the Hollow floor still draws brick joints through `floor_fx` for material `stone`; S4 owns the rubble replacement.
+- **Unverified:** nobody has looked at it under a moving light or on the player's own monitor; the author looked at about 20 frames only.
+
 ## Changes in 0.21.2 (WP13b: The Old Road and Crossroads Inn)
 
 Version 0.21.2: stages 4 and 5. The trek now runs hollow -> wood -> moor -> road -> inn and ends with cause `frontier` after the inn (the hamlet has no generator). Design: `docs/ROGUELIKE.md` ("Road stages").

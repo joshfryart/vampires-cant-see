@@ -1,6 +1,6 @@
 extends TestCase
 ## S1 contour geometry (docs/STYLE.md section 2 and the S1 acceptance list): ContourField.build / for_world and the contour mesh path of WorldMeshBuilder.
-## The whole thing is dormant in the game: WorldMeshBuilder.contour_enabled is false and the generators do not carry wallStyle yet (S3).
+## Since 0.21.3 (S3) the game switches WorldMeshBuilder.contour_enabled on at boot and the generators carry wallStyle; these tests set the switch explicitly.
 
 const STAGES := ["hollow", "wood", "moor", "road", "inn"]
 ## 50 seeds x 5 stages for the cheap per-vertex checks; the expensive ones (rebuild compare, self-intersection, mesh) use fewer.
@@ -17,6 +17,8 @@ func _def(stage: String, seed: int, styled: bool = true) -> Dictionary:
 	var d: Dictionary = StageGen.generate(stage, seed)
 	if styled:
 		d["wallStyle"] = StageGen.stage_row(stage)["wallStyle"]
+	else:
+		d.erase("wallStyle")   # the generators carry wallStyle since 0.21.3
 	return d
 
 
@@ -61,7 +63,7 @@ func test_stage_rows_have_wall_style() -> void:
 		"wood": {"#": "thicket", "W": "trunk"},
 		"moor": {"#": "gorse", "B": "cairn", "I": "gibbet"},
 		"road": {"#": "thicket", "B": "milestone", "I": "fence", "W": "trunk"},
-		"inn": {"#": "drystone", "W": "timber"},
+		"inn": {"#": "drystone", "W": "timber", "B": "milestone", "I": "fence"},
 	}
 	for st in STAGES:
 		var ws: Variant = StageGen.stage_row(st).get("wallStyle")
@@ -354,8 +356,9 @@ func test_classic_mesh_unchanged() -> void:
 		eq(_mesh_hash(WorldMeshBuilder.build(w)), CLASSIC_STAGE_HASH[st], st + " without wallStyle, switch on")
 		WorldMeshBuilder.contour_enabled = was
 		var ws := World.from_def(_def(st, 7, true))
+		WorldMeshBuilder.contour_enabled = false
 		eq(_mesh_hash(WorldMeshBuilder.build(ws)), CLASSIC_STAGE_HASH[st], st + " with wallStyle but the switch off: dormant")
-	ok(not WorldMeshBuilder.contour_enabled, "the contour switch is off by default")
+		WorldMeshBuilder.contour_enabled = was
 
 
 func test_contour_switch_selects_contour_path() -> void:

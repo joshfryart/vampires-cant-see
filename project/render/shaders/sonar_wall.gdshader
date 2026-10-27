@@ -25,6 +25,14 @@ uniform float reduced_motion = 0.0;
 uniform float fx = 2.0;            // effects level after the governor cap (0..2)
 uniform float fx_taper = 1.0;      // fx == 2 and quality >= 3: vertical lines thin out toward their ends
 uniform float quality = 3.0;       // render quality 0..3
+uniform float styled = 0.0;        // 1 = the visible mesh is the contour (ink) mesh: UV2 = grid anchor, UV.x = arc length, COLOR.g = style * 4 + face code (docs/STYLE.md)
+
+// Per-quality switches indexed by quality 0..3. Mirrored (and checked as text) by LineStyle.wall_features.
+const vec4 STRATA_Q = vec4(0.0, 0.0, 0.0, 1.0);    // strata, cracks, material ticks (these also need mat_detail)
+const vec4 HALO_Q = vec4(0.0, 0.0, 1.0, 2.0);      // 0 none, 1 flash only, 2 full
+const vec4 LIP_JAG_Q = vec4(0.0, 0.0, 1.0, 1.0);   // ragged lips (rock, thicket, gorse, drystone)
+const vec3 INK_BONE = vec3(1.0, 0.9882, 0.9569);
+const vec3 INK_HALO_WARM = vec3(1.0, 0.9255, 0.8235);
 
 const float DOOR_GAIN = 1.35;
 const vec3 COL_WOOD_DOOR = vec3(1.0, 0.8863, 0.7686);
@@ -99,8 +107,202 @@ void put(inout vec3 acc, vec3 col, float a, float cov, float halo_cov) {
 	}
 }
 
+
+// ---- ink-etched natural / built walls (styled maps, style ids 1..9; docs/STYLE.md section 3) ----
+
+// smooth 1D value noise on a world-anchored coordinate
+float vn1(float x, int sd) {
+	int i = int(floor(x));
+	float f = fract(x);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(cell_hash(i, 97, sd), cell_hash(i + 1, 97, sd), f);
+}
+
+// ink brightness curve (LineStyle.ping_lit): keeps faint echoes legible
+float ink_lit(float b, float d, float flash) {
+	return min(1.0, max(1.15 * pow(b, 0.65), 0.2 + 0.6 * b)) / (1.0 + 0.10 * d) + 0.6 * flash;
+}
+
+// the top edge of a wall as a fraction of its height; the material is readable from this alone
+float wall_lip(int st, float s, float facing, bool jag) {
+	if (st == 1) { // rock: full height, a slightly ragged ceiling line
+		return jag ? 1.0 - 0.07 * vn1(s * 2.5, 1) : 1.0;
+	} else if (st == 2) { // thicket: spiky peaks every 0.25
+		if (!jag) {
+			return 0.92;
+		}
+		float c = s * 4.0;
+		float h = 0.5 + 0.5 * cell_hash(int(floor(c)), 31, 2);
+		return 0.85 + 0.15 * h * (1.0 - abs(2.0 * fract(c) - 1.0));
+	} else if (st == 3) { // gorse: low, with thorn spikes
+		float base = 0.70 + 0.15 * vn1(s * 0.8, 3);
+		if (!jag) {
+			return base;
+		}
+		float c = s * 4.0;
+		float h = cell_hash(int(floor(c)), 32, 3) * 2.0 - 1.0;
+		return clamp(base + 0.08 * h * (1.0 - abs(2.0 * fract(c) - 1.0)), 0.6, 0.95);
+	} else if (st == 5) { // cairn: conical, high where it faces you
+		return 0.75 + 0.25 * sqrt(clamp(facing, 0.0, 1.0));
+	} else if (st == 6) { // milestone: domed
+		return 0.75 + 0.10 * sqrt(clamp(facing, 0.0, 1.0));
+	} else if (st == 9 && jag) { // drystone: nearly level
+		return 1.0 - 0.03 * vn1(s * 3.0, 9);
+	}
+	return 1.0;
+}
+
+// rock: strata (x) and cracks / seeps (y) as coverage. s = arc length, v = height from the floor, tilt = strata slope per cell of s.
+vec2 rock_detail(float s, float v, float lip, float fws, float fwy, float tilt, float curv, float wd) {
+	const float GL = 0.6;
+	float g = floor(s / GL);
+	int gi = int(g);
+	float f = (s - g * GL) / GL;
+	float strata = 0.0;
+	for (int k = 0; k < 3; k++) {
+		if (cell_hash(gi, 21, k) < 0.5) {
+			float fs = 0.03 + 0.2 * cell_hash(gi, 22, k);
+			float fe = min(1.0, fs + 0.55 + 0.45 * cell_hash(gi, 23, k));
+			if (f >= fs && f <= fe) {
+				float vk = 0.12 + 0.76 * cell_hash(gi, 24, k) + tilt * (s - (g + 0.5) * GL);
+				float endk = clamp(min(f - fs, fe - f) / 0.08, 0.0, 1.0);
+				strata = max(strata, tent((v - vk) / fwy, wd) * endk);
+			}
+		}
+	}
+	float crack = 0.0;
+	float pk = curv > 1.5 ? 0.6 : (curv < -1.5 ? 0.1 : 0.25);
+	if (cell_hash(gi, 25, 0) < pk) {
+		float cx = (g + 0.2 + 0.6 * cell_hash(gi, 26, 0)) * GL;
+		float len = 0.12 + 0.2 * cell_hash(gi, 27, 0);
+		float vv = lip - v;
+		if (vv >= 0.0 && vv <= len) {
+			float wob = 0.03 * sin(v * 22.0 + float(gi));
+			crack = tent((s - cx + wob) / fws, wd) * clamp((len - vv) / 0.05, 0.0, 1.0);
+		}
+	}
+	if (curv < -1.5 && cell_hash(gi, 28, 0) < 0.4) { // seeps rise from the floor in recesses
+		float cx = (g + 0.25 + 0.5 * cell_hash(gi, 29, 0)) * GL;
+		float len = 0.12 + 0.2 * cell_hash(gi, 30, 0);
+		if (v >= 0.0 && v <= len) {
+			float wob = 0.025 * sin(v * 19.0 + float(gi) * 1.7);
+			crack = max(crack, tent((s - cx + wob) / fws, wd) * clamp((len - v) / 0.05, 0.0, 1.0));
+		}
+	}
+	return vec2(strata, crack);
+}
+
+// material marks of the other styles (quality 3 + mat_detail); u = position along the cell face 0..1
+float mat_marks(int st, float s, float u, float v, float lip, float facing, float al, float fwal, float fws, float fwu, float fwy, float wd) {
+	float cov = 0.0;
+	if (st == 2) { // thicket: V-shaped leaf ticks in the top 40%, two per cell
+		float c = s * 2.0;
+		int gi = int(floor(c));
+		float x0 = (float(gi) + 0.25 + 0.5 * cell_hash(gi, 61, 0)) * 0.5;
+		float vc = max(0.6, lip - 0.28) + 0.12 * cell_hash(gi, 62, 0);
+		float dx = abs(s - x0);
+		if (dx < 0.07 && vc < lip) {
+			cov = tent((v - (vc + 1.1 * dx)) / fwy, wd);
+		}
+	} else if (st == 3) { // gorse: thorn ticks at 60 degrees, three per cell, upper half
+		float c = s * 3.0;
+		int gi = int(floor(c));
+		float x0 = (float(gi) + 0.15 + 0.4 * cell_hash(gi, 63, 0)) / 3.0;
+		float vb = 0.45 + 0.2 * cell_hash(gi, 64, 0);
+		float dx = s - x0;
+		if (dx >= 0.0 && dx <= 0.08 && vb < lip) {
+			cov = tent((v - (vb + 1.73 * dx)) / fwy, wd);
+		}
+	} else if (st == 4) { // trunk: two wavy bark lines per cell
+		float c = s * 2.0;
+		int gi = int(floor(c));
+		float x0 = (float(gi) + 0.3 + 0.4 * cell_hash(gi, 65, 0)) * 0.5 + 0.012 * sin(v * 13.0 + cell_hash(gi, 66, 0) * 6.0);
+		if (v >= 0.3 && v <= 0.7) {
+			cov = tent((s - x0) / fws, wd) * clamp(min(v - 0.3, 0.7 - v) / 0.06, 0.0, 1.0);
+		}
+	} else if (st == 5) { // cairn: stacked lens courses, staggered joints, narrowing upward
+		for (int k = 0; k < 4; k++) {
+			float hk = 0.2 * float(k + 1);
+			if (facing > 0.15 + 0.17 * float(k) && hk < lip - 0.04) {
+				cov = max(cov, tent((v - hk) / fwy, wd));
+			}
+		}
+		int band = clamp(int(floor(v / 0.2)), 0, 3);
+		float off = 0.225 * float(band & 1);
+		float x0 = (floor((s - off) / 0.45) + 0.5) * 0.45 + off;
+		float vlo = 0.2 * float(band);
+		if (facing > 0.15 + 0.17 * float(band) && vlo + 0.2 < lip && v > vlo + 0.02 && v < vlo + 0.18) {
+			cov = max(cov, tent((s - x0) / fws, wd));
+		}
+	} else if (st == 6) { // milestone: one incised line and three mile ticks
+		if (u >= 0.12 && u <= 0.88) {
+			cov = tent((v - 0.6) / fwy, wd);
+		}
+		if (v >= 0.6 && v <= 0.72) {
+			cov = max(cov, max(tent((u - 0.38) / fwu, wd), max(tent((u - 0.5) / fwu, wd), tent((u - 0.62) / fwu, wd))));
+		}
+	} else if (st == 8) { // timber: weatherboard every 0.2 h, studs every 2 cells
+		for (int k = 1; k < 5; k++) {
+			cov = max(cov, tent((v - 0.2 * float(k)) / fwy, wd));
+		}
+		cov = max(cov, tent(abs(al - 2.0 * round(al * 0.5)) / fwal, wd));
+	} else if (st == 9) { // drystone: three irregular courses, one staggered joint per 0.8 cell
+		float c1 = 0.33 + 0.05 * (vn1(s * 1.1, 11) - 0.5);
+		float c2 = 0.66 + 0.05 * (vn1(s * 1.1, 12) - 0.5);
+		cov = max(tent((v - c1) / fwy, wd), tent((v - c2) / fwy, wd));
+		int course = v < c1 ? 0 : (v < c2 ? 1 : 2);
+		int gi = int(floor(s / 0.8));
+		float xj = (float(gi) + 0.15 + 0.7 * cell_hash(gi, 67, course)) * 0.8;
+		float lo = course == 0 ? 0.0 : (course == 1 ? c1 : c2);
+		float hi = course == 0 ? c1 : (course == 1 ? c2 : 1.0);
+		if (v > lo + 0.02 && v < hi - 0.02) {
+			cov = max(cov, tent((s - xj) / fws, wd));
+		}
+	}
+	return cov;
+}
+
+// put() with a configurable halo strength (ink uses 0.16)
+void put_k(inout vec3 acc, vec3 col, float a, float cov, float halo_cov, float halo_k) {
+	float aq = qalpha(a);
+	acc = max(acc, col * aq * cov);
+	if (halo > 0.5 && aq >= 0.6) {
+		acc = max(acc, col * aq * halo_k * halo_cov);
+	}
+}
+
 void fragment() {
-	vec2 p = wpos.xz;
+	// styled (contour) mesh: COLOR.g = style * 4 + face code, UV2 = grid anchor, UV.x = arc length. Light, cell and ripple maths use the anchor and grid normal.
+	bool sty = styled > 0.5;
+	int gc = int(floor(COLOR.g * 255.0 + 0.5));
+	int style = sty ? gc / 4 : 0;
+	vec3 ngv = wnorm;
+	if (sty) {
+		int fc = gc - style * 4;
+		ngv = fc == 0 ? vec3(0.0, 0.0, -1.0) : (fc == 1 ? vec3(0.0, 0.0, 1.0) : (fc == 2 ? vec3(-1.0, 0.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+	}
+	vec2 p = sty ? UV2 : wpos.xz;
+	bool x_face = abs(ngv.x) > 0.5;
+	float along = x_face ? p.y : p.x;
+	float u = UV.x;
+	if (sty) {
+		float sg = x_face ? ngv.x : -ngv.z;
+		float ca = floor(along - sg * 1e-4);
+		u = sg > 0.0 ? along - ca : ca + 1.0 - along;
+	}
+	vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;
+	int qi = int(clamp(quality, 0.0, 3.0) + 0.5);
+	vec2 nvv = vec2(0.0, 1.0);
+	float sil = 0.0;
+	float lip = 1.0;
+	if (style > 0) {
+		nvv = normalize(wnorm.xz + vec2(1e-6));
+		sil = dot(nvv, normalize(cam_pos.xz - wpos.xz + vec2(1e-6)));
+		lip = wall_lip(style, UV.x, abs(sil), LIP_JAG_Q[qi] > 0.5);
+		if (lip < 0.999 && UV.y > lip) {
+			discard; // low walls (gorse, cairns, milestones) read by their outline
+		}
+	}
 	int code = int(floor(COLOR.b * 255.0 + 0.5));
 	bool is_door = code == 68 || code == 71;
 	bool is_gate = code == 71;
@@ -117,10 +319,9 @@ void fragment() {
 		ALBEDO = vec3(0.0);
 	} else {
 		float depth = max(0.05, -VERTEX.z);
-		float u = UV.x;
 		float vt = 1.0 - UV.y;                 // height fraction, top 0 .. bottom 1 (as the JS detail code)
 		float fwy = max(fwidth(UV.y), 1e-5);
-		float fwx = max(fwidth(UV.x), 1e-5);
+		float fwx = max(fwidth(u), 1e-5);
 		float col_i = floor(FRAGCOORD.x / 2.0);
 		float jb = boil_on * boil_amp * jitter(col_i, 1.0);
 		float jt = boil_on * boil_amp * jitter(col_i, 0.0);
@@ -134,11 +335,10 @@ void fragment() {
 		}
 		float w_wall = (depth < 1.5 || flash > 0.0) ? line_px_near : line_px;
 
-		ivec2 cell = ivec2(floor(wpos.xz - wnorm.xz * 0.01));
-		bool x_face = abs(wnorm.x) > 0.5;
-		float along = x_face ? wpos.z : wpos.x;
+		ivec2 cell = ivec2(floor(p - ngv.xz * 0.01));
 		vec3 outc = vec3(0.0);
 
+		if (style == 0) {
 		// ---- top and bottom edge lines (a crooked door's top edge sags like the JS tilt) ----
 		float tilt_px = is_door ? hp_px * 0.05 * (u * (1.0 - u) * 4.0) * (0.4 + 0.6 * u) : 0.0;
 		vec3 edge_col_door = is_gate ? COL_GATE : COL_WOOD_DOOR;
@@ -165,7 +365,7 @@ void fragment() {
 
 		// ---- vertical lines at the face ends: full strength at corners, 0.35 where the wall continues flush ----
 		float side_u = u < 0.5 ? u : 1.0 - u;
-		float strength = u < 0.5 ? COLOR.r : COLOR.g;
+		float strength = sty ? COLOR.r : (u < 0.5 ? COLOR.r : COLOR.g);
 		float bv = vt < 0.5 ? mix(b0, b1, 0.75) : mix(b0, b1, 0.25);
 		if (bv > 0.01) {
 			float a = line_alpha(bv, depth) * strength;
@@ -179,12 +379,58 @@ void fragment() {
 			put(outc, col, a, tent(d, wv), tent(d, wv * 3.4));
 		}
 
+		} else {
+			// ---- ink walls (styles 1..9): contour edges, silhouette, corner posts, lit body ----
+			float fdetail = line_px * 0.8;
+			float cw = qi >= 2 ? 1.25 + 0.5 * clamp((2.5 - depth) / 1.5, 0.0, 1.0) : (qi == 1 ? 1.25 : 1.0);
+			cw = (cw + 0.5 * flash) * line_px;
+			float jbi = jb * 0.625;
+			float jti = jt * 0.625;
+			float halo_f = HALO_Q[qi];
+			bool has_top = style != 4 && style != 7;
+			if (b0 > 0.01) {
+				bool gap = style == 2 && cell_hash(int(floor(UV.x / 0.3)), 55, 1) < 0.15; // thicket: the foot is broken
+				if (!gap) {
+					float a = ink_lit(b0, depth, flash);
+					vec3 col = flash > 0.0 ? INK_BONE : bucket_col(b0);
+					float d = (UV.y / fwy + jbi + wob_px) - cw * 0.5;
+					put_k(outc, col, a, tent(d, cw), halo_f > 1.5 ? tent(d, cw * 3.0) : 0.0, 0.16);
+				}
+			}
+			if (b1 > 0.01 && has_top) {
+				float a = ink_lit(b1, depth, flash);
+				vec3 col = flash > 0.0 ? INK_BONE : bucket_col(b1);
+				float d = ((lip - UV.y) / fwy + jti + wob_px) - cw * 0.5;
+				put_k(outc, col, a, tent(d, cw), halo_f > 1.5 ? tent(d, cw * 3.0) : 0.0, 0.16);
+				if (flash > 0.0 && halo_f > 0.5) {
+					outc = max(outc, INK_HALO_WARM * 0.35 * flash * tent(d, cw * 3.0));
+				}
+			}
+			// silhouette: where the surface turns edge-on (pillars, passage mouths); thins toward both ends
+			float bm = 0.5 * (b0 + b1);
+			if (bm > 0.01 && UV.y >= 0.0 && UV.y <= min(lip, 1.0)) {
+				float wv = fx_taper > 0.5 ? cw * clamp(min(UV.y, lip - UV.y) / 0.14, 0.35, 1.0) : cw;
+				float d = abs(sil) / max(fwidth(sil), 1e-5) - wv * 0.5;
+				vec3 col = flash > 0.0 ? INK_BONE : bucket_col(bm);
+				put_k(outc, col, ink_lit(bm, depth, flash), tent(d, wv), halo_f > 1.5 ? tent(d, wv * 3.0) : 0.0, 0.16);
+			}
+			// built faces: a post only at real convex corners (COLOR.r = 1)
+			if (style >= 6 && bm > 0.01 && UV.y <= min(lip, 1.0)) {
+				float dr = (1.0 - COLOR.r) / max(fwidth(COLOR.r), 1e-4) - cw * 0.5;
+				put_k(outc, bucket_col(bm), ink_lit(bm, depth, flash), tent(dr, cw), 0.0, 0.16);
+			}
+			// dark body with a faint lit tint (quality 2 and 3)
+			if (qi >= 2 && UV.y >= 0.0 && UV.y <= min(lip, 1.0)) {
+				outc = max(outc, C_MID * 0.06 * sqrt(min(b, 1.0)) / (1.0 + 0.08 * depth));
+			}
+		}
+
 		if (vt >= 0.0 && vt <= 1.0) {
 			// brightness at this height for detail lines: top edge = b1, bottom edge = b0 (JS matH / matV / dH / dV)
 			float bd = mix(b1, b0, vt);
 
 			// ---- material detail ----
-			if (mat_detail > 0.5 && b > MAT_B && !is_door && !is_window) {
+			if (style == 0 && mat_detail > 0.5 && b > MAT_B && !is_door && !is_window) {
 				float a = line_alpha(bd, depth) * 0.6;
 				if (bd >= 0.1 && a >= 0.04) {
 					vec3 col = bucket_col(bd);
@@ -252,6 +498,49 @@ void fragment() {
 					}
 				}
 			}
+
+				// ---- ink material detail (styles 1..9) ----
+				if (style > 0 && !is_door && !is_window) {
+					float fws = max(fwidth(UV.x), 1e-5);
+					float fwu = max(fwidth(u), 1e-5);
+					float fwal = max(fwidth(along), 1e-5);
+					float facing = abs(sil);
+					float wd = line_px * 0.8;
+					if (style == 7 && bd >= 0.1) { // fence: two rails and posts (always drawn)
+						float a = ink_lit(bd, depth, 0.0) * 0.85;
+						float cov = max(tent((UV.y - 0.3) / fwy, wd), tent((UV.y - 0.7) / fwy, wd));
+						if (UV.y >= 0.08 && UV.y <= 0.9) {
+							cov = max(cov, max(tent((u - 0.04) / fwu, wd), max(tent((u - 0.5) / fwu, wd), tent((u - 0.96) / fwu, wd))));
+						}
+						put_k(outc, bucket_col(bd), a, cov, 0.0, 0.16);
+					}
+					if (STRATA_Q[qi] > 0.5 && mat_detail > 0.5 && b > MAT_B && bd >= 0.2) {
+						float a = ink_lit(bd, depth, 0.0) * 0.6;
+						vec3 col = bucket_col(bd);
+						float curv = (COLOR.r - 0.5) * 8.0; // signed curvature per cell: convex > 0 (ContourField.CURV_RANGE = 4)
+						if (style == 1) {
+							float ang = TWO_PI * cell_hash(int(floor(p.x / 8.0)), int(floor(p.y / 8.0)), 41);
+							float dip = radians(5.0 + 8.0 * cell_hash(int(floor(p.x / 8.0)), int(floor(p.y / 8.0)), 42));
+							vec2 tg = vec2(-nvv.y, nvv.x);
+							float tilt = tan(dip) * dot(tg, vec2(cos(ang), sin(ang))) / z_scale;
+							vec2 rc = rock_detail(UV.x, UV.y, lip, fws, fwy, tilt, curv, line_px * 0.7);
+							float fk = (0.35 + 0.65 * facing);
+							float st_a = a * fk * (1.0 - smoothstep(5.0, 7.0, depth));
+							float cr_a = a * (1.0 - smoothstep(3.5, 5.0, depth));
+							if (rc.x > 0.0 && st_a >= 0.04) {
+								put_k(outc, col, st_a, rc.x, 0.0, 0.16);
+							}
+							if (rc.y > 0.0 && cr_a >= 0.04) {
+								put_k(outc, col, cr_a, rc.y, 0.0, 0.16);
+							}
+						} else {
+							float cov = mat_marks(style, UV.x, u, UV.y, lip, facing, along, fwal, fws, fwu, fwy, wd);
+							if (cov > 0.0) {
+								put_k(outc, col, a, cov, 0.0, 0.16);
+							}
+						}
+					}
+				}
 
 			// ---- doors and gates ----
 			if (is_door && b > 0.12 && bd >= 0.08) {
@@ -329,7 +618,7 @@ void fragment() {
 
 			// ---- windows ----
 			if (is_window) {
-				vec2 beyond = vec2(float(cell.x) + 0.5 - wnorm.x, float(cell.y) + 0.5 - wnorm.z);
+				vec2 beyond = vec2(float(cell.x) + 0.5 - ngv.x, float(cell.y) + 0.5 - ngv.z);
 				float lit_v = 0.0;
 				if (beyond.x >= 0.0 && beyond.y >= 0.0 && beyond.x < map_size.x && beyond.y < map_size.y) {
 					lit_v = texelFetch(light_tex, ivec2(int(beyond.x), int(beyond.y)), 0).r;
@@ -398,7 +687,6 @@ void fragment() {
 
 		if (vt >= 0.0 && vt <= 1.0 && b >= 0.04 && !is_door) {
 			// camera heading and the ray from the camera to this fragment (render.js h.rayAngle)
-			vec3 cam_pos = INV_VIEW_MATRIX[3].xyz;
 			vec2 fwd2 = normalize(-INV_VIEW_MATRIX[2].xz);
 			vec2 ray = normalize(wpos.xz - cam_pos.xz);
 			float cinc = abs(x_face ? ray.x : ray.y);
@@ -445,7 +733,7 @@ void fragment() {
 					}
 					float sh = reduced_motion > 0.5 ? 0.0 : sin(TWO_PI * VIB_HZ * age_v);
 					float amp = min(14.0 * sc, 0.11 * focal_px / max(0.3, depth)) * sh;
-					float vy_px = (wnorm.x * fwd2.x + wnorm.z * fwd2.y) * 0.8 * amp;
+					float vy_px = (ngv.x * fwd2.x + ngv.z * fwd2.y) * 0.8 * amp;
 					float a = min(1.0, 2.2 * kv);
 					float cov = 0.0;
 					for (int j = 0; j < 5; j++) {

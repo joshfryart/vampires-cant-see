@@ -286,6 +286,7 @@ static func _assemble(plan: RP, row: Dictionary, style: String, seed: int, attem
 		"kind": String(row["kind"]),
 		"floor": String(row["floor"]),
 		"materials": row["materials"].duplicate(),
+		"wallStyle": row.get("wallStyle", {}),
 		"rows": _rows(plan),
 		"doors": doors,
 		"props": plan.props,

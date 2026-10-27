@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.3 (S3): the ink wall style is on for the five trek stages (see `AI_HANDOFF.md`, "Changes in 0.21.3"). Still to do: a person judges the cave strata and the other materials under real play, crease lines, a separate gibbet look, a map-seed uniform for the strata dip.
+
 Changes in 0.21.2 (WP13b): The Old Road (`road`) and Crossroads Inn (`inn`) are generated (`core/gen/gen_road.gd`), the trek runs hollow -> wood -> moor -> road -> inn and ends with "To be continued..." after the inn (see `AI_HANDOFF.md`, "Changes in 0.21.2"). Still to do for them: a person plays both (shrine holy ground, watchers, patrons and schedules, cellar risk), sounds for the `cart` / `bell` / `singing` ambient kinds, a horse prop, then WP13c (Hamlet and Farms onwards).
 
 Changes in 0.21.1 (WP13a): Bramble Wood (`wood`) and Gallows Moor (`moor`) are generated (`core/gen/gen_wild.gd`, rows in `data/rogue/stages.json`), the trek runs hollow -> wood -> moor and ends with "To be continued..." after the moor (see `AI_HANDOFF.md`, "Changes in 0.21.1"). Still to do for them: a person plays both (thicket density, deer / wolf balance, pockets, the wind bed at the exit, owl / creek / cricket sounds), then WP13b (The Old Road onwards).

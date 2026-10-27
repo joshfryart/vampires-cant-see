@@ -207,6 +207,7 @@ func boot() -> void:
 			want_map = a.substr(6)
 	audio = AudioDirector.new()
 	add_child(audio)
+	WorldMeshBuilder.contour_enabled = true # styled (wallStyle) maps use the smooth contour mesh and the ink wall look (docs/STYLE.md)
 	_build_view()
 	_load_worlds()
 	cfg = Config.load_file() if test_storage == null else Config.defaults_copy()
@@ -439,6 +440,7 @@ func _show_map_mesh(name: String) -> void:
 	if not meshes.has(name):
 		var walls := MeshInstance3D.new()
 		walls.mesh = WorldMeshBuilder.build(worlds[name])
+		walls.set_meta("styled", WorldMeshBuilder.contour_enabled and not worlds[name].wall_style.is_empty()) # which mesh path was built (the shader reads UV2 / COLOR.g differently)
 		walls.material_override = wall_mat
 		viewport.add_child(walls)
 		var fl := MeshInstance3D.new()
@@ -455,6 +457,7 @@ func _show_map_mesh(name: String) -> void:
 			inst.visible = n == name
 	walls_inst = meshes[name][0]
 	floor_inst = meshes[name][1]
+	wall_mat.set_shader_parameter("styled", 1.0 if walls_inst.get_meta("styled", false) else 0.0)
 	update_light_texture()
 
 

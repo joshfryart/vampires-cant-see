@@ -207,7 +207,7 @@
    "name": "Crossroads Inn",
    "index": 5,
    "generator": "inn",
-   "wallStyle": {"#": "drystone", "W": "timber"},
+   "wallStyle": {"#": "drystone", "W": "timber", "B": "milestone", "I": "fence"},
    "miles": 3,
    "next": "hamlet",
    "drainMul": 1.1,

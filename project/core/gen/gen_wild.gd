@@ -813,6 +813,7 @@ static func _assemble(plan: WP, row: Dictionary, style: String, seed: int, attem
 		"kind": String(row["kind"]),
 		"floor": String(row["floor"]),
 		"materials": mats,
+		"wallStyle": row.get("wallStyle", {}),
 		"rows": _rows(plan),
 		"doors": doors,
 		"props": plan.props,
