@@ -3,6 +3,15 @@
 Read this first. It is written for the next AI session (or developer) picking the port up. Status: **alpha, feature-complete against the
 JS game (version 0.20.2) except the items under "NOT included"; version 0.21.0 adds the Godot-only roguelike mode "The Long Night" (see "Changes in 0.21.0"); 0.21.1 adds its next two stages, Bramble Wood and Gallows Moor (see "Changes in 0.21.1")**. Nothing here has been judged by a person's eyes or ears yet (see "Unverified").
 
+**Latest (2026-10-28): version 0.22.0** (09c11f9; Hollow three-pass polish, see "Changes in 0.21.8–0.22.0" and `docs/CAVE_ITERATIONS.md`). Full suite green (406 tests, 1,260,937 checks). The version lives in `project.godot` (not js/log.js); patch 0–9 then roll into the minor. Stages after the Crossroads Inn are **on hold until the user has playtested and says continue**.
+
+**Working notes for the next AI**
+- User wants very terse updates between tasks (abbreviations fine). Opus for plans and final review, sonnet/haiku for implementation; run agents on disjoint files; commit explicit paths only (never `git add -A`); untracked `.uid` files are noise.
+- Full suite: run in the background, save output to a file, read the final JSON line (`failed` must be 0). Never `tail -4` it. Don't leave `until grep ...` wait loops running; a wait on a killed run spins forever.
+- `--scenario=` runs now use in-memory saves (0.22.0), so windowed scenarios no longer touch `user://`. Pass 2 once overwrote the real trek save and restored it from an older backup: if the user reports lost Soil or unlocks, that is the likely cause.
+- First-run Hollow layout is byte-identical to 0.21.7 by design (tests pin seeds); variants and the brief cave apply to repeat runs only (`night.trek.brief`).
+- Nothing has been judged by a person's eyes or ears yet beyond the user's early cave feedback: wind level, Sense hint, draft pan, joke cards, revive card, stalactite bodies, strata, shiver.
+
 ## Ground rules
 
 - Repo layout (restructured 2026-10-22): the **Godot port is the repo root** (`project/`, `tools/`, `docs/`, `PLAN.md`, this file). The original browser game was moved to
