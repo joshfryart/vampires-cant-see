@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.1", "version 0.22.1")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.2", "version 0.22.2")
 
 
 func test_new_trek_from_the_menu() -> void:
@@ -259,8 +259,8 @@ func test_sleep_needs_a_rest_spot() -> void:
 	var best := -1.0
 	for y in g.world.height:
 		for x in g.world.width:
-			if g.world.blocks(x + 0.5, y + 0.5, 0.2):
-				continue
+			if g.world.blocks(x + 0.5, y + 0.5, 0.2) or g.world.kind_at(x + 0.5, y + 0.5) != "indoor":
+				continue   # the open apron outside the mouth is deadly by day, and this test is about the choice
 			var dmin := 999.0
 			for rr in f.def["rest"]:
 				dmin = minf(dmin, Vector2(float(rr["cell"][0]) + 0.5, float(rr["cell"][1]) + 0.5).distance_to(Vector2(x + 0.5, y + 0.5)))

@@ -708,8 +708,15 @@ func _read_input() -> Dictionary:
 
 # ---------------------------------------------------------------- frame
 
+var _last_mouse_mode: int = -1
+
+
 func _process(delta: float) -> void:
 	frame_no += 1
+	if Input.mouse_mode != _last_mouse_mode:
+		if _last_mouse_mode != -1:
+			Log.info("input", "mouse mode %d -> %d (state %s, prompt %s, waiting %s, focus %s)" % [_last_mouse_mode, Input.mouse_mode, state, str(rogue_on() and rogue.prompt_open), str(rogue_on() and rogue.waiting), str(get_window().has_focus())])
+		_last_mouse_mode = Input.mouse_mode
 	var inp := {}
 	if scenario != null:
 		inp = scenario.step(self, delta)

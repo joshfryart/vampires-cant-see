@@ -118,6 +118,8 @@ func test_floor_makes_the_draft_audible_far_from_the_door() -> void:
 	var c := _far_cell(r.trek, 40)
 	if c.x < 0:
 		c = _far_cell(r.trek, 25)
+	if c.x < 0:
+		c = _far_cell(r.trek, 14)   # the compact Hollow has nothing 25 steps out; WIND_RANGE is 12, so 14 is still silent
 	_place(g, c)
 	r.sense_t = 0.0
 	r.assist = 0

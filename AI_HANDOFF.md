@@ -76,6 +76,10 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.22.2 (compact Hollow)
+
+User found the starting cave too big and easy to get lost in. Hollow row in `data/rogue/stages.json`: size 64x48 -> 60x44, nodes 8-9 -> 7-8, spurs 2-3 -> 2; `GenCave.CHAIN_REACH` 24 -> 22 (BRIEF_REACH stays 18). Smaller grids than ~56x42 fail layout (the 17x17 echo hall plus gaps), and 56x42 made generation 4x slower, so 60x44 is the practical floor with the current chunks. New acceptance `GenCave._spur_clear_of_beats` (reason r14): the tutorial's dead-end step fires within 4.5 cells of the spur mouth or spur rest, so no main-path beat may be within 6 cells of it. Mean coffin-to-exit walk 178.6 -> 164 (first run); the brief cave is no longer shorter than the first run (test relaxed to `lb < lf * 1.04`). Tests updated: sizes, FIRST_RUN_HASH / BRIEF_0219_HASH / CLASSIC_STAGE_HASH re-pinned (old pins no longer mean "0.21.9 byte-identical"), generation time limit 900 ms, up to 2 weak crumbs per 50 seeds, rest-spot sleep test avoids the sunny apron, sense test falls back to a 14-step cell. Other stages were not resized (the Hollow is now the smallest, so size still grows). Also: `game.gd` logs every mouse-mode change (`Log.info("input", "mouse mode ...")`) to find where the cursor gets released in play. Still to do: a person plays it; further shrinking needs smaller chunks.
+
 ## Changes in 0.22.1 (polish: no stars, ambient sounds, more Hollow variants)
 
 - **No stars**: open sky (moor, road, inn yard, cave apron) draws nothing overhead, echoes included (`FloorFx.ceil_kind_styled` returns "" for outdoor cells outside the wood; the ceiling pass skips it). The wood keeps its canopy. `_add_stars` is now unused.

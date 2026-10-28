@@ -16,7 +16,7 @@ const MAX_ATTEMPTS := 200
 const FILLER_GAP := 2
 ## Greatest distance between the centres of two consecutive beat chunks: the first-run cave, and the brief (repeat-run) cave, whose beats
 ## sit closer together so the walk from the coffin to the mouth is shorter.
-const CHAIN_REACH := 24
+const CHAIN_REACH := 22
 const BRIEF_REACH := 18
 
 static var last_attempts: int = 0
@@ -273,6 +273,8 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 	var def := _assemble(plan, rng, row, seed, attempt, chunks, role, info, path, order, spur_ends, loops.size(), crumb_from, rects)
 	if def.is_empty():
 		return _fail("r11")
+	if not _spur_clear_of_beats(def):
+		return _fail("r14")
 	if strict and not _crumbs_clean(plan, def):
 		return _fail("r13")
 	var rep := StageGen.analyze(def, row)
@@ -290,6 +292,29 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 		def["gen"]["brief"] = true
 		def["gen"]["fillers"] = fillr.size()
 	return def
+
+
+## The tutorial's "dead end" step fires within 4.5 cells of the spur mouth or a spur rest spot, so in the compact Hollow no main-path beat
+## may sit that close, or the hint would fire before the beat it belongs after.
+const SPUR_BEAT_GAP := 6.0
+
+
+static func _spur_clear_of_beats(def: Dictionary) -> bool:
+	var spot: Array = []
+	for b in def["beats"]:
+		if b["id"] == "dead_end_spurs":
+			spot.append(Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5))
+	for r in def.get("rest", []):
+		if String(r.get("kind", "")) == "spur":
+			spot.append(Vector2(float(r["cell"][0]) + 0.5, float(r["cell"][1]) + 0.5))
+	for b in def["beats"]:
+		if b["id"] == "dead_end_spurs":
+			continue
+		var bc := Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5)
+		for p in spot:
+			if bc.distance_to(p) < SPUR_BEAT_GAP:
+				return false
+	return true
 
 
 ## Walk out the chain of chunk rects (each rect fits the map, keeps a gap for tunnels and lies within reach of the previous one), then the
