@@ -44,13 +44,15 @@ static func stage_row(stage_id: String) -> Dictionary:
 ## `brief` (repeat runs: the Long Night tutorial is done) asks for the short form of a stage; only the cave has one (the Hollow without its
 ## filler chambers, a pure beat chain). The flag is an explicit argument, never read from global state, and brief = false is bit-identical
 ## to the generator before the flag existed. Generators without a short form ignore it.
-static func generate(stage_id: String, seed: int, brief: bool = false) -> Dictionary:
+## `variants` (0.22.0) lets the brief cave use the seed's chunk variants (GenCave.variant_pick); false gives the 0.21.8-0.21.9 brief cave
+## byte for byte (repeat-run checkpoints saved before 0.22.0). It has no effect on a first-run (brief = false) layout.
+static func generate(stage_id: String, seed: int, brief: bool = false, variants: bool = true) -> Dictionary:
 	var row := stage_row(stage_id)
 	if row.is_empty():
 		return {}
 	match String(row.get("generator", "")):
 		"cave":
-			return GenCave.generate(row, seed, brief)
+			return GenCave.generate(row, seed, brief, variants)
 		"wood", "moor":
 			return GenWild.generate(row, seed, String(row["generator"]))
 		"road", "inn":

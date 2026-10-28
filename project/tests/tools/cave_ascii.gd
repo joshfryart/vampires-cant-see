@@ -1,6 +1,7 @@
 extends SceneTree
 ## ASCII dump + layout checks for generated Hollow caves (a design aid, not part of the test suite).
-## Usage: godot --headless --path project -s res://tests/tools/cave_ascii.gd -- --seeds=1,2,3 [--stage=hollow]
+## Usage: godot --headless --path project -s res://tests/tools/cave_ascii.gd -- --seeds=1,2,3 [--stage=hollow] [--brief]
+## --brief dumps the repeat-run (brief) form, whose beats may use chunk variants (printed as "variants:").
 ## Markers: 1-9 beats (in generator order), @ start, X exit, B bat, R rat, ? other critter, s rest spot, a ambient anchor, # wall, ~ water.
 ## Checks: the squeeze cannot be bypassed (BFS coffin -> echo hall with squeeze zone cells blocked), beat order by BFS depth,
 ## dead_end_spurs must not branch off the Coffin Nook, plus per-zone emptiness counts. Prints WARN lines.
@@ -11,7 +12,10 @@ const N4 := [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 func _init() -> void:
 	var seeds: Array = [1, 2, 3]
 	var stage := "hollow"
+	var brief := false
 	for a in OS.get_cmdline_user_args():
+		if a == "--brief":
+			brief = true
 		if a.begins_with("--seeds="):
 			seeds = []
 			for p in a.substr(8).split(","):
@@ -21,7 +25,7 @@ func _init() -> void:
 			stage = a.substr(8)
 	var warns := 0
 	for sd in seeds:
-		warns += _report(stage, int(sd))
+		warns += _report(stage, int(sd), brief)
 	print("CAVE_ASCII done, %d warning(s)" % warns)
 	quit(0)
 
@@ -67,8 +71,8 @@ func _cell(a: Variant) -> Vector2i:
 	return Vector2i(int(a[0]), int(a[1]))
 
 
-func _report(stage: String, sd: int) -> int:
-	var def: Dictionary = StageGen.generate(stage, sd)
+func _report(stage: String, sd: int, brief: bool = false) -> int:
+	var def: Dictionary = StageGen.generate(stage, sd, brief)
 	if def.is_empty():
 		print("seed %d: NO DEF" % sd)
 		return 1
@@ -109,7 +113,9 @@ func _report(stage: String, sd: int) -> int:
 		put.call(_cell(b["cell"]), str(i))
 		legend.append("%d=%s" % [i, b["id"]])
 		i += 1
-	print("=== %s seed %d  (%dx%d) ===" % [stage, sd, w.width, w.height])
+	print("=== %s seed %d%s  (%dx%d) ===" % [stage, sd, " brief" if brief else "", w.width, w.height])
+	if def["gen"].has("variants"):
+		print("variants: " + str(def["gen"]["variants"]))
 	for r in grid:
 		print(r)
 	print("legend: " + ", ".join(legend) + " | @ start X exit B bat R rat s rest a ambient A dead-air * crumb M spur mouth")

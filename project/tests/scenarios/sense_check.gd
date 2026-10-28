@@ -5,7 +5,8 @@ extends RefCounted
 ## trek.senses before and after. Game._unhandled_input ignores input while a scenario runs (the scenarios drive the sim themselves), so the
 ## scenario lifts that guard for the one dispatch only.
 ## Use: godot --path project --rendering-driver opengl3 --quit-after 600 -- --scenario=sense_check [--out=<absolute dir>]
-## It needs a real window (it reads the window texture). Back up your user:// saves first: it starts a new trek.
+## It needs a real window (it reads the window texture). Since 0.22.0 every --scenario run uses in-memory saves (Game.boot), so the
+## new trek it starts no longer touches the user:// trek checkpoint or rogue meta.
 
 const OUT_DEFAULT := "C:/Users/hello/AppData/Local/Temp/claude/C--Users-hello-OneDrive-Desktop-claude-Vampires-Cant-See/4095c3ef-caf6-4fb9-a1b1-a8cf76b650c8/scratchpad/sense_check"
 const PRESS_AT := 3.0

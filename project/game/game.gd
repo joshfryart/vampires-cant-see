@@ -213,7 +213,13 @@ func boot() -> void:
 	_build_view()
 	_load_worlds()
 	cfg = Config.load_file() if test_storage == null else Config.defaults_copy()
-	flow = RunFlow.new(self, test_storage)
+	# 0.22.0: a scripted scenario (--scenario=) runs on an in-memory save store, so windowed tours (cave_tour, sense_check, run_start, ...)
+	# can no longer overwrite or remove the player's real user:// saves (classic run, meta, rogue meta, trek checkpoint). They start from a
+	# fresh install's saves instead (a new Long Night is the guided first night on the first-run Hollow layout). Settings are still read.
+	var saves: Object = test_storage
+	if saves == null and scenario_name != "":
+		saves = SaveCodec.MemoryStorage.new()
+	flow = RunFlow.new(self, saves)
 	var chk := {"ok": true, "notices": [], "failed": ""}
 	if test_storage == null:
 		chk = Checks.report(Checks.run())

@@ -5,7 +5,8 @@ extends RefCounted
 ## is still a pure function of the seed):
 ##   1 layout: the chain of 7 beat chunks (coffin nook ... cave mouth) is walked out first, then 1-2 filler chambers (8-9 nodes in all);
 ##     tree = MST of the node centres with the chain edges forced, so the tree path start -> exit is the beat order (order by depth).
-##     The brief form (repeat runs, generate(..., brief = true)) keeps the 7 beat chunks only: no fillers, so a pure beat chain
+##     The brief form (repeat runs, generate(..., brief = true)) keeps the 7 beat chunks only: no fillers, so a pure beat chain; since
+##     0.22.0 its beats may also use a second authored chunk (variant_pick, per seed) and its breadcrumb trail must be clean (_crumbs_clean)
 ##   2 stamp the chunks (rect protected from later carving), CA blobs for fillers, one small loop through a filler, biased drunk-walk
 ##     tunnels of width 1-2 between chunk ports
 ##   3 2-3 blind spurs (end = hidden rest spot), growth towards a target open fraction, prune floor the start cannot reach
@@ -29,14 +30,33 @@ static func _fail(k: String) -> Dictionary:
 
 
 ## brief = the repeat-run Hollow: the beat chain alone (no filler chambers, so no filler loop, filler drips or filler rats). brief = false is
-## the first-run layout, bit-identical to the generator before the flag existed (same rng draws in the same order).
-static func generate(row: Dictionary, seed: int, brief: bool = false) -> Dictionary:
+## the first-run layout, bit-identical to the generator before the flag existed (same chunks, same rng draws in the same order): the guided
+## first night always teaches in the authored cave.
+## variants (0.22.0, brief only): each beat that has alternative chunks (chunks.json "variants") uses the one variant_pick chose for this seed,
+## and the attempt must also lay a clean breadcrumb trail (_crumbs_clean). variants = false is the 0.21.8-0.21.9 brief cave, byte-identical,
+## kept so a repeat-run checkpoint saved before 0.22.0 (no night.trek "variants" key) continues in the cave it was saved in.
+static func generate(row: Dictionary, seed: int, brief: bool = false, variants: bool = true) -> Dictionary:
 	var data := StageGen.chunks()
 	if data.is_empty():
 		return {}
+	var strict: bool = brief and variants
+	var pick := variant_pick(String(row.get("id", "")), seed, brief) if variants else {}
+	var def := _attempts(row, with_variants(data, pick), seed, brief, strict)
+	if not def.is_empty() or pick.is_empty():
+		if not def.is_empty() and strict:
+			def["gen"]["variants"] = pick
+		return def
+	# a variant set that never fits (not seen over the tested seeds) falls back to the authored chunks, so a seed still always has a cave
+	def = _attempts(row, data, seed, brief, strict)
+	if not def.is_empty():
+		def["gen"]["variants"] = {}
+	return def
+
+
+static func _attempts(row: Dictionary, data: Dictionary, seed: int, brief: bool, strict: bool = false) -> Dictionary:
 	for attempt in MAX_ATTEMPTS:
 		var rng := Rng.new(StageGen.seed_for(seed, attempt))
-		var def := _attempt(row, data, rng, seed, attempt, brief)
+		var def := _attempt(row, data, rng, seed, attempt, brief, strict)
 		if not def.is_empty():
 			last_attempts = attempt + 1
 			return def
@@ -44,7 +64,50 @@ static func generate(row: Dictionary, seed: int, brief: bool = false) -> Diction
 	return {}
 
 
-static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, attempt: int, brief: bool = false) -> Dictionary:
+## Salt for the variant draw (its own rng stream, so picking variants never shifts the layout rng).
+const VARIANT_SALT := 0x5EED7A
+## Chance that a beat with alternatives uses one of them (each alternative equally likely) instead of its authored chunk.
+const VARIANT_CHANCE := 0.5
+
+
+## Which chunk variant each beat uses: {beat id: chunk name} for every beat that has alternatives in chunks.json "variants" (the authored
+## chunk's own name when it was kept). A pure function of (stage id, seed, brief) on its own rng stream. Empty for the first run
+## (brief = false): the guided night's cave never varies its chunks, so its layout stays byte-identical to the one the tutorial was tuned on.
+static func variant_pick(stage_id: String, seed: int, brief: bool) -> Dictionary:
+	if not brief:
+		return {}
+	var vars: Dictionary = StageGen.chunks().get("variants", {})
+	if vars.is_empty():
+		return {}
+	var rng := Rng.new(StageGen.seed_for((seed ^ stage_id.hash()) & JsMath.M32, VARIANT_SALT))
+	var out := {}
+	for b in StageGen.chunks()["order"]:
+		if not vars.has(b):
+			continue
+		var alts: Array = vars[b]
+		var r := rng.next()
+		out[b] = b
+		if r < VARIANT_CHANCE and not alts.is_empty():
+			out[b] = String(alts[mini(alts.size() - 1, int(floor(r / VARIANT_CHANCE * float(alts.size()))))])
+	return out
+
+
+## The chunk data with each picked beat's chunk swapped for its variant (a shallow copy; the shared chunks.json data is not touched).
+## The variant keeps the beat id, so roles, zones, beats and the tutorial all still speak of the beat by its name.
+static func with_variants(data: Dictionary, pick: Dictionary) -> Dictionary:
+	if pick.is_empty():
+		return data
+	var chunks: Dictionary = (data["chunks"] as Dictionary).duplicate()
+	for b in pick:
+		var nm: String = pick[b]
+		if nm != b and chunks.has(nm):
+			chunks[b] = chunks[nm]
+	var out := data.duplicate()
+	out["chunks"] = chunks
+	return out
+
+
+static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, attempt: int, brief: bool = false, strict: bool = false) -> Dictionary:
 	var sz: Dictionary = row["size"]
 	var w: int = int(sz["w"])
 	var h: int = int(sz["h"])
@@ -205,6 +268,8 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 	var def := _assemble(plan, rng, row, seed, attempt, chunks, role, info, path, order, spur_ends, loops.size(), crumb_from, rects)
 	if def.is_empty():
 		return _fail("r11")
+	if strict and not _crumbs_clean(plan, def):
+		return _fail("r13")
 	var rep := StageGen.analyze(def, row)
 	if not rep["ok"]:
 		for rs in rep["reasons"]:
@@ -707,6 +772,31 @@ static func _breadcrumbs(plan: StageGen.Plan, crumb_from: Array, rects: Dictiona
 		taken[pick.y * plan.w + pick.x] = true
 		out.append([pick.x, pick.y])
 	return out
+
+
+## Strict breadcrumb acceptance (brief caves with variants, 0.22.0): every crumb lies deeper than the crumb before it and past the beat before
+## its own (so the trail never points back), on a cell with at least 3 walkable neighbours (a funnelled 2-wide stretch, not a 1-wide
+## pinch). _breadcrumbs only prefers these; about 2% of seeds miss them (first-run seeds keep that for byte-identity; see CAVE_ITERATIONS.md).
+static func _crumbs_clean(plan: StageGen.Plan, def: Dictionary) -> bool:
+	var dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+	var crumbs: Array = def["gen"]["crumbs"]
+	var beats: Array = def["beats"]
+	var last := -1
+	for k in crumbs.size():
+		var c: Array = crumbs[k]
+		var dc: int = dist[plan.idx(int(c[0]), int(c[1]))]
+		if dc <= last:
+			return false
+		if k > 0 and dc <= dist[plan.idx(int(beats[k - 1]["cell"][0]), int(beats[k - 1]["cell"][1]))]:
+			return false
+		last = dc
+		var open := 0
+		for d in StageGen.N8:
+			if plan.walkable(int(c[0]) + d.x, int(c[1]) + d.y):
+				open += 1
+		if open < 3:
+			return false
+	return true
 
 
 static func _clear_around(plan: StageGen.Plan, c: Vector2i, allowed: Dictionary, pending: Dictionary = {}) -> bool:

@@ -67,6 +67,19 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.8–0.22.0 (the Hollow, three passes: summary)
+
+Full log with numbers, ASCII samples and decisions: `docs/CAVE_ITERATIONS.md` (table at the top: version, what contributed, commit).
+
+- **0.21.8** (c70008b): Sense hint held until the tutorial's V line; a ping during the waking line completes the ping step; dry waking line, echo-hall word and complaining-rat cards; the brief repeat-run Hollow (`StageGen.generate(id, seed, brief)`, no filler chambers, beats within 18 cells; `night.trek.brief`).
+- **0.21.9** (b27352f): `Tutorial.OPEN_HOLD` 3.2 s with the stage card alone; one free revive from withering on the guided night (`TrekFlow.guided` / `guided_revived`, `night.trek.guidedRevive`); stalactite occluding body, far strata thinning, calmer ink shiver.
+- **0.22.0**: **chunk variants on repeat runs only**. `chunks.json` `variants` + `coffin_nook_b`, `drip_gallery_b`, `echo_hall_b`, `still_pool_b`; `GenCave.variant_pick(stage_id, seed, brief)` (own rng stream, 50/50 per beat, `{}` on the first run) and `with_variants`; `def.gen.variants` records the pick. Brief caves with variants must also lay a clean breadcrumb trail (`_crumbs_clean`). The first-run cave is byte-identical (hashes of seeds 1..60 compared, three pinned). `StageGen.generate(id, seed, brief, variants = true)`: `TrekFlow.variants` is saved as `night.trek.variants` on brief treks, and a brief checkpoint from 0.21.8-0.21.9 (no key) continues in its old variant-free cave (byte-identical). **Scenarios** (`--scenario=`) now run on an in-memory save store (`Game.boot`), so windowed tours no longer overwrite or delete the user:// run, meta, rogue or trek saves (settings, `seen.json` and `flags.json` behave as before); `cave_tour` therefore always shows the first-run layout. `cave_ascii.gd -- --brief` dumps repeat-run caves. Tests: bottom of `tests/unit/test_stage_gen.gd` (`-- --variant-seeds=300` widens the sweep).
+
+Needs a human playtest:
+- Guided first night: is the held Sense hint noticed when it lights with the V line; does the 3.2 s opening hold feel deliberate; tone of the waking line, echo word, rat quip and the "Back in the box" revive card; does a first-timer understand they were saved once.
+- Look: the solid stalactite bodies across a whole cave (dark rim at grazing angles?), far-strata thinning, calmer shiver.
+- Repeat runs (tutorial Off, several new runs): pace of the brief cave; do the variants feel different and readable without the tutorial (oval hall echo and pillars, pool detour, bent gallery, second nook).
+
 ## Changes in 0.21.9 (Hollow pass 2: opening order, free first-night revive, quieter rock)
 
 Second of three cave passes (log: `docs/CAVE_ITERATIONS.md`). Tests: `test_rogue_tutorial.gd` and `test_trek_flow.gd` (bottoms), `test_vault_mesh.gd`, `test_style_switch.gd`.

@@ -114,52 +114,54 @@ func test_beats_in_order() -> void:
 func test_shelter() -> void:
 	var defs := _all()
 	for i in defs.size():
-		var d: Dictionary = defs[i]
-		var tag := "seed %d" % (i + 1)
-		var s_count := 0
-		var c_count := 0
-		for r in "\n".join(d["rows"]):
-			if r == "S":
-				s_count += 1
-			elif r == "C":
-				c_count += 1
-		ok(s_count >= 1, tag + " has a safe spot")
-		eq(c_count, 1, tag + " one crypt spot")
-		var kinds := {}
-		for r in d["rest"]:
-			kinds[r["kind"]] = int(kinds.get(r["kind"], 0)) + 1
-			ok(float(r["safety"]) >= 0.0 and float(r["safety"]) <= 1.0, tag + " safety in 0..1")
-			var ch: String = String(d["rows"][r["cell"][1]])[r["cell"][0]]
-			eq(ch, r["marker"], tag + " rest marker on the map")
-		eq(kinds.get("coffin", 0), 1, tag + " coffin rest")
-		ok(kinds.get("roost", 0) >= 1, tag + " roost ledge")
-		ok(d["rest"].size() - 1 >= 2, tag + " >= 2 non-coffin rest spots")
-		ok(d["pockets"].size() >= 3, tag + " >= 3 covered pockets")
-		var rest_pockets := 0
-		for p in d["pockets"]:
-			var z := _zone(d, p["zone"])
-			ok(not z.is_empty() and z["kind"] == "indoor", tag + " pocket zone " + p["zone"])
-			if not z.is_empty():
-				ok(_in_zone(z, p["cell"]), tag + " pocket cell inside its zone")
-			if p["rest"]:
-				rest_pockets += 1
-		ok(rest_pockets >= 3, tag + " pockets that are rest spots")
-		# coffin nook: upright coffin on the north wall, start next to it, drip two cells ahead
-		var coffin: Dictionary = {}
-		for p in d["props"]:
-			if p["type"] == "coffin":
-				coffin = p
-		ok(not coffin.is_empty(), tag + " coffin prop")
-		if not coffin.is_empty():
-			eq(String(d["rows"][coffin["row"] - 1])[coffin["col"]], "#", tag + " coffin stands against the north wall")
-			var st: Array = d["start"]["cell"]
-			eq(st[0], coffin["col"], tag + " start is below the coffin")
-			eq(st[1], coffin["row"] + 1, tag + " start is one cell south of the coffin")
-			var drip := false
-			for a in d["ambient"]:
-				if a["kind"] == "drip" and a["cell"][0] == st[0] and a["cell"][1] == st[1] + 2:
-					drip = true
-			ok(drip, tag + " drip anchor 2 cells ahead of the start")
+		_shelter(defs[i], "seed %d" % (i + 1))
+
+
+func _shelter(d: Dictionary, tag: String) -> void:
+	var s_count := 0
+	var c_count := 0
+	for r in "\n".join(d["rows"]):
+		if r == "S":
+			s_count += 1
+		elif r == "C":
+			c_count += 1
+	ok(s_count >= 1, tag + " has a safe spot")
+	eq(c_count, 1, tag + " one crypt spot")
+	var kinds := {}
+	for r in d["rest"]:
+		kinds[r["kind"]] = int(kinds.get(r["kind"], 0)) + 1
+		ok(float(r["safety"]) >= 0.0 and float(r["safety"]) <= 1.0, tag + " safety in 0..1")
+		var ch: String = String(d["rows"][r["cell"][1]])[r["cell"][0]]
+		eq(ch, r["marker"], tag + " rest marker on the map")
+	eq(kinds.get("coffin", 0), 1, tag + " coffin rest")
+	ok(kinds.get("roost", 0) >= 1, tag + " roost ledge")
+	ok(d["rest"].size() - 1 >= 2, tag + " >= 2 non-coffin rest spots")
+	ok(d["pockets"].size() >= 3, tag + " >= 3 covered pockets")
+	var rest_pockets := 0
+	for p in d["pockets"]:
+		var z := _zone(d, p["zone"])
+		ok(not z.is_empty() and z["kind"] == "indoor", tag + " pocket zone " + p["zone"])
+		if not z.is_empty():
+			ok(_in_zone(z, p["cell"]), tag + " pocket cell inside its zone")
+		if p["rest"]:
+			rest_pockets += 1
+	ok(rest_pockets >= 3, tag + " pockets that are rest spots")
+	# coffin nook: upright coffin on the north wall, start next to it, drip two cells ahead
+	var coffin: Dictionary = {}
+	for p in d["props"]:
+		if p["type"] == "coffin":
+			coffin = p
+	ok(not coffin.is_empty(), tag + " coffin prop")
+	if not coffin.is_empty():
+		eq(String(d["rows"][coffin["row"] - 1])[coffin["col"]], "#", tag + " coffin stands against the north wall")
+		var st: Array = d["start"]["cell"]
+		eq(st[0], coffin["col"], tag + " start is below the coffin")
+		eq(st[1], coffin["row"] + 1, tag + " start is one cell south of the coffin")
+		var drip := false
+		for a in d["ambient"]:
+			if a["kind"] == "drip" and a["cell"][0] == st[0] and a["cell"][1] == st[1] + 2:
+				drip = true
+		ok(drip, tag + " drip anchor 2 cells ahead of the start")
 
 
 func test_cover_distance_rule() -> void:
@@ -214,187 +216,191 @@ func test_caps_and_fractions() -> void:
 func test_beat_features() -> void:
 	var defs := _all()
 	for i in defs.size():
-		var d: Dictionary = defs[i]
-		var tag := "seed %d" % (i + 1)
-		var plan := StageGen.plan_from_def(d)
-		# echo hall: radius 7 open, T60 zone, pillars, bats under stalactites
-		var hall := _zone(d, "echo_hall")
-		ok(not hall.is_empty(), tag + " echo_hall zone")
-		var hc: Array = d["places"]["echo_hall"]
-		var open7 := 0
-		for y in range(hc[1] - 7, hc[1] + 8):
-			for x in range(hc[0] - 7, hc[0] + 8):
-				if (x - hc[0]) * (x - hc[0]) + (y - hc[1]) * (y - hc[1]) <= 49 and plan.tile(x, y) != 0:
-					open7 += 1
-		ok(open7 >= 120, tag + " hall radius 7 is open (%d of about 154)" % open7)
-		var pillars := 0
-		for y in range(hall["y0"], hall["y1"] + 1):
-			for x in range(hall["x0"], hall["x1"] + 1):
-				if plan.tile(x, y) == 0 and plan.tile(x - 1, y) != 0 and plan.tile(x + 1, y) != 0 and plan.tile(x, y - 1) != 0 and plan.tile(x, y + 1) != 0:
-					pillars += 1
-		ok(pillars >= 2 and pillars <= 3, tag + " lone pillar cells %d" % pillars)
-		# showpiece: stalagmite clusters, stalactite props and drip anchors in the hall
-		var mites := 0
-		for p in d["props"]:
-			if p["type"] == "stalagmite" and _in_zone(hall, [p["col"], p["row"]]):
-				mites += 1
-		ok(mites >= 6, tag + " hall stalagmites in clusters %d" % mites)
-		var hall_anchors := 0
-		for a in d["ambient"]:
-			if _in_zone(hall, a["cell"]) and not a.get("dead", false):
-				hall_anchors += 1
-		ok(hall_anchors >= 2 and hall_anchors <= 4, tag + " hall ambient anchors %d" % hall_anchors)
-		var bats := 0
-		for c in d["critters"]:
-			if c["species"] == "bat":
-				bats += 1
-		ok(bats >= 2, tag + " bats")
-		var stalactites := 0
-		for p in d["props"]:
-			if p["type"] == "stalactite" and _in_zone(hall, [p["col"], p["row"]]):
-				stalactites += 1
-		ok(stalactites >= 7, tag + " stalactite props in the hall %d" % stalactites)
-		near(Acoustics.t60_for("echo_hall", "indoor"), 2.2, 0.1, "echo hall T60")
-		# squeeze: 1-wide corridor of about 31 cells
-		var sq := _zone(d, "squeeze")
-		var walk := 0
-		for y in range(sq["y0"], sq["y1"] + 1):
-			for x in range(sq["x0"], sq["x1"] + 1):
-				if plan.walkable(x, y):
-					walk += 1
-					var nb := 0
-					for dd in StageGen.N4:
-						if plan.walkable(x + dd.x, y + dd.y) and _in_zone(sq, [x + dd.x, y + dd.y]):
-							nb += 1
-					ok(nb <= 2, tag + " squeeze cell is 1 wide")
-		ok(walk >= 28 and walk <= 36, tag + " squeeze length %d" % walk)
-		# one quiet drip at the far end of the squeeze (in the deeper half)
-		var sq_dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
-		var sq_max := 0
-		var sq_near := 1 << 20
-		for y in range(sq["y0"], sq["y1"] + 1):
-			for x in range(sq["x0"], sq["x1"] + 1):
-				if plan.walkable(x, y):
-					sq_max = maxi(sq_max, sq_dist[plan.idx(x, y)])
-					sq_near = mini(sq_near, sq_dist[plan.idx(x, y)])
-		var sq_drips := 0
-		for a in d["ambient"]:
-			if _in_zone(sq, a["cell"]):
-				sq_drips += 1
-				eq(a["kind"], "drip", tag + " squeeze anchor is a drip")
-				var ad: int = sq_dist[plan.idx(a["cell"][0], a["cell"][1])]
-				ok(ad >= sq_near + (sq_max - sq_near) / 2, tag + " squeeze drip at the far end (depth %d of %d..%d)" % [ad, sq_near, sq_max])
-		eq(sq_drips, 1, tag + " one squeeze drip")
-		# pool
-		var pool := _zone(d, "still_pool")
-		var water := 0
-		for y in range(pool["y0"], pool["y1"] + 1):
-			for x in range(pool["x0"], pool["x1"] + 1):
-				if plan.tile(x, y) == 2:
-					water += 1
-		ok(water >= 20, tag + " pool water %d" % water)
-		var rip := 0
-		var drips := 0
-		var draft := 0
-		for a in d["ambient"]:
-			if a["kind"] == "ripple":
-				rip += 1
-				ok(_in_zone(pool, a["cell"]), tag + " ripple in pool zone")
-			elif a["kind"] == "drip":
-				drips += 1
-			elif a["kind"] == "draft":
-				draft += 1
-		ok(rip >= 2, tag + " pool ripples")
-		ok(drips >= 5, tag + " drips (nook + gallery + fillers)")
-		eq(draft, 1, tag + " one draft anchor")
-		var gal := _zone(d, "drip_gallery")
-		var gd := 0
-		for a in d["ambient"]:
-			if a["kind"] == "drip" and _in_zone(gal, a["cell"]):
-				gd += 1
-		ok(gd >= 3 and gd <= 4, tag + " gallery drips %d" % gd)
-		var shore_rats := 0
-		for c in d["critters"]:
-			if c["species"] == "rat" and _in_zone(pool, c["cell"]):
-				shore_rats += 1
-		ok(shore_rats >= 1, tag + " rats on the shore")
-		var war := _zone(d, "rat_warren")
-		var wr := 0
-		for c in d["critters"]:
-			if c["species"] == "rat" and _in_zone(war, c["cell"]):
-				wr += 1
-		ok(wr >= 3 and wr <= 4, tag + " warren rats %d" % wr)
-		var wa := 0
-		for a in d["ambient"]:
-			if _in_zone(war, a["cell"]) and not a.get("dead", false):
-				wa += 1
-		ok(wa >= 1 and wa <= 2, tag + " warren anchors %d" % wa)
-		# exit
-		var door: Dictionary = d["doors"][0]
-		eq(door["toMap"], "stage:wood", tag + " exit placeholder")
-		eq(String(d["rows"][door["row"]])[door["col"]], "D", tag + " door cell")
-		var glow := false
-		for l in d["lights"]:
-			if Vector2(l["cell"][0], l["cell"][1]).distance_to(Vector2(door["col"], door["row"])) < 9.0:
-				glow = true
-		ok(glow, tag + " glow-worm light by the mouth")
-		# spurs are dead ends
-		var spur_pockets := 0
-		for p in d["pockets"]:
-			if p["kind"] == "spur":
-				spur_pockets += 1
-				var nb2 := 0
+		_beat_features(defs[i], "seed %d" % (i + 1))
+
+
+func _beat_features(d: Dictionary, tag: String) -> void:
+	var plan := StageGen.plan_from_def(d)
+	# echo hall: radius 7 open, T60 zone, pillars, bats under stalactites
+	var hall := _zone(d, "echo_hall")
+	ok(not hall.is_empty(), tag + " echo_hall zone")
+	var hc: Array = d["places"]["echo_hall"]
+	var open7 := 0
+	for y in range(hc[1] - 7, hc[1] + 8):
+		for x in range(hc[0] - 7, hc[0] + 8):
+			if (x - hc[0]) * (x - hc[0]) + (y - hc[1]) * (y - hc[1]) <= 49 and plan.tile(x, y) != 0:
+				open7 += 1
+	ok(open7 >= 120, tag + " hall radius 7 is open (%d of about 154)" % open7)
+	var pillars := 0
+	for y in range(hall["y0"], hall["y1"] + 1):
+		for x in range(hall["x0"], hall["x1"] + 1):
+			if plan.tile(x, y) == 0 and plan.tile(x - 1, y) != 0 and plan.tile(x + 1, y) != 0 and plan.tile(x, y - 1) != 0 and plan.tile(x, y + 1) != 0:
+				pillars += 1
+	ok(pillars >= 2 and pillars <= 3, tag + " lone pillar cells %d" % pillars)
+	# showpiece: stalagmite clusters, stalactite props and drip anchors in the hall
+	var mites := 0
+	for p in d["props"]:
+		if p["type"] == "stalagmite" and _in_zone(hall, [p["col"], p["row"]]):
+			mites += 1
+	ok(mites >= 6, tag + " hall stalagmites in clusters %d" % mites)
+	var hall_anchors := 0
+	for a in d["ambient"]:
+		if _in_zone(hall, a["cell"]) and not a.get("dead", false):
+			hall_anchors += 1
+	ok(hall_anchors >= 2 and hall_anchors <= 4, tag + " hall ambient anchors %d" % hall_anchors)
+	var bats := 0
+	for c in d["critters"]:
+		if c["species"] == "bat":
+			bats += 1
+	ok(bats >= 2, tag + " bats")
+	var stalactites := 0
+	for p in d["props"]:
+		if p["type"] == "stalactite" and _in_zone(hall, [p["col"], p["row"]]):
+			stalactites += 1
+	ok(stalactites >= 7, tag + " stalactite props in the hall %d" % stalactites)
+	near(Acoustics.t60_for("echo_hall", "indoor"), 2.2, 0.1, "echo hall T60")
+	# squeeze: 1-wide corridor of about 31 cells
+	var sq := _zone(d, "squeeze")
+	var walk := 0
+	for y in range(sq["y0"], sq["y1"] + 1):
+		for x in range(sq["x0"], sq["x1"] + 1):
+			if plan.walkable(x, y):
+				walk += 1
+				var nb := 0
 				for dd in StageGen.N4:
-					if plan.walkable(p["cell"][0] + dd.x, p["cell"][1] + dd.y):
-						nb2 += 1
-				eq(nb2, 1, tag + " spur end is a dead end")
-		ok(spur_pockets >= 2 and spur_pockets <= 3, tag + " 2-3 spurs")
+					if plan.walkable(x + dd.x, y + dd.y) and _in_zone(sq, [x + dd.x, y + dd.y]):
+						nb += 1
+				ok(nb <= 2, tag + " squeeze cell is 1 wide")
+	ok(walk >= 28 and walk <= 36, tag + " squeeze length %d" % walk)
+	# one quiet drip at the far end of the squeeze (in the deeper half)
+	var sq_dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+	var sq_max := 0
+	var sq_near := 1 << 20
+	for y in range(sq["y0"], sq["y1"] + 1):
+		for x in range(sq["x0"], sq["x1"] + 1):
+			if plan.walkable(x, y):
+				sq_max = maxi(sq_max, sq_dist[plan.idx(x, y)])
+				sq_near = mini(sq_near, sq_dist[plan.idx(x, y)])
+	var sq_drips := 0
+	for a in d["ambient"]:
+		if _in_zone(sq, a["cell"]):
+			sq_drips += 1
+			eq(a["kind"], "drip", tag + " squeeze anchor is a drip")
+			var ad: int = sq_dist[plan.idx(a["cell"][0], a["cell"][1])]
+			ok(ad >= sq_near + (sq_max - sq_near) / 2, tag + " squeeze drip at the far end (depth %d of %d..%d)" % [ad, sq_near, sq_max])
+	eq(sq_drips, 1, tag + " one squeeze drip")
+	# pool
+	var pool := _zone(d, "still_pool")
+	var water := 0
+	for y in range(pool["y0"], pool["y1"] + 1):
+		for x in range(pool["x0"], pool["x1"] + 1):
+			if plan.tile(x, y) == 2:
+				water += 1
+	ok(water >= 20, tag + " pool water %d" % water)
+	var rip := 0
+	var drips := 0
+	var draft := 0
+	for a in d["ambient"]:
+		if a["kind"] == "ripple":
+			rip += 1
+			ok(_in_zone(pool, a["cell"]), tag + " ripple in pool zone")
+		elif a["kind"] == "drip":
+			drips += 1
+		elif a["kind"] == "draft":
+			draft += 1
+	ok(rip >= 2, tag + " pool ripples")
+	ok(drips >= 5, tag + " drips (nook + gallery + fillers)")
+	eq(draft, 1, tag + " one draft anchor")
+	var gal := _zone(d, "drip_gallery")
+	var gd := 0
+	for a in d["ambient"]:
+		if a["kind"] == "drip" and _in_zone(gal, a["cell"]):
+			gd += 1
+	ok(gd >= 3 and gd <= 4, tag + " gallery drips %d" % gd)
+	var shore_rats := 0
+	for c in d["critters"]:
+		if c["species"] == "rat" and _in_zone(pool, c["cell"]):
+			shore_rats += 1
+	ok(shore_rats >= 1, tag + " rats on the shore")
+	var war := _zone(d, "rat_warren")
+	var wr := 0
+	for c in d["critters"]:
+		if c["species"] == "rat" and _in_zone(war, c["cell"]):
+			wr += 1
+	ok(wr >= 3 and wr <= 4, tag + " warren rats %d" % wr)
+	var wa := 0
+	for a in d["ambient"]:
+		if _in_zone(war, a["cell"]) and not a.get("dead", false):
+			wa += 1
+	ok(wa >= 1 and wa <= 2, tag + " warren anchors %d" % wa)
+	# exit
+	var door: Dictionary = d["doors"][0]
+	eq(door["toMap"], "stage:wood", tag + " exit placeholder")
+	eq(String(d["rows"][door["row"]])[door["col"]], "D", tag + " door cell")
+	var glow := false
+	for l in d["lights"]:
+		if Vector2(l["cell"][0], l["cell"][1]).distance_to(Vector2(door["col"], door["row"])) < 9.0:
+			glow = true
+	ok(glow, tag + " glow-worm light by the mouth")
+	# spurs are dead ends
+	var spur_pockets := 0
+	for p in d["pockets"]:
+		if p["kind"] == "spur":
+			spur_pockets += 1
+			var nb2 := 0
+			for dd in StageGen.N4:
+				if plan.walkable(p["cell"][0] + dd.x, p["cell"][1] + dd.y):
+					nb2 += 1
+			eq(nb2, 1, tag + " spur end is a dead end")
+	ok(spur_pockets >= 2 and spur_pockets <= 3, tag + " 2-3 spurs")
 
 
 ## Wayfinding: glow-worm breadcrumbs on the tunnel leading on from each main-path beat, spur tells, funnelled (2-wide) true path.
 func test_wayfinding_crumbs_and_spur_tells() -> void:
 	var defs := _all()
 	for i in defs.size():
-		var d: Dictionary = defs[i]
-		var tag := "seed %d" % (i + 1)
-		var plan := StageGen.plan_from_def(d)
-		var dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
-		var crumbs: Array = d["gen"]["crumbs"]
-		eq(crumbs.size(), MAIN_ORDER.size() - 1, tag + " one breadcrumb per beat but the last")
-		var worms := {}
-		for l in d["lights"]:
-			if l["kind"] == "glowworm":
-				worms[str(l["cell"])] = true
-		ok(d["lights"].size() <= 16, tag + " lights <= 16 with the crumbs")
-		var mouths: Array = []
-		for p in d["pockets"]:
-			if p["kind"] == "spur":
-				mouths.append(p["mouth"])
-		var last := -1
-		for k in crumbs.size():
-			var c: Array = crumbs[k]
-			ok(worms.has(str(c)), tag + " crumb %d is a glow-worm light" % k)
-			var dc: int = dist[plan.idx(c[0], c[1])]
-			ok(dc > last, tag + " crumb %d deeper than the one before (%d > %d)" % [k, dc, last])
-			last = dc
-			if k > 0:
-				ok(dc > rep_depth(d, MAIN_ORDER[k - 1]), tag + " crumb %d lies past the previous beat" % k)
-			for m in mouths:
-				ok(maxi(absi(m[0] - c[0]), absi(m[1] - c[1])) > 3, tag + " crumb %d is more than 3 cells from spur mouth %s" % [k, str(m)])
-			var open9 := 0
-			for dd in StageGen.N8:
-				if plan.walkable(c[0] + dd.x, c[1] + dd.y):
-					open9 += 1
-			ok(open9 >= 3, tag + " crumb %d sits in a funnelled (2-wide) tunnel (%d open neighbours)" % [k, open9])
-		# spur tell: a stalactite over every mouth and one dead-air drip anchor per spur
-		var dead := 0
-		for a in d["ambient"]:
-			if a.get("dead", false):
-				dead += 1
-				eq(a["kind"], "drip", tag + " dead-air anchor reuses the drip kind")
-		eq(dead, mouths.size(), tag + " one dead-air anchor per spur")
+		_wayfinding(defs[i], "seed %d" % (i + 1))
+
+
+func _wayfinding(d: Dictionary, tag: String) -> void:
+	var plan := StageGen.plan_from_def(d)
+	var dist := StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])
+	var crumbs: Array = d["gen"]["crumbs"]
+	eq(crumbs.size(), MAIN_ORDER.size() - 1, tag + " one breadcrumb per beat but the last")
+	var worms := {}
+	for l in d["lights"]:
+		if l["kind"] == "glowworm":
+			worms[str(l["cell"])] = true
+	ok(d["lights"].size() <= 16, tag + " lights <= 16 with the crumbs")
+	var mouths: Array = []
+	for p in d["pockets"]:
+		if p["kind"] == "spur":
+			mouths.append(p["mouth"])
+	var last := -1
+	for k in crumbs.size():
+		var c: Array = crumbs[k]
+		ok(worms.has(str(c)), tag + " crumb %d is a glow-worm light" % k)
+		var dc: int = dist[plan.idx(c[0], c[1])]
+		ok(dc > last, tag + " crumb %d deeper than the one before (%d > %d)" % [k, dc, last])
+		last = dc
+		if k > 0:
+			ok(dc > rep_depth(d, MAIN_ORDER[k - 1]), tag + " crumb %d lies past the previous beat" % k)
 		for m in mouths:
-			eq(plan.prop_cells.get(plan.idx(m[0], m[1]), ""), "stalactite", tag + " stalactite over spur mouth " + str(m))
+			ok(maxi(absi(m[0] - c[0]), absi(m[1] - c[1])) > 3, tag + " crumb %d is more than 3 cells from spur mouth %s" % [k, str(m)])
+		var open9 := 0
+		for dd in StageGen.N8:
+			if plan.walkable(c[0] + dd.x, c[1] + dd.y):
+				open9 += 1
+		ok(open9 >= 3, tag + " crumb %d sits in a funnelled (2-wide) tunnel (%d open neighbours)" % [k, open9])
+	# spur tell: a stalactite over every mouth and one dead-air drip anchor per spur
+	var dead := 0
+	for a in d["ambient"]:
+		if a.get("dead", false):
+			dead += 1
+			eq(a["kind"], "drip", tag + " dead-air anchor reuses the drip kind")
+	eq(dead, mouths.size(), tag + " one dead-air anchor per spur")
+	for m in mouths:
+		eq(plan.prop_cells.get(plan.idx(m[0], m[1]), ""), "stalactite", tag + " stalactite over spur mouth " + str(m))
 
 
 func rep_depth(d: Dictionary, id: String) -> int:
@@ -666,3 +672,199 @@ func test_brief_is_shorter_and_first_run_untouched() -> void:
 	eq(seen.size(), brief.size(), "brief seeds give different maps")
 	# other generators have no short form: the flag is ignored
 	eq(StageGen.generate("wood", 3, true)["rows"], StageGen.generate("wood", 3)["rows"], "wood ignores brief")
+
+
+# ---------------------------------------------------------------- 0.22.0 chunk variants (repeat runs only)
+
+const VARIANT_SEEDS := 60
+const VARIANT_BEATS := ["coffin_nook", "drip_gallery", "echo_hall", "still_pool"]
+## JSON hashes of first-run defs pinned at 0.21.9: the guided night's cave must not change by accident (variants are repeat-run only).
+const FIRST_RUN_HASH := {1: 3320154239, 7: 375772508, 25: 2026876954}
+static var _variant_defs: Array = []
+
+
+## Brief seeds 1..VARIANT_SEEDS (the first BRIEF_SEEDS reuse _all_brief). A wider sweep: -- --filter=stage_gen --variant-seeds=300
+func _all_variants() -> Array:
+	if _variant_defs.is_empty():
+		var n := VARIANT_SEEDS
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--variant-seeds="):
+				n = maxi(1, int(a.substr(16)))
+		var b := _all_brief()
+		for s in range(1, n + 1):
+			_variant_defs.append(b[s - 1] if s <= b.size() else StageGen.generate("hollow", s, true))
+	return _variant_defs
+
+
+func test_variant_chunks_are_well_formed() -> void:
+	var c := StageGen.chunks()
+	var vars: Dictionary = c["variants"]
+	for b in VARIANT_BEATS:
+		ok(vars.has(b) and (vars[b] as Array).size() >= 1, "beat %s has a second variant" % b)
+	for b in vars:
+		ok(c["order"].has(b), "variant beat %s is a main-path beat" % b)
+		var base: Dictionary = c["chunks"][b]
+		for nm in vars[b]:
+			ok(c["chunks"].has(nm), "variant chunk " + nm)
+			if not c["chunks"].has(nm):
+				continue
+			var ch: Dictionary = c["chunks"][nm]
+			eq(ch["beat"], b, nm + " keeps the beat id")
+			eq(ch.get("transpose", false), base.get("transpose", false), nm + " transposes like the authored chunk")
+			var rows: Array = ch["rows"]
+			eq(rows.size(), int(ch["h"]), nm + " height")
+			for r in rows:
+				eq(String(r).length(), int(ch["w"]), nm + " row width")
+			ok(rows != base["rows"], nm + " differs from the authored chunk")
+			var zn: Array = []
+			for z in ch["zones"]:
+				zn.append(z["name"])
+			var bzn: Array = []
+			for z in base["zones"]:
+				bzn.append(z["name"])
+			eq(zn, bzn, nm + " has the authored zone names")
+			eq(ch.get("pockets", []).size(), base.get("pockets", []).size(), nm + " has the authored pockets")
+			for mk in ["@", "C", "R", "D", "k"]:
+				eq("".join(rows).count(mk), "".join(base["rows"]).count(mk), nm + " has as many '%s' as the authored chunk" % mk)
+			# ports sit on the rim, on floor, facing out; the beat cell is floor; every port reaches the beat cell inside the chunk
+			var plan := StageGen.Plan.new(int(ch["w"]) + 4, int(ch["h"]) + 4)
+			var res := StageGen.stamp(plan, ch, c["legend"], 2, 2, false, false)
+			var bc: Vector2i = res["beat_cell"]
+			ok(plan.walkable(bc.x, bc.y), nm + " beat cell is walkable floor")
+			var dist := StageGen.bfs(plan, [plan.idx(bc.x, bc.y)])
+			for pr in ch["ports"]:
+				var x := int(pr[0])
+				var y := int(pr[1])
+				var rim: bool = {"w": x == 0, "e": x == int(ch["w"]) - 1, "n": y == 0, "s": y == int(ch["h"]) - 1}[String(pr[2])]
+				ok(rim, nm + " port %s on its rim" % str(pr))
+				eq(String(rows[y])[x], ".", nm + " port %s is floor" % str(pr))
+				ok(dist[plan.idx(x + 2, y + 2)] >= 0, nm + " port %s reaches the beat cell" % str(pr))
+
+
+func test_variants_only_on_repeat_runs() -> void:
+	for s in [1, 2, 3, 17, 42]:
+		eq(GenCave.variant_pick("hollow", s, false), {}, "seed %d: the first run never picks a variant" % s)
+		var p := GenCave.variant_pick("hollow", s, true)
+		eq(p.keys(), VARIANT_BEATS, "seed %d: one pick per beat with variants" % s)
+		eq(p, GenCave.variant_pick("hollow", s, true), "seed %d: the pick is a pure function" % s)
+	var full := _all()
+	for i in full.size():
+		ok(not full[i]["gen"].has("variants"), "seed %d first-run def has no variants key" % (i + 1))
+	for s in FIRST_RUN_HASH:
+		eq(JSON.stringify(full[s - 1]).hash(), FIRST_RUN_HASH[s], "seed %d first-run def is byte-identical to 0.21.9" % s)
+	var used := {}
+	var defs := _all_variants()
+	for i in defs.size():
+		var v: Dictionary = defs[i]["gen"].get("variants", {})
+		eq(v, GenCave.variant_pick("hollow", i + 1, true), "brief seed %d uses its own pick (no fallback to the authored set)" % (i + 1))
+		for b in v:
+			used[v[b]] = true
+	for b in VARIANT_BEATS:
+		ok(used.has(b), "the authored %s still appears on repeat runs" % b)
+		for nm in StageGen.chunks()["variants"][b]:
+			ok(used.has(nm), "%s appears on repeat runs" % nm)
+	for s in [5, 12, 40]:
+		ok(StageGen.generate("hollow", s, true) == defs[s - 1], "brief seed %d regenerates identically" % s)
+	var seen := {}
+	for d in defs:
+		seen[str(d["rows"]).hash()] = true
+	eq(seen.size(), defs.size(), "brief seeds give different maps")
+
+
+## Every repeat-run cave, whatever its variants, passes the first-run checks: analyze / validate, beat order, the squeeze cannot be bypassed,
+## shelter (coffin, start, drip ahead), every beat's features (hall radius, pillars, bats; pool water, ripples, shore rats; gallery drips), and
+## wayfinding (breadcrumbs, spur tells).
+func test_variant_caves_pass_every_check() -> void:
+	var defs := _all_variants()
+	var row := _row()
+	for i in defs.size():
+		var d: Dictionary = defs[i]
+		var picked: Array = []
+		for b in d["gen"].get("variants", {}):
+			if d["gen"]["variants"][b] != b:
+				picked.append(d["gen"]["variants"][b])
+		var tag := "brief seed %d %s" % [i + 1, str(picked)]
+		ok(not d.is_empty(), tag + " generated")
+		if d.is_empty():
+			continue
+		var rep := StageGen.analyze(d, row)
+		ok(rep["ok"], tag + " analyze: " + str(rep["reasons"]))
+		ok(StageGen.validate(d)["ok"], tag + " validate")
+		var all := {"startMap": d["name"], "maps": {d["name"]: d, "stage:wood": _stub_next(d["name"])}, "links": []}
+		ok(WorldValidate.validate_all(all)["ok"], tag + " validate_all")
+		var ids: Array = []
+		for b in d["beats"]:
+			ids.append(b["id"])
+		eq(ids, BEAT_ORDER, tag + " beat list")
+		var last := -1
+		for id in MAIN_ORDER:
+			ok(rep["depths"][id] > last, tag + " depth increases at " + id)
+			last = rep["depths"][id]
+		eq(rep["depths"]["coffin_nook"], 0, tag + " start is at the coffin nook")
+		# the squeeze gates the hall: with its zone blocked the hall is out of reach
+		var plan := StageGen.plan_from_def(d)
+		var sq := _zone(d, "squeeze")
+		for y in range(sq["y0"], sq["y1"] + 1):
+			for x in range(sq["x0"], sq["x1"] + 1):
+				plan.tiles[plan.idx(x, y)] = 0
+		var hc: Array = d["places"]["echo_hall"]
+		eq(StageGen.bfs(plan, [plan.idx(plan.start.x, plan.start.y)])[plan.idx(hc[0], hc[1])], -1, tag + " the squeeze cannot be bypassed")
+		_shelter(d, tag)
+		_beat_features(d, tag)
+		_wayfinding(d, tag)
+
+
+## The trek's wayfinding field (TrekFlow.next_toward_exit, read by the draft, breath and Sense) leads from the coffin and from every beat to the
+## exit on repeat-run caves with variants.
+func test_variant_caves_lead_to_the_exit() -> void:
+	var meta := TrekMeta.create()
+	meta["tutorialDone"] = true
+	var picked := 0
+	for s in range(1, 13):
+		var f := TrekFlow.begin(meta, s)
+		ok(f.brief, "seed %d is a repeat run" % s)
+		ok(f.def["gen"].has("variants"), "seed %d trek cave carries its variant pick" % s)
+		for b in f.def["gen"].get("variants", {}):
+			if f.def["gen"]["variants"][b] != b:
+				picked += 1
+		var froms: Array = [f.def["start"]["cell"]]
+		for b in f.def["beats"]:
+			froms.append(b["cell"])
+		for c in froms:
+			var cell := Vector2i(int(c[0]), int(c[1]))
+			ok(f.dist_to_exit(cell) >= 0, "seed %d %s reaches the exit" % [s, str(c)])
+			var end := f.next_toward_exit(cell, 100000)
+			eq(f.dist_to_exit(end), 0, "seed %d the downhill walk from %s ends at the exit" % [s, str(c)])
+	ok(picked >= 6, "variants were exercised (%d picks over 12 treks)" % picked)
+
+
+## Repeat-run checkpoints saved before 0.22.0 (night.trek "brief" without "variants") continue in the variant-free brief cave they were made in;
+## new brief treks save the key; first-run treks are untouched.
+const BRIEF_0219_HASH := {1: 844813486, 7: 253758783}
+
+
+func test_variant_free_brief_cave_for_old_checkpoints() -> void:
+	for s in BRIEF_0219_HASH:
+		var old := StageGen.generate("hollow", s, true, false)
+		eq(JSON.stringify(old).hash(), BRIEF_0219_HASH[s], "seed %d: variants = false is the 0.21.9 brief cave byte for byte" % s)
+		ok(not old["gen"].has("variants"), "seed %d: no variants key in the old form" % s)
+		ok(StageGen.generate("hollow", s, false, true) == _all()[s - 1], "seed %d: the flag does nothing to the first-run cave" % s)
+	var meta := TrekMeta.create()
+	meta["tutorialDone"] = true
+	var f := TrekFlow.begin(meta, 99)
+	ok(f.brief and f.variants, "a new repeat run uses variants")
+	var snap := f.snapshot()
+	eq(snap["night"]["trek"].get("variants"), true, "the checkpoint says so")
+	var g := TrekFlow.continue_from(snap, meta, null)
+	ok(g != null and g.variants and g.def == f.def, "continue regenerates the same variant cave")
+	var old_snap: Dictionary = snap.duplicate(true)
+	(old_snap["night"]["trek"] as Dictionary).erase("variants")
+	var h := TrekFlow.continue_from(old_snap, meta, null)
+	ok(h != null and h.brief and not h.variants, "an older brief checkpoint continues without variants")
+	if h != null:
+		ok(not h.def["gen"].has("variants"), "in the variant-free cave")
+		eq(h.def["rows"], StageGen.generate("hollow", TrekFlow.stage_seed(99, h.leg), true, false)["rows"], "the very cave 0.21.9 made")
+	var first := TrekFlow.begin(TrekMeta.create(), 99)
+	ok(not first.brief, "first run")
+	ok(not (first.snapshot()["night"]["trek"] as Dictionary).has("variants"), "a first-run checkpoint has no variants key")
+	ok(not first.def["gen"].has("variants"), "and its cave no variants")

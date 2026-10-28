@@ -47,6 +47,9 @@ var senses: int = 0               ## Sense uses this run (additive, optional key
 ## chambers, beats closer together). Fixed for the whole trek and saved (night.trek "brief", written only when true) so a continue
 ## regenerates the very same layout even if the tutorial flag changed since.
 var brief: bool = false
+## 0.22.0: the brief cave may use the seed's chunk variants (GenCave.variant_pick). True for every trek begun since; saved (night.trek "variants",
+## written only on a brief trek) so a repeat-run checkpoint from 0.21.8-0.21.9 (no key) continues in the variant-free cave it was saved in.
+var variants: bool = true
 ## The guided first night is on (RogueMode sets it every frame from Tutorial.rogue_active; TrekFlow never reads the tutorial itself). While it is
 ## on in the Hollow, the first withering death is forgiven once (GUIDED_REVIVE_STAGE): the second-coffin wake-up, free, without using a bought
 ## Second Coffin. Only "withered" (sun, stake and holy ground keep their rules: the sun is warned, belled and taught; there are no hunters or holy
@@ -136,6 +139,7 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.stages_unseen = int(ex.get("unseenStages", 0))
 	f.senses = clampi(int(ex.get("senses", 0)), 0, 100000)
 	f.brief = ex.get("brief", false) == true   # older saves (and first-run treks) have no key: the full layout they were made with
+	f.variants = ex.get("variants", false) == true   # no key: a brief cave saved before 0.22.0 (no chunk variants); ignored by first-run caves
 	f.guided_revived = ex.get("guidedRevive", false) == true   # no key: the free revive is unused
 	f.noticed = bool(ex.get("noticed", false))
 	f.day_t = float(ex.get("day_t", 0.0))
@@ -226,7 +230,7 @@ func _load_stage(id: String) -> bool:
 	row = StageGen.stage_row(id)
 	if row.is_empty() or not GENERATORS.has(String(row.get("generator", ""))):
 		return false
-	def = StageGen.generate(id, stage_seed(seed, leg), brief)
+	def = StageGen.generate(id, stage_seed(seed, leg), brief, variants)
 	if def.is_empty():
 		return false
 	stage_id = id
@@ -697,6 +701,8 @@ func snapshot(quit: bool = false) -> Dictionary:
 	}
 	if brief:
 		nd[SAVE_EXTRA]["brief"] = true   # only when set, so a first-run checkpoint is unchanged
+		if variants:
+			nd[SAVE_EXTRA]["variants"] = true   # the brief cave with chunk variants (0.22.0)
 	if guided_revived:
 		nd[SAVE_EXTRA]["guidedRevive"] = true   # likewise: only once the free revive has been spent
 	var used: Array = []

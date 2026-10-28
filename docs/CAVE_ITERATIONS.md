@@ -3,11 +3,11 @@
 The Hollow is the first stage of The Long Night and its tutorial: the first playthrough has to teach (echolocation, drips, the squeeze,
 feeding, the sun), and every later run has to get out of the way. Three sequential passes improve it, each one handing off to the next:
 
-| Pass | Version | Scope |
-|------|---------|-------|
-| 1 | 0.21.8 | Calmer opening, ping step bug, quirky moments (cards only), shorter cave on repeat runs |
-| 2 | 0.21.9 | Visual noise (stalactite occluding fill, far-wall strata thinning, strike vibration), a free first-run revive on the guided night |
-| 3 | 0.22.0 | Second chunk variant per beat for layout variety, final review |
+| Version | What contributed | Commit |
+|---------|------------------|--------|
+| 0.21.8 (pass 1) | Sense hint held until the tutorial's V line; a ping during the waking line counts for the ping step ("Click or Space"); dry waking line, echo-hall word and complaining-rat cards; brief repeat-run Hollow (no filler chambers, beats within 18 cells) | c70008b |
+| 0.21.9 (pass 2) | Stage card alone for 3.2 s before the first guided line; one free revive from withering on the guided night; stalactites get an opaque occluding body; far rock strata and vault bedding thin with distance; calmer ink wall shiver | b27352f |
+| 0.22.0 (pass 3) | Second chunk for coffin_nook, drip_gallery, echo_hall and still_pool on repeat runs (per seed, 50/50 per beat), strict breadcrumb acceptance on those caves, old repeat-run checkpoints keep their cave; scenarios run on in-memory saves; final review and docs | the `0.22.0:` commit (`git log --grep "^0.22.0"`) |
 
 Rules all passes keep: classic / parity code paths and tests stay untouched; the first-run Hollow layout stays a pure function of
 (stage id, seed) and only changes on purpose; tutorial lines fit `Tutorial.MAX_TEXT` (76); every pass ends on a green full suite.
@@ -158,3 +158,172 @@ Full suite at 0.21.8: {"checks":1250376,"failed":0,"failures":[],"tests":395}.
   Back up `%APPDATA%\Godot\app_userdata\Vampires Cant See` first and restore it afterwards (pass 2 restored `vcs_trek.json`).
 - Deliberately not done: no change to the Hollow layout, chunks or generator (pass 3), no change to the HUD Sense hint, the hold is not
   applied to later stage cards (only the guided night's opening).
+
+## 0.22.0 (pass 3)
+
+### Changes
+
+1. **Chunk variants, repeat runs only.** `chunks.json` gets a `variants` map and four second chunks, each keeping its beat id, zone
+   names, pockets and every feature the beat tests check:
+   - `coffin_nook_b` (10x8): coffin against the north wall with the coffin rest marker in the far corner, a stub pillar, ports south and
+     east (the authored nook: south and west). The start stays under the coffin with the waking drip two cells ahead.
+   - `drip_gallery_b` (13x9): a bent gallery, in from the west and out through the north (the authored one runs straight west-east),
+     three drips, two stalagmites.
+   - `echo_hall_b` (19x15): a wider, lower oval with off-centre north and south ports, three lone pillars near the middle instead of
+     scattered, ten stalagmites in four clusters, the roost on the north-east ledge. 144 of the 149 cells within radius 7 are open.
+   - `still_pool_b` (15x9): the pool reaches the north wall, so the direct line between the west and east ports is water and the way round
+     is the south shore (the authored pool is a lake with a walkway all round). Two ripples, two shore rats, two glow-worms.
+
+   `GenCave.variant_pick(stage_id, seed, brief)` picks, per beat, the authored chunk or its alternative (50/50, `VARIANT_CHANCE`) on its
+   own rng stream (`StageGen.seed_for(seed ^ id.hash(), VARIANT_SALT)`), so the layout rng is never shifted; `with_variants` swaps the
+   chunk in under the beat's name. The pick is stored as `def.gen.variants` (brief caves only). If a pick could never fit, the authored
+   chunks are used (not seen in 300 seeds; the tests assert every tested seed used its own pick).
+2. **Decision: variants apply to repeat runs (brief) only.** The guided first night always teaches in the authored cave: `variant_pick`
+   returns `{}` for brief = false and the first-run code path is unchanged. First-run JSON hashes of seeds 1..60 compared before and after:
+   identical; three are pinned in `test_stage_gen.gd` (`FIRST_RUN_HASH`). A guided night continued on a repeat-run checkpoint after the
+   tutorial was turned back on in Settings can meet variants; the tutorial keys off beat ids and positions, so it still works there.
+3. **Strict breadcrumbs on the new caves.** The breadcrumb pass only *prefers* a 2-wide spot past the previous beat. Over 300 seeds about
+   2% of caves miss (first run: seeds 140, 146, 163, 255, 267, 274 have a crumb in a 1-wide pinch or not deeper than the one before;
+   variant-free brief: 6 of 300; with variants before this fix: 8 of 300, mostly `drip_gallery_b`, whose north port sits near a corner so
+   one side of the 2-wide funnel falls inside the protected chunk rect). Brief caves with variants now reject such an attempt
+   (`_crumbs_clean`, fail key `r13`): 0 of 300 bad. The first-run generator is deliberately not changed (byte-identity, saved checkpoints).
+4. **Old checkpoints keep their cave.** A trek checkpoint stores no layout; `continue_from` regenerates it from the seed. A repeat-run
+   checkpoint saved by 0.21.8-0.21.9 would have reopened in a different cave (player in rock, wrong eaten-critter indices). New:
+   `StageGen.generate(id, seed, brief, variants = true)`, `TrekFlow.variants` (true for new treks), saved as `night.trek.variants`
+   (written only on brief treks); a brief checkpoint without the key continues with variants = false, which is the 0.21.9 brief cave byte
+   for byte (all 60 brief hashes compared; two pinned, `BRIEF_0219_HASH`). First-run checkpoints are unaffected.
+5. **Scenarios no longer touch user:// saves.** `Game.boot` gives any `--scenario=` run an in-memory save store
+   (`SaveCodec.MemoryStorage`) when no test storage is set. Before, `cave_tour` / `sense_check` (`new_trek` removes the checkpoint) and
+   `run_start` / `bot_play` / `vessel_view` / `warm_halo` (`begin_run` writes the classic run save) wrote to the player's saves; `perf_play`
+   already swapped in a memory store; `style_tour` only adds worlds. Settings are still read; `seen.json` (classic hint list) and
+   `flags.json` are still persisted by scenarios as before. Checked headless: `cave_tour` for 90 frames left every `user://*.json`
+   byte-identical (the trek checkpoint included). Consequence: `cave_tour` now always tours the first-run layout on a guided night
+   (fresh meta), whatever the real rogue save says.
+6. **Review of passes 1 and 2 (c70008b, b27352f).** Re-read the diffs of `tutorial.gd`, `rogue_mode.gd`, `trek_flow.gd`, `gen_cave.gd`,
+   `stage_gen.gd`, `game.gd`. No functional bug found in: the ping step (`_ping0` set in `rogue_begin`), the Sense-hint hold (released when
+   `sense_intro` is shown or skipped through `_past`, or by the `sense` reminder; continued runs mark `sense_intro` done), the opening hold
+   (`_open_t` reset per `rogue_begin`; it holds the line display and step clock only, steps are still chosen), the free revive
+   (`_sync_guided` before step / sleep / finished wait; withering only, Hollow only, saved once spent, a bought Second Coffin untouched,
+   no Soil or stats), the brief flag (fixed at `begin`, saved, older saves full). Fixed: the save-compatibility gap above (this pass's
+   variants would have opened it) and a stale `docs/ROGUELIKE.md` tutorial line (the old "You rise" / "Space" texts).
+
+### Numbers (300 seeds, headless)
+
+| Cave | Mean coffin-to-exit walk | Mean / max attempts | Seeds with a weak breadcrumb |
+|------|--------------------------|---------------------|------------------------------|
+| First run (unchanged) | 174.2 cells | 3.16 / 12 | 6 (left as is) |
+| Repeat run with variants | 158.4 cells | 2.83 / 15 | 0 |
+
+The variant caves walk a little longer than the 0.21.8 brief cave (about 151 cells over 40 seeds then) because `echo_hall_b` and
+`still_pool_b` are larger and the pool forces its detour; still clearly shorter than the first run. `BRIEF_REACH` 18 was enough for every
+variant (no seed needed the authored fallback), so it was not raised.
+
+### ASCII samples (`cave_ascii.gd --brief`)
+
+Seed 12, repeat run, all four variants (columns 3-55, rows 3-44). 1 nook, 2 bent gallery, 3 squeeze, 4 oval hall, 5 pool with the south
+detour, 6 warren, 7 mouth, 8 spur beat; X exit, * crumb, M spur mouth, A dead-air drip, a ambient anchor, s rest spot, B bat, R rat:
+
+```
+######X##########################################s###
+#####...#########################################.###
+####.....###########.####################.........###
+####.....########..R....#################M###########
+#####...########.....#...################.###########
+######.########..##.......#..#...#~~~~~#.A.##########
+####..7..###..#.........R.#.....~~~~a~~~....#########
+###.......##....R...6......*.#..~~~~~~~~~..##########
+##.........#*.#.......##..#..#..~~~~~a~~~..##########
+#.............#....#...a..####...~~~~~~~...##########
+##.........#..##....R....######.R...5...R.###########
+###.......##.####.......########.........############
+####.....###s#######.################.###############
+######.########################..............########
+##########################....#...............#######
+######################.........................######
+######################................*.........#####
+####s....#############.........................######
+####...1...##########...........#####.###############
+#####.......##########..........####.........########
+####...a.....8.A.##s........*...###..B.......B.######
+####.#......####.#####..........##..............s####
+#####......####..##########.#...#........#........###
+########.####...###########a#...#.a...............###
+####........#.#############.#...#......#..........###
+####.....*..#s#########.....#............4.........##
+###.........###########.#####...#.........#.......###
+###.........###########.#####...#..............a..###
+####...###.############.....#...#..............a..###
+##########...##############3#...##..B............####
+#########..a..#############.##..###.............#####
+#########.........##..#.....########...........######
+#########....2..a.....#.#####################.#######
+#########..a.......#.*#.#############################
+###########.......##..#.....#s#######################
+############.....###..#####.#.#######################
+####################..#####.#..######################
+################.................####################
+###############...................###################
+###############...................###################
+###############...............#.#####################
+################...............######################
+```
+
+Seed 7, repeat run, `still_pool_b` (mirrored): the west and east ports open at the water's north end, the way round is the south shore
+past the beat (5) and both shore rats:
+
+```
+###############.####
+####...#~~~~~#...#..
+###...~~~~a~~~......
+####..~~~~~~~~~..#.*
+####..~~~~~a~~~..#..
+####...~~~~~~~...#..
+#####.R...5...R.##..
+######.........###..
+```
+
+`cave_ascii.gd` over brief seeds 1-12 printed one kind of warning only: "dead_end_spurs grows out of the Coffin Nook" (seeds 10 and 12;
+seed 10 uses no variant). It matters for the tutorial's dead-end hint, and the tutorial is off on repeat runs, so it was left.
+
+### Files touched
+
+- `project/data/rogue/chunks.json` (`variants`, four `_b` chunks)
+- `project/core/gen/gen_cave.gd` (`variant_pick`, `with_variants`, `_attempts`, `variants` / `strict` arguments, `_crumbs_clean`)
+- `project/core/gen/stage_gen.gd` (`generate(..., variants)`)
+- `project/game/trek_flow.gd` (`variants`, save key `variants`, `_load_stage`)
+- `project/game/game.gd` (scenario runs on a memory save store)
+- `project/tests/tools/cave_ascii.gd` (`--brief`, prints the pick), `project/tests/scenarios/cave_tour.gd`, `sense_check.gd` (comments)
+- `project/project.godot`, `project/tests/flow/test_rogue_mode.gd` (version 0.22.0)
+- `AI_HANDOFF.md`, `TODO.md`, `docs/ROGUELIKE.md`, this file
+
+### Tests
+
+`tests/unit/test_stage_gen.gd`: `test_shelter`, `test_beat_features` and `test_wayfinding_crumbs_and_spur_tells` now call per-def helpers
+(`_shelter`, `_beat_features`, `_wayfinding`) so the variant caves get the same checks. New: `test_variant_chunks_are_well_formed` (beat id,
+zone names, pockets, marker counts, ports on the rim and reaching the beat cell), `test_variants_only_on_repeat_runs` (no pick and no key on
+the first run, pinned first-run hashes, pure pick, every seed used its own pick, every chunk appears, determinism, distinct maps),
+`test_variant_caves_pass_every_check` (60 brief seeds: analyze, validate, validate_all, beat order, the squeeze cannot be bypassed, shelter,
+beat features, wayfinding), `test_variant_caves_lead_to_the_exit` (12 repeat-run treks: `next_toward_exit` from the start and from every beat
+reaches the exit), `test_variant_free_brief_cave_for_old_checkpoints` (pinned 0.21.9 brief hashes, the save key, continue with and without
+it, first run untouched). Wider sweep: `-- --filter=test_stage_gen --variant-seeds=300` (green, 76026 checks).
+
+Full suite at 0.22.0: {"checks":1260937,"failed":0,"failures":[],"tests":406}.
+
+### Needs a human playtest (all three passes)
+
+- First run (guided night): is the held Sense hint noticed when it lights up with the V line; does the 3.2 s opening hold feel deliberate;
+  tone of the waking line, the echo-hall word, the complaining rat and the "Back in the box" revive card; does a first-timer understand
+  they were saved once.
+- Look: the stalactites' solid bodies across a whole cave (any dark rim at grazing angles), the far-strata thinning and the calmer shiver.
+- Repeat runs (Settings > Long Night tutorial Off, then several new runs): does the brief cave feel fast enough; do the variants feel
+  different (the oval hall's echo and pillars, the pool detour, the bent gallery, the second nook); is any variant confusing without the
+  tutorial.
+- Scenarios: `cave_tour` now shows the first-run layout on a guided night; check its frames still show what the tour is for.
+
+### Left for later
+
+- The ~2% of first-run seeds with a weak breadcrumb (listed above) keep it: fixing them changes those first-run caves and their saved
+  checkpoints. A later pass can turn `_crumbs_clean` on for the first run behind a save key, as `variants` does for repeat runs.
+- More variants (squeeze, rat warren, cave mouth) are cheap to add the same way: a `_b` chunk plus an entry in `variants`; the tests pick
+  them up (the well-formedness test covers every listed variant).
+- Scenarios still write `seen.json` (classic hint list) through `Tutorial`; not touched (it would change which classic hints scenarios show).

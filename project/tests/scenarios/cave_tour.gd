@@ -3,6 +3,8 @@ extends RefCounted
 ## (drip gallery, squeeze, echo hall with bats, still pool, ...), and the dawn warning at the end. Critter glyphs, drips and the stage
 ## card are what to look at.
 ## Use: godot --path project --rendering-driver opengl3 --write-movie <ABSOLUTE dir>\f.png --fixed-fps 60 --quit-after 420 -- --scenario=cave_tour
+## Saves are in memory (Game.boot, 0.22.0): the user:// checkpoint is untouched, and the tour is always a fresh install's first Long Night
+## (the guided night on the first-run Hollow layout, whatever tutorialDone says in the real rogue save).
 
 const BEAT_FRAMES := 60
 var _cells: Array = []
