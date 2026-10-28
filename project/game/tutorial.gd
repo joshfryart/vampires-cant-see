@@ -140,8 +140,8 @@ const MAX_TEXT := 76
 ## id, text (at most MAX_TEXT characters: the HUD hint is one line of 90 with the skip suffix), `timed` = seconds shown (the whole step),
 ## `min` = least seconds before the gate may complete it. "interrupt" steps jump the queue when their moment comes.
 const ROGUE_STEPS := [
-	{"id": "wake", "text": "You rise. You cannot see. Listen.", "min": 2.5},
-	{"id": "ping", "text": "Press Space to ping. Listen to what comes back.", "min": 0.0},
+	{"id": "wake", "text": "The lid creaks. So do your knees. You cannot see. Listen.", "min": 2.5},
+	{"id": "ping", "text": "Click or Space to ping. Listen to what comes back.", "min": 0.0},
 	{"id": "rings", "text": "Each ring is a wall. A long echo means a big room.", "timed": 5.5},
 	{"id": "sense_intro", "text": "V: sense the way. Free in the cave; beyond it, the cold air costs blood.", "timed": 6.5},
 	{"id": "drips", "text": "Drips sing on their own, no ping needed. Follow them.", "min": 0.0},
@@ -166,6 +166,7 @@ var rogue_age: float = 0.0
 var ping_n: int = 0                 ## player pings since boot (the gates compare against the count when a step began)
 var _base: Dictionary = {}          ## step id -> {ping, drip} counters when the step began
 var _fed0: int = 0                  ## RogueMode.stats critters_fed when the guided night began
+var _ping0: int = 0                 ## ping_n when the guided night began (a ping made while "wake" still shows counts for the ping step)
 var _rank: int = -1                 ## furthest main-path beat reached in the Hollow
 var _field: PackedInt32Array = PackedInt32Array()
 var _field_world: Variant = null
@@ -187,6 +188,7 @@ func rogue_begin(fresh: bool) -> void:
 	_rank = -1
 	_field_world = null
 	_fed0 = int(g.rogue.stats["critters_fed"])
+	_ping0 = ping_n
 	if not fresh:
 		rogue_done["wake"] = true
 		rogue_done["ping"] = true
@@ -274,6 +276,7 @@ func _at_dead_end(pp: Vector2) -> bool:
 ## True when the step has been overtaken by where the player has got to (resuming a checkpoint, running ahead).
 func _past(id: String) -> bool:
 	match id:
+		"ping": return ping_n > _ping0   # already pinged this night (during the waking line): the lesson is learnt, go on to the rings
 		"drips": return _rank >= 1
 		"sense_intro": return _rank >= 2 or g.rogue.trek.senses > 0   # already past the gallery, or already sensed: no need to teach it
 		"squeeze": return _rank >= 3

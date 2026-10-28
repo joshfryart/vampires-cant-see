@@ -598,3 +598,71 @@ func test_zones_measured_per_seed() -> void:
 		if shapes[nm].size() > 1:
 			varied += 1
 	ok(varied >= 1, "at least one beat zone changes size between seeds (%d of %d)" % [varied, shapes.size()])
+
+
+# ---------------------------------------------------------------- 0.21.8 the brief (repeat-run) Hollow
+
+const BRIEF_SEEDS := 25
+static var _briefs: Array = []
+
+
+func _all_brief() -> Array:
+	if _briefs.is_empty():
+		for s in range(1, BRIEF_SEEDS + 1):
+			_briefs.append(StageGen.generate("hollow", s, true))
+	return _briefs
+
+
+func test_brief_is_a_pure_beat_chain() -> void:
+	var defs := _all_brief()
+	var row := _row()
+	for i in defs.size():
+		var d: Dictionary = defs[i]
+		var tag := "brief seed %d" % (i + 1)
+		ok(not d.is_empty(), tag + " generated")
+		if d.is_empty():
+			continue
+		var rep := StageGen.analyze(d, row)
+		ok(rep["ok"], tag + " analyze: " + str(rep["reasons"]))
+		ok(rep.get("brief", false), tag + " analyze sees the brief form")
+		ok(StageGen.validate(d)["ok"], tag + " validate")
+		eq(d["gen"]["brief"], true, tag + " flagged")
+		eq(int(d["gen"]["fillers"]), 0, tag + " no filler chambers")
+		eq(int(d["gen"]["loops"]), 0, tag + " so no filler loop")
+		eq(int(d["gen"]["nodes"]), MAIN_ORDER.size(), tag + " seven beat nodes")
+		var ids: Array = []
+		for b in d["beats"]:
+			ids.append(b["id"])
+		eq(ids, BEAT_ORDER, tag + " beat list")
+		var last := -1
+		for id in MAIN_ORDER:
+			ok(rep["depths"][id] > last, tag + " depth increases at " + id)
+			last = rep["depths"][id]
+		eq((d["gen"]["crumbs"] as Array).size(), MAIN_ORDER.size() - 1, tag + " breadcrumbs kept")
+		ok(d["critters"].size() >= int(row["preyCount"]["min"]) - 1, tag + " prey count %d (the chunks' own rats and bats)" % d["critters"].size())
+		ok(rep["max_rest_dist"] <= int(row["shelter"]["restTarget"]) + 12, tag + " rest spots still in reach")
+		ok(rep["path_len"] > 0, tag + " exit reachable")
+
+
+func test_brief_is_shorter_and_first_run_untouched() -> void:
+	var full := _all()
+	var brief := _all_brief()
+	var row := _row()
+	var lf := 0.0
+	var lb := 0.0
+	for i in brief.size():
+		ok(not full[i]["gen"].has("brief") and not full[i]["gen"].has("fillers"), "seed %d first-run def has no brief keys" % (i + 1))
+		ok(brief[i]["rows"] != full[i]["rows"], "seed %d brief layout differs from the first-run one" % (i + 1))
+		lf += float(StageGen.analyze(full[i], row)["path_len"])
+		lb += float(StageGen.analyze(brief[i], row)["path_len"])
+	print("stage_gen: mean coffin-to-exit walk over %d seeds: first run %.1f cells, brief %.1f cells" % [brief.size(), lf / brief.size(), lb / brief.size()])
+	ok(lb < lf * 0.92, "the brief cave is a shorter walk on average (%.1f vs %.1f)" % [lb / brief.size(), lf / brief.size()])
+	for s in [1, 13]:
+		ok(StageGen.generate("hollow", s, true) == brief[s - 1], "brief seed %d regenerates identically" % s)
+		ok(StageGen.generate("hollow", s, false) == full[s - 1], "brief = false is the first-run def (seed %d)" % s)
+	var seen := {}
+	for d in brief:
+		seen[str(d["rows"]).hash()] = true
+	eq(seen.size(), brief.size(), "brief seeds give different maps")
+	# other generators have no short form: the flag is ignored
+	eq(StageGen.generate("wood", 3, true)["rows"], StageGen.generate("wood", 3)["rows"], "wood ignores brief")

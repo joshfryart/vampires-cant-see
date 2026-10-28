@@ -340,9 +340,13 @@ func test_sim_is_identical_with_the_tutorial_on_and_off() -> void:
 	var out: Array = []
 	for tut_on in [true, false]:
 		var g := _game()
+		# the tutorial flag also picks the Hollow layout (0.21.8: repeat runs get the brief cave), so both treks start on the first-run
+		# layout and the guided night is turned off afterwards: what is compared is the hints, not the map
+		var r := _trek(g)
 		if not tut_on:
 			g.menus.set_tutorial_enabled(false)
-		var r := _trek(g)
+		ok(not r.trek.brief, "first-run layout in both")
+		eq(g.tut.rogue_active, tut_on, "guided night %s" % tut_on)
 		g.card_text = ""
 		_step(g, 90.0, {"forward": 0.0})
 		out.append([g.player.x, g.player.y, g.clock, r.trek.night.blood, r.trek.night.min, r.critters.critters.size()])
@@ -610,9 +614,18 @@ func test_sense_intro_is_skipped_when_already_sensed_or_resumed() -> void:
 	_done(g)
 
 
+## A repeat run (no guided night): the hint is up from the first frame, as before 0.21.8.
+func _veteran(g: Game) -> RogueMode:
+	g.menus._tm()["tutorialDone"] = true
+	var r := _trek(g)
+	ok(not g.tut.rogue_active, "no guided night")
+	ok(not r.sense_hint_held(), "no hold off the guided night")
+	return r
+
+
 func test_hint_is_bright_and_pulses_early_then_rests() -> void:
 	var g := _game()
-	var r := _trek(g)
+	var r := _veteran(g)
 	var l0: Dictionary = r.sense_hint_look()
 	ok(float(l0["bright"]) >= 1.0, "bright at the start")
 	_step(g, 2.0)
@@ -627,13 +640,57 @@ func test_hint_is_bright_and_pulses_early_then_rests() -> void:
 
 func test_hint_goes_dim_once_sense_is_used() -> void:
 	var g := _game()
-	var r := _trek(g)
+	var r := _veteran(g)
 	ok(float(r.sense_hint_look()["bright"]) >= 1.0)
 	g.pressed[KEY_V] = true
 	g.step(0.05, {})
 	eq(float(r.sense_hint_look()["bright"]), 0.0, "used once: dim")
 	eq(float(r.sense_hint_look()["pulse"]), 0.0)
 	_done(g)
+
+
+## 0.21.8 calmer opening: on the guided night the hint rests (no pulse, not bright) and its clock stands still until the V line shows.
+func test_guided_night_holds_the_hint_until_the_v_line() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.card_text = ""
+	ok(g.tut.rogue_active, "guided night")
+	ok(r.sense_hint_held(), "held at the start")
+	eq(float(r.sense_hint_look()["pulse"]), 0.0, "no pulse under the stage card and the waking line")
+	eq(float(r.sense_hint_look()["bright"]), 0.0, "rested")
+	_step(g, 6.0)
+	eq(g.tut.rogue_cur, "ping")
+	eq(r.hint_t, 0.0, "the hint clock has not run")
+	ok(r.sense_hint_held(), "still held on the ping step")
+	g.tut.rogue_done["ping"] = true
+	g.tut.rogue_cur = ""
+	_step(g, 0.2)
+	eq(g.tut.rogue_cur, "rings")
+	ok(r.sense_hint_held(), "still held on the rings")
+	_step(g, 6.0)
+	eq(g.tut.rogue_cur, "sense_intro", "the V line")
+	ok(not r.sense_hint_held(), "released with it")
+	_step(g, 1.0)
+	ok(float(r.sense_hint_look()["bright"]) >= 1.0, "bright with the V line")
+	ok(float(r.sense_hint_look()["pulse"]) > 0.0, "pulsing from the V line on")
+	ok(r.hint_t > 0.5 and r.hint_t < 2.0, "the clock started with the V line (%.2f)" % r.hint_t)
+	_done(g)
+
+
+func test_hint_hold_ends_when_the_tutorial_is_skipped_or_resumed() -> void:
+	var g := _game()
+	var r := _trek(g)
+	ok(r.sense_hint_held())
+	g.pressed[Tutorial.SKIP_KEY] = true
+	g.step(0.05, {})
+	ok(not r.sense_hint_held(), "Tab: no hold")
+	ok(float(r.sense_hint_look()["bright"]) >= 1.0, "the hint is up")
+	_done(g)
+	var g2 := _game()
+	var r2 := _trek(g2)
+	g2.tut.rogue_begin(false)   # a continued run has the V line behind it
+	ok(not r2.sense_hint_held(), "continued: no hold")
+	_done(g2)
 
 
 func test_hint_after_the_cave_names_the_blood_cost() -> void:

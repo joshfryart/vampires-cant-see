@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.8: Hollow pass 1 (Sense hint held until the tutorial's V line, a ping during the waking line counts, echo-hall word and complaining rat cards, brief repeat-run Hollow without filler chambers), see `AI_HANDOFF.md`, "Changes in 0.21.8" and `docs/CAVE_ITERATIONS.md`. Still to do: a person plays a first and a repeat run.
+
 Changes in 0.21.7: Sense discoverability (tutorial `sense_intro` step after the rings, brighter pulsing HUD hint under the dawn line, How to play and pause list V, windowed `sense_check` scenario that proved V works), see `AI_HANDOFF.md`, "Changes in 0.21.7". Still to do: a person confirms the hint is noticed in play.
 
 Changes in 0.21.6: Hollow wayfinding (panned draft, breath beads, assist ladder, Sense on V: free in the cave, 4+ blood after), see `AI_HANDOFF.md`, "Changes in 0.21.6". Still to do: a person judges the draft pan, the Sense cue and the thresholds (25 / 50 s) under real play. Full suite green at 0.21.6 with the cave wayfinding layout: {"checks":1249720,"failed":0,"failures":[],"tests":378}.

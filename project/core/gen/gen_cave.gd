@@ -4,7 +4,8 @@ extends RefCounted
 ## Pipeline per attempt (an attempt that breaks a constraint is discarded and the next attempt uses a derived seed, so the result
 ## is still a pure function of the seed):
 ##   1 layout: the chain of 7 beat chunks (coffin nook ... cave mouth) is walked out first, then 1-2 filler chambers (8-9 nodes in all);
-##     tree = MST of the node centres with the chain edges forced, so the tree path start -> exit is the beat order (order by depth)
+##     tree = MST of the node centres with the chain edges forced, so the tree path start -> exit is the beat order (order by depth).
+##     The brief form (repeat runs, generate(..., brief = true)) keeps the 7 beat chunks only: no fillers, so a pure beat chain
 ##   2 stamp the chunks (rect protected from later carving), CA blobs for fillers, one small loop through a filler, biased drunk-walk
 ##     tunnels of width 1-2 between chunk ports
 ##   3 2-3 blind spurs (end = hidden rest spot), growth towards a target open fraction, prune floor the start cannot reach
@@ -12,6 +13,10 @@ extends RefCounted
 
 const MAX_ATTEMPTS := 200
 const FILLER_GAP := 2
+## Greatest distance between the centres of two consecutive beat chunks: the first-run cave, and the brief (repeat-run) cave, whose beats
+## sit closer together so the walk from the coffin to the mouth is shorter.
+const CHAIN_REACH := 24
+const BRIEF_REACH := 18
 
 static var last_attempts: int = 0
 ## Why attempts were rejected, by reason key (diagnostics only; not part of the def).
@@ -23,13 +28,15 @@ static func _fail(k: String) -> Dictionary:
 	return {}
 
 
-static func generate(row: Dictionary, seed: int) -> Dictionary:
+## brief = the repeat-run Hollow: the beat chain alone (no filler chambers, so no filler loop, filler drips or filler rats). brief = false is
+## the first-run layout, bit-identical to the generator before the flag existed (same rng draws in the same order).
+static func generate(row: Dictionary, seed: int, brief: bool = false) -> Dictionary:
 	var data := StageGen.chunks()
 	if data.is_empty():
 		return {}
 	for attempt in MAX_ATTEMPTS:
 		var rng := Rng.new(StageGen.seed_for(seed, attempt))
-		var def := _attempt(row, data, rng, seed, attempt)
+		var def := _attempt(row, data, rng, seed, attempt, brief)
 		if not def.is_empty():
 			last_attempts = attempt + 1
 			return def
@@ -37,7 +44,7 @@ static func generate(row: Dictionary, seed: int) -> Dictionary:
 	return {}
 
 
-static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, attempt: int) -> Dictionary:
+static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, attempt: int, brief: bool = false) -> Dictionary:
 	var sz: Dictionary = row["size"]
 	var w: int = int(sz["w"])
 	var h: int = int(sz["h"])
@@ -46,12 +53,14 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 	var order: Array = data["order"]
 	var nodes_cfg: Dictionary = row["nodes"]
 	var n: int = StageGen.rint(rng, int(nodes_cfg["min"]), int(nodes_cfg["max"]))
+	if brief:
+		n = order.size()   # the draw above still happens, so both forms consume the rng alike up to here
 
 	# 1+2 layout: the beat chain is walked out first (each chunk rect fits, gap for tunnels), then fillers; the MST of all centres must
 	# contain every chain edge, so the tree path from the first to the last beat is the main path in order.
 	var lay: Dictionary = {}
 	for _l in 6:
-		lay = _layout(rng, w, h, n, order, chunks)
+		lay = _layout(rng, w, h, n, order, chunks, BRIEF_REACH if brief else CHAIN_REACH)
 		if not lay.is_empty():
 			break
 	if lay.is_empty():
@@ -206,14 +215,18 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 		return _fail("r10")
 	def["gen"]["openFraction"] = rep["open_fraction"]
 	def["gen"]["maxRestDist"] = rep["max_rest_dist"]
+	if brief:
+		# only the short form carries these keys, so a first-run def is unchanged to the byte
+		def["gen"]["brief"] = true
+		def["gen"]["fillers"] = fillr.size()
 	return def
 
 
 ## Walk out the chain of chunk rects (each rect fits the map, keeps a gap for tunnels and lies within reach of the previous one), then the
 ## fillers. Candidate centres are enumerated on a 2-cell lattice and one is picked at random; a node with no candidate (or whose successors
 ## cannot be placed) backtracks into up to 3 alternative picks of the node before it, within a fixed expansion budget. Returns {} on failure.
-static func _layout(rng: Rng, w: int, h: int, n: int, order: Array, chunks: Dictionary) -> Dictionary:
-	var st := {"pts": [], "rects": {}, "xform": {}, "fillr": {}, "role": {}, "path": [], "budget": 80, "bounds": Rect2i(3, 3, w - 6, h - 6)}
+static func _layout(rng: Rng, w: int, h: int, n: int, order: Array, chunks: Dictionary, reach: int = CHAIN_REACH) -> Dictionary:
+	var st := {"pts": [], "rects": {}, "xform": {}, "fillr": {}, "role": {}, "path": [], "budget": 80, "bounds": Rect2i(3, 3, w - 6, h - 6), "reach": reach}
 	if not _place(rng, 0, n, order, chunks, st):
 		return {}
 	return {"pts": st["pts"], "rects": st["rects"], "xform": st["xform"], "fillr": st["fillr"], "role": st["role"], "path": st["path"]}
@@ -223,6 +236,7 @@ static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, s
 	if k >= n:
 		return true
 	var bounds: Rect2i = st["bounds"]
+	var reach: int = int(st["reach"])
 	var pts: Array = st["pts"]
 	var rects: Dictionary = st["rects"]
 	var is_chunk: bool = k < order.size()
@@ -237,17 +251,17 @@ static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, s
 		grown.append([q.position.x, q.position.y, q.end.x, q.end.y])
 	for tr in tr_opts:
 		var s: Vector2i = StageGen.chunk_size(ch, tr) if is_chunk else Vector2i(2 * r + 1, 2 * r + 1)
-		# chunks must lie within 24 cells of the previous centre: scan only that window (same lattice, same candidate order as a full scan)
+		# chunks must lie within `reach` cells of the previous centre: scan only that window (same lattice, same candidate order as a full scan)
 		var ylo: int = bounds.position.y
 		var yhi: int = bounds.end.y
 		var xlo: int = bounds.position.x
 		var xhi: int = bounds.end.x
 		if is_chunk and k > 0:
 			var pc: Vector2i = pts[k - 1]
-			ylo = maxi(ylo, pc.y - 24 - s.y / 2 - 1)
-			yhi = mini(yhi, pc.y + 24 - s.y / 2 + s.y + 1)
-			xlo = maxi(xlo, pc.x - 24 - s.x / 2 - 1)
-			xhi = mini(xhi, pc.x + 24 - s.x / 2 + s.x + 1)
+			ylo = maxi(ylo, pc.y - reach - s.y / 2 - 1)
+			yhi = mini(yhi, pc.y + reach - s.y / 2 + s.y + 1)
+			xlo = maxi(xlo, pc.x - reach - s.x / 2 - 1)
+			xhi = mini(xhi, pc.x + reach - s.x / 2 + s.x + 1)
 		var y := bounds.position.y + 2 * int(ceil(float(ylo - bounds.position.y) / 2.0))
 		while y + s.y <= yhi:
 			var x := bounds.position.x + ((y / 2) % 2)
@@ -263,7 +277,7 @@ static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, s
 				if ok and k > 0 and (is_chunk or k >= order.size()):
 					var c := Vector2(x + s.x / 2, y + s.y / 2)
 					if is_chunk:
-						if Vector2(pts[k - 1]).distance_to(c) > 24.0:
+						if Vector2(pts[k - 1]).distance_to(c) > float(reach):
 							ok = false
 					else:
 						var best := 1.0e9

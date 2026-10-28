@@ -67,7 +67,7 @@ func test_first_run_shows_step_one() -> void:
 	ok(g.tut.rogue_active, "guided night on")
 	_step(g, 0.3)
 	eq(_cur(g), "wake", "step 1: waking")
-	ok(g.hint_text.find("You rise. You cannot see. Listen.") == 0, "the waking line: " + g.hint_text)
+	ok(g.hint_text.find("The lid creaks. So do your knees. You cannot see. Listen.") == 0, "the waking line: " + g.hint_text)
 	ok(g.hint_text.find("Tab: skip") > 0, "the skip hint is on the line")
 	ok(r.active, "trek active")
 	_done(g)
@@ -89,7 +89,7 @@ func test_gating_follows_the_player() -> void:
 	eq(_cur(g), "ping", "2: after the drip, the ping prompt")
 	_step(g, 4.0)
 	eq(_cur(g), "ping", "the ping prompt waits for the ping, not the clock")
-	ok(g.hint_text.find("Space") >= 0, "it names Space")
+	ok(g.hint_text.find("Click or Space to ping") == 0, "it names both ways to ping: " + g.hint_text)
 	_ping(g)
 	eq(_cur(g), "rings", "a ping advances to what the rings mean")
 	_step(g, 6.0)
@@ -331,11 +331,16 @@ func test_classic_unaffected() -> void:
 
 
 func test_tutorial_does_not_touch_the_sim() -> void:
+	# the tutorial flag also picks the Hollow layout (repeat runs get the brief cave), so both treks start on the first-run layout and the
+	# guided night is then turned off for one of them: what is compared is the hints, not the map
 	var out: Array = []
 	for on in [true, false]:
 		var g := _game()
-		g.menus._tm()["tutorialDone"] = not on
 		_trek(g)
+		if not on:
+			g.menus._tm()["tutorialDone"] = true
+			g.tut.rogue_begin(true)
+		ok(not g.rogue.trek.brief, "first-run layout in both")
 		_step(g, 6.0, {"forward": 1.0})
 		g.ping_clicks = 1
 		_step(g, 3.0, {"forward": 1.0, "turn": 0.4})
@@ -343,3 +348,125 @@ func test_tutorial_does_not_touch_the_sim() -> void:
 		eq(g.tut.rogue_active, on, "tutorial %s" % on)
 		_done(g)
 	eq(out[0], out[1], "same player, blood, pulses and critters with the tutorial on or off")
+
+
+# ---------------------------------------------------------------- 0.21.8 opening and ping step
+
+func test_a_ping_during_the_waking_line_counts() -> void:
+	var g := _game()
+	var r := _trek(g)
+	_step(g, 0.3)
+	eq(_cur(g), "wake", "waking line up")
+	_ping(g)   # the player pings before being asked to
+	_step(g, 6.0)
+	ok(r.stats["drips"] > 0, "a drip was heard")
+	ok(g.tut.rogue_done.has("ping"), "the ping step is already done")
+	ok(_cur(g) == "rings" or _cur(g) == "sense_intro", "on to what the rings mean, not stuck on the ping prompt: " + _cur(g))
+	ok(g.hint_text.find("to ping") < 0, "the ping prompt is not up: " + g.hint_text)
+	_done(g)
+
+
+func test_a_ping_before_the_step_still_needs_one_when_none_was_made() -> void:
+	var g := _game()
+	_trek(g)
+	_step(g, 6.0)
+	eq(_cur(g), "ping", "no ping yet: the prompt shows")
+	_step(g, 3.0)
+	eq(_cur(g), "ping", "and waits")
+	_done(g)
+
+
+func test_ping_text_names_click_and_space() -> void:
+	var t: String = String(Tutorial.new(null, false).step_def("ping")["text"])
+	ok(t.begins_with("Click or Space"), t)
+	ok(t.length() <= Tutorial.MAX_TEXT, "fits")
+	ok(String(Tutorial.new(null, false).step_def("wake")["text"]).find("You cannot see") > 0, "the waking line keeps the premise")
+
+
+func test_brief_cave_on_repeat_runs_only() -> void:
+	var g := _game()
+	_trek(g)
+	ok(not g.rogue.trek.brief, "first run: the full Hollow")
+	ok(not g.rogue.trek.def["gen"].has("brief"), "first-run def has no brief key")
+	g.pressed[Tutorial.SKIP_KEY] = true
+	g.step(0.05, {})
+	ok(not g.menus.tutorial_enabled(), "tutorial done")
+	ok(not g.rogue.trek.brief, "skipping mid-run keeps this trek's layout")
+	var snap: Dictionary = g.rogue.trek.snapshot()
+	ok(not (snap["night"]["trek"] as Dictionary).has("brief"), "a first-run checkpoint carries no brief key")
+	g.set_state("title")
+	g.rogue.new_trek(SEED + 1)
+	ok(g.rogue.trek.brief, "next trek: the brief Hollow")
+	eq(g.rogue.trek.def["gen"].get("brief"), true, "the def says so")
+	eq(int(g.rogue.trek.def["gen"]["fillers"]), 0, "no filler chambers")
+	var pure := StageGen.generate("hollow", TrekFlow.stage_seed(SEED + 1, 0), true)
+	eq(g.rogue.trek.def["rows"], pure["rows"], "the same pure function the generator gives")
+	eq(g.rogue.trek.def["beats"], pure["beats"], "same beats")
+	var snap2: Dictionary = g.rogue.trek.snapshot()
+	eq(snap2["night"]["trek"]["brief"], true, "saved with the checkpoint")
+	# a continue regenerates the same brief layout even after the tutorial is turned back on
+	g.set_state("title")
+	g.menus.set_tutorial_enabled(true)
+	ok(g.rogue.continue_trek(), "continued")
+	ok(g.rogue.trek.brief, "still brief")
+	eq(g.rogue.trek.def["rows"], StageGen.generate("hollow", TrekFlow.stage_seed(SEED + 1, 0), true)["rows"], "same rows after continue")
+	# and a save without the key (every save before 0.21.8) loads the full layout it was made with
+	(snap2["night"]["trek"] as Dictionary).erase("brief")
+	var old := TrekFlow.continue_from(snap2, g.rogue._meta(), null)
+	ok(old != null and not old.brief, "old save: full layout")
+	_done(g)
+
+
+# ---------------------------------------------------------------- 0.21.8 quirks (cards only)
+
+func test_echo_hall_says_a_word_once_on_the_guided_night() -> void:
+	var g := _game()
+	var r := _trek(g)
+	_go(g, r, "echo_hall")
+	g.card_text = ""
+	_ping(g)
+	eq(g.card_text, RogueMode.ECHO_WORD, "the hall answers")
+	eq(g.card_sub, RogueMode.ECHO_WORD_SUB)
+	ok(RogueMode.ECHO_WORD_SUB.length() <= 60, "short")
+	g.card_text = ""
+	_ping(g)
+	eq(g.card_text, "", "only once")
+	_done(g)
+	# off the hall: nothing
+	var g2 := _game()
+	_trek(g2)
+	g2.card_text = ""
+	_ping(g2)
+	ok(g2.card_text != RogueMode.ECHO_WORD, "not at the coffin")
+	_done(g2)
+	# a repeat run (no guided night): no card in the hall
+	var g3 := _game()
+	g3.menus._tm()["tutorialDone"] = true
+	var r3 := _trek(g3)
+	_go(g3, r3, "echo_hall")
+	g3.card_text = ""
+	_ping(g3)
+	eq(g3.card_text, "", "repeat runs stay quiet")
+	_done(g3)
+
+
+func test_the_first_rat_complains() -> void:
+	var g := _game()
+	var r := _trek(g)
+	var subs: Array = []
+	for c in r.critters.critters.duplicate():
+		if c.species != "rat" or subs.size() >= 2:
+			continue
+		g.player.place(c.x - 0.9, c.y, 0.0)
+		if g.world.blocks(c.x - 0.9, c.y, 0.2):
+			g.player.place(c.x + 0.9, c.y, PI)
+		g.night.blood = 30.0
+		var before: int = int(r.stats["critters_fed"])
+		if r.try_feed_critter() and int(r.stats["critters_fed"]) == before + 1 and g.card_sub.begins_with("Rat"):
+			subs.append(g.card_sub)
+		g.card_text = ""
+	eq(subs.size(), 2, "two rats fed")
+	if subs.size() == 2:
+		eq(subs[0], RogueMode.RAT_QUIP, "the first one complains")
+		eq(subs[1], "Rat", "the rest just are rats")
+	_done(g)

@@ -42,6 +42,10 @@ var deaths_avoided: int = 0
 var humans_fed: int = 0
 var critters_fed: int = 0
 var senses: int = 0               ## Sense uses this run (additive, optional key in the night.trek extension)
+## Repeat run: the Long Night tutorial was done when this trek began, so stages that have a short form use it (the brief Hollow: no filler
+## chambers, beats closer together). Fixed for the whole trek and saved (night.trek "brief", written only when true) so a continue
+## regenerates the very same layout even if the tutorial flag changed since.
+var brief: bool = false
 var stages_unseen: int = 0
 var noticed: bool = false
 var state: String = "idle"
@@ -86,6 +90,7 @@ static func begin(meta_: Dictionary, seed_: int, store_: Object = null) -> TrekF
 	f.store = store_
 	f.seed = seed_ & JsMath.M32
 	f.fx = TrekMeta.effects(meta_)
+	f.brief = meta_.get("tutorialDone", false) == true
 	f.night = f._make_night()
 	f.hunger = Hunger.create()
 	var order := stage_order()
@@ -123,6 +128,7 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.critters_fed = int(ex.get("critters", 0))
 	f.stages_unseen = int(ex.get("unseenStages", 0))
 	f.senses = clampi(int(ex.get("senses", 0)), 0, 100000)
+	f.brief = ex.get("brief", false) == true   # older saves (and first-run treks) have no key: the full layout they were made with
 	f.noticed = bool(ex.get("noticed", false))
 	f.day_t = float(ex.get("day_t", 0.0))
 	f._stake_ignored = int(ex.get("stakeIgnored", 0))
@@ -212,7 +218,7 @@ func _load_stage(id: String) -> bool:
 	row = StageGen.stage_row(id)
 	if row.is_empty() or not GENERATORS.has(String(row.get("generator", ""))):
 		return false
-	def = StageGen.generate(id, stage_seed(seed, leg))
+	def = StageGen.generate(id, stage_seed(seed, leg), brief)
 	if def.is_empty():
 		return false
 	stage_id = id
@@ -663,6 +669,8 @@ func snapshot(quit: bool = false) -> Dictionary:
 		"at": [at.x, at.y], "rest": [last_rest.x, last_rest.y], "stakeIgnored": _stake_ignored, "cleared": cleared.duplicate(),
 		"reached": reached.duplicate(), "warned": _warned, "eaten": eaten.duplicate(), "wither_t": _wither_t, "senses": senses,
 	}
+	if brief:
+		nd[SAVE_EXTRA]["brief"] = true   # only when set, so a first-run checkpoint is unchanged
 	var used: Array = []
 	for id in (meta.get("unlocks", {}) as Dictionary):
 		if TrekMeta.tier_of(meta, id) > 0 and used.size() < 32:

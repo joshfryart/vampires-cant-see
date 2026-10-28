@@ -67,6 +67,15 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.8 (Hollow pass 1: calmer opening, ping step, quirks, brief repeat-run cave)
+
+First of three cave passes (log: `docs/CAVE_ITERATIONS.md`). Tests: `test_rogue_tutorial.gd`, `test_rogue_sense.gd`, `test_stage_gen.gd` (bottoms).
+
+- **Calmer opening**: on the guided night the Sense HUD hint is rested (no pulse, not bright) and its clock (`RogueMode.hint_t`) stands still until the tutorial shows `sense_intro` (or the `sense` reminder); `RogueMode.sense_hint_held()`. Off the guided night (repeat runs, Tab, a continued run) nothing changes.
+- **Ping step**: a ping made while the waking line shows now completes the `ping` step (`Tutorial._past("ping")`: any ping since `rogue_begin`); it used to wait for a second ping. Text "Click or Space to ping. Listen to what comes back." (click pings too). Waking line: "The lid creaks. So do your knees. You cannot see. Listen."
+- **Quirks (cards only)**: the first ping within 7 cells of the echo hall beat on the guided night shows "...hello ...ello ...llo" / "You only clicked. The hall is being polite." (a short card, never over another card, once a trek); the first rat drunk each trek shows "Rat. It wishes to complain." as the +blood card's subtitle.
+- **Brief Hollow (repeat runs)**: `StageGen.generate(id, seed, brief := false)`; `GenCave` with brief = true places the 7 beat chunks only (no filler chambers, so no filler loop, drips or rats) and keeps consecutive beats within `BRIEF_REACH` 18 cells instead of `CHAIN_REACH` 24: the walk from the coffin to the exit is about 15% shorter (151 vs 179 cells, mean over 40 seeds). brief = false is byte-identical to 0.21.7 (60 seeds hashed). `TrekFlow.brief` is set at `begin` from the meta's `tutorialDone` and saved as the optional `night.trek.brief` (written only when true), so a continue regenerates the same layout; older saves load the full cave. `StageGen.analyze` reports `path_len` (start to exit arrival) and rejects a brief def with fillers or loops. Other generators ignore the flag.
+
 ## Changes in 0.21.7 (Sense discoverability)
 
 Playtest: "couldn't find a way to use that new power". V worked (verified in a real window, below), but nothing introduced it. Tests: `tests/flow/test_rogue_sense.gd` (bottom), `test_rogue_tutorial.gd`.

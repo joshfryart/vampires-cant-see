@@ -40,14 +40,17 @@ static func stage_row(stage_id: String) -> Dictionary:
 	return {}
 
 
-## Pure function of (stage_id, seed). Returns {} for an unknown stage or if no attempt satisfied every constraint.
-static func generate(stage_id: String, seed: int) -> Dictionary:
+## Pure function of (stage_id, seed, brief). Returns {} for an unknown stage or if no attempt satisfied every constraint.
+## `brief` (repeat runs: the Long Night tutorial is done) asks for the short form of a stage; only the cave has one (the Hollow without its
+## filler chambers, a pure beat chain). The flag is an explicit argument, never read from global state, and brief = false is bit-identical
+## to the generator before the flag existed. Generators without a short form ignore it.
+static func generate(stage_id: String, seed: int, brief: bool = false) -> Dictionary:
 	var row := stage_row(stage_id)
 	if row.is_empty():
 		return {}
 	match String(row.get("generator", "")):
 		"cave":
-			return GenCave.generate(row, seed)
+			return GenCave.generate(row, seed, brief)
 		"wood", "moor":
 			return GenWild.generate(row, seed, String(row["generator"]))
 		"road", "inn":
@@ -588,12 +591,21 @@ static func analyze(def: Dictionary, row: Dictionary = {}) -> Dictionary:
 	if unreach > 0:
 		reasons.append("%d unreachable floor cells" % unreach)
 	var ex: Variant = def.get("exit")
+	rep["path_len"] = -1
 	if ex is Dictionary:
 		var a: Array = ex["arrival"]
 		var ai: int = int(a[1]) * plan.w + int(a[0])
 		rep["exit_reachable"] = plan.inb(int(a[0]), int(a[1])) and dist[ai] >= 0
+		if rep["exit_reachable"]:
+			rep["path_len"] = dist[ai]   # walking cells from the start to the exit arrival
 	if not rep["exit_reachable"]:
 		reasons.append("exit not reachable")
+	# the brief (repeat-run) cave is a pure beat chain: no filler chambers, hence no filler loop either
+	var gen: Variant = def.get("gen")
+	if gen is Dictionary and gen.get("brief", false) == true:
+		rep["brief"] = true
+		if int(gen.get("fillers", 0)) != 0 or int(gen.get("loops", 0)) != 0:
+			reasons.append("brief stage has fillers")
 	rep["open_fraction"] = plan.open_fraction()
 	# beat depth order (spurs hang off the path, so they are not ordered)
 	var last := -1

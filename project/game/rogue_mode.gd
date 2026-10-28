@@ -107,7 +107,9 @@ var _sense_cd: float = 0.0
 var _sense_weak_at: float = -99.0
 var _breath_next: float = 0.0
 var sense_notice_shown: bool = false
-var hint_t: float = 0.0          ## seconds since this trek was started or continued (the Sense hint pulses early, then rests)
+var hint_t: float = 0.0          ## seconds the Sense hint has been on show this trek (it pulses early, then rests); held at 0 while the guided night has not reached its V line
+var _echo_word_done: bool = false ## the echo hall has said its word this trek (guided night only)
+var _rat_quip_done: bool = false  ## the first rat of the trek has lodged its complaint
 var wind_pan_now: float = 0.0     ## -1 (left) .. 1 (right): where the draft comes from, for tests
 var wind_src: Vector2 = Vector2.ZERO
 
@@ -183,6 +185,8 @@ func continue_trek() -> bool:
 func _start(t: TrekFlow, fresh: bool) -> void:
 	trek = t
 	hint_t = 0.0
+	_echo_word_done = false
+	_rat_quip_done = false
 	if _classic.is_empty():
 		_classic = {"has_run": g.flow.has_run, "fx": g.flow.fx.duplicate(true)}
 	active = true
@@ -341,7 +345,8 @@ func step(_gm: Variant, dt: float) -> void:
 	if g.state != "playing" and g.state != "feeding":
 		return
 	_t += dt
-	hint_t += dt
+	if not sense_hint_held():
+		hint_t += dt
 	g.flow.fx = trek.fx
 	var pp := Vector2(g.player.x, g.player.y)
 	var cell := Vector2i(floori(pp.x), floori(pp.y))
@@ -425,6 +430,7 @@ func on_pulse(_gm: Variant, pulse: Variant) -> void:
 		return
 	if String(pulse.kind) == "ping":
 		critters.on_ping(Vector2(pulse.x, pulse.y))   # the player's own ping startle-freezes nearby prey instead of flushing it
+		_echo_word()
 		return
 	var loud: float = float(NOISE_LOUD.get(pulse.kind, 0.0))
 	if loud <= 0.0:
@@ -668,8 +674,33 @@ func try_feed_critter() -> bool:
 		var nm: float = float(trek.fx.get("drinkNoise", 1.0)) * 0.5
 		g.emit_sound("struggle", x, y, {"rangeMul": nm, "strengthMul": nm})
 		sfx("rg_rat_squeak" if species == "rat" else "rg_bat_squeak", x, y)
-	g.show_card("+%d blood" % int(round(gain)), 0.0, species.capitalize())
+	var who := species.capitalize()
+	if species == "rat" and not _rat_quip_done:
+		_rat_quip_done = true
+		who = RAT_QUIP   # once a trek, on the card that is shown anyway
+	g.show_card("+%d blood" % int(round(gain)), 0.0, who)
 	return true
+
+
+const RAT_QUIP := "Rat. It wishes to complain."
+const ECHO_WORD := "...hello ...ello ...llo"
+const ECHO_WORD_SUB := "You only clicked. The hall is being polite."
+const ECHO_WORD_R := 7.0
+## The word card is short (it starts part-way through Game.CARD_LEN) so it barely covers the guided line under it.
+const ECHO_WORD_AGE := 0.6
+
+
+## The first ping in the echo hall on the guided night comes back as a word. A card only (no sound, no sim); never over another card.
+func _echo_word() -> void:
+	if _echo_word_done or trek == null or g.tut == null or not g.tut.rogue_active or g.card_text != "":
+		return
+	for b in trek.def.get("beats", []):
+		if String(b["id"]) == "echo_hall":
+			var c := Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5)
+			if c.distance_to(Vector2(g.player.x, g.player.y)) <= ECHO_WORD_R:
+				_echo_word_done = true
+				g.show_card(ECHO_WORD, ECHO_WORD_AGE, ECHO_WORD_SUB)
+			return
 
 
 ## A villager was drained to the end (Game.end_drink): count it for the Soil. The blood itself came through the classic drink.
@@ -984,16 +1015,28 @@ func sense_hint() -> String:
 	return "V sense (free)" if c <= 0.0 else "V sense (-%d blood)" % int(c)
 
 
-const SENSE_HINT_PULSE_S := 8.0    ## the hint pulses for this long at the start of a run
+const SENSE_HINT_PULSE_S := 8.0    ## the hint pulses for this long at the start of a run (guided night: from the tutorial's V line on)
 const SENSE_HINT_BRIGHT_S := 60.0  ## and stays bright until the player has used Sense once or this long has passed
+
+
+## On the guided first night the opening is already busy (stage card, coffin creak, the waking line), so the Sense hint stays rested and its
+## clock stands still until the tutorial shows its V line (sense_intro, or the lost-player reminder). Off the guided night: no hold.
+func sense_hint_held() -> bool:
+	if g.tut == null or not g.tut.rogue_active:
+		return false
+	for id in ["sense_intro", "sense"]:
+		if g.tut.rogue_cur == id or g.tut.rogue_done.has(id):
+			return false
+	return true
 
 
 ## How the HUD should draw the Sense hint: {"bright": 0..1 (1 = prominent, 0 = rested), "pulse": 0..1 (0 = none, else the pulse phase
 ## swing 0..1)}. Prominent until Sense has been used once or SENSE_HINT_BRIGHT_S seconds have passed (then it fades out over 4 s).
+## Rested while sense_hint_held().
 func sense_hint_look() -> Dictionary:
 	if not active or trek == null:
 		return {"bright": 0.0, "pulse": 0.0}
-	if trek.senses > 0 or int(stats.get("senses", 0)) > 0:
+	if trek.senses > 0 or int(stats.get("senses", 0)) > 0 or sense_hint_held():
 		return {"bright": 0.0, "pulse": 0.0}
 	var b: float = clampf((SENSE_HINT_BRIGHT_S + 4.0 - hint_t) / 4.0, 0.0, 1.0)
 	var p := 0.0
