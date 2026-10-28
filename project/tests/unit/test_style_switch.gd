@@ -120,3 +120,12 @@ func test_vibration_gating_text() -> void:
 	ok(txt.contains("if (style == 1) {\n\t\t\t\t\t\t// ink rock: the strata themselves quiver"), "rock vibration reuses the strata")
 	ok(txt.contains("for (int j = 0; j < 5; j++) {\n\t\t\t\t\t\t\tfloat f = float(j) * 0.25;"), "classic five-line vibration kept for style 0")
 	ok(txt.contains("for (int k = 0; k < 7; k++)"), "seven strata courses")
+	# 0.21.9: ink walls shiver shorter, fainter and smaller; classic (style 0) keeps VIB_DUR and full alpha; minor strata thin out with distance
+	ok(txt.contains("const float VIB_DUR = 0.9;"), "classic duration kept")
+	ok(txt.contains("if (style > 0) {\n\t\t\t\t\t\tif (age_v > VIB_DUR_INK) {"), "ink-only shorter shiver")
+	ok(txt.contains("if (style > 0) {\n\t\t\t\t\t\tamp *= VIB_AMP_INK;"), "ink-only smaller swing")
+	eq(txt.count("a *= VIB_A_INK;"), 2, "ink-only fainter (rock and the other ink materials)")
+	ok(not txt.contains("a *= 0.45;"), "the old ink alpha is gone")
+	ok(txt.contains("float w = (k % 3 == 0) ? 1.0 : 0.55 * minor_k;"), "minor courses fade with distance")
+	var vt := FileAccess.open("res://render/shaders/sonar_vault.gdshader", FileAccess.READ).get_as_text()
+	ok(vt.contains("THIN_NEAR") and vt.contains("bdf *= (int(kb) & 1) != 0"), "the vault bedding thins with distance too")

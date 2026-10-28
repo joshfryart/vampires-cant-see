@@ -137,6 +137,9 @@ const SKIP_SUFFIX := "  [Tab: skip]"
 const BEAT_RANK := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "rat_warren", "cave_mouth"]
 const BEAT_NEAR := 4.5
 const MAX_TEXT := 76
+## The stage card (TrekFlow.stage_card: 4 s, TrekUi fades it over its last 0.8 s) has the screen to itself at the start: the first guided line
+## waits this long, and the step clock stands still meanwhile (so "wake" still gets its full minimum on screen). Fresh and continued runs alike.
+const OPEN_HOLD := 3.2
 ## id, text (at most MAX_TEXT characters: the HUD hint is one line of 90 with the skip suffix), `timed` = seconds shown (the whole step),
 ## `min` = least seconds before the gate may complete it. "interrupt" steps jump the queue when their moment comes.
 const ROGUE_STEPS := [
@@ -167,6 +170,7 @@ var ping_n: int = 0                 ## player pings since boot (the gates compar
 var _base: Dictionary = {}          ## step id -> {ping, drip} counters when the step began
 var _fed0: int = 0                  ## RogueMode.stats critters_fed when the guided night began
 var _ping0: int = 0                 ## ping_n when the guided night began (a ping made while "wake" still shows counts for the ping step)
+var _open_t: float = 0.0            ## seconds since rogue_begin (the line is held while < OPEN_HOLD)
 var _rank: int = -1                 ## furthest main-path beat reached in the Hollow
 var _field: PackedInt32Array = PackedInt32Array()
 var _field_world: Variant = null
@@ -186,6 +190,7 @@ func rogue_begin(fresh: bool) -> void:
 	rogue_age = 0.0
 	_base = {}
 	_rank = -1
+	_open_t = 0.0
 	_field_world = null
 	_fed0 = int(g.rogue.stats["critters_fed"])
 	_ping0 = ping_n
@@ -337,6 +342,11 @@ func _next_step(pp: Vector2) -> String:
 	return ""
 
 
+## True for the first OPEN_HOLD seconds of the guided night: the stage card is the one thing on screen.
+func opening_held() -> bool:
+	return rogue_active and _open_t < OPEN_HOLD
+
+
 func _step_secs(def: Dictionary) -> float:
 	return float(def.get("timed", def.get("min", 0.0)))
 
@@ -347,9 +357,12 @@ func _rogue_step(dt: float) -> void:
 		return
 	var pp := Vector2(g.player.x, g.player.y)
 	_update_rank(pp)
+	var held := opening_held()
+	_open_t += dt
 	if rogue_cur != "":
 		var def := step_def(rogue_cur)
-		rogue_age += dt
+		if not held:
+			rogue_age += dt
 		var skip_now: bool = rogue_cur == "sense_intro" and _past(rogue_cur)   # a lesson never holds the queue once the player has run past it
 		if skip_now or (rogue_age >= _step_secs(def) and (_gate(rogue_cur, pp) or (_past(rogue_cur) and not bool(def.get("interrupt", false))))):
 			rogue_done[rogue_cur] = true
@@ -370,7 +383,7 @@ func _rogue_step(dt: float) -> void:
 		if all_done:
 			rogue_finish()
 			return
-	if g.card_text != "" or g.unlock_hint_t > 0.0 or rogue_cur == "":
+	if held or g.card_text != "" or g.unlock_hint_t > 0.0 or rogue_cur == "":
 		g.hint_text = ""
 		return
 	g.hint_text = String(step_def(rogue_cur)["text"]) + SKIP_SUFFIX

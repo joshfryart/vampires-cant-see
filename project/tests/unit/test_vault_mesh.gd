@@ -137,8 +137,17 @@ func test_game_wiring_and_classic_untouched() -> void:
 	g.boot()
 	g.add_world("hollow", StageGen.generate("hollow", 7))
 	ok(g.debug_map("hollow"), "enter the hollow")
-	eq(g.meshes["hollow"].size(), 5, "walls, floor, ring pass, vault surface, stalactites")
+	eq(g.meshes["hollow"].size(), 6, "walls, floor, ring pass, vault surface, stalactite ink, stalactite body")
 	ok(g.world.has_meta("vault_mesh"), "the world is tagged so the canvas ceiling skips its vault marks")
+	# 0.21.9: the stalactites' dark occluding body shares the ink pass's mesh and is drawn opaque (writes depth), the ink stays additive
+	var ink: MeshInstance3D = g.meshes["hollow"][4]
+	var body: MeshInstance3D = g.meshes["hollow"][5]
+	ok(body.mesh == ink.mesh, "the body is the same cone mesh")
+	eq(ink.material_override, g.vault_mat, "ink pass: the vault shader")
+	eq(body.material_override, g.vault_occ_mat, "body: the occluder")
+	var occ_code: String = (g.vault_occ_mat.shader as Shader).code
+	ok(occ_code.contains("depth_draw_opaque") and not occ_code.contains("blend_add"), "the body is opaque and writes depth")
+	ok((g.vault_mat.shader as Shader).code.contains("blend_add"), "the ink stays additive")
 	ok(g.debug_map("town"), "enter a classic map")
 	eq(g.meshes["town"].size(), 3, "classic map: walls, floor, flat ceiling")
 	ok(not g.world.has_meta("vault_mesh"), "classic world not tagged")

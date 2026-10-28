@@ -48,6 +48,13 @@ const float WOBBLE_FREQ = 34.0;
 const float VIB_DUR = 0.9;
 const float VIB_HZ = 7.0;
 const float VIB_DAMP = 2.6;
+// 0.21.9 ink walls (style > 0) only: a calmer shiver, shorter, fainter and a smaller swing (classic style 0 keeps VIB_DUR and its alpha)
+const float VIB_DUR_INK = 0.5;
+const float VIB_A_INK = 0.3;
+const float VIB_AMP_INK = 0.6;
+// 0.21.9 rock strata thin out with distance: the minor courses fade between these depths (cells)
+const float STRATA_THIN_NEAR = 2.5;
+const float STRATA_THIN_FAR = 4.0;
 const float RIPPLE_V = 4.0;
 
 varying vec3 wpos;
@@ -164,13 +171,19 @@ float rock_tilt(vec2 p, vec2 nv) {
 
 // rock: strata (x) and cracks / seeps (y) as coverage. s = arc length, v = height from the floor, tilt = strata slope per cell of s.
 // Strata are seven layered courses, each with its own run length, breaks and wobble (odd courses only within 4.2 cells); voff shifts them in px (vibration).
+// 0.21.9: the minor courses (all but 0, 3, 6) also fade out between STRATA_THIN_NEAR and STRATA_THIN_FAR cells, so a far wall keeps two or three
+// bold courses instead of a dense comb (rock style only: classic walls never call this).
 vec2 rock_detail(float s, float v, float lip, float fws, float fwy, float tilt, float curv, float wd, float depth, float voff) {
 	const float GL = 0.6;
 	float g = floor(s / GL);
 	int gi = int(g);
 	float strata = 0.0;
+	float minor_k = 1.0 - smoothstep(STRATA_THIN_NEAR, STRATA_THIN_FAR, depth);
 	for (int k = 0; k < 7; k++) {
 		if ((k & 1) != 0 && depth > 4.2) {
+			continue;
+		}
+		if (k % 3 != 0 && minor_k <= 0.0) {
 			continue;
 		}
 		float lk = 0.4 + 0.7 * cell_hash(k, 70, 0);
@@ -186,7 +199,7 @@ vec2 rock_detail(float s, float v, float lip, float fws, float fwy, float tilt, 
 				float sm = (float(si) + 0.5 - off) * lk;
 				float vk = base + tilt * (s - sm) + 0.03 * (vn1(s * 1.6 + float(k) * 9.0, 76 + k) - 0.5);
 				float endk = clamp(min(f - fs, fe - f) * lk / 0.07, 0.0, 1.0);
-				float w = (k % 3 == 0) ? 1.0 : 0.55;
+				float w = (k % 3 == 0) ? 1.0 : 0.55 * minor_k;
 				strata = max(strata, tent((v - vk) / fwy - voff, wd) * endk * w);
 			}
 		}
@@ -543,7 +556,7 @@ void fragment() {
 							float tilt = rock_tilt(p, nvv);
 							vec2 rc = rock_detail(UV.x, UV.y, lip, fws, fwy, tilt, curv, line_px * 0.7, depth, 0.0);
 							float fk = (0.35 + 0.65 * facing);
-							float st_a = a * fk * (1.0 - smoothstep(5.0, 7.0, depth));
+							float st_a = a * fk * (1.0 - smoothstep(4.5, 6.5, depth));
 							float cr_a = a * (1.0 - smoothstep(3.5, 5.0, depth));
 							if (rc.x > 0.0 && st_a >= 0.04) {
 								put_k(outc, col, st_a, rc.x, 0.0, 0.16);
@@ -745,21 +758,30 @@ void fragment() {
 						continue;
 					}
 					float env = exp(-age_v * VIB_DAMP) * (1.0 - age_v / VIB_DUR);
+					if (style > 0) {
+						if (age_v > VIB_DUR_INK) {
+							continue; // ink: over sooner, and eased out over its own short span
+						}
+						env *= 1.0 - age_v / VIB_DUR_INK;
+					}
 					float kv = env * gb * max(0.0, 1.0 - dist_p / r1.x) * (0.5 + 0.5 * inc_k) * min(1.0, r1.w);
 					if (kv < 0.015) {
 						continue;
 					}
 					float sh = reduced_motion > 0.5 ? 0.0 : sin(TWO_PI * VIB_HZ * age_v);
 					float amp = min(14.0 * sc, 0.11 * focal_px / max(0.3, depth)) * sh;
+					if (style > 0) {
+						amp *= VIB_AMP_INK;
+					}
 					float vy_px = (ngv.x * fwd2.x + ngv.z * fwd2.y) * 0.8 * amp;
 					float a = min(1.0, 2.2 * kv);
 					float cov = 0.0;
 					if (style == 1) {
 						// ink rock: the strata themselves quiver (their own dip, breaks and spacing) instead of evenly spaced stripes
 						float fws_v = max(fwidth(UV.x), 1e-5);
-						vec2 rv = rock_detail(UV.x, UV.y, lip, fws_v, fwy, rock_tilt(p, nvv), 0.0, line_px_thin, max(depth, 4.3), vy_px); // even courses only: a quivering wall is thinner than a still one
+						vec2 rv = rock_detail(UV.x, UV.y, lip, fws_v, fwy, rock_tilt(p, nvv), 0.0, line_px_thin, max(depth, 4.3), vy_px); // the far-wall courses only (0 and 6): a quivering wall is thinner than a still one
 						cov = rv.x;
-						a *= 0.45;
+						a *= VIB_A_INK;
 					} else if (style > 0) {
 						// other ink materials: three faint, broken, wandering lines
 						for (int j = 0; j < 3; j++) {
@@ -767,7 +789,7 @@ void fragment() {
 							float brk = smoothstep(0.3, 0.4, vn1(UV.x * 2.5 + float(j) * 3.0, 55 + j));
 							cov = max(cov, tent((UV.y - fj) / fwy - vy_px, line_px_thin * 0.8) * brk);
 						}
-						a *= 0.45;
+						a *= VIB_A_INK;
 					} else {
 						for (int j = 0; j < 5; j++) {
 							float f = float(j) * 0.25;

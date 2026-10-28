@@ -1,5 +1,7 @@
 # TODO (0.21.1, The Long Night)
 
+Changes in 0.21.9: Hollow pass 2 (the stage card stands alone for 3.2 s before the first guided line, one free revive from withering on the guided night in the Hollow, stalactites get a dark occluding body, far rock strata thin out, ink walls shiver shorter and fainter), see `AI_HANDOFF.md`, "Changes in 0.21.9" and `docs/CAVE_ITERATIONS.md`. Still to do: a person judges the look and the revive card in play.
+
 Changes in 0.21.8: Hollow pass 1 (Sense hint held until the tutorial's V line, a ping during the waking line counts, echo-hall word and complaining rat cards, brief repeat-run Hollow without filler chambers), see `AI_HANDOFF.md`, "Changes in 0.21.8" and `docs/CAVE_ITERATIONS.md`. Still to do: a person plays a first and a repeat run.
 
 Changes in 0.21.7: Sense discoverability (tutorial `sense_intro` step after the rings, brighter pulsing HUD hint under the dawn line, How to play and pause list V, windowed `sense_check` scenario that proved V works), see `AI_HANDOFF.md`, "Changes in 0.21.7". Still to do: a person confirms the hint is noticed in play.

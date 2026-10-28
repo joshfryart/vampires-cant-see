@@ -329,6 +329,104 @@ func test_second_coffin() -> void:
 	near(g.night.blood, 30.0, 0.1, "blood back")
 
 
+## 0.21.9: the guided night forgives the first withering in the Hollow, once, for free (no Second Coffin used, nothing paid, nothing counted).
+func test_guided_revive_withering_once() -> void:
+	var f := _flow()
+	f.guided = true
+	var rest := Vector2i(int(f.def["rest"][0]["cell"][0]), int(f.def["rest"][0]["cell"][1]))
+	f.note_rest(rest)
+	ok(f.guided_revive_ready(), "ready on the guided Hollow")
+	var stats0: Dictionary = f.meta["stats"].duplicate(true)
+	var soil0: Variant = f.meta.get("soil")
+	f.night.blood = 0.0
+	var ev := f.step(26.0, f.start_cell, false)
+	ok(_has(ev, "revived"), "revived")
+	var rv: Dictionary = {}
+	for e in ev:
+		if e["type"] == "revived":
+			rv = e
+	eq(rv.get("free"), true, "the event says it was the free one")
+	eq(rv.get("was"), "withered", "from withering")
+	ok(f.alive(), "alive")
+	eq(f.state, "playing", "still night: playing")
+	eq(f.at_cell, rest, "woke at the last rest spot")
+	near(f.night.blood, TrekFlow.REVIVE_BLOOD, 0.1, "the second-coffin blood")
+	ok(f.guided_revived, "spent")
+	eq(f.deaths_avoided, 0, "the Second Coffin counter is untouched")
+	ok(not _has(ev, "death"), "no death event")
+	eq(f.meta["stats"], stats0, "no stats recorded (no run end)")
+	eq(f.meta.get("soil"), soil0, "no Soil paid")
+	ok(not f.guided_revive_ready(), "not ready again")
+	# the second withering sticks
+	f.night.blood = 0.0
+	f.step(26.0, f.at_cell, false)
+	eq(f.state, "dead", "second withering is death")
+	eq(f.cause, "withered", "cause")
+	var r := f.end_run()
+	eq(r["cause"], "withered", "result")
+	eq(f.meta["stats"]["deaths"]["withered"], 1, "one death counted, not two")
+
+
+func test_guided_revive_rules() -> void:
+	# off the guided night: an ordinary death
+	var a := _flow()
+	a.night.blood = 0.0
+	a.step(26.0, a.start_cell, false)
+	eq(a.cause, "withered", "not guided: death")
+	# the sun is not forgiven (it is warned, belled and taught)
+	var b := _flow()
+	b.guided = true
+	b.night.skip_to(5, 59)
+	b.step(2.0, b.start_cell, true)
+	eq(b.cause, "sun", "guided, sun: death")
+	ok(not b.guided_revived, "the free revive was not spent on it")
+	ok(not b.guided_revive_ready("staked") and not b.guided_revive_ready("holy"), "stakes and holy ground are not covered")
+	# a stage past the Hollow is not covered
+	var c := _flow()
+	c.guided = true
+	var x := c.reach_exit()
+	ok(x["ok"] and not x["ended"], "into the next stage")
+	ok(c.stage_id != "hollow", "past the Hollow")
+	c.night.blood = 0.0
+	c.step(30.0, c.start_cell, false)
+	eq(c.cause, "withered", "guided past the Hollow: death")
+	# a bought Second Coffin is kept for later: free revive first, then the coffin, then death
+	var d := _flow({"second_coffin": 1})
+	d.guided = true
+	for i in 2:
+		d.night.blood = 0.0
+		d.step(26.0, d.at_cell, false)
+		ok(d.alive(), "revive %d" % (i + 1))
+	ok(d.guided_revived and d.deaths_avoided == 1, "free one, then the coffin")
+	d.night.blood = 0.0
+	d.step(26.0, d.at_cell, false)
+	eq(d.state, "dead", "third withering: death")
+
+
+func test_guided_revive_saved_with_the_checkpoint() -> void:
+	var st := _store()
+	var f := _flow({}, st)
+	f.guided = true
+	var snap0 := f.snapshot()
+	ok(not (snap0["night"]["trek"] as Dictionary).has("guidedRevive"), "unused: no key (checkpoints unchanged)")
+	f.night.blood = 0.0
+	f.step(26.0, f.start_cell, false)
+	ok(f.guided_revived, "spent")
+	ok(f.quit_checkpoint(), "quit checkpoint")
+	var rd: Dictionary = st.read("trek")
+	ok(rd["ok"], "trek save read")
+	eq(rd["data"]["night"]["trek"].get("guidedRevive"), true, "saved")
+	var g := TrekFlow.continue_from(rd["data"], f.meta, st)
+	ok(g != null and g.guided_revived, "restored as spent")
+	g.guided = true
+	g.night.blood = 0.0
+	g.step(26.0, g.at_cell, false)
+	eq(g.state, "dead", "a continue cannot reuse it")
+	# an older save without the key: unused
+	var h := TrekFlow.continue_from(snap0, f.meta, null)
+	ok(h != null and not h.guided_revived, "no key: unused")
+
+
 func test_feeding_counts_and_soil() -> void:
 	var f := _flow()
 	f.night.blood = 20.0

@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.21.8", "version 0.21.8")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.21.9", "version 0.21.9")
 
 
 func test_new_trek_from_the_menu() -> void:
@@ -351,6 +351,7 @@ func test_withered_laid_to_rest_and_rise_again() -> void:
 	var g := _game()
 	var r := _trek(g)
 	var world0 := g.world
+	r.trek.guided_revived = true   # 0.21.9: the guided night's one free revive is spent (tested in test_rogue_tutorial / test_trek_flow)
 	g.night.blood = 0.0
 	_step(g, 27.0, {}, 0.1)
 	ok(not r.active, "the trek ended")
@@ -397,6 +398,7 @@ func test_continue_from_the_checkpoint() -> void:
 func test_classic_still_starts_after_a_trek() -> void:
 	var g := _game()
 	var r := _trek(g)
+	r.trek.guided_revived = true   # 0.21.9: the free revive is not what this test is about
 	g.night.blood = 0.0
 	_step(g, 27.0, {}, 0.1)
 	eq(g.state, "runend", "ended")

@@ -176,6 +176,7 @@ var wall_mat: ShaderMaterial
 var floor_mat: ShaderMaterial
 var ceil_mat: ShaderMaterial
 var vault_mat: ShaderMaterial
+var vault_occ_mat: ShaderMaterial   ## the stalactites' opaque dark body (render/shaders/vault_occluder.gdshader)
 var cam: Camera3D
 var map_view: MapView
 var dev_panel: DevPanel
@@ -277,6 +278,8 @@ func _build_view() -> void:
 	ceil_mat.set_shader_parameter("is_ceiling", true)
 	vault_mat = ShaderMaterial.new()
 	vault_mat.shader = load("res://render/shaders/sonar_vault.gdshader")
+	vault_occ_mat = ShaderMaterial.new()
+	vault_occ_mat.shader = load("res://render/shaders/vault_occluder.gdshader")
 	fx_grade = ColorRect.new()
 	fx_grade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fx_grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -457,12 +460,19 @@ func _show_map_mesh(name: String) -> void:
 			var vm := VaultMesh.build(worlds[name])
 			var vsurf := vm.build_surface()
 			ce.mesh = vsurf
-			for mesh_i in [vsurf, vm.build_stalactites()]:
+			var stal := vm.build_stalactites()
+			for mesh_i in [vsurf, stal]:
 				var vi := MeshInstance3D.new()
 				vi.mesh = mesh_i
 				vi.material_override = vault_mat
 				viewport.add_child(vi)
 				vault_extra.append(vi)
+			# 0.21.9: the cones' dark body (opaque, depth-writing) so they read as solid rock and hide what hangs behind them
+			var occ := MeshInstance3D.new()
+			occ.mesh = stal
+			occ.material_override = vault_occ_mat
+			viewport.add_child(occ)
+			vault_extra.append(occ)
 			worlds[name].set_meta("vault_mesh", true)
 		else:
 			ce.mesh = WorldMeshBuilder.build_ceiling(worlds[name])

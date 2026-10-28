@@ -67,6 +67,14 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.21.9 (Hollow pass 2: opening order, free first-night revive, quieter rock)
+
+Second of three cave passes (log: `docs/CAVE_ITERATIONS.md`). Tests: `test_rogue_tutorial.gd` and `test_trek_flow.gd` (bottoms), `test_vault_mesh.gd`, `test_style_switch.gd`.
+
+- **Opening order**: `Tutorial.OPEN_HOLD` (3.2 s, where the 4 s stage card starts to fade): after `rogue_begin` (fresh or continued) no guided line shows and the step clock stands still, so the card is alone first and "wake" still gets its full minimum afterwards. `Tutorial.opening_held()`.
+- **Free revive on the guided night**: `TrekFlow.guided` (RogueMode sets it from `Tutorial.rogue_active` before every step, sleep and finished wait) and `guided_revived`. While guided, in the Hollow, the first **withering** death takes the second-coffin path (`_revive`: `REVIVE_BLOOD`, last rest spot, the day prompt again if it is day) for free: `deaths_avoided` and a bought Second Coffin are untouched, no Soil or stats change (only `end_run` pays). Event `revived` carries `free: true`; card "Back in the box" / "The first night is on the house. Next time, drink something." Sun, stake and holy deaths are not covered. Saved as the optional `night.trek.guidedRevive` (only when spent). Tab-skipping the tutorial ends the offer.
+- **Render (Hollow ink only; classic style 0 untouched)**: stalactite cones get an opaque black body (`render/shaders/vault_occluder.gdshader`, a sixth mesh instance in the Hollow sharing the cone mesh, inset 0.012 cells, drip beads collapsed) so they hide what is behind them; the rock strata's minor courses fade out between 2.5 and 4 cells and the strata alpha fade starts at 4.5 instead of 5 (`sonar_wall.gdshader` `STRATA_THIN_*`); the vault's alternate bedding courses and boss levels thin with distance (`sonar_vault.gdshader` `THIN_*`); struck ink walls shiver for 0.5 s instead of 0.9, at alpha x0.3 instead of x0.45 and 0.6 of the swing (`VIB_*_INK`).
+
 ## Changes in 0.21.8 (Hollow pass 1: calmer opening, ping step, quirks, brief repeat-run cave)
 
 First of three cave passes (log: `docs/CAVE_ITERATIONS.md`). Tests: `test_rogue_tutorial.gd`, `test_rogue_sense.gd`, `test_stage_gen.gd` (bottoms).

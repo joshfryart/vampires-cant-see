@@ -15,6 +15,9 @@ uniform float vault_seed = 0.0;   // per-map offset of the noise lattice (World.
 
 const vec4 STRATA_Q = vec4(0.0, 0.0, 0.0, 1.0);
 const vec3 INK_BONE = vec3(1.0, 0.9882, 0.9569);
+// 0.21.9 thinning with distance (cells), as the wall shader's STRATA_THIN_NEAR / STRATA_THIN_FAR: alternate bedding courses, then alternate boss levels
+const float THIN_NEAR = 2.5;
+const float THIN_FAR = 4.0;
 
 varying vec3 wpos;
 varying vec3 wnorm;
@@ -120,6 +123,8 @@ void fragment() {
 			float bd = abs(fract(gl + 0.5) - 0.5) / fg;
 			float bmask = smoothstep(0.28, 0.44, vn2(sp * 1.7 + vec2(4.1, 8.8), 13));
 			float bf = (1.0 - smoothstep(6.0, 9.5, depth)) * (1.0 - smoothstep(0.3, 0.6, fg));
+			// 0.21.9: far away every other contour level fades out, so the distant vault keeps its relief without a dense comb
+			bf *= (int(floor(gl + 0.5)) & 1) != 0 ? 1.0 - smoothstep(THIN_NEAR + 1.5, THIN_FAR + 2.0, depth) : 1.0;
 			accum(outc, col, al * 0.8 * bf, tent(bd, wd) * bmask);
 			if (detail) {
 				// jointed cracks: broken Voronoi borders of a domain-warped lattice
@@ -157,6 +162,7 @@ void fragment() {
 				float ab = dot(sp, vec2(-dv.y, dv.x)) / 1.1 + 5.0 * cell_hash(int(kb), 15, 0);
 				float on = (cell_hash(int(kb), 16, 0) < 0.6 && fract(ab) < 0.55) ? 1.0 : 0.0;
 				float bdf = (1.0 - smoothstep(3.5, 6.5, depth)) * dn;
+				bdf *= (int(kb) & 1) != 0 ? 1.0 - smoothstep(THIN_NEAR, THIN_FAR, depth) : 1.0;   // 0.21.9: alternate courses thin out first
 				accum(outc, col, al * 0.5 * bdf, tent(fb, wd) * on);
 			}
 			// a faint lit body so the lit band reads as a surface

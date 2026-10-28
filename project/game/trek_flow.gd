@@ -24,6 +24,7 @@ const STAKE_DMG := 45.0
 const STAKE_CD := 3.0
 const HOLY_DPS := 8.0
 const REVIVE_BLOOD := 30.0
+const GUIDED_REVIVE_STAGE := "hollow"
 const SUB_STEP := 0.1
 const MAX_HEAT_HUNTERS := 2
 const SAVE_EXTRA := "trek"
@@ -46,6 +47,12 @@ var senses: int = 0               ## Sense uses this run (additive, optional key
 ## chambers, beats closer together). Fixed for the whole trek and saved (night.trek "brief", written only when true) so a continue
 ## regenerates the very same layout even if the tutorial flag changed since.
 var brief: bool = false
+## The guided first night is on (RogueMode sets it every frame from Tutorial.rogue_active; TrekFlow never reads the tutorial itself). While it is
+## on in the Hollow, the first withering death is forgiven once (GUIDED_REVIVE_STAGE): the second-coffin wake-up, free, without using a bought
+## Second Coffin. Only "withered" (sun, stake and holy ground keep their rules: the sun is warned, belled and taught; there are no hunters or holy
+## ground in the Hollow on night 1). `guided_revived` is saved (night.trek "guidedRevive", written only when true) so a continue cannot reuse it.
+var guided: bool = false
+var guided_revived: bool = false
 var stages_unseen: int = 0
 var noticed: bool = false
 var state: String = "idle"
@@ -129,6 +136,7 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.stages_unseen = int(ex.get("unseenStages", 0))
 	f.senses = clampi(int(ex.get("senses", 0)), 0, 100000)
 	f.brief = ex.get("brief", false) == true   # older saves (and first-run treks) have no key: the full layout they were made with
+	f.guided_revived = ex.get("guidedRevive", false) == true   # no key: the free revive is unused
 	f.noticed = bool(ex.get("noticed", false))
 	f.day_t = float(ex.get("day_t", 0.0))
 	f._stake_ignored = int(ex.get("stakeIgnored", 0))
@@ -472,25 +480,43 @@ func withering_left() -> float:
 	return maxf(0.0, WITHER_SEC / maxf(0.01, float(fx["witherSlow"])) - _wither_t)
 
 
+## Whether a death of this kind would be forgiven by the guided night's free revive right now.
+func guided_revive_ready(why: String = "withered") -> bool:
+	return guided and not guided_revived and why == "withered" and stage_id == GUIDED_REVIVE_STAGE
+
+
 func _die(why: String, ev: Array) -> void:
+	if guided_revive_ready(why):
+		guided_revived = true   # checked first so a bought Second Coffin is still there for later; deaths_avoided is not touched
+		_revive(why, ev, true)
+		return
 	if int(floor(float(fx["secondCoffin"]))) >= 1 and deaths_avoided < 1:
 		deaths_avoided += 1
-		night.blood = minf(night.blood_max, REVIVE_BLOOD)
-		_wither_t = 0.0
-		_stake_cd = STAKE_CD
-		night.reason = ""
-		night.status = "day" if night.min >= Night.NIGHT_MIN else "night"
-		state = "choice" if night.status == "day" else "playing"
-		at_cell = last_rest
-		player_pos = Vector2(last_rest.x + 0.5, last_rest.y + 0.5)
-		_revived = true
-		ev.append({"type": "revived", "cell": last_rest, "was": why})
-		if state == "choice":
-			ev.append({"type": "needs_choice"})
+		_revive(why, ev, false)
 		return
 	state = "dead"
 	cause = why
 	ev.append({"type": "death", "cause": why})
+
+
+## The second-coffin wake-up: REVIVE_BLOOD, the wither timer and stake cooldown reset, back at the last rest spot (the day prompt again
+## if the sun is up). `free` marks the guided night's one free revive in the event.
+func _revive(why: String, ev: Array, free: bool) -> void:
+	night.blood = minf(night.blood_max, REVIVE_BLOOD)
+	_wither_t = 0.0
+	_stake_cd = STAKE_CD
+	night.reason = ""
+	night.status = "day" if night.min >= Night.NIGHT_MIN else "night"
+	state = "choice" if night.status == "day" else "playing"
+	at_cell = last_rest
+	player_pos = Vector2(last_rest.x + 0.5, last_rest.y + 0.5)
+	_revived = true
+	var e := {"type": "revived", "cell": last_rest, "was": why}
+	if free:
+		e["free"] = true
+	ev.append(e)
+	if state == "choice":
+		ev.append({"type": "needs_choice"})
 
 
 ## A new night of the same stage: Heat up, clock back to dusk. (Prey does not respawn: the caller keeps its critters.)
@@ -671,6 +697,8 @@ func snapshot(quit: bool = false) -> Dictionary:
 	}
 	if brief:
 		nd[SAVE_EXTRA]["brief"] = true   # only when set, so a first-run checkpoint is unchanged
+	if guided_revived:
+		nd[SAVE_EXTRA]["guidedRevive"] = true   # likewise: only once the free revive has been spent
 	var used: Array = []
 	for id in (meta.get("unlocks", {}) as Dictionary):
 		if TrekMeta.tier_of(meta, id) > 0 and used.size() < 32:

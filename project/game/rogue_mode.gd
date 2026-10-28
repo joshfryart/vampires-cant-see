@@ -353,6 +353,7 @@ func step(_gm: Variant, dt: float) -> void:
 	var outdoor: bool = g.world.kind_at(pp.x, pp.y) == "outdoor"
 	var frozen: bool = prompt_open or waiting
 	var ctx := {"player_pos": pp, "mist": g.powers.mist != null, "hunters": _hunter_list(), "frozen": frozen}
+	_sync_guided()
 	_handle(trek.step(dt, cell, outdoor, ctx))
 	if not active:
 		return
@@ -477,7 +478,10 @@ func _handle(ev: Array) -> void:
 			"revived":
 				var c: Vector2i = e["cell"]
 				g.player.place(c.x + 0.5, c.y + 0.5, g.player.angle)
-				g.show_card("The second coffin", 0.0, "You wake where you last rested.")
+				if e.get("free", false) == true:
+					g.show_card(GUIDED_REVIVE_TITLE, 0.0, GUIDED_REVIVE_SUB)
+				else:
+					g.show_card("The second coffin", 0.0, "You wake where you last rested.")
 			"death":
 				_on_end()
 				return
@@ -592,6 +596,7 @@ func stir() -> void:
 func _finish_wait(o: Dictionary) -> void:
 	waiting = false
 	_ui().hide_waiting()
+	_sync_guided()
 	var r := trek.apply_wait(o)
 	wait_day = null
 	_handle(r["events"])
@@ -605,6 +610,7 @@ func _finish_wait(o: Dictionary) -> void:
 ## Sleep at the rest spot `rest` (a descriptor["rest"] entry). Returns "sleep" or "blocked".
 func _sleep(rest: Dictionary) -> String:
 	var cell := Vector2i(int(rest["cell"][0]), int(rest["cell"][1]))
+	_sync_guided()
 	var r := trek.sleep_at_rest(cell)
 	if not r.get("ok", false):
 		return "blocked"
@@ -680,6 +686,17 @@ func try_feed_critter() -> bool:
 		who = RAT_QUIP   # once a trek, on the card that is shown anyway
 	g.show_card("+%d blood" % int(round(gain)), 0.0, who)
 	return true
+
+
+## The guided night's one free revive (TrekFlow.guided_revive_ready): the second-coffin card, in the Hollow's voice.
+const GUIDED_REVIVE_TITLE := "Back in the box"
+const GUIDED_REVIVE_SUB := "The first night is on the house. Next time, drink something."
+
+
+## TrekFlow never reads the tutorial: tell it whether the guided night is on before anything that can kill (step, sleep, a finished wait).
+func _sync_guided() -> void:
+	if trek != null:
+		trek.guided = g.tut != null and g.tut.rogue_active
 
 
 const RAT_QUIP := "Rat. It wishes to complain."

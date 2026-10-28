@@ -67,6 +67,8 @@ func test_first_run_shows_step_one() -> void:
 	ok(g.tut.rogue_active, "guided night on")
 	_step(g, 0.3)
 	eq(_cur(g), "wake", "step 1: waking")
+	eq(g.hint_text, "", "the stage card has the screen to itself first (0.21.9)")
+	_step(g, Tutorial.OPEN_HOLD)
 	ok(g.hint_text.find("The lid creaks. So do your knees. You cannot see. Listen.") == 0, "the waking line: " + g.hint_text)
 	ok(g.hint_text.find("Tab: skip") > 0, "the skip hint is on the line")
 	ok(r.active, "trek active")
@@ -152,7 +154,7 @@ func test_dead_end_step() -> void:
 func test_skip_completes_and_persists() -> void:
 	var g := _game()
 	_trek(g)
-	_step(g, 0.5)
+	_step(g, Tutorial.OPEN_HOLD + 0.5)
 	ok(g.hint_text != "", "step 1 showing")
 	var px := g.player.x
 	g.pressed[Tutorial.SKIP_KEY] = true
@@ -251,6 +253,9 @@ func test_day_prompt_steps() -> void:
 func test_death_explains_soil_once_and_finishes() -> void:
 	var g := _game()
 	var r := _trek(g)
+	g.night.blood = 0.0
+	_step(g, 27.0, {}, 0.1)
+	eq(g.state, "playing", "the guided night forgives the first withering (0.21.9)")
 	g.night.blood = 0.0
 	_step(g, 27.0, {}, 0.1)
 	eq(g.state, "runend", "ended")
@@ -469,4 +474,77 @@ func test_the_first_rat_complains() -> void:
 	if subs.size() == 2:
 		eq(subs[0], RogueMode.RAT_QUIP, "the first one complains")
 		eq(subs[1], "Rat", "the rest just are rats")
+	_done(g)
+
+
+# ---------------------------------------------------------------- 0.21.9 opening order and the free revive
+
+func test_opening_holds_the_line_for_the_stage_card() -> void:
+	var g := _game()
+	var r := _trek(g)
+	_step(g, 0.3)
+	ok(g.menus.trek_ui.stage_card_visible(), "the stage card is up")
+	ok(g.tut.opening_held(), "the guided line is held")
+	eq(g.hint_text, "", "no line under the card")
+	_step(g, Tutorial.OPEN_HOLD - 0.6)
+	eq(g.hint_text, "", "still held just before the card fades")
+	_step(g, 0.6)
+	ok(not g.tut.opening_held(), "hold over")
+	ok(g.hint_text.find("The lid creaks") == 0, "then the waking line: " + g.hint_text)
+	ok(r.stats["drips"] > 0, "a drip came during the hold")
+	_step(g, 1.5)
+	eq(_cur(g), "wake", "the waking line still gets its own minimum on screen after the hold")
+	_step(g, 1.5)
+	eq(_cur(g), "ping", "then the ping prompt")
+	# a continued run holds its first line as well (its stage card shows too)
+	g.set_state("title")
+	g.menus.trek_continue_requested.emit()
+	ok(g.tut.rogue_active, "continued, guided")
+	_step(g, 0.3)
+	eq(g.hint_text, "", "held on continue")
+	_step(g, Tutorial.OPEN_HOLD)
+	ok(g.hint_text.find("Tab: skip") > 0, "then the line: " + g.hint_text)
+	_done(g)
+
+
+func test_guided_night_forgives_the_first_withering() -> void:
+	var g := _game()
+	var r := _trek(g)
+	_step(g, 1.0, {"forward": 1.0})
+	var rest: Vector2i = r.trek.last_rest
+	g.night.blood = 0.0
+	_step(g, 27.0, {}, 0.1)
+	eq(g.state, "playing", "alive")
+	ok(r.trek.guided_revived, "the free revive is spent")
+	eq(r.trek.deaths_avoided, 0, "no Second Coffin used")
+	eq(g.card_text, RogueMode.GUIDED_REVIVE_TITLE, "the card")
+	eq(g.card_sub, RogueMode.GUIDED_REVIVE_SUB)
+	ok(RogueMode.GUIDED_REVIVE_SUB.length() <= Tutorial.MAX_TEXT and RogueMode.GUIDED_REVIVE_TITLE.length() <= Tutorial.MAX_TEXT, "short lines")
+	near(g.player.x, rest.x + 0.5, 0.6, "back at the last rest spot (x)")
+	near(g.player.y, rest.y + 0.5, 0.6, "back at the last rest spot (y)")
+	ok(g.night.blood > 25.0, "second-coffin blood (%.1f)" % g.night.blood)
+	ok(g.tut.rogue_active, "still the guided night")
+	eq(int(g.menus.trek_meta["stats"]["treks"]), 0, "no run recorded")
+	eq(int(g.menus.trek_meta["soil"]), 0, "no Soil")
+	# quit and continue: still spent
+	g.set_state("title")
+	ok(g.rogue.continue_trek(), "continued")
+	ok(g.rogue.trek.guided_revived, "restored as spent")
+	g.night.blood = 0.0
+	_step(g, 27.0, {}, 0.1)
+	eq(g.state, "runend", "the second withering ends the run")
+	eq(int(g.menus.trek_meta["stats"]["deaths"]["withered"]), 1, "one death")
+	_done(g)
+
+
+func test_no_free_revive_once_the_guided_night_is_skipped() -> void:
+	var g := _game()
+	var r := _trek(g)
+	g.pressed[Tutorial.SKIP_KEY] = true
+	g.step(0.05, {})
+	ok(not g.tut.rogue_active, "skipped")
+	g.night.blood = 0.0
+	_step(g, 27.0, {}, 0.1)
+	eq(g.state, "runend", "Tab-skipped: withering is death")
+	ok(not r.trek.guided_revived, "nothing spent")
 	_done(g)
