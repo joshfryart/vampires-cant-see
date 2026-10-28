@@ -35,12 +35,13 @@ static func _fail(k: String) -> Dictionary:
 ## variants (0.22.0, brief only): each beat that has alternative chunks (chunks.json "variants") uses the one variant_pick chose for this seed,
 ## and the attempt must also lay a clean breadcrumb trail (_crumbs_clean). variants = false is the 0.21.8-0.21.9 brief cave, byte-identical,
 ## kept so a repeat-run checkpoint saved before 0.22.0 (no night.trek "variants" key) continues in the cave it was saved in.
-static func generate(row: Dictionary, seed: int, brief: bool = false, variants: bool = true) -> Dictionary:
+static func generate(row: Dictionary, seed: int, brief: bool = false, variants: Variant = VARIANT_LEVEL) -> Dictionary:
 	var data := StageGen.chunks()
 	if data.is_empty():
 		return {}
-	var strict: bool = brief and variants
-	var pick := variant_pick(String(row.get("id", "")), seed, brief) if variants else {}
+	var level := int(variants)   # false 0, true 1 (the four 0.22.0 beats), 2 (all seven)
+	var strict: bool = brief and level > 0
+	var pick := variant_pick(String(row.get("id", "")), seed, brief, level) if level > 0 else {}
 	var def := _attempts(row, with_variants(data, pick), seed, brief, strict)
 	if not def.is_empty() or pick.is_empty():
 		if not def.is_empty() and strict:
@@ -68,12 +69,16 @@ static func _attempts(row: Dictionary, data: Dictionary, seed: int, brief: bool,
 const VARIANT_SALT := 0x5EED7A
 ## Chance that a beat with alternatives uses one of them (each alternative equally likely) instead of its authored chunk.
 const VARIANT_CHANCE := 0.5
+## Variant levels: 1 = the beats that had variants at 0.22.0 (draws unchanged, so a 0.22.0 checkpoint keeps its cave), 2 = also the squeeze, rat warren
+## and cave mouth (0.22.1). New treks use VARIANT_LEVEL and save it.
+const VARIANT_LEVEL := 2
+const VARIANT_V1_BEATS := ["coffin_nook", "drip_gallery", "echo_hall", "still_pool"]
 
 
 ## Which chunk variant each beat uses: {beat id: chunk name} for every beat that has alternatives in chunks.json "variants" (the authored
 ## chunk's own name when it was kept). A pure function of (stage id, seed, brief) on its own rng stream. Empty for the first run
 ## (brief = false): the guided night's cave never varies its chunks, so its layout stays byte-identical to the one the tutorial was tuned on.
-static func variant_pick(stage_id: String, seed: int, brief: bool) -> Dictionary:
+static func variant_pick(stage_id: String, seed: int, brief: bool, level: int = VARIANT_LEVEL) -> Dictionary:
 	if not brief:
 		return {}
 	var vars: Dictionary = StageGen.chunks().get("variants", {})
@@ -82,7 +87,7 @@ static func variant_pick(stage_id: String, seed: int, brief: bool) -> Dictionary
 	var rng := Rng.new(StageGen.seed_for((seed ^ stage_id.hash()) & JsMath.M32, VARIANT_SALT))
 	var out := {}
 	for b in StageGen.chunks()["order"]:
-		if not vars.has(b):
+		if not vars.has(b) or (level < 2 and not VARIANT_V1_BEATS.has(b)):
 			continue
 		var alts: Array = vars[b]
 		var r := rng.next()

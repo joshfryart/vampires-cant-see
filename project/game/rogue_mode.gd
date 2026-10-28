@@ -820,6 +820,10 @@ func _track_speed(pp: Vector2, dt: float) -> float:
 	return _speed
 
 
+## Ambient anchor kinds that play a baked bed sample from their anchor (0.22.1; the beds are quiet, see QUIET_BEDS in test_rogue_audio).
+const AMBIENT_BED_SFX := {"cricket": "rg_cricket_loop", "creek": "rg_creek_loop", "hearth": "rg_hearth_crackle", "fountain": "rg_fountain_loop"}
+
+
 func _step_ambient(dt: float, pp: Vector2) -> void:
 	var before: Array = ambient.live.duplicate()
 	ambient.step(g.world, g.sonar, pp, dt, amb_rng, g.clock)
@@ -835,6 +839,14 @@ func _step_ambient(dt: float, pp: Vector2) -> void:
 				sfx("rg_drip_pool", p.x, p.y)
 			"owl":
 				sfx("rg_owl_hoot", p.x, p.y)
+			"cart":
+				sfx("rg_cart_creak", p.x, p.y)
+			"bell":
+				sfx("rg_shrine_bell", p.x, p.y)
+			"singing":
+				sfx("rg_inn_singing", p.x, p.y)
+			"cricket", "creek", "hearth", "fountain":
+				sfx(AMBIENT_BED_SFX[String(p.kind)], p.x, p.y)   # the baked beds, played as positional one-shots at their anchors
 
 
 ## Cave-mouth wind: audible only within WIND_RANGE cells of the exit, never louder than WIND_CAP of the manifest gain. It is also a

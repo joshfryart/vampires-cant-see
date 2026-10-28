@@ -45,8 +45,9 @@ static func stage_row(stage_id: String) -> Dictionary:
 ## filler chambers, a pure beat chain). The flag is an explicit argument, never read from global state, and brief = false is bit-identical
 ## to the generator before the flag existed. Generators without a short form ignore it.
 ## `variants` (0.22.0) lets the brief cave use the seed's chunk variants (GenCave.variant_pick); false gives the 0.21.8-0.21.9 brief cave
-## byte for byte (repeat-run checkpoints saved before 0.22.0). It has no effect on a first-run (brief = false) layout.
-static func generate(stage_id: String, seed: int, brief: bool = false, variants: bool = true) -> Dictionary:
+## byte for byte (repeat-run checkpoints saved before 0.22.0). 0.22.1: it is a level, true / 1 = the four 0.22.0 variant beats (checkpoints saved
+## at 0.22.0), 2 = all seven (GenCave.VARIANT_LEVEL, the default). It has no effect on a first-run (brief = false) layout.
+static func generate(stage_id: String, seed: int, brief: bool = false, variants: Variant = GenCave.VARIANT_LEVEL) -> Dictionary:
 	var row := stage_row(stage_id)
 	if row.is_empty():
 		return {}

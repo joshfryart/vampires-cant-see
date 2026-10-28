@@ -49,7 +49,7 @@ var senses: int = 0               ## Sense uses this run (additive, optional key
 var brief: bool = false
 ## 0.22.0: the brief cave may use the seed's chunk variants (GenCave.variant_pick). True for every trek begun since; saved (night.trek "variants",
 ## written only on a brief trek) so a repeat-run checkpoint from 0.21.8-0.21.9 (no key) continues in the variant-free cave it was saved in.
-var variants: bool = true
+var variants: int = GenCave.VARIANT_LEVEL   ## 0 none, 1 the 0.22.0 beats, 2 all (0.22.1)
 ## The guided first night is on (RogueMode sets it every frame from Tutorial.rogue_active; TrekFlow never reads the tutorial itself). While it is
 ## on in the Hollow, the first withering death is forgiven once (GUIDED_REVIVE_STAGE): the second-coffin wake-up, free, without using a bought
 ## Second Coffin. Only "withered" (sun, stake and holy ground keep their rules: the sun is warned, belled and taught; there are no hunters or holy
@@ -139,7 +139,8 @@ static func continue_from(save: Variant, meta_: Dictionary, store_: Object = nul
 	f.stages_unseen = int(ex.get("unseenStages", 0))
 	f.senses = clampi(int(ex.get("senses", 0)), 0, 100000)
 	f.brief = ex.get("brief", false) == true   # older saves (and first-run treks) have no key: the full layout they were made with
-	f.variants = ex.get("variants", false) == true   # no key: a brief cave saved before 0.22.0 (no chunk variants); ignored by first-run caves
+	var vsave: Variant = ex.get("variants", false)   # no key: a brief cave saved before 0.22.0 (no chunk variants); true: the 0.22.0 four; 2: all
+	f.variants = 1 if vsave is bool and vsave else (clampi(int(vsave), 0, GenCave.VARIANT_LEVEL) if vsave is float or vsave is int else 0)   # ignored by first-run caves
 	f.guided_revived = ex.get("guidedRevive", false) == true   # no key: the free revive is unused
 	f.noticed = bool(ex.get("noticed", false))
 	f.day_t = float(ex.get("day_t", 0.0))
@@ -701,8 +702,10 @@ func snapshot(quit: bool = false) -> Dictionary:
 	}
 	if brief:
 		nd[SAVE_EXTRA]["brief"] = true   # only when set, so a first-run checkpoint is unchanged
-		if variants:
-			nd[SAVE_EXTRA]["variants"] = true   # the brief cave with chunk variants (0.22.0)
+		if variants == 1:
+			nd[SAVE_EXTRA]["variants"] = true   # the brief cave with the four 0.22.0 chunk variants
+		elif variants > 1:
+			nd[SAVE_EXTRA]["variants"] = variants   # 0.22.1: all seven
 	if guided_revived:
 		nd[SAVE_EXTRA]["guidedRevive"] = true   # likewise: only once the free revive has been spent
 	var used: Array = []

@@ -159,7 +159,7 @@ func test_cave_ceiling_varies_by_chamber() -> void:
 	ok(FloorFx.ceil_mesh_mul(w) > 1.0, "ceiling plane sits above the wall tops")
 	var apron := _zone_cell(w, "cave_apron")
 	if apron.x >= 0:
-		eq(FloorFx.ceil_kind_styled(w, apron.x, apron.y), "stars", "the apron is open sky")
+		eq(FloorFx.ceil_kind_styled(w, apron.x, apron.y), "", "the apron is open sky and draws nothing (no stars)")
 	# ordinary chambers vary a little per cell but stay between the squeeze and the hall
 	var seen := {}
 	for y in w.height:
@@ -179,7 +179,7 @@ func test_ceiling_kind_per_stage() -> void:
 	var moor := World.from_def(StageGen.generate("moor", 3))
 	var road := World.from_def(StageGen.generate("road", 3))
 	var found := {}
-	for pair in [[wood, "canopy"], [moor, "stars"], [road, "stars"]]:
+	for pair in [[wood, "canopy"], [moor, ""], [road, ""]]:
 		var w: World = pair[0]
 		for y in w.height:
 			for x in w.width:

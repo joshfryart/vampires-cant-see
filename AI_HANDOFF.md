@@ -76,6 +76,14 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.22.1 (polish: no stars, ambient sounds, more Hollow variants)
+
+- **No stars**: open sky (moor, road, inn yard, cave apron) draws nothing overhead, echoes included (`FloorFx.ceil_kind_styled` returns "" for outdoor cells outside the wood; the ceiling pass skips it). The wood keeps its canopy. `_add_stars` is now unused.
+- **Inn rafters verified**: new `style_tour` view `ceil_tavern` (`zone:` spec) shows the beam lines overhead.
+- **Audio** (`tools/bake-rogue-audio.mjs`, rebaked; existing sounds unchanged except the wind): `rg_cart_creak`, `rg_shrine_bell`, `rg_inn_singing` play for the `cart`, `bell` and `singing` ambient kinds; the cricket, creek, hearth and fountain kinds now play their baked beds as positional one-shots (`RogueMode.AMBIENT_BED_SFX`); wind bed peak 0.28 -> 0.24. Not listened to by a person.
+- **Hollow variants**: `squeeze_b` (serpentine, 29 cells), `rat_warren_b` (pillared), `cave_mouth_b` (pinched apron, rocks) in `chunks.json`. `variants` is now a level (`GenCave.VARIANT_LEVEL` = 2): 1 = the four 0.22.0 beats (draws unchanged, so a 0.22.0 checkpoint, saved `variants: true`, keeps its cave), 2 = all seven (saved as `variants: 2`). Old (no key) = 0. Tests: `test_stage_gen.gd` (300-seed sweep green), `test_rogue_audio.gd`.
+- Not done: no stage-specific balance change for the wood, moor, road or inn (nothing to go on without a playtest of them).
+
 ## Changes in 0.21.8–0.22.0 (the Hollow, three passes: summary)
 
 Full log with numbers, ASCII samples and decisions: `docs/CAVE_ITERATIONS.md` (table at the top: version, what contributed, commit).

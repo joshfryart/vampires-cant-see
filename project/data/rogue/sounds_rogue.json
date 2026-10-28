@@ -246,6 +246,33 @@
    "gain": 0.55,
    "bus": "World",
    "use": "Laid to Rest (death) toll: two slow low bells, then silence"
+  },
+  {
+   "id": "rg_cart_creak",
+   "file": "rg_cart_creak.wav",
+   "loop": false,
+   "ms": 1980,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "far cart on the road (ambient kind \"cart\"): hoof clops, axle creak, rattle"
+  },
+  {
+   "id": "rg_shrine_bell",
+   "file": "rg_shrine_bell.wav",
+   "loop": false,
+   "ms": 2188,
+   "gain": 0.45,
+   "bus": "World",
+   "use": "small shrine bell (ambient kind \"bell\"): one high thin toll, thinner than the dawn bell"
+  },
+  {
+   "id": "rg_inn_singing",
+   "file": "rg_inn_singing.wav",
+   "loop": false,
+   "ms": 2972,
+   "gain": 0.4,
+   "bus": "World",
+   "use": "muffled tavern singing (ambient kind \"singing\"): a slow, slightly flat round of voices"
   }
  ]
 }

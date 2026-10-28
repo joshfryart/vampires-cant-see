@@ -16,7 +16,7 @@ const MANIFEST = join(PORT, 'project', 'data', 'rogue', 'sounds_rogue.json');
 const RATE = 44100;
 const PEAK = 0.9;
 const LOOP_PEAK = 0.35; // ambience beds (wind/creek/fountain/cricket) sit quietly under the one-shots
-const WIND_PEAK = 0.28; // cave-mouth wind bed: quieter than the other beds (user playtest)
+const WIND_PEAK = 0.24; // cave-mouth wind bed: quieter than the other beds (user playtest, one more notch at 0.22.1)
 
 function mulberry(seed) {
   let a = seed >>> 0;
@@ -238,6 +238,31 @@ def('rg_laid_to_rest', 4.5, 0.55, 'Laid to Rest (death) toll: two slow low bells
   bell(c, { t: 0.0, f: 110, dur: 3.6, gain: 0.5 });
   bell(c, { t: 2.1, f: 98, dur: 2.3, gain: 0.4 });
   tone(c, { t: 0, f0: 41, dur: 4.2, gain: 0.25, a: 0.3 });
+});
+
+// road and inn ambients
+def('rg_cart_creak', 2.2, 0.45, 'far cart on the road (ambient kind "cart"): hoof clops, axle creak, rattle', (c, r) => {
+  for (let i = 0; i < 6; i++) {
+    const t = 0.1 + i * 0.32 + (i % 2) * 0.02;
+    tone(c, { t, f0: 210, f1: 110, dur: 0.09, gain: 0.5, a: 0.002, type: 'triangle' });
+    noise(c, r, { t, dur: 0.03, gain: 0.25, type: 'bandpass', f0: 900, q: 1.5 });
+  }
+  tone(c, { t: 0.0, f0: 520, f1: 610, dur: 1.9, gain: 0.07, a: 0.3, type: 'sawtooth', filt: { type: 'bandpass', f: 700, q: 7 }, am: { hz: 5, depth: 0.8 }, vib: { hz: 3, cents: 90 } });
+  for (let i = 0; i < 16; i++) noise(c, r, { t: 0.1 + r() * 1.9, dur: 0.012, gain: 0.12, type: 'bandpass', f0: 1800 + r() * 1500, q: 2 });
+});
+def('rg_shrine_bell', 2.8, 0.45, 'small shrine bell (ambient kind "bell"): one high thin toll, thinner than the dawn bell', (c, r) => {
+  bell(c, { t: 0, f: 520, dur: 2.4, gain: 0.3 });
+  bell(c, { t: 1.3, f: 520, dur: 1.2, gain: 0.12 });
+});
+def('rg_inn_singing', 3.4, 0.4, 'muffled tavern singing (ambient kind "singing"): a slow, slightly flat round of voices', (c, r) => {
+  const note = (t, f, dur, g) => {
+    for (const [dt, ff] of [[0, 1], [0.03, 1.012], [0.05, 0.5]]) {
+      tone(c, { t: t + dt, f0: f * ff, f1: f * ff * 0.985, dur, gain: g, a: 0.12, type: 'sawtooth', filt: { type: 'bandpass', f: 650, q: 2.5 }, vib: { hz: 5.3, cents: 35 } });
+    }
+    tone(c, { t, f0: f * 2, f1: f * 1.97, dur: dur * 0.8, gain: g * 0.15, a: 0.12, type: 'sawtooth', filt: { type: 'bandpass', f: 1500, q: 3 } });
+  };
+  note(0.0, 220, 0.55, 0.3); note(0.6, 247, 0.5, 0.3); note(1.15, 262, 0.55, 0.32); note(1.75, 247, 0.4, 0.28); note(2.2, 196, 0.9, 0.34);
+  noise(c, r, { dur: 3.2, gain: 0.04, a: 0.4, f0: 500, q: 0.6 });
 });
 
 // ---- render ----

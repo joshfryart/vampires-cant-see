@@ -4,7 +4,7 @@ extends TestCase
 
 const QUIET_BEDS := ["rg_wind_loop", "rg_creek_loop", "rg_fountain_loop", "rg_cricket_loop"]
 const MANIFEST := "res://data/rogue/sounds_rogue.json"
-const REQUIRED := ["rg_drip_cave", "rg_drip_pool", "rg_drip_gutter", "rg_splash_step_a", "rg_bat_squeak", "rg_bat_flutter", "rg_rat_skitter", "rg_rat_squeak", "rg_hare_thump", "rg_owl_hoot", "rg_wolf_howl", "rg_cricket_loop", "rg_wind_loop", "rg_creek_loop", "rg_fountain_loop", "rg_hearth_crackle", "rg_crow_caw", "rg_sheep_bleat", "rg_hen_cluck", "rg_coffin_creak", "rg_soil_chime", "rg_upgrade_sting", "rg_stage_arrival", "rg_dawn_bell", "rg_dawn_birds", "rg_laid_to_rest"]
+const REQUIRED := ["rg_drip_cave", "rg_drip_pool", "rg_drip_gutter", "rg_splash_step_a", "rg_bat_squeak", "rg_bat_flutter", "rg_rat_skitter", "rg_rat_squeak", "rg_hare_thump", "rg_owl_hoot", "rg_wolf_howl", "rg_cricket_loop", "rg_wind_loop", "rg_creek_loop", "rg_fountain_loop", "rg_hearth_crackle", "rg_crow_caw", "rg_sheep_bleat", "rg_hen_cluck", "rg_coffin_creak", "rg_soil_chime", "rg_upgrade_sting", "rg_stage_arrival", "rg_dawn_bell", "rg_dawn_birds", "rg_laid_to_rest", "rg_cart_creak", "rg_shrine_bell", "rg_inn_singing"]
 
 
 func _manifest() -> Dictionary:
@@ -62,3 +62,14 @@ func test_manifest_and_files() -> void:
 	for id in REQUIRED:
 		ok(ids.has(id), "manifest has " + id)
 	ok(total < 5 * 1024 * 1024, "total size under 5 MB (%d)" % total)
+
+
+## Every ambient kind the trek plays a sample for has a baked sound (RogueMode._step_ambient).
+func test_ambient_kinds_have_samples() -> void:
+	var ids := {}
+	for s in _manifest().get("sounds", []):
+		ids[s["id"]] = true
+	for k in RogueMode.AMBIENT_BED_SFX:
+		ok(ids.has(RogueMode.AMBIENT_BED_SFX[k]), "ambient %s has a baked bed" % k)
+	for id in ["rg_cart_creak", "rg_shrine_bell", "rg_inn_singing"]:
+		ok(ids.has(id), "ambient sample " + id)

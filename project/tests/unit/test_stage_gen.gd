@@ -677,7 +677,9 @@ func test_brief_is_shorter_and_first_run_untouched() -> void:
 # ---------------------------------------------------------------- 0.22.0 chunk variants (repeat runs only)
 
 const VARIANT_SEEDS := 60
-const VARIANT_BEATS := ["coffin_nook", "drip_gallery", "echo_hall", "still_pool"]
+## 0.22.1: every main-path beat except the start-to-exit bookends has a second chunk; level 1 is the four beats of 0.22.0.
+const VARIANT_BEATS := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "rat_warren", "cave_mouth"]
+const VARIANT_BEATS_V1 := ["coffin_nook", "drip_gallery", "echo_hall", "still_pool"]
 ## JSON hashes of first-run defs pinned at 0.21.9: the guided night's cave must not change by accident (variants are repeat-run only).
 const FIRST_RUN_HASH := {1: 3320154239, 7: 375772508, 25: 2026876954}
 static var _variant_defs: Array = []
@@ -746,6 +748,8 @@ func test_variants_only_on_repeat_runs() -> void:
 		eq(GenCave.variant_pick("hollow", s, false), {}, "seed %d: the first run never picks a variant" % s)
 		var p := GenCave.variant_pick("hollow", s, true)
 		eq(p.keys(), VARIANT_BEATS, "seed %d: one pick per beat with variants" % s)
+		var p1 := GenCave.variant_pick("hollow", s, true, 1)
+		eq(p1.keys(), VARIANT_BEATS_V1, "seed %d: level 1 (0.22.0 checkpoints) picks only the four original beats" % s)
 		eq(p, GenCave.variant_pick("hollow", s, true), "seed %d: the pick is a pure function" % s)
 	var full := _all()
 	for i in full.size():
@@ -854,7 +858,7 @@ func test_variant_free_brief_cave_for_old_checkpoints() -> void:
 	var f := TrekFlow.begin(meta, 99)
 	ok(f.brief and f.variants, "a new repeat run uses variants")
 	var snap := f.snapshot()
-	eq(snap["night"]["trek"].get("variants"), true, "the checkpoint says so")
+	eq(int(snap["night"]["trek"].get("variants")), GenCave.VARIANT_LEVEL, "the checkpoint says so")
 	var g := TrekFlow.continue_from(snap, meta, null)
 	ok(g != null and g.variants and g.def == f.def, "continue regenerates the same variant cave")
 	var old_snap: Dictionary = snap.duplicate(true)
@@ -868,3 +872,12 @@ func test_variant_free_brief_cave_for_old_checkpoints() -> void:
 	ok(not first.brief, "first run")
 	ok(not (first.snapshot()["night"]["trek"] as Dictionary).has("variants"), "a first-run checkpoint has no variants key")
 	ok(not first.def["gen"].has("variants"), "and its cave no variants")
+	# a 0.22.0 checkpoint (variants: true) continues with the four original variant beats only
+	var v1_snap: Dictionary = snap.duplicate(true)
+	(v1_snap["night"]["trek"] as Dictionary)["variants"] = true
+	var k := TrekFlow.continue_from(v1_snap, meta, null)
+	ok(k != null and k.variants == 1, "a 0.22.0 checkpoint continues at variant level 1")
+	if k != null:
+		eq(k.def, StageGen.generate("hollow", TrekFlow.stage_seed(99, 0), true, true), "level 1 regenerates the 0.22.0 cave")
+		for b in k.def["gen"]["variants"]:
+			ok(VARIANT_BEATS_V1.has(b), "level 1 pick covers only original beats (%s)" % b)

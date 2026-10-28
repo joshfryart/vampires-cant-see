@@ -8,6 +8,7 @@ feeding, the sun), and every later run has to get out of the way. Three sequenti
 | 0.21.8 (pass 1) | Sense hint held until the tutorial's V line; a ping during the waking line counts for the ping step ("Click or Space"); dry waking line, echo-hall word and complaining-rat cards; brief repeat-run Hollow (no filler chambers, beats within 18 cells) | c70008b |
 | 0.21.9 (pass 2) | Stage card alone for 3.2 s before the first guided line; one free revive from withering on the guided night; stalactites get an opaque occluding body; far rock strata and vault bedding thin with distance; calmer ink wall shiver | b27352f |
 | 0.22.0 (pass 3) | Second chunk for coffin_nook, drip_gallery, echo_hall and still_pool on repeat runs (per seed, 50/50 per beat), strict breadcrumb acceptance on those caves, old repeat-run checkpoints keep their cave; scenarios run on in-memory saves; final review and docs | the `0.22.0:` commit (`git log --grep "^0.22.0"`) |
+| 0.22.1 (polish) | Second chunk for the squeeze, rat warren and cave mouth too (variant level 2; 0.22.0 checkpoints stay at level 1) | |
 
 Rules all passes keep: classic / parity code paths and tests stay untouched; the first-run Hollow layout stays a pure function of
 (stage id, seed) and only changes on purpose; tutorial lines fit `Tutorial.MAX_TEXT` (76); every pass ends on a green full suite.

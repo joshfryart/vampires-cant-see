@@ -23,6 +23,7 @@ const VIEWS := [
 	["ceil_cave", "hollow", "beat:drip", 170.0],
 	["ceil_hall", "hollow", "beat:echo", 170.0],
 	["ceil_inn", "inn", "tile:W", 170.0],
+	["ceil_tavern", "inn", "zone:tavern", 170.0, 3.0],
 	["ceil_moor", "moor", "tile:B", 170.0],
 	["wood", "wood", "tile:W"],
 	["moor", "moor", "tile:B"],
@@ -142,6 +143,17 @@ func _place(g: Node, v: Array) -> void:
 				c = Vector2(float(b["cell"][0]) + 0.5, float(b["cell"][1]) + 0.5)
 				break
 		at = [c.x, c.y, _best_angle(w, c.x, c.y, float(v[4]) if v.size() > 4 else -1.0)]
+	elif spec.begins_with("zone:"):
+		var zc := start
+		var zb := 1e9
+		for y in w.height:
+			for x in w.width:
+				if w.zone_at(x + 0.5, y + 0.5) == spec.substr(5) and not w.blocks(x + 0.5, y + 0.5, 0.25):
+					var zd := Vector2(x + 0.5, y + 0.5).distance_to(start)
+					if zd < zb:
+						zb = zd
+						zc = Vector2(x + 0.5, y + 0.5)
+		at = [zc.x, zc.y, _best_angle(w, zc.x, zc.y, float(v[4]) if v.size() > 4 else -1.0)]
 	else:
 		at = _face_tile(w, spec.substr(5), start)
 	g.player.place(at[0], at[1], at[2])

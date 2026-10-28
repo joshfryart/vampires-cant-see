@@ -93,7 +93,10 @@
   "coffin_nook": ["coffin_nook_b"],
   "drip_gallery": ["drip_gallery_b"],
   "echo_hall": ["echo_hall_b"],
-  "still_pool": ["still_pool_b"]
+  "still_pool": ["still_pool_b"],
+  "squeeze": ["squeeze_b"],
+  "rat_warren": ["rat_warren_b"],
+  "cave_mouth": ["cave_mouth_b"]
  },
  "chunks": {
   "coffin_nook": {
@@ -576,6 +579,9 @@
    "zones": [{"name": "still_pool", "rect": [1, 1, 13, 7]}],
    "w": 15,
    "h": 9
-  }
+  },
+  "squeeze_b": {"beat": "squeeze", "beat_at": [7, 1], "rows": ["###############", "....###....#...", "###.###.##.#.##", "###.###.##.#.##", "###.###.##...##", "###.....#######", "###############"], "ports": [[0, 1, "w"], [14, 1, "e"]], "flip": true, "transpose": true, "zones": [{"name": "squeeze", "rect": [0, 1, 14, 5]}], "w": 15, "h": 7},
+  "rat_warren_b": {"beat": "rat_warren", "beat_at": [6, 5], "rows": ["######.######", "####..r..####", "###.......###", "##....#....##", "#....###....#", "..r.......r..", "#....###....#", "##....#....##", "###.......###", "####..e..####", "######.######"], "ports": [[0, 5, "w"], [12, 5, "e"], [6, 0, "n"], [6, 10, "s"]], "flip": true, "zones": [{"name": "rat_warren", "rect": [1, 1, 11, 9]}], "w": 13, "h": 11},
+  "cave_mouth_b": {"beat": "cave_mouth", "beat_at": [5, 6], "rows": ["#####D#####", "####...####", "###.....###", "####...####", "####...####", "#####.#####", "####.v.####", "###.....###", "##.m...g.##", "...........", "##.g...m.##", "###.....###", "####...####", "#####.#####"], "ports": [[0, 9, "w"], [10, 9, "e"], [5, 13, "s"]], "flip": true, "door": {"id": "mouth", "facing": "s"}, "zones": [{"name": "cave_apron", "rect": [3, 1, 7, 4], "kind": "outdoor"}, {"name": "cave_mouth", "rect": [1, 6, 9, 12]}], "w": 11, "h": 14}
  }
 }

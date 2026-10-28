@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.0", "version 0.22.0")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.1", "version 0.22.1")
 
 
 func test_new_trek_from_the_menu() -> void:

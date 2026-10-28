@@ -362,7 +362,7 @@ static func ceil_kind_styled(world: World, x: float, y: float) -> String:
 	if cs == "":
 		return ""
 	if world.kind_at(x, y) == "outdoor":
-		return "canopy" if cs == "wood" else "stars"
+		return "canopy" if cs == "wood" else ""   # open sky is never drawn: no stars, not even in an echo
 	if cs == "inn":
 		return "rafter"
 	var zone := world.zone_at(x, y)
@@ -842,6 +842,8 @@ static func _draw_surface_texture(rs: RenderState, c: Canvas, world: World, sona
 					var hm := 1.0
 					if styled_up:
 						kind = ceil_kind_styled(world, mx, my)
+						if kind == "":
+							continue # open sky: nothing is drawn overhead
 						if vault_mesh_on and kind.begins_with("vault"):
 							continue # the rock vault is geometry (VaultMesh + sonar_vault.gdshader), not canvas marks
 						hm = ceil_height(world, mx, my)
