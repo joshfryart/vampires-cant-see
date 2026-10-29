@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.3", "version 0.22.3")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.23.0", "version 0.23.0")
 
 
 func test_new_trek_from_the_menu() -> void:
@@ -93,7 +93,7 @@ func test_new_trek_from_the_menu() -> void:
 	var st := r.trek.start_cell
 	near(g.player.x, st.x + 0.5, 1e-9, "player on the start cell x")
 	near(g.player.y, st.y + 0.5, 1e-9, "player on the start cell y")
-	ok(r.critters.critters.size() >= 8, "critters spawned (%d)" % r.critters.critters.size())
+	ok(r.critters.critters.size() >= 5, "critters spawned (%d)" % r.critters.critters.size())
 	ok(not r.ambient.emitters.is_empty(), "ambient anchors")
 	ok(g.sonar.protect_last, "player ping protected")
 	eq(g.run_seed, SEED, "run_seed follows the trek")

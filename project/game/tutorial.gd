@@ -134,7 +134,7 @@ func step(dt: float) -> void:
 const SKIP_KEY := KEY_TAB
 const SKIP_SUFFIX := "  [Tab: skip]"
 ## Beat ids in the order the generator lays them along the main path (rank = index). dead_end_spurs is off the path.
-const BEAT_RANK := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "rat_warren", "cave_mouth"]
+const BEAT_RANK := ["coffin_nook", "drip_gallery", "squeeze", "echo_hall", "still_pool", "cave_mouth"]
 const BEAT_NEAR := 4.5
 const MAX_TEXT := 76
 ## The stage card (TrekFlow.stage_card: 4 s, TrekUi fades it over its last 0.8 s) has the screen to itself at the start: the first guided line
@@ -290,7 +290,7 @@ func _past(id: String) -> bool:
 		"vial": return _fed_run() == 0
 		"pool": return _rank >= 5
 		# a spur can branch off beyond the cave mouth in walking depth (so standing at its mouth already ranks as the cave mouth): at a spur, never retire it
-		"dead_end": return _rank >= 6 and not _at_dead_end(Vector2(g.player.x, g.player.y))
+		"dead_end": return _rank >= 5 and not _at_dead_end(Vector2(g.player.x, g.player.y))
 		"mouth", "powers": return _rank >= BEAT_RANK.size()
 	return false
 
@@ -300,7 +300,7 @@ func _trigger(id: String, pp: Vector2) -> bool:
 	match id:
 		"hall": return _rank >= 3
 		"dead_end": return _at_dead_end(pp)
-		"mouth": return _rank >= 6
+		"mouth": return _rank >= 5
 		"sense": return g.rogue.assist >= 1 or (_rank >= BEAT_RANK.size() - 1 and rogue_done.has("mouth"))   # first time lost, or after the cave-mouth beat
 		"draft": return g.rogue.assist >= 2                                                               # lost for long: once per run
 		"dawn": return g.rogue.trek.dawn_warning()

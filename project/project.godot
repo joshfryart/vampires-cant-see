@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 config/name="Vampires Cant See"
-config/version="0.22.3"
+config/version="0.23.0"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 run/main_scene="res://main.tscn"
 

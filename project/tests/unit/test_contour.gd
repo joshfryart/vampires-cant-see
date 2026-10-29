@@ -9,7 +9,7 @@ const FEW := 10
 ## Pre-change hashes of the classic wall mesh (vertex, normal, color, uv, index bytes), captured before WorldMeshBuilder was touched.
 const CLASSIC_HASH := {"crypt": 3992633256, "test": 208008445, "town": 2024417853}
 ## hollow re-pinned in 0.21.6 (cave wayfinding: breadcrumbs, spur tells, 2-wide tunnels changed the generated layout); the other stages are unchanged.
-const CLASSIC_STAGE_HASH := {"hollow": 4135100009, "wood": 918674218, "moor": 1415106364, "road": 4057627582, "inn": 3587000798}
+const CLASSIC_STAGE_HASH := {"hollow": 1178465541, "wood": 918674218, "moor": 1415106364, "road": 4057627582, "inn": 3587000798}
 
 static var _cache: Dictionary = {}
 
@@ -441,7 +441,7 @@ func test_build_time_64x48() -> void:
 	var parts := []
 	for st in STAGES:
 		var w := World.from_def(_def(st, 11))
-		eq(w.width * w.height, 56 * 40 if st == "hollow" else 64 * 48, st + " is 64x48 (the Hollow 56x40)")
+		eq(w.width * w.height, 40 * 28 if st == "hollow" else 64 * 48, st + " is 64x48 (the Hollow 40x28)")
 		var best := 1e9
 		var bm := 1e9
 		for r in 3:

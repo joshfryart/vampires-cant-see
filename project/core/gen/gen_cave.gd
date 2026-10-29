@@ -13,10 +13,10 @@ extends RefCounted
 ##   4 crevice alcoves until every walkable cell is near a rest spot, decoration, critters, def assembly, StageGen.analyze + WorldValidate
 
 const MAX_ATTEMPTS := 200
-const FILLER_GAP := 2
+const FILLER_GAP := 1
 ## Greatest distance between the centres of two consecutive beat chunks: the first-run cave, and the brief (repeat-run) cave, whose beats
 ## sit closer together so the walk from the coffin to the mouth is shorter.
-const CHAIN_REACH := 20
+const CHAIN_REACH := 17
 const BRIEF_REACH := 17
 ## Tunnels between chunks run nearly straight (0.22.3; the default drunk-walk bias of 0.68 made long arching halls in a cave that is only a tutorial).
 const TUNNEL_BIAS := 0.96
@@ -328,7 +328,7 @@ static func _spur_clear_of_beats(def: Dictionary) -> bool:
 ## fillers. Candidate centres are enumerated on a 2-cell lattice and one is picked at random; a node with no candidate (or whose successors
 ## cannot be placed) backtracks into up to 3 alternative picks of the node before it, within a fixed expansion budget. Returns {} on failure.
 static func _layout(rng: Rng, w: int, h: int, n: int, order: Array, chunks: Dictionary, reach: int = CHAIN_REACH) -> Dictionary:
-	var st := {"pts": [], "rects": {}, "xform": {}, "fillr": {}, "role": {}, "path": [], "budget": 80, "bounds": Rect2i(3, 3, w - 6, h - 6), "reach": reach}
+	var st := {"pts": [], "rects": {}, "xform": {}, "fillr": {}, "role": {}, "path": [], "budget": 80, "bounds": Rect2i(2, 2, w - 4, h - 4), "reach": reach}
 	if not _place(rng, 0, n, order, chunks, st):
 		return {}
 	return {"pts": st["pts"], "rects": st["rects"], "xform": st["xform"], "fillr": st["fillr"], "role": st["role"], "path": st["path"]}
