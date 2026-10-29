@@ -676,7 +676,7 @@ const VARIANT_SEEDS := 60
 const VARIANT_BEATS := ["coffin_nook"]
 const VARIANT_BEATS_V1 := ["coffin_nook"]
 ## JSON hashes of first-run defs pinned at 0.21.9: the guided night's cave must not change by accident (variants are repeat-run only).
-const FIRST_RUN_HASH := {1: 1873407853, 7: 245092792, 25: 600211866}
+const FIRST_RUN_HASH := {1: 1074949039, 7: 414025121, 25: 1287905253}
 static var _variant_defs: Array = []
 
 
@@ -839,7 +839,7 @@ func test_variant_caves_lead_to_the_exit() -> void:
 
 ## Repeat-run checkpoints saved before 0.22.0 (night.trek "brief" without "variants") continue in the variant-free brief cave they were made in;
 ## new brief treks save the key; first-run treks are untouched.
-const BRIEF_0219_HASH := {1: 3953640106, 7: 782977493}
+const BRIEF_0219_HASH := {1: 2177681708, 7: 1250158334}
 
 
 func test_variant_free_brief_cave_for_old_checkpoints() -> void:

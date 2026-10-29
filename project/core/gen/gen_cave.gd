@@ -23,6 +23,8 @@ const TUNNEL_BIAS := 0.96
 ## Chunk placement keeps the nearest 1/CLOSE_DIV of the candidates (at least CLOSE_KEEP) to the previous beat.
 const CLOSE_KEEP := 6
 const CLOSE_DIV := 8
+## Longest empty gap (cells) between two consecutive beat rooms, so every hallway between rooms is short (0.23.1).
+const HALL_MAX := 2
 const SPUR_LEN_MIN := 4
 const SPUR_LEN_MAX := 7
 
@@ -381,6 +383,13 @@ static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, s
 					if is_chunk:
 						if Vector2(pts[k - 1]).distance_to(c) > float(reach):
 							ok = false
+						else:
+							# hallways stay short: the empty strip between this room and the previous one is at most HALL_MAX cells
+							var pr: Rect2i = rects[k - 1]
+							var gx: int = maxi(pr.position.x - (x + s.x), x - pr.end.x)
+							var gy: int = maxi(pr.position.y - (y + s.y), y - pr.end.y)
+							if maxi(gx, gy) > HALL_MAX:
+								ok = false
 					else:
 						var best := 1.0e9
 						for p in pts:

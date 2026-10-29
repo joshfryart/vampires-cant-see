@@ -82,6 +82,10 @@ schedule/forge, night/hunger, meta, save, barks, listen, struggle, creator, vess
 - `DrawCanvas.fill` approximates nonzero winding by merging self-overlaps; it skips polygons Godot cannot triangulate.
 - `People.vessels_on` is a static; `Game.boot` sets it from the flag, parity tests set it per test. `Flags.persist = false` in tests so a developer's `flags.json` cannot change results.
 
+## Changes in 0.23.1 (short hallways)
+
+User: hallways in the cave short. `GenCave.HALL_MAX` 2: the empty gap between two consecutive beat rooms is at most 2 cells (`_place` candidate filter), so every hallway between rooms is a few cells. Hashes re-pinned; generation about 0.5 s avg, ~2 s worst. The squeeze stays a corridor by design.
+
 ## Changes in 0.23.0 (tiny Hollow: 40x28, six rooms)
 
 User: shrink the cave map by 60%. The Hollow is now 40x28 (1120 cells, half the 0.22.3 area of 2240; below that the chain of rooms does not fit: 36x26 / 38x26 never lay out, 40x26 is slow). To get there: the **rat warren is gone from the chain** (`chunks.json` "order" has six beats; its chunks and the echo-hall / squeeze / cave-mouth / gallery / pool variants are deleted, only `coffin_nook_b` remains, so repeat runs vary less); the squeeze is 11x7 (two bends, about 19 floor cells, was 15x7), the echo hall 11x11, the cave mouth 11x11; `FILLER_GAP` 2 -> 1 (rooms sit one wall apart), layout bounds margin 3 -> 2, `CHAIN_REACH` / `BRIEF_REACH` 17; hollow row: nodes 6-6 (no filler chamber), spurs 1-1, preyCount 5-8. Tutorial: `BEAT_RANK` lost `rat_warren` (rank of the cave mouth is now 5; `dead_end` / `mouth` / `pool` thresholds moved with it). Generation avg ~0.4 s, worst ~2 s (limit 2500 ms). Tests re-tuned: sizes and borders, one spur, hall / squeeze / stalactite numbers, crumbs <= 6 per 50 seeds, FIRST_RUN_HASH / BRIEF_0219_HASH / CLASSIC_STAGE_HASH re-pinned (the 0.21.9 byte-identity claims are gone), rats caught >= 2, critters >= 5. Old mid-night Hollow saves load a different cave. Still to do: a person plays it (is 40x28 right, or too cramped for the echo hall and pool?); the other stages are still 64x48.
