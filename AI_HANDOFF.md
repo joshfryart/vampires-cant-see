@@ -3,7 +3,13 @@
 Read this first. It is written for the next AI session (or developer) picking the port up. Status: **alpha, feature-complete against the
 JS game (version 0.20.2) except the items under "NOT included"; version 0.21.0 adds the Godot-only roguelike mode "The Long Night" (see "Changes in 0.21.0"); 0.21.1 adds its next two stages, Bramble Wood and Gallows Moor (see "Changes in 0.21.1")**. Nothing here has been judged by a person's eyes or ears yet (see "Unverified").
 
-**Latest (2026-10-28): version 0.22.0** (09c11f9; Hollow three-pass polish, see "Changes in 0.21.8–0.22.0" and `docs/CAVE_ITERATIONS.md`). Full suite green (406 tests, 1,260,937 checks). The version lives in `project.godot` (not js/log.js); patch 0–9 then roll into the minor. Stages after the Crossroads Inn are **on hold until the user has playtested and says continue**.
+**Latest (2026-10-29): version 0.22.3** (a873829; smaller Hollow, second pass: see "Changes in 0.22.3"; earlier 0.22.0 Hollow polish, see "Changes in 0.21.8–0.22.0" and `docs/CAVE_ITERATIONS.md`). Full suite green (407 tests, 1,253,937 checks, 0 failed).
+
+**Open at the end of the 0.22.3 session (start here):**
+1. **Mouse capture bug, unresolved.** User: on reaching the first area with people (The Old Road) the mouse "goes to grab but then lets go". Root cause not found. 0.22.2 added a log line on every mouse-mode change (`game.gd` `_process`, `Log.info("input", "mouse mode A -> B (state, prompt, waiting, focus)")`); ask the user for that line from the log. Release sites reviewed: `game.gd` ~651-662 (click re-grab only in playing/feeding), ~678-686 (Esc/pause), ~902 (`NOTIFICATION_APPLICATION_FOCUS_OUT` pauses), ~939 (state change); `rogue_mode.gd` ~382/393 (`step_waiting`), ~551/569 (prompt open, `_begin_wait`), `_recapture()` ~1338. Likeliest: a wait/sun-up prompt or focus loss with no re-grab path.
+2. **Playtest of 0.22.3 pending:** is the Hollow now small and easy enough (mean walk ~149 first run)? If not, next levers: cut the echo hall / pool chunks further (re-tune hall and pool test numbers) or drop a filler beat. Below ~52x38 generation is slow or fails.
+3. Later: scale the other stages (wood, moor, road, inn are still 64x48) so size grows with stage; strict breadcrumbs for weak first-run seeds behind a save key.
+4. The user said to work autonomously on the Hollow size; that is done. The held stages stay on hold until they say "continue". The version lives in `project.godot` (not js/log.js); patch 0–9 then roll into the minor. Stages after the Crossroads Inn are **on hold until the user has playtested and says continue**.
 
 **Working notes for the next AI**
 - User wants very terse updates between tasks (abbreviations fine). Opus for plans and final review, sonnet/haiku for implementation; run agents on disjoint files; commit explicit paths only (never `git add -A`); untracked `.uid` files are noise.
