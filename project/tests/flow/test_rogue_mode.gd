@@ -72,7 +72,7 @@ func _rest_cell(f: TrekFlow) -> Vector2i:
 
 
 func test_version() -> void:
-	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.2", "version 0.22.2")
+	eq(str(ProjectSettings.get_setting("application/config/version")), "0.22.3", "version 0.22.3")
 
 
 func test_new_trek_from_the_menu() -> void:
@@ -339,8 +339,11 @@ func test_hunters_at_heat_two() -> void:
 	# a hunter within 1.2 cells stakes the player
 	p.x = g.player.x + 0.5
 	p.y = g.player.y
-	if g.world.blocks(p.x, p.y, 0.2):
-		p.x = g.player.x - 0.5
+	for o in [Vector2(-0.5, 0.0), Vector2(0.0, 0.5), Vector2(0.0, -0.5)]:
+		if not g.world.blocks(p.x, p.y, 0.2):
+			break
+		p.x = g.player.x + o.x
+		p.y = g.player.y + o.y
 	var b0: float = g.night.blood
 	_step(g, 0.3)
 	ok(g.night.blood < b0 - 30.0 or not r.active, "stake hit (%.1f -> %.1f)" % [b0, g.night.blood])

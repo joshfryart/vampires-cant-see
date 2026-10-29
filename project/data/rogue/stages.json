@@ -15,7 +15,7 @@
    "watchers": 0,
    "preyCount": {"min": 8, "max": 11},
    "lights": {"min": 3, "max": 12},
-   "size": {"w": 60, "h": 44},
+   "size": {"w": 56, "h": 40},
    "kind": "indoor",
    "floor": "stone",
    "materials": {"#": "roughStone"},

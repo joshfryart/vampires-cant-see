@@ -16,8 +16,15 @@ const MAX_ATTEMPTS := 200
 const FILLER_GAP := 2
 ## Greatest distance between the centres of two consecutive beat chunks: the first-run cave, and the brief (repeat-run) cave, whose beats
 ## sit closer together so the walk from the coffin to the mouth is shorter.
-const CHAIN_REACH := 22
-const BRIEF_REACH := 18
+const CHAIN_REACH := 20
+const BRIEF_REACH := 17
+## Tunnels between chunks run nearly straight (0.22.3; the default drunk-walk bias of 0.68 made long arching halls in a cave that is only a tutorial).
+const TUNNEL_BIAS := 0.96
+## Chunk placement keeps the nearest 1/CLOSE_DIV of the candidates (at least CLOSE_KEEP) to the previous beat.
+const CLOSE_KEEP := 6
+const CLOSE_DIV := 8
+const SPUR_LEN_MIN := 4
+const SPUR_LEN_MAX := 7
 
 static var last_attempts: int = 0
 ## Why attempts were rejected, by reason key (diagnostics only; not part of the def).
@@ -188,7 +195,7 @@ static func _attempt(row: Dictionary, data: Dictionary, rng: Rng, seed: int, att
 			# funnel: the tunnel that leads on from a beat is always 2 wide (spurs stay 1 wide), so the true way reads as the broad one
 			width = 2
 			crumb_from.append([a, sa])
-		if not StageGen.carve_tunnel(plan, rng, sa, sb, width):
+		if not StageGen.carve_tunnel(plan, rng, sa, sb, width, TUNNEL_BIAS):
 			return _fail("r4")
 	if not _early_order_ok(plan, info, role, order):
 		return _fail("r4b")
@@ -384,6 +391,18 @@ static func _place(rng: Rng, k: int, n: int, order: Array, chunks: Dictionary, s
 					cands.append([Rect2i(x, y, s.x, s.y), tr])
 				x += 2
 			y += 2
+	if is_chunk and k > 0 and cands.size() > CLOSE_KEEP:
+		# the next beat sits close to the last one (short tunnels, a compact cave): keep only the nearest candidates, ties by lattice order
+		var pc2 := Vector2(pts[k - 1])
+		var keyed: Array = []
+		for ci in cands.size():
+			var rr: Rect2i = cands[ci][0]
+			keyed.append([pc2.distance_to(Vector2(rr.position.x + rr.size.x / 2, rr.position.y + rr.size.y / 2)), ci])
+		keyed.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+		var near_c: Array = []
+		for ki in maxi(CLOSE_KEEP, cands.size() / CLOSE_DIV):
+			near_c.append(cands[keyed[ki][1]])
+		cands = near_c
 	var tries: int = mini(3, cands.size())
 	for _t in tries:
 		if int(st["budget"]) <= 0:
@@ -634,7 +653,7 @@ static func _make_spur(plan: StageGen.Plan, rng: Rng, info: Dictionary, pts: Arr
 static func _try_spur(plan: StageGen.Plan, rng: Rng, start: Vector2i, dir: Vector2i, parent: Vector2i, idx: int) -> Vector2i:
 	if plan.tile(start.x, start.y) != 0 or not StageGen.can_carve(plan, start.x, start.y, 3):
 		return Vector2i(-1, -1)
-	var length: int = StageGen.rint(rng, 8, 14)
+	var length: int = StageGen.rint(rng, SPUR_LEN_MIN, SPUR_LEN_MAX)
 	var cells: Array = [start]
 	var used := {start.y * plan.w + start.x: true, parent.y * plan.w + parent.x: true}
 	if not _clear_around(plan, start, used):

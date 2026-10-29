@@ -145,6 +145,7 @@ func test_dead_end_step() -> void:
 	_step(g, 6.0)
 	_go(g, r, "still_pool")
 	_step(g, 0.3)
+	_ping(g)   # the pool step ends on a ping beside the water; in the compact Hollow the spur no longer lies deeper than the warren, so it cannot skip it
 	_go(g, r, "dead_end_spurs")
 	_step(g, 0.5)
 	eq(_cur(g), "dead_end", "7: a dead end rings short and bright")

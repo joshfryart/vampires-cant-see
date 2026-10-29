@@ -25,6 +25,7 @@ const HUNTER_SPEED := 2.4
 const HUNTER_FIELD_SEC := 0.4
 const HUNTER_MIN_BFS := 16
 const HUNTER_MAX_BFS := 38
+const HUNTER_DOOR_GAP := 9   ## hunters spawn farther than this (Manhattan cells) from the exit door
 const HEAT_CARD_SEC := 3.0
 ## An interrupted wait ends by itself after this many seconds (the Stir button / E / Enter / Space end it sooner).
 const INTERRUPT_TIMEOUT := 8.0
@@ -1211,9 +1212,19 @@ func _spawn_hunters() -> void:
 	var pool: Array = []
 	var far_i := -1
 	var far_d := -1
+	# never spawn a hunter by the exit door: the way through it is shut to walkers, so in a compact stage one placed beside it would stand there for good
+	var door_cells: Array = []
+	for dr in trek.def.get("doors", []):
+		door_cells.append(Vector2i(int(dr["col"]), int(dr["row"])))
 	for i in field.size():
 		var d: int = field[i]
 		if d < 0:
+			continue
+		var by_door := false
+		for dc in door_cells:
+			if absi(i % g.world.width - dc.x) + absi(i / g.world.width - dc.y) <= HUNTER_DOOR_GAP:
+				by_door = true
+		if by_door:
 			continue
 		if d >= HUNTER_MIN_BFS and d <= HUNTER_MAX_BFS:
 			pool.append(i)
@@ -1244,6 +1255,41 @@ func _hunter_list() -> Array:
 	return out
 
 
+## Walking distance field for hunters: like RunFlow.bfs_cells, but a cell a body cannot stand in (a stalagmite, water) is closed too, so the
+## downhill step is never into a prop (a hunter would otherwise push at one in a bend for good).
+func _hunter_field(sx: int, sy: int) -> PackedInt32Array:
+	var w: World = g.world
+	var n: int = w.width * w.height
+	var dist := PackedInt32Array()
+	dist.resize(n)
+	dist.fill(-1)
+	if sx < 0 or sy < 0 or sx >= w.width or sy >= w.height:
+		return dist
+	var q := PackedInt32Array()
+	q.resize(n)
+	var head := 0
+	var tail := 1
+	dist[sy * w.width + sx] = 0
+	q[0] = sy * w.width + sx
+	while head < tail:
+		var cur: int = q[head]
+		head += 1
+		var cx: int = cur % w.width
+		var cy: int = cur / w.width
+		for o in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nx: int = cx + o.x
+			var ny: int = cy + o.y
+			if nx < 0 or ny < 0 or nx >= w.width or ny >= w.height or dist[ny * w.width + nx] >= 0:
+				continue
+			var ch := w.tile_at(nx + 0.5, ny + 0.5)
+			if ch != "D" and ch != "G" and w.blocks(nx + 0.5, ny + 0.5, 0.2):
+				continue
+			dist[ny * w.width + nx] = dist[cur] + 1
+			q[tail] = ny * w.width + nx
+			tail += 1
+	return dist
+
+
 ## Hunters walk the shortest way to the player (a distance field refreshed 2.5 times a second) at HUNTER_SPEED.
 func _step_hunters(dt: float) -> void:
 	if hunter_ids.is_empty():
@@ -1253,7 +1299,7 @@ func _step_hunters(dt: float) -> void:
 	var pcy: int = floori(g.player.y)
 	if _hfield_t >= HUNTER_FIELD_SEC or _hfield.is_empty():
 		_hfield_t = 0.0
-		_hfield = RunFlow.bfs_cells(g.world, pcx, pcy)
+		_hfield = _hunter_field(pcx, pcy)
 	var w: int = g.world.width
 	for id in hunter_ids:
 		var p := g.people.find_person(int(id))
